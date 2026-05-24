@@ -1,0 +1,21 @@
+name: Lint Check (pre-commit)
+
+on:
+  # We have to use pull_request_target here as pull_request does not grant
+  # enough permission for reviewdog
+  pull_request_target:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  pre-commit:
+    permissions:
+      contents: read
+      checks: write
+      issues: write
+      pull-requests: write
+    uses: bemanproject/infra-workflows/.github/workflows/reusable-beman-pre-commit.yml@4d946e210ce2ee68ccd8607c8acccacf171830c5 # ratchet:bemanproject/infra-workflows/.github/workflows/reusable-beman-pre-commit.yml@1.7.1

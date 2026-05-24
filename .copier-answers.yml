@@ -1,0 +1,11 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: 24e8e21
+_src_path: git+file:///home/sdowney/src/steve-downey/example/main
+include_prefix: smd
+library_name: schemepoc
+maintainer_email: sdowney@gmail.com
+maintainer_name: Steve Downey
+namespace: schemepoc
+project_slug: schemepoc
+project_title: Scheme for C++26 Compile Time
+sample_value: Steve
