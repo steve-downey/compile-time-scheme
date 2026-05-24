@@ -34,6 +34,8 @@ CONFIG ?= Asan
 
 export
 
+TOOLCHAIN?=gcc-16
+
 ifeq ($(strip $(TOOLCHAIN)),)
 	_build_name?=build-system/
 	_build_dir?=.build/
@@ -55,7 +57,7 @@ VCPKG ?= $(shell command -v vcpkg 2> /dev/null)
 ifeq ($(VCPKG),)
 	_cmake_top_level?="infra/cmake/use-fetch-content.cmake"
 	_toolchain:=$(_local_toolchain)
-	_args=-DBEMANINFRA_googletest_REPO=file:///home/sdowney/bld/googletest/googletest.git
+    _args=-DBEMANINFRA_Catch_REPO=file:///home/sdowney/bld/Catch2/Catch2.git
 else
 	_vcpkg_toolchain:=$(VCPKG_ROOT)/scripts/buildsystems/vcpkg.cmake
 	_cmake_top_level?=$(_vcpkg_toolchain)

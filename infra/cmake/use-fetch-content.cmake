@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.24)
 
 include(FetchContent)
 
-if(NOT BEMAN_EXEMPLAR_LOCKFILE)
-    set(BEMAN_EXEMPLAR_LOCKFILE
+if(NOT BEMAN_INFRA_LOCKFILE)
+    set(BEMAN_INFRA_LOCKFILE
         "lockfile.json"
         CACHE FILEPATH
         "Path to the dependency lockfile for the Beman Exemplar."
@@ -13,9 +13,9 @@ endif()
 set(BemanExemplar_projectDir "${CMAKE_CURRENT_LIST_DIR}/../..")
 message(TRACE "BemanExemplar_projectDir=\"${BemanExemplar_projectDir}\"")
 
-message(TRACE "BEMAN_EXEMPLAR_LOCKFILE=\"${BEMAN_EXEMPLAR_LOCKFILE}\"")
+message(TRACE "BEMAN_INFRA_LOCKFILE=\"${BEMAN_INFRA_LOCKFILE}\"")
 file(
-    REAL_PATH "${BEMAN_EXEMPLAR_LOCKFILE}"
+    REAL_PATH "${BEMAN_INFRA_LOCKFILE}"
     BemanExemplar_lockfile
     BASE_DIRECTORY "${BemanExemplar_projectDir}"
     EXPAND_TILDE

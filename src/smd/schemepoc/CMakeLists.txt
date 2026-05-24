@@ -7,15 +7,15 @@ target_sources(
 )
 
 ## Tests
-if(SCHEMEPOC_ENABLE_TESTING AND NOT GTest_FOUND)
-    find_package(GTest QUIET)
-    if(GTest_FOUND)
-        include(GoogleTest)
+if(SCHEMEPOC_ENABLE_TESTING AND NOT Catch2_FOUND)
+    find_package(Catch2 REQUIRED)
+    if(Catch2_FOUND)
+        include(Catch)
     else()
         message(
             WARNING
             "
-No provider for GTest. Unable to build tests.
+No provider for Catch2. Unable to build tests.
 Consider using CMAKE_PROJECT_TOP_LEVEL_INCLUDES=./cmake/use-fetch-content.cmake as documented in the README.md
 "
         )
@@ -27,10 +27,9 @@ if(SCHEMEPOC_ENABLE_TESTING)
 
     target_sources(schemepoc_test PRIVATE schemepoc.test.cpp)
 
-    target_link_libraries(schemepoc_test schemepoc.schemepoc)
-    target_link_libraries(schemepoc_test GTest::gtest)
-    target_link_libraries(schemepoc_test GTest::gtest_main)
+    target_link_libraries(schemepoc_test PRIVATE schemepoc.schemepoc)
+    target_link_libraries(schemepoc_test PRIVATE Catch2::Catch2WithMain)
 
-    include(GoogleTest)
-    gtest_discover_tests(schemepoc_test)
+    include(Catch)
+    catch_discover_tests(schemepoc_test)
 endif()

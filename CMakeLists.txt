@@ -36,14 +36,14 @@ target_sources(
 )
 
 if(SCHEMEPOC_ENABLE_TESTING)
-    find_package(GTest QUIET)
-    if(GTest_FOUND)
-        include(GoogleTest)
+    find_package(Catch2 3 REQUIRED)
+    if(Catch2_FOUND)
+        include(Catch)
     else()
         message(
             WARNING
             "
-No provider for GTest. Unable to build tests.
+No provider for Catch2. Unable to build tests.
 Consider using CMAKE_PROJECT_TOP_LEVEL_INCLUDES=./cmake/use-fetch-content.cmake as documented in the README.md
 "
         )
