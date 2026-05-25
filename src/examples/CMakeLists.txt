@@ -36,3 +36,14 @@ install(
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     EXCLUDE_FROM_ALL
 )
+
+add_executable(godbolt_ffi)
+target_sources(godbolt_ffi PRIVATE godbolt_ffi.cpp)
+target_link_libraries(godbolt_ffi PRIVATE schemepoc.schemepoc)
+
+install(
+    TARGETS godbolt_ffi
+    COMPONENT schemepoc.schemepoc.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
