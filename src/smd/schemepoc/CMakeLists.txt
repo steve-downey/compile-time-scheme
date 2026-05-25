@@ -14,6 +14,7 @@ target_sources(
                 reader_cursor.hpp
                 parser.hpp
                 parser_alternative.hpp
+                reader_atom.hpp
     PRIVATE schemepoc.cpp version.cpp
 )
 
@@ -47,6 +48,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             reader_cursor.test.cpp
             parser.test.cpp
             parser_alternative.test.cpp
+            reader_atom.test.cpp
     )
 
     target_link_libraries(schemepoc_test PRIVATE schemepoc.schemepoc)
