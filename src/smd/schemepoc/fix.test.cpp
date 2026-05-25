@@ -27,10 +27,10 @@ template <class A>
 using expr_f = std::variant<int_f<A>, add_f<A>>;
 
 template <class A, class Fn>
-constexpr auto fmap(expr_f<A> const& layer, Fn fn) {
-    using B = std::invoke_result_t<Fn, A const&>;
+constexpr auto fmap(expr_f<A> const &layer, Fn fn) {
+    using B = std::invoke_result_t<Fn, A const &>;
     return std::visit(
-        [&](auto const& node) -> expr_f<B> {
+        [&](auto const &node) -> expr_f<B> {
             using T = std::remove_cvref_t<decltype(node)>;
             if constexpr (std::is_same_v<T, int_f<A>>) {
                 return int_f<B>{node.value};
@@ -43,9 +43,7 @@ constexpr auto fmap(expr_f<A> const& layer, Fn fn) {
 
 using expr = smd::schemepoc::fix<expr_f>;
 
-constexpr auto lit(int v) -> expr {
-    return expr{expr_f<expr>{int_f<expr>{v}}};
-}
+constexpr auto lit(int v) -> expr { return expr{expr_f<expr>{int_f<expr>{v}}}; }
 
 constexpr auto add(expr l, expr r) -> expr {
     return expr{expr_f<expr>{add_f<expr>{std::move(l), std::move(r)}}};
@@ -53,7 +51,7 @@ constexpr auto add(expr l, expr r) -> expr {
 
 constexpr auto eval_algebra = [](expr_f<int> layer) -> int {
     return std::visit(
-        [](auto const& node) -> int {
+        [](auto const &node) -> int {
             using T = std::remove_cvref_t<decltype(node)>;
             if constexpr (std::is_same_v<T, int_f<int>>) {
                 return node.value;
