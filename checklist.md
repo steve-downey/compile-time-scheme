@@ -44,7 +44,7 @@
 - [x] Step 13: typeclass-object facade for parser operations
 - [x] Step 14: generic fixpoint playground
 - [x] Step 15: CPS closure backend facade
-- [ ] Step 16: bottom-up CPS direction decision
+- [x] Step 16: bottom-up CPS direction decision
 - [ ] Step 17: defunctionalized CPS program
 - [ ] Step 18: closure materialization over CPS program
 - [ ] Step 19: public one-shot API

@@ -23,9 +23,9 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const& ct   = er.value();
-    auto         code = compile_cps(ct, ct.size() - 1);
-    auto         env0 = default_env<16>();
+    auto const &ct = er.value();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto env0 = default_env<16>();
     auto r = code(env0, [](value v) constexpr -> result<value> { return v; });
     return r.has_value() && std::holds_alternative<int>(r.value()) &&
            std::get<int>(r.value()) == 7;
@@ -39,9 +39,9 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const& ct   = er.value();
-    auto         code = compile_cps(ct, ct.size() - 1);
-    auto         env0 = default_env<16>();
+    auto const &ct = er.value();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto env0 = default_env<16>();
     auto r = code(env0, [](value v) constexpr -> result<value> { return v; });
     return r.has_value() && std::holds_alternative<int>(r.value()) &&
            std::get<int>(r.value()) == 42;
@@ -55,9 +55,9 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const& ct   = er.value();
-    auto         code = compile_cps(ct, ct.size() - 1);
-    auto         env0 = default_env<16>();
+    auto const &ct = er.value();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto env0 = default_env<16>();
     auto r = code(env0, [](value v) constexpr -> result<value> { return v; });
     return r.has_value() && std::holds_alternative<int>(r.value()) &&
            std::get<int>(r.value()) == 12;
@@ -71,9 +71,9 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const& ct   = er.value();
-    auto         code = compile_cps(ct, ct.size() - 1);
-    auto         env0 = default_env<16>();
+    auto const &ct = er.value();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto env0 = default_env<16>();
     auto r = code(env0, [](value v) constexpr -> result<value> { return v; });
     return !r.has_value();
 }());
@@ -88,9 +88,9 @@ TEST_CASE("CpsArithmeticTest - AddExpression") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const& ct   = er.value();
-    auto         code = compile_cps(ct, ct.size() - 1);
-    auto         env0 = default_env<16>();
+    auto const &ct = er.value();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto env0 = default_env<16>();
     auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
@@ -103,9 +103,9 @@ TEST_CASE("CpsArithmeticTest - Integer") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const& ct   = er.value();
-    auto         code = compile_cps(ct, ct.size() - 1);
-    auto         env0 = default_env<16>();
+    auto const &ct = er.value();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto env0 = default_env<16>();
     auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
@@ -118,9 +118,9 @@ TEST_CASE("CpsArithmeticTest - Multiply") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const& ct   = er.value();
-    auto         code = compile_cps(ct, ct.size() - 1);
-    auto         env0 = default_env<16>();
+    auto const &ct = er.value();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto env0 = default_env<16>();
     auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
@@ -133,9 +133,9 @@ TEST_CASE("CpsArithmeticTest - ErrorPropagates") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const& ct   = er.value();
-    auto         code = compile_cps(ct, ct.size() - 1);
-    auto         env0 = default_env<16>();
+    auto const &ct = er.value();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto env0 = default_env<16>();
     auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE_FALSE(r.has_value());
 }
