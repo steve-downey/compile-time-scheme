@@ -1,3 +1,4 @@
+target_link_libraries(schemepoc.schemepoc PUBLIC beman::execution_headers)
 include(GNUInstallDirs)
 
 target_sources(
@@ -20,6 +21,7 @@ target_sources(
                 reader.hpp
                 elaborator.hpp
                 value.hpp
+                sender_adapter.hpp
                 eval_direct.hpp
                 parser_ops.hpp
                 fix.hpp
@@ -70,6 +72,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             fix.test.cpp
             ffi.test.cpp
             cps_arithmetic.test.cpp
+            sender_adapter.test.cpp
             cps.test.cpp
             closure_backend.test.cpp
     )
