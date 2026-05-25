@@ -55,7 +55,7 @@
 - [x] Step 24: quote elaboration
 - [x] Step 25: error quality pass
 - [x] Step 26: negative compile tests
-- [ ] Step 27: Godbolt single-file extraction
+- [x] Step 27: Godbolt single-file extraction
 - [ ] Step 28: vendor Beman Execution
 - [ ] Step 29: sender adapter over Beman Execution
 - [ ] Step 30: sender backend over CPS program using Beman Execution
