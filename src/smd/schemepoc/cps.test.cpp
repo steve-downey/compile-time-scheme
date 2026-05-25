@@ -227,3 +227,44 @@ TEST_CASE("CpsTest - CpsOfDirectly") {
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 5);
 }
+
+TEST_CASE("CpsTest - LambdaEvaluatesToClosure") {
+    auto dr = read_datum<32, 16>(cursor{"(lambda (x) x)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto r = code(env0, [](value v) -> result<value> { return v; });
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<closure>(r.value()));
+}
+
+TEST_CASE("CpsTest - ApplicationOfLambda") {
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x) (+ x 1)) 41)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto r = code(env0, [](value v) -> result<value> { return v; });
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<int>(r.value()));
+    REQUIRE(std::get<int>(r.value()) == 42);
+}
+
+TEST_CASE("CpsTest - QuoteEvaluatesToAtom") {
+    auto dr = read_datum<32, 16>(cursor{"(quote abc)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto r = code(env0, [](value v) -> result<value> { return v; });
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<symbol>(r.value()));
+    REQUIRE(std::get<symbol>(r.value()).name == "abc");
+}
