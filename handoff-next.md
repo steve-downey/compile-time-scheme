@@ -7,7 +7,7 @@ Step 24 ("quote elaboration") is complete. Branch is on `step-24`, tests and lin
 
 ## Next Step
 Your task is to review and complete **Step 25: error quality pass**.
-According to the checklist, you are implementing Step 25. Check the `docs/schemepoc-plan.md` (or relevant design doc) to see what the "error quality pass" implies. It probably involves evaluating parser errors, elaboration errors, and ensuring they pass accurately to results. 
+According to the checklist, you are implementing Step 25. Check the `docs/schemepoc-plan.md` (or relevant design doc) to see what the "error quality pass" implies. It probably involves evaluating parser errors, elaboration errors, and ensuring they pass accurately to results.
 
 ## Instructions
 1. Run `make compile test lint` to verify working conditions.

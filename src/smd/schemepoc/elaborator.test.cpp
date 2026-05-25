@@ -306,7 +306,7 @@ TEST_CASE("ElaboratorTest - Lambda") {
         REQUIRE(dr.has_value());
         auto er = elaborate(dr.value().value);
         REQUIRE(!er.has_value());
-        REQUIRE(er.error().message == "lambda: duplicate parameter name"sv);
+        REQUIRE(er.error().message == "duplicate parameter"sv);
     }
 
     {
@@ -314,7 +314,7 @@ TEST_CASE("ElaboratorTest - Lambda") {
         REQUIRE(dr.has_value());
         auto er = elaborate(dr.value().value);
         REQUIRE(!er.has_value());
-        REQUIRE(er.error().message == "lambda: param must be a symbol"sv);
+        REQUIRE(er.error().message == "lambda malformed parameter list"sv);
     }
 
     {
@@ -322,7 +322,7 @@ TEST_CASE("ElaboratorTest - Lambda") {
         REQUIRE(dr.has_value());
         auto er = elaborate(dr.value().value);
         REQUIRE(!er.has_value());
-        REQUIRE(er.error().message == "lambda: expected params and body"sv);
+        REQUIRE(er.error().message == "unknown special form shape"sv);
     }
 
     {
@@ -330,7 +330,7 @@ TEST_CASE("ElaboratorTest - Lambda") {
         REQUIRE(dr.has_value());
         auto er = elaborate(dr.value().value);
         REQUIRE(!er.has_value());
-        REQUIRE(er.error().message == "lambda: params must be a list"sv);
+        REQUIRE(er.error().message == "lambda malformed parameter list"sv);
     }
 }
 
