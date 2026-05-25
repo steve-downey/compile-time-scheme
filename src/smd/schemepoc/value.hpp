@@ -3,6 +3,7 @@
 #ifndef SRC_SMD_SCHEMEPOC_VALUE_HPP
 #define SRC_SMD_SCHEMEPOC_VALUE_HPP
 
+#include <smd/schemepoc/datum_tree.hpp>
 #include <smd/schemepoc/result.hpp>
 #include <smd/schemepoc/static_vector.hpp>
 
@@ -18,7 +19,12 @@ struct builtin {
     friend constexpr auto operator==(builtin, builtin) -> bool = default;
 };
 
-using value = std::variant<int, bool, builtin>;
+struct closure {
+    node_id node;
+    friend constexpr auto operator==(closure, closure) -> bool = default;
+};
+
+using value = std::variant<int, bool, builtin, closure>;
 
 template <int MaxBindings>
 class env {
