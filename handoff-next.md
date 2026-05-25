@@ -1,177 +1,151 @@
-# Next step: Step 5
+# Next step: Step 6
 
 ## Goal
 
-Add parser repetition and lexeme: `many`, `some`, `optional`, and `lexeme`.
-Also add `alt` as an explicit named function (not just the operator).
+Add reader atom parsers: `integer_p` and `symbol_p`.
+These produce typed `datum` variants (or simpler typed tokens) from raw character sequences.
 
-Do not add integer or symbol parsing yet (those are Step 6+).
+Do not add list or pair parsing yet (that is Step 7+).
+Do not add the datum tree or arena yet.
 
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/parser_alternative.hpp     (new)
-src/smd/schemepoc/parser_alternative.test.cpp  (new)
-src/smd/schemepoc/CMakeLists.txt             (add new files)
+src/smd/schemepoc/reader_atom.hpp        (new)
+src/smd/schemepoc/reader_atom.test.cpp   (new)
+src/smd/schemepoc/CMakeLists.txt         (add new files)
 ```
 
-`parser.hpp` and `parser.test.cpp` do not need changes.
+`parser.hpp`, `parser_alternative.hpp`, and `reader_cursor.hpp` do not need changes.
 
 ## Context from previous steps
 
-Step 4 completed `parser.hpp` with the full combinator set in `namespace smd::schemepoc`:
+Step 5 completed `parser_alternative.hpp` with the full repetition combinator set
+in `namespace smd::schemepoc`:
 
 ```cpp
-template <class T>
-struct parse_state { T value; cursor rest; };
-
-template <class T>
-using parse_result = result<parse_state<T>>;
-
-template <class F>
-class parser { ... };  // wraps callable by value, calls it from operator()
-
-template <class F>
-parser(F) -> parser<F>;
-
-// primitives
-template <class T>
-[[nodiscard]] constexpr auto pure(T value);
-[[nodiscard]] constexpr auto satisfy(auto pred, char const* expected);
-[[nodiscard]] constexpr auto char_p(char expected);
-
-// functor / applicative
-template <class PA, class F>
-[[nodiscard]] constexpr auto map(PA pa, F f);
-
-template <class PA, class PB, class F>
-[[nodiscard]] constexpr auto lift2(PA pa, PB pb, F f);
-
-template <class PA, class PB>
-[[nodiscard]] constexpr auto sequence_left(PA pa, PB pb);
-
-template <class PA, class PB>
-[[nodiscard]] constexpr auto sequence_right(PA pa, PB pb);
-
-// choice (operator on parser objects)
-template <class PA, class PB>
-[[nodiscard]] constexpr auto operator|(PA pa, PB pb);
-```
-
-Key implementation notes from Step 4:
-- `map` and `lift2` deduce return type with `using R = decltype(f(r.value().value))` inside
-  the lambda, used in both branches. The `decltype(...)` in the error branch is an unevaluated
-  operand, so calling `.value()` on an error result is safe for type deduction only.
-- `operator|` detects input consumption via `cur.position().offset` vs `ra.error().where.offset`.
-  (`parse_error` has `.where`, a `source_pos` with `.offset` — NOT `.pos`.)
-- All parsers capture by value in lambdas.
-- `parse_error` is defined in `source.hpp` as `struct parse_error { source_pos where; char const* message; }`.
-- `cursor::position()` returns `source_pos` which has `.offset`.
-
-Step 1 provided `static_vector<T,N>` in `static_vector.hpp` — use it for `many`/`some` results.
-
-Step 2 provided `skip_intertoken_space(cursor)` in `reader_cursor.hpp` — use it for `lexeme`.
-
-`make compile` and `make test` pass (43 tests). `make lint` passes.
-
-## Required implementation details
-
-All additions go in `src/smd/schemepoc/parser_alternative.hpp`,
-in `namespace smd::schemepoc`.
-
-Include `<smd/schemepoc/parser.hpp>` and `<smd/schemepoc/static_vector.hpp>`
-(and `<optional>` for `optional`).
-
-### `alt`
-
-```cpp
+// named alias for operator|
 template <class PA, class PB>
 [[nodiscard]] constexpr auto alt(PA pa, PB pb);
-```
 
-Named alias for `operator|`. Tries `pa`; on failure without consuming, tries `pb`.
-Implementation: `return pa | pb;`
-
-### `many`
-
-```cpp
+// zero or more, returns static_vector<T, Capacity>; never fails
 template <int Capacity, class P>
 [[nodiscard]] constexpr auto many(P p);
-```
 
-Repeatedly applies `p` until it fails or capacity is reached.
-Returns `parse_result<static_vector<T, Capacity>>` where `T` is the value type of `p`.
-`many` never fails — returns an empty vector on zero matches.
-Stops silently at capacity (does not overflow).
-
-### `some`
-
-```cpp
+// one or more; fails with error from first application if zero matches
 template <int Capacity, class P>
 [[nodiscard]] constexpr auto some(P p);
-```
 
-Like `many` but requires at least one match.
-Fails with the error from the first application of `p` if it yields zero matches.
-
-### `optional`
-
-```cpp
+// wraps value in std::optional<T>; never fails
 template <class P>
 [[nodiscard]] constexpr auto optional(P p);
-```
 
-Tries `p`. On success wraps the value in `std::optional<T>`. On failure (without consuming),
-returns `std::optional<T>{}` (empty) without consuming input. Never fails.
-
-### `lexeme`
-
-```cpp
+// skips leading/trailing intertoken space, applies p
 template <class P>
 [[nodiscard]] constexpr auto lexeme(P p);
 ```
 
-Skips leading intertoken space (using `skip_intertoken_space`), applies `p`,
-then skips trailing intertoken space. Returns the value of `p`.
-On failure from `p`, propagates the error unchanged.
+Key implementation notes:
+- `many` and `some` return `parse_result<static_vector<V, Capacity>>` where `V` is the
+  value type of the sub-parser.
+- `optional` returns `parse_result<std::optional<V>>`. On failure it returns an empty
+  optional in a successful `parse_result` (not an error) and does not consume input.
+- `lexeme` uses `skip_intertoken_space` from `reader_cursor.hpp`.
+- All parsers capture by value. No raw function pointers. No heap.
 
-Implementation sketch:
+Step 1 provided `static_vector<T,N>` in `static_vector.hpp` — already used by `many`/`some`.
+Step 2 provided lexical predicates in `reader_cursor.hpp`:
+  - `is_space(char)`, `is_initial_symbol_char(char)`, `is_symbol_char(char)`,
+    `is_delimiter(char)`, `skip_intertoken_space(cursor)`.
+Step 3 provided `parser<F>`, `parse_state<T>`, `parse_result<T>` in `parser.hpp`.
+Step 4 added `map`, `lift2`, `sequence_left`, `sequence_right`, `operator|`.
+Step 5 added `alt`, `many`, `some`, `optional`, `lexeme` in `parser_alternative.hpp`.
+
+`make compile` and `make test` pass (49 tests). `make lint` passes.
+
+## Atom model
+
+Define a tagged-union `atom` type in `reader_atom.hpp` that can represent:
+- an integer (a signed 64-bit integer value, or `int` if that suffices for now)
+- a symbol (a `std::string_view` into the original source — no allocation)
+
+A minimal representation:
 
 ```cpp
-template <class P>
-[[nodiscard]] constexpr auto lexeme(P p) {
-    return parser{[p](cursor cur) {
-        auto start = skip_intertoken_space(cur);
-        auto r     = p(start);
-        if (!r.has_value())
-            return r;
-        auto rest = skip_intertoken_space(r.value().rest);
-        using V   = decltype(r.value().value);
-        return parse_result<V>{parse_state<V>{r.value().value, rest}};
-    }};
-}
+struct atom_integer { int value; };
+struct atom_symbol  { std::string_view name; };
+
+using atom = std::variant<atom_integer, atom_symbol>;
+```
+
+Keep it simple. No heap. `std::string_view` points into the cursor's underlying
+`std::string_view` (the `remaining()` slice at parse time).
+
+## Required parsers
+
+### `integer_p`
+
+```cpp
+[[nodiscard]] constexpr auto integer_p();
+```
+
+Parses an optional leading `-` followed by one or more decimal digits.
+Returns `parse_result<atom_integer>` with the numeric value.
+Uses `some<20>(satisfy(...))` and converts the digit sequence to an integer.
+Does not use `std::stoi` (not constexpr). Compute manually:
+
+```cpp
+// inside the lambda after digit collection:
+int sign = negative ? -1 : 1;
+int n = 0;
+for (int i = 0; i < digits.size(); ++i)
+    n = n * 10 + (digits[i] - '0');
+return parse_result<atom_integer>{parse_state<atom_integer>{atom_integer{sign * n}, rest}};
+```
+
+For the sign: use `optional(char_p('-'))` to detect it.
+
+### `symbol_p`
+
+```cpp
+[[nodiscard]] constexpr auto symbol_p();
+```
+
+Parses an initial symbol character followed by zero or more symbol characters.
+Returns `parse_result<atom_symbol>` with a `std::string_view` into the source.
+
+`std::string_view` can be constructed from the cursor's `remaining()` at the start,
+then `substr(0, length)` where `length` is the number of consumed characters.
+
+```cpp
+// inside the lambda:
+auto start   = cur;
+auto first   = satisfy(is_initial_symbol_char, "symbol")(cur);
+if (!first.has_value()) return parse_result<atom_symbol>{first.error()};
+auto rest_cur = first.value().rest;
+auto tail    = many<64>(satisfy(is_symbol_char, "symbol char"))(rest_cur);
+auto end_cur  = tail.value().rest;
+int  len      = end_cur.position().offset - start.position().offset;
+auto name    = start.remaining().substr(0, len);
+return parse_result<atom_symbol>{parse_state<atom_symbol>{atom_symbol{name}, end_cur}};
 ```
 
 ## CMakeLists.txt
 
-Add `parser_alternative.hpp` and `parser_alternative.test.cpp` to the existing
-target in `src/smd/schemepoc/CMakeLists.txt`. Follow the same pattern as the
-existing `parser.hpp` / `parser.test.cpp` entries.
+Add `reader_atom.hpp` to the `FILE_SET HEADERS` block and
+`reader_atom.test.cpp` to the `target_sources` for `schemepoc_test`.
+Follow the same pattern as `parser_alternative.hpp` / `parser_alternative.test.cpp`.
 
 ## Required tests
 
-In `parser_alternative.test.cpp`:
+In `reader_atom.test.cpp`:
 
-- `static_assert` that `alt(char_p('a'), char_p('b'))(cursor{"a"})` succeeds with `'a'`.
-- `static_assert` that `alt(char_p('a'), char_p('b'))(cursor{"b"})` succeeds with `'b'`.
-- `static_assert` that `alt(char_p('a'), char_p('b'))(cursor{"c"})` fails.
-- `static_assert` that `many<4>(char_p('a'))(cursor{""}).value().value` is an empty vector (`.size() == 0`).
-- `static_assert` that `many<4>(char_p('a'))(cursor{"aaa"}).value().value.size() == 3`.
-- `static_assert` that `some<4>(char_p('a'))(cursor{""})` fails.
-- `static_assert` that `some<4>(char_p('a'))(cursor{"aa"}).value().value.size() == 2`.
-- `static_assert` that `optional(char_p('a'))(cursor{"b"}).has_value()` and the inner optional is empty.
-- `static_assert` that `optional(char_p('a'))(cursor{"a"}).value().value.has_value()`.
-- `static_assert` that `lexeme(char_p('x'))(cursor{"  x  "}).value().value == 'x'`.
+- `static_assert` that `integer_p()(cursor{"42"})` succeeds with value `42`.
+- `static_assert` that `integer_p()(cursor{"-7"})` succeeds with value `-7`.
+- `static_assert` that `integer_p()(cursor{"abc"})` fails.
+- `static_assert` that `symbol_p()(cursor{"foo"})` succeeds with `.name == "foo"`.
+- `static_assert` that `symbol_p()(cursor{"+"})`  succeeds with `.name == "+"`.
+- `static_assert` that `symbol_p()(cursor{"42"})` fails.
 - Runtime `TEST_CASE` variants are welcome but constexpr contracts must use `static_assert`.
 
 ## Required commands
@@ -184,9 +158,13 @@ make lint
 
 ## Do not do
 
-- Do not add `integer_p`, `symbol_p`, or any reader/datum integration.
-- Do not add comment-stripping to the cursor.
-- Do not change `parser.hpp`, `parse_state`, `parse_result`, or `parser` class.
+- Do not add list/pair/quote atom types.
+- Do not add a datum tree or arena.
+- Do not add `std::string` or any heap allocation.
+- Do not use `std::stoi`, `std::stol`, or any non-constexpr standard library function
+  for the integer conversion.
+- Do not change `parser.hpp`, `parser_alternative.hpp`, `reader_cursor.hpp`, or any
+  prior component.
+- Do not add `lexeme` wrapping to the atom parsers (leave that to the caller).
 - Do not use raw function pointers.
-- Do not use `std::vector` or any heap allocation.
 - Do not change architecture decisions without documenting in `handoff.md`.
