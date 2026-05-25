@@ -39,6 +39,10 @@ template <int MaxNodes, int MaxList, int MaxBindings>
         return eval_direct(ct, cif.consequent, environment);
     }
 
+    if (std::holds_alternative<core_lambda<MaxList>>(node)) {
+        return value{closure{root}};
+    }
+
     if (std::holds_alternative<core_application<MaxList>>(node)) {
         auto const &app = std::get<core_application<MaxList>>(node);
         auto func_r = eval_direct(ct, app.func, environment);
