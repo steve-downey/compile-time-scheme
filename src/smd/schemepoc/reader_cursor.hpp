@@ -11,7 +11,7 @@ namespace smd::schemepoc {
 
 class cursor {
     std::string_view input_{};
-    source_pos       pos_{};
+    source_pos pos_{};
 
   public:
     constexpr explicit cursor(std::string_view input) : input_{input} {}
