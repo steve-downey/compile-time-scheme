@@ -52,7 +52,7 @@
 - [x] Step 21: runtime closure values
 - [x] Step 22: function application
 - [x] Step 23: lexical closure capture
-- [ ] Step 24: quote elaboration
+- [x] Step 24: quote elaboration
 - [ ] Step 25: error quality pass
 - [ ] Step 26: negative compile tests
 - [ ] Step 27: Godbolt single-file extraction

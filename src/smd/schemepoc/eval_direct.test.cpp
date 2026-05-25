@@ -447,3 +447,39 @@ TEST_CASE("EvalDirectTest - LexicalCapture2") {
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 42);
 }
+
+TEST_CASE("EvalDirectTest - QuoteAtom") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+
+    auto test_eval_quote = [](std::string_view src) {
+        auto dr = read_datum<32, 16>(cursor{src});
+        REQUIRE(dr.has_value());
+        auto er = elaborate(dr.value().value);
+        REQUIRE(er.has_value());
+        auto const &ct = er.value();
+        auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+        REQUIRE(vr.has_value());
+        return vr.value();
+    };
+
+    auto sym = test_eval_quote("'x"sv);
+    REQUIRE(std::holds_alternative<symbol>(sym));
+    REQUIRE(std::get<symbol>(sym).name == "x"sv);
+
+    auto num = test_eval_quote("'123"sv);
+    REQUIRE(std::holds_alternative<int>(num));
+    REQUIRE(std::get<int>(num) == 123);
+
+    auto bln = test_eval_quote("'#t"sv);
+    REQUIRE(std::holds_alternative<bool>(bln));
+    REQUIRE(std::get<bool>(bln) == true);
+}
+
+static_assert([] {
+    auto dr = read_datum<32, 16>(cursor{"'x"sv});
+    auto er = elaborate(dr.value().value);
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    return std::get<symbol>(vr.value()).name == "x"sv;
+}());
