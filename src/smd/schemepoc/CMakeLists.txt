@@ -17,6 +17,10 @@ target_sources(
                 reader_atom.hpp
                 datum_tree.hpp
                 reader.hpp
+                elaborator.hpp
+                value.hpp
+                eval_direct.hpp
+                parser_ops.hpp
     PRIVATE schemepoc.cpp version.cpp
 )
 
@@ -53,6 +57,10 @@ if(SCHEMEPOC_ENABLE_TESTING)
             reader_atom.test.cpp
             datum_tree.test.cpp
             reader.test.cpp
+            elaborator.test.cpp
+            value.test.cpp
+            eval_direct.test.cpp
+            parser_ops.test.cpp
     )
 
     target_link_libraries(schemepoc_test PRIVATE schemepoc.schemepoc)

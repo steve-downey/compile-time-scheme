@@ -35,12 +35,12 @@
 - [x] Step 4: functor and applicative combinators
 - [x] Step 5: alternative, repetition, and lexeme
 - [x] Step 6: reader atom model
-- [ ] Step 7: fixed-capacity datum tree
-- [ ] Step 8: datum reader for lists and quote
-- [ ] Step 9: core language model
-- [ ] Step 10: datum-to-core elaborator for literals, variables, calls
-- [ ] Step 11: direct evaluator for core arithmetic
-- [ ] Step 12: elaborate `if`
+- [x] Step 7: fixed-capacity datum tree
+- [x] Step 8: datum reader for lists and quote
+- [x] Step 9: core language model
+- [x] Step 10: datum-to-core elaborator for literals, variables, calls
+- [x] Step 11: direct evaluator for core arithmetic
+- [x] Step 12: elaborate `if`
 - [ ] Step 13: typeclass-object facade for parser operations
 - [ ] Step 14: generic fixpoint playground
 - [ ] Step 15: CPS closure backend facade
