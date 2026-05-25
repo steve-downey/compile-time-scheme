@@ -10,7 +10,7 @@ namespace smd::schemepoc {
 
 template <class T>
 struct parse_state {
-    T      value;
+    T value;
     cursor rest;
 };
 
@@ -38,7 +38,7 @@ template <class T>
     }};
 }
 
-[[nodiscard]] constexpr auto satisfy(auto pred, char const* expected) {
+[[nodiscard]] constexpr auto satisfy(auto pred, char const *expected) {
     return parser{[pred, expected](cursor cur) -> parse_result<char> {
         if (!cur.empty() && pred(cur.peek())) {
             return parse_state<char>{cur.peek(), cur.bump()};
@@ -48,7 +48,64 @@ template <class T>
 }
 
 [[nodiscard]] constexpr auto char_p(char expected) {
-    return satisfy([expected](char c) { return c == expected; }, "expected char");
+    return satisfy([expected](char c) { return c == expected; },
+                   "expected char");
+}
+
+template <class PA, class F>
+[[nodiscard]] constexpr auto map(PA pa, F f) {
+    return parser{[pa, f](cursor cur) {
+        auto r = pa(cur);
+        if (!r.has_value()) {
+            using R = decltype(f(r.value().value));
+            return parse_result<R>{r.error()};
+        }
+        using R = decltype(f(r.value().value));
+        return parse_result<R>{
+            parse_state<R>{f(r.value().value), r.value().rest}};
+    }};
+}
+
+template <class PA, class PB, class F>
+[[nodiscard]] constexpr auto lift2(PA pa, PB pb, F f) {
+    return parser{[pa, pb, f](cursor cur) {
+        auto ra = pa(cur);
+        if (!ra.has_value()) {
+            using V = decltype(f(ra.value().value, pb(cur).value().value));
+            return parse_result<V>{ra.error()};
+        }
+        auto rb = pb(ra.value().rest);
+        if (!rb.has_value()) {
+            using V = decltype(f(ra.value().value, rb.value().value));
+            return parse_result<V>{rb.error()};
+        }
+        using V = decltype(f(ra.value().value, rb.value().value));
+        return parse_result<V>{parse_state<V>{
+            f(ra.value().value, rb.value().value), rb.value().rest}};
+    }};
+}
+
+template <class PA, class PB>
+[[nodiscard]] constexpr auto sequence_left(PA pa, PB pb) {
+    return lift2(pa, pb, [](auto a, auto) { return a; });
+}
+
+template <class PA, class PB>
+[[nodiscard]] constexpr auto sequence_right(PA pa, PB pb) {
+    return lift2(pa, pb, [](auto, auto b) { return b; });
+}
+
+template <class PA, class PB>
+[[nodiscard]] constexpr auto operator|(PA pa, PB pb) {
+    return parser{[pa, pb](cursor cur) {
+        auto start = cur.position().offset;
+        auto ra = pa(cur);
+        if (ra.has_value())
+            return ra;
+        if (ra.error().where.offset != start)
+            return ra;
+        return pb(cur);
+    }};
 }
 
 } // namespace smd::schemepoc
