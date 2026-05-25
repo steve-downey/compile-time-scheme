@@ -45,7 +45,7 @@
 - [x] Step 14: generic fixpoint playground
 - [x] Step 15: CPS closure backend facade
 - [x] Step 16: bottom-up CPS direction decision
-- [ ] Step 17: defunctionalized CPS program
+- [x] Step 17: defunctionalized CPS program
 - [ ] Step 18: closure materialization over CPS program
 - [ ] Step 19: public one-shot API
 - [ ] Step 20: lambda syntax
