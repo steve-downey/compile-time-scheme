@@ -123,6 +123,20 @@ eval_direct(core_type<MaxNodes, MaxList> const &node,
                 arena.get(lam.body), arena, new_env);
         }
 
+        if (std::holds_alternative<foreign_function<Core>>(func_r.value())) {
+            auto const &ff = std::get<foreign_function<Core>>(func_r.value());
+            static_vector<value<Core>, MaxNodes> evaluated_args;
+            for (auto const &arg_id : app.args) {
+                auto arg_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                    arena.get(arg_id), arena, environment);
+                if (!arg_r.has_value())
+                    return arg_r.error();
+                evaluated_args.push_back(arg_r.value());
+            }
+            return ff.fn(std::span<value<Core> const>(evaluated_args.begin(),
+                                                      evaluated_args.end()));
+        }
+
         return parse_error{{}, "attempted to call non-function"};
     }
 

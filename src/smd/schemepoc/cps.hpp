@@ -176,6 +176,30 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
                                                    cont, new_env, k);
         }
 
+        if (std::holds_alternative<foreign_function<Core>>(func_r.value())) {
+            auto const &ff = std::get<foreign_function<Core>>(func_r.value());
+
+            static_vector<value<Core>, MaxNodes> evaluated_args;
+            for (auto const &arg_id : app.args) {
+                auto arg_r = cps_dispatch<MaxNodes, MaxList>(
+                    arena.get(arg_id), arena, identity_k<Core>{}, env,
+                    identity_k<Core>{});
+                if (!arg_r.has_value())
+                    return arg_r;
+                evaluated_args.push_back(arg_r.value());
+            }
+
+            auto ff_r = ff.fn(std::span<value<Core> const>(
+                evaluated_args.begin(), evaluated_args.end()));
+            if (!ff_r.has_value())
+                return result<value<Core>>{ff_r.error()};
+
+            auto r = cont(ff_r.value());
+            if (!r.has_value())
+                return r;
+            return k(r.value());
+        }
+
         return result<value<Core>>{
             parse_error{{}, "attempted to call non-function"}};
     }
