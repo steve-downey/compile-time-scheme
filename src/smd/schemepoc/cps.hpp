@@ -164,7 +164,7 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
                 return result<value<Core>>{parse_error{{}, "arity mismatch"}};
 
             auto new_env = clo.captured ? *clo.captured : env;
-            for (std::size_t i = 0; i < app.args.size(); ++i) {
+            for (int i = 0; i < app.args.size(); ++i) {
                 auto arg_r = cps_dispatch<MaxNodes, MaxList>(
                     arena.get(app.args[i]), arena, identity_k<Core>{}, env,
                     identity_k<Core>{});
@@ -213,7 +213,6 @@ template <int MaxNodes, int MaxList, class Cont>
 [[nodiscard]] constexpr auto
 cps_of(core_type<MaxNodes, MaxList> const &node,
        tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> arena, Cont cont) {
-    using Core = core_type<MaxNodes, MaxList>;
     return cps_code{[node, arena, cont](auto const &env, auto k) constexpr {
         return detail::cps_dispatch<MaxNodes, MaxList>(node, arena, cont, env,
                                                        k);
