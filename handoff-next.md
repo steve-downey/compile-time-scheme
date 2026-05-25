@@ -1,153 +1,128 @@
-# Next step: Step 13 (typeclass-object facade for parser operations)
+# Next step: Step 14 (generic fixpoint playground)
 
 ## Goal
 
-Introduce a typeclass-object facade over the existing parser free functions.
-This is a presentation/refactoring step with no behavior changes.
-The facade exposes `map`, `apply`, `alt`, and `pure` as methods on a global constant object.
-All existing parser tests must continue to pass unchanged.
+Add a small, isolated `fix<F>` and `fold_fix` experiment without converting
+the main arena-based compiler. This step introduces recursion-scheme machinery
+in a safe sandbox. The existing compiler pipeline must not be modified.
 
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/parser_ops.hpp        (new)
-src/smd/schemepoc/parser_ops.test.cpp   (new)
-src/smd/schemepoc/CMakeLists.txt        (add new files)
+src/smd/schemepoc/fix.hpp         (new)
+src/smd/schemepoc/fix.test.cpp    (new)
+src/smd/schemepoc/CMakeLists.txt  (add new files)
+checklist.md                      (mark step done)
+handoff-next.md                   (update for step 15)
 ```
 
 No existing files need to change.
 
 ## Context from previous steps
 
-Steps 11 and 12 (combined) completed the first end-to-end milestone:
-`source string → datum_tree → core_tree → value`.
+Steps 11-13 completed the first full pipeline milestone and a presentation layer:
 
-What is in the codebase now:
-
-- `value.hpp`: `enum class builtin_op { add, multiply }`, `struct builtin`, `using value = std::variant<int, bool, builtin>`, `template <int MaxBindings> class env`, `template <int MaxBindings> constexpr auto default_env() -> env<MaxBindings>`
+- `value.hpp`: `enum class builtin_op { add, multiply }`, `struct builtin`,
+  `using value = std::variant<int, bool, builtin>`,
+  `template <int MaxBindings> class env`,
+  `template <int MaxBindings> constexpr auto default_env() -> env<MaxBindings>`
 - `eval_direct.hpp`: `template <int MaxNodes, int MaxList, int MaxBindings> constexpr auto eval_direct(core_tree<MaxNodes, MaxList> const &ct, node_id root, env<MaxBindings> const &environment) -> result<value>`
 - `elaborator.hpp`: all core types, `elaborate(datum_tree)` function
 - `reader.hpp`: `read_datum<MaxNodes, MaxList>(cursor{sv})` returning `parse_result<datum_tree<...>>`
+- `parser_ops.hpp`: `parser_applicative_ops`, `parser_alternative_ops`,
+  `struct parser_ops : parser_applicative_ops, parser_alternative_ops {}`,
+  `inline constexpr parser_ops parser_v{}`
 
-104 tests pass. `make compile`, `make test`, `make lint` are all green.
-
-The existing free-function parser API (in `parser.hpp` and `parser_alternative.hpp`):
-- `pure(value)` → parser that always succeeds
-- `satisfy(pred, expected)` → char parser
-- `char_p(ch)` → char parser
-- `map(p, f)` → transforms parser output
-- `apply(pf, pa)` → applicative apply
-- `lift2(f, pa, pb)` → applies binary function over two parsers
-- `sequence_left(left, right)`, `sequence_right(left, right)` → sequence discarding one side
-- `alt(pa, pb)` → try first, fall back to second
-- `many<Capacity>(p)`, `some<Capacity>(p)` → repetition
-- `optional(p)` → zero or one
-- `lexeme(p)` → skips surrounding intertoken whitespace
+105 tests pass. `make compile`, `make test`, `make lint` are all green.
 
 ## Required implementation
 
-Define in `namespace smd::schemepoc`:
+The `fix.hpp` header must define `fix<F>` and `fold_fix` in
+`namespace smd::schemepoc`. The `fix` type wraps a single layer of a
+functorial expression family:
 
 ```cpp
-struct parser_applicative_ops {
-    template <class T>
-    [[nodiscard]] constexpr auto pure(T value) const;
+template <template <class> class F>
+class fix {
+  public:
+    using layer_type = F<fix<F>>;
 
-    template <class P, class F>
-    [[nodiscard]] constexpr auto map(P p, F f) const;
+    constexpr explicit fix(layer_type layer);
 
-    template <class PF, class PA>
-    [[nodiscard]] constexpr auto apply(PF pf, PA pa) const;
+    [[nodiscard]] constexpr auto layer() const -> layer_type const &;
 
-    template <class F, class PA, class PB>
-    [[nodiscard]] constexpr auto lift2(F f, PA pa, PB pb) const;
-
-    template <class PLeft, class PRight>
-    [[nodiscard]] constexpr auto sequence_left(PLeft left, PRight right) const;
-
-    template <class PLeft, class PRight>
-    [[nodiscard]] constexpr auto sequence_right(PLeft left, PRight right) const;
+  private:
+    layer_type layer_;
 };
-
-struct parser_alternative_ops {
-    template <class PA, class PB>
-    [[nodiscard]] constexpr auto alt(PA pa, PB pb) const;
-
-    template <int Capacity, class P>
-    [[nodiscard]] constexpr auto many(P p) const;
-
-    template <int Capacity, class P>
-    [[nodiscard]] constexpr auto some(P p) const;
-
-    template <class P>
-    [[nodiscard]] constexpr auto optional(P p) const;
-
-    template <class P>
-    [[nodiscard]] constexpr auto lexeme(P p) const;
-};
-
-struct parser_ops : parser_applicative_ops, parser_alternative_ops {};
-
-inline constexpr parser_ops parser_v{};
 ```
 
-Each method delegates directly to the corresponding free function.
-For example:
+`fold_fix` folds a `fix<F>` tree using a carrier-algebra. It requires that
+`fmap` is findable via ADL for the layer type:
 
 ```cpp
-template <class T>
-[[nodiscard]] constexpr auto parser_applicative_ops::pure(T value) const {
-    return smd::schemepoc::pure(value);
-}
-
-template <class P, class F>
-[[nodiscard]] constexpr auto parser_applicative_ops::map(P p, F f) const {
-    return smd::schemepoc::map(p, f);
+template <template <class> class F, class Algebra>
+constexpr auto fold_fix(fix<F> const &tree, Algebra algebra) {
+    auto mapped = fmap(tree.layer(), [&](auto const &child) {
+        return fold_fix(child, algebra);
+    });
+    return algebra(mapped);
 }
 ```
 
-Do not declare members in the class body and define them out of line unless the compiler requires it.
-Inline templated definitions in the class body are acceptable here.
-
-## Required tests
+To test, define a tiny expression family in the test file (not the header):
 
 ```cpp
-// Usage via parser_v
-static_assert([] {
-    using namespace smd::schemepoc;
-    auto p = parser_v.map(char_p('x'), [](char) { return 42; });
-    auto r = p(cursor{"x"});
-    return r.has_value() && r.value().value == 42;
-}());
+template <class A>
+struct int_f {
+    int value{};
+};
 
-static_assert([] {
-    using namespace smd::schemepoc;
-    auto p = parser_v.alt(char_p('a'), char_p('b'));
-    auto ra = p(cursor{"a"});
-    auto rb = p(cursor{"b"});
-    return ra.has_value() && ra.value().value == 'a' &&
-           rb.has_value() && rb.value().value == 'b';
-}());
+template <class A>
+struct add_f {
+    A left;
+    A right;
+};
 
-static_assert([] {
-    using namespace smd::schemepoc;
-    auto p = parser_v.pure(7);
-    auto r = p(cursor{"anything"});
-    return r.has_value() && r.value().value == 7;
-}());
+template <class A>
+using expr_f = std::variant<int_f<A>, add_f<A>>;
 ```
 
-Add a `TEST_CASE("ParserOpsTest - HeaderIsIdempotent")` runtime test.
+Define `fmap` for `expr_f<A>` in the test file as well:
+
+```cpp
+template <class A, class Fn>
+constexpr auto fmap(expr_f<A> const &layer, Fn fn) {
+    return std::visit(
+        [&](auto const &node) -> expr_f<decltype(fn(node.left))> {
+            // int_f has no children; add_f maps both children
+            ...
+        },
+        layer);
+}
+```
+
+The eval algebra maps `expr_f<int>` to `int`:
+
+```cpp
+constexpr auto eval_algebra = [](expr_f<int> layer) -> int {
+    return std::visit([](auto const &node) -> int { ... }, layer);
+};
+```
+
+Test that `(1 + 2) + 3` evaluated through `fold_fix` gives `6`.
+
+Keep tests as `static_assert` where possible. Include a runtime
+`TEST_CASE("FixTest - HeaderIsIdempotent")`.
 
 ## CMakeLists.txt changes
 
 Add to `FILE_SET HEADERS`:
-- `parser_ops.hpp`
+- `fix.hpp`
 
 Add to `target_sources` for `schemepoc_test`:
-- `parser_ops.test.cpp`
+- `fix.test.cpp`
 
-Follow the same pattern as `elaborator.hpp` / `elaborator.test.cpp`.
+Follow the same pattern as `parser_ops.hpp` / `parser_ops.test.cpp`.
 
 ## Required commands
 
@@ -157,13 +132,22 @@ make test
 make lint
 ```
 
+## Design notes
+
+- `fmap` must be defined by the user of `fix`, not inside `fix.hpp` itself.
+  `fix.hpp` depends on ADL to find `fmap` for each specific functor family.
+- `fix<F>` is value-semantics. No heap allocation.
+- Do not use `std::recursive_variant` or `std::any`.
+- `constexpr` throughout where GCC16 supports it for `std::variant`.
+
 ## Do not do
 
-- Do not change any existing free functions.
-- Do not change `parser.hpp`, `parser_alternative.hpp`, or any earlier file.
-- Do not change any existing tests.
-- Do not introduce behavior changes.
-- Do not add CPS, closure backend, or evaluator changes.
-- Do not proceed to Step 14 (generic fixpoint playground) in the same commit.
+- Do not change any existing files except `CMakeLists.txt`, `checklist.md`,
+  and `handoff-next.md`.
+- Do not refactor `reader.hpp`, `elaborator.hpp`, `eval_direct.hpp`, or
+  any other pipeline file onto `fix<F>`.
 - Do not add `using namespace` in headers.
-- Do not change architecture decisions without documenting the reason in `handoff.md`.
+- Do not add CPS, closure backend, or sender changes.
+- Do not proceed to Step 15 (CPS closure backend) in the same commit.
+- Do not change architecture decisions without documenting the reason in
+  `handoff.md`.
