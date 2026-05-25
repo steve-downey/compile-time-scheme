@@ -20,7 +20,7 @@ struct builtin {
 };
 
 // Forward declaration of env to resolve circular dependency
-template <int MaxBindings>
+template <typename Core, int MaxBindings>
 class env;
 
 // A custom copyable constexpr unique pointer to avoid escaping allocations
@@ -62,12 +62,14 @@ struct constexpr_box {
     constexpr auto get() const -> T * { return ptr; }
 };
 
+template <typename Core>
 struct closure {
-    node_id node;
-    constexpr_box<env<16>> captured; // capture env<16> directly
+    Core const *node;
 
-    friend constexpr auto operator==(closure const &lhs, closure const &rhs)
-        -> bool {
+    constexpr_box<env<Core, 16>> captured; // capture env<16> directly
+
+    friend constexpr auto operator==(closure<Core> const &lhs,
+                                     closure<Core> const &rhs) -> bool {
         // Simple structural equality for test purposes.
         return lhs.node == rhs.node;
     }
@@ -81,32 +83,33 @@ struct symbol {
     }
 };
 
-using value = std::variant<int, bool, builtin, closure, symbol>;
+template <typename Core>
+using value = std::variant<int, bool, builtin, closure<Core>, symbol>;
 
-template <int MaxBindings>
+template <typename Core, int MaxBindings>
 class env {
   public:
-    constexpr auto define(std::string_view name, value val) -> void;
+    constexpr auto define(std::string_view name, value<Core> val) -> void;
     [[nodiscard]] constexpr auto lookup(std::string_view name) const
-        -> result<value>;
+        -> result<value<Core>>;
 
   private:
     struct binding {
         std::string_view name;
-        value val;
+        value<Core> val;
     };
     static_vector<binding, MaxBindings> bindings_{};
 };
 
-template <int MaxBindings>
-constexpr auto env<MaxBindings>::define(std::string_view name, value val)
-    -> void {
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::define(std::string_view name,
+                                              value<Core> val) -> void {
     bindings_.push_back(binding{name, val});
 }
 
-template <int MaxBindings>
-constexpr auto env<MaxBindings>::lookup(std::string_view name) const
-    -> result<value> {
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::lookup(std::string_view name) const
+    -> result<value<Core>> {
     for (int i = bindings_.size() - 1; i >= 0; --i) {
         if (bindings_[i].name == name)
             return bindings_[i].val;
@@ -114,11 +117,11 @@ constexpr auto env<MaxBindings>::lookup(std::string_view name) const
     return parse_error{{}, "unbound variable"};
 }
 
-template <int MaxBindings>
-[[nodiscard]] constexpr auto default_env() -> env<MaxBindings> {
-    env<MaxBindings> e{};
-    e.define("+", value{builtin{builtin_op::add}});
-    e.define("*", value{builtin{builtin_op::multiply}});
+template <typename Core, int MaxBindings>
+[[nodiscard]] constexpr auto default_env() -> env<Core, MaxBindings> {
+    env<Core, MaxBindings> e{};
+    e.define("+", value<Core>{builtin{builtin_op::add}});
+    e.define("*", value<Core>{builtin{builtin_op::multiply}});
     return e;
 }
 

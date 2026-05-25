@@ -17,206 +17,253 @@ using namespace std::string_view_literals;
 
 // Full pipeline: "(+ 1 (* 2 3))" -> 7
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"(+ 1 (* 2 3))"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(+ 1 (* 2 3))"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 7;
 }());
 
 // Lambda yielding closure
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"(lambda (x) x)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(lambda (x) x)"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
-    return vr.has_value() && std::holds_alternative<closure>(vr.value()) &&
-           std::get<closure>(vr.value()).node == ct.size() - 1;
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
+    return vr.has_value() &&
+           std::holds_alternative<closure<core_type<32, 16>>>(vr.value()) &&
+           std::get<closure<core_type<32, 16>>>(vr.value()).node != nullptr;
 }());
 
 // "42" -> value holding int{42}
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"42"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"42"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 42;
 }());
 
 // "#t" -> value holding bool{true}
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"#t"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"#t"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<bool>(vr.value()) &&
            std::get<bool>(vr.value()) == true;
 }());
 
 // "(+ 1 2)" -> value holding int{3}
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"(+ 1 2)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(+ 1 2)"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 3;
 }());
 
 // "(* 3 4)" -> value holding int{12}
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"(* 3 4)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(* 3 4)"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 12;
 }());
 
 // "(if #t 1 2)" -> value holding int{1}
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"(if #t 1 2)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(if #t 1 2)"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 1;
 }());
 
 // "(if #f 1 2)" -> value holding int{2}
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"(if #f 1 2)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(if #f 1 2)"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 2;
 }());
 
 // "()" -> error from elaboration (before eval is reached)
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"()"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"()"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     return !er.has_value();
 }());
 
 // Unbound variable "x" -> error from lookup
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"x"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"x"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return !vr.has_value();
 }());
 
 // "((lambda (x) x) 42)" -> value holding int{42}
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"((lambda (x) x) 42)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x) x) 42)"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 42;
 }());
 
 // "((lambda (x) (+ x 1)) 5)" -> value holding int{6}
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"((lambda (x) (+ x 1)) 5)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr =
+        read_datum<32, 16>(cursor{"((lambda (x) (+ x 1)) 5)"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 6;
 }());
 
 // "((lambda (x y) (+ x y)) 3 4)" -> value holding int{7}
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"((lambda (x y) (+ x y)) 3 4)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x y) (+ x y)) 3 4)"sv},
+                                 datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 7;
 }());
 
 // "(((lambda (x) (lambda (y) (+ x y))) 3) 4)" -> value holding int{7}
 static_assert([] {
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
     auto dr = read_datum<32, 16>(
-        cursor{"(((lambda (x) (lambda (y) (+ x y))) 3) 4)"sv});
+        cursor{"(((lambda (x) (lambda (y) (+ x y))) 3) 4)"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 7;
 }());
 
 // "((lambda (x) ((lambda (y) (+ x y)) 2)) 40)" -> value holding int{42}
 static_assert([] {
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
     auto dr = read_datum<32, 16>(
-        cursor{"((lambda (x) ((lambda (y) (+ x y)) 2)) 40)"sv});
+        cursor{"((lambda (x) ((lambda (y) (+ x y)) 2)) 40)"sv}, datum_arena);
     if (!dr.has_value())
         return false;
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return false;
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 42;
 }());
@@ -228,12 +275,15 @@ TEST_CASE("EvalDirectTest - HeaderIsIdempotent") { REQUIRE(true); }
 TEST_CASE("EvalDirectTest - FullPipeline") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"(+ 1 (* 2 3))"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(+ 1 (* 2 3))"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 7);
@@ -242,12 +292,15 @@ TEST_CASE("EvalDirectTest - FullPipeline") {
 TEST_CASE("EvalDirectTest - Integer") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"42"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"42"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 42);
@@ -256,12 +309,15 @@ TEST_CASE("EvalDirectTest - Integer") {
 TEST_CASE("EvalDirectTest - Boolean") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"#t"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"#t"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<bool>(vr.value()));
     REQUIRE(std::get<bool>(vr.value()) == true);
@@ -270,12 +326,15 @@ TEST_CASE("EvalDirectTest - Boolean") {
 TEST_CASE("EvalDirectTest - Add") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"(+ 1 2)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(+ 1 2)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 3);
@@ -284,12 +343,15 @@ TEST_CASE("EvalDirectTest - Add") {
 TEST_CASE("EvalDirectTest - Multiply") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"(* 3 4)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(* 3 4)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 12);
@@ -298,12 +360,15 @@ TEST_CASE("EvalDirectTest - Multiply") {
 TEST_CASE("EvalDirectTest - IfTrue") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"(if #t 1 2)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(if #t 1 2)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 1);
@@ -312,12 +377,15 @@ TEST_CASE("EvalDirectTest - IfTrue") {
 TEST_CASE("EvalDirectTest - IfFalse") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"(if #f 1 2)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(if #f 1 2)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 2);
@@ -326,39 +394,48 @@ TEST_CASE("EvalDirectTest - IfFalse") {
 TEST_CASE("EvalDirectTest - UnboundVariable") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"x"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"x"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE_FALSE(vr.has_value());
 }
 
 TEST_CASE("EvalDirectTest - EvalLambdaYieldsClosure") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"(lambda (x) x)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(lambda (x) x)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
-    REQUIRE(std::holds_alternative<closure>(vr.value()));
-    auto closure_val = std::get<closure>(vr.value());
-    REQUIRE(closure_val.node == ct.size() - 1);
+    REQUIRE(std::holds_alternative<closure<core_type<32, 16>>>(vr.value()));
+    auto closure_val = std::get<closure<core_type<32, 16>>>(vr.value());
+    REQUIRE(closure_val.node != nullptr);
 }
 
 TEST_CASE("EvalDirectTest - ApplicationIdentity") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"((lambda (x) x) 42)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x) x) 42)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 42);
@@ -367,12 +444,16 @@ TEST_CASE("EvalDirectTest - ApplicationIdentity") {
 TEST_CASE("EvalDirectTest - ApplicationAdd") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"((lambda (x) (+ x 1)) 5)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr =
+        read_datum<32, 16>(cursor{"((lambda (x) (+ x 1)) 5)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 6);
@@ -381,12 +462,16 @@ TEST_CASE("EvalDirectTest - ApplicationAdd") {
 TEST_CASE("EvalDirectTest - ApplicationAddMultiArgs") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"((lambda (x y) (+ x y)) 3 4)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x y) (+ x y)) 3 4)"sv},
+                                 datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 7);
@@ -395,12 +480,15 @@ TEST_CASE("EvalDirectTest - ApplicationAddMultiArgs") {
 TEST_CASE("EvalDirectTest - ApplicationArityMismatch") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"((lambda (x y) x) 1)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x y) x) 1)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE_FALSE(vr.has_value());
     REQUIRE(vr.error().message == "arity mismatch");
 }
@@ -408,12 +496,15 @@ TEST_CASE("EvalDirectTest - ApplicationArityMismatch") {
 TEST_CASE("EvalDirectTest - ApplicationNonFunction") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"(1 2 3)"sv});
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(1 2 3)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE_FALSE(vr.has_value());
     REQUIRE(vr.error().message == "attempted to call non-function");
 }
@@ -421,13 +512,16 @@ TEST_CASE("EvalDirectTest - ApplicationNonFunction") {
 TEST_CASE("EvalDirectTest - LexicalCapture1") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
     auto dr = read_datum<32, 16>(
-        cursor{"(((lambda (x) (lambda (y) (+ x y))) 3) 4)"sv});
+        cursor{"(((lambda (x) (lambda (y) (+ x y))) 3) 4)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 7);
@@ -436,13 +530,16 @@ TEST_CASE("EvalDirectTest - LexicalCapture1") {
 TEST_CASE("EvalDirectTest - LexicalCapture2") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
     auto dr = read_datum<32, 16>(
-        cursor{"((lambda (x) ((lambda (y) (+ x y)) 2)) 40)"sv});
+        cursor{"((lambda (x) ((lambda (y) (+ x y)) 2)) 40)"sv}, datum_arena);
     REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     REQUIRE(er.has_value());
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE(vr.has_value());
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 42);
@@ -453,12 +550,15 @@ TEST_CASE("EvalDirectTest - QuoteAtom") {
     using namespace std::string_view_literals;
 
     auto test_eval_quote = [](std::string_view src) {
-        auto dr = read_datum<32, 16>(cursor{src});
+        tree_arena<datum_type<32, 16>, 32> datum_arena;
+        tree_arena<core_type<32, 16>, 32> core_arena;
+        auto dr = read_datum<32, 16>(cursor{src}, datum_arena);
         REQUIRE(dr.has_value());
-        auto er = elaborate(dr.value().value);
+        auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
         REQUIRE(er.has_value());
         auto const &ct = er.value();
-        auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+        auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                          default_env<core_type<32, 16>, 16>());
         REQUIRE(vr.has_value());
         return vr.value();
     };
@@ -477,20 +577,26 @@ TEST_CASE("EvalDirectTest - QuoteAtom") {
 }
 
 static_assert([] {
-    auto dr = read_datum<32, 16>(cursor{"'x"sv});
-    auto er = elaborate(dr.value().value);
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"'x"sv}, datum_arena);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     return std::get<symbol>(vr.value()).name == "x"sv;
 }());
 
 TEST_CASE("EvalDirectTest - AddBadType") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"(+ #t 1)"sv});
-    auto er = elaborate(dr.value().value);
+    tree_arena<datum_type<32, 16>, 32> datum_arena;
+    tree_arena<core_type<32, 16>, 32> core_arena;
+    auto dr = read_datum<32, 16>(cursor{"(+ #t 1)"sv}, datum_arena);
+    auto er = elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
     auto const &ct = er.value();
-    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    auto vr = eval_direct<32, 16, 16>(ct, core_arena,
+                                      default_env<core_type<32, 16>, 16>());
     REQUIRE_FALSE(vr.has_value());
     REQUIRE(vr.error().message == "type error");
 }
