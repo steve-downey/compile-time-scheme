@@ -50,6 +50,8 @@ Consider using CMAKE_PROJECT_TOP_LEVEL_INCLUDES=./cmake/use-fetch-content.cmake 
     endif()
 endif()
 
+add_subdirectory(vendor/execution EXCLUDE_FROM_ALL)
+
 add_subdirectory(src)
 
 include(infra/cmake/beman-install-library.cmake)

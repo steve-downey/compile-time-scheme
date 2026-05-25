@@ -1,0 +1,3 @@
+[submodule "vendor/execution"]
+	path = vendor/execution
+	url = https://github.com/bemanproject/execution.git
