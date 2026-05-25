@@ -33,7 +33,7 @@
 - [x] Step 2: input cursor and lexical primitives
 - [x] Step 3: minimal parser object
 - [x] Step 4: functor and applicative combinators
-- [ ] Step 5: alternative, repetition, and lexeme
+- [x] Step 5: alternative, repetition, and lexeme
 - [ ] Step 6: reader atom model
 - [ ] Step 7: fixed-capacity datum tree
 - [ ] Step 8: datum reader for lists and quote
