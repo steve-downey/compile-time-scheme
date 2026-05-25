@@ -1,5 +1,5 @@
-// schemepoc/schemepoc.test.cpp                                              -*-C++-*-
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// schemepoc/schemepoc.test.cpp -*-C++-*- SPDX-License-Identifier: Apache-2.0
+// WITH LLVM-exception
 
 #include <smd/schemepoc/schemepoc.hpp>
 
