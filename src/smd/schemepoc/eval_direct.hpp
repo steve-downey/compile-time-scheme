@@ -48,31 +48,57 @@ template <int MaxNodes, int MaxList, int MaxBindings>
         auto func_r = eval_direct(ct, app.func, environment);
         if (!func_r.has_value())
             return func_r.error();
-        if (!std::holds_alternative<builtin>(func_r.value()))
-            return parse_error{{}, "type error"};
-        auto const &bi = std::get<builtin>(func_r.value());
 
-        if (app.args.size() != 2)
-            return parse_error{{}, "type error"};
+        if (std::holds_alternative<builtin>(func_r.value())) {
+            auto const &bi = std::get<builtin>(func_r.value());
 
-        auto arg0_r = eval_direct(ct, app.args[0], environment);
-        if (!arg0_r.has_value())
-            return arg0_r.error();
-        if (!std::holds_alternative<int>(arg0_r.value()))
-            return parse_error{{}, "type error"};
+            if (app.args.size() != 2)
+                return parse_error{{}, "type error"};
 
-        auto arg1_r = eval_direct(ct, app.args[1], environment);
-        if (!arg1_r.has_value())
-            return arg1_r.error();
-        if (!std::holds_alternative<int>(arg1_r.value()))
-            return parse_error{{}, "type error"};
+            auto arg0_r = eval_direct(ct, app.args[0], environment);
+            if (!arg0_r.has_value())
+                return arg0_r.error();
+            if (!std::holds_alternative<int>(arg0_r.value()))
+                return parse_error{{}, "type error"};
 
-        int a = std::get<int>(arg0_r.value());
-        int b = std::get<int>(arg1_r.value());
+            auto arg1_r = eval_direct(ct, app.args[1], environment);
+            if (!arg1_r.has_value())
+                return arg1_r.error();
+            if (!std::holds_alternative<int>(arg1_r.value()))
+                return parse_error{{}, "type error"};
 
-        if (bi.op == builtin_op::add)
-            return value{a + b};
-        return value{a * b};
+            int a = std::get<int>(arg0_r.value());
+            int b = std::get<int>(arg1_r.value());
+
+            if (bi.op == builtin_op::add)
+                return value{a + b};
+            return value{a * b};
+        }
+
+        if (std::holds_alternative<closure>(func_r.value())) {
+            auto const &clo = std::get<closure>(func_r.value());
+            auto const &lam_node = ct.get(clo.node);
+            // This cast should never fail if AST is valid, but we handle it
+            // anyway
+            if (!std::holds_alternative<core_lambda<MaxList>>(lam_node))
+                return parse_error{{}, "type error"};
+
+            auto const &lam = std::get<core_lambda<MaxList>>(lam_node);
+            if (app.args.size() != lam.params.size())
+                return parse_error{{}, "arity error"};
+
+            auto new_env = environment;
+            for (std::size_t i = 0; i < app.args.size(); ++i) {
+                auto arg_r = eval_direct(ct, app.args[i], environment);
+                if (!arg_r.has_value())
+                    return arg_r.error();
+                new_env.define(lam.params[i], arg_r.value());
+            }
+
+            return eval_direct(ct, lam.body, new_env);
+        }
+
+        return parse_error{{}, "type error"};
     }
 
     return parse_error{{}, "eval_direct: unsupported form"};

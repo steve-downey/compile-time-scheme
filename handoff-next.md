@@ -1,25 +1,26 @@
-# Next step: Step 22 (function application)
+# Next step: Step 23 (lexical closure capture)
 
 ## Goal
 
-Now that we have `closure` values representing lambdas at runtime, we need to implement evaluating function application where the operator evaluates to a `closure`.
+Currently, `closure` values only store the `node_id` of their `core_lambda` and do not capture their defining lexical environment. We need to implement lexical environment capture so closures can access variables bound outside their parameters.
 
-The goal is to update `eval_direct.hpp` to handle `core_application` when the operator evaluates to a `closure`, bind the arguments to the parameters, and evaluate the lambda's body.
+## Details
 
-Lexical capture (environments nested in closures) is deferred to Step 23. For Step 22, it is sufficient that applying a closure evaluates the body in an environment extended with the arguments.
+- Update the `closure` type (in `value.hpp`) to store a copy of the lexical `env` present when the lambda was evaluated. Since `env` is currently templated on `MaxBindings` (often `16`), consider how to embed an environment within a `closure`. Since we are relying on fixed-capacity structures, adding `env<16>` to `closure` directly may be an acceptable first step if type dependencies align (or templating `closure` / `value` if necessary, though this cascades... a fixed type or pointer could work, but be mindful of `constexpr` allocation).
+- Update `eval_direct.hpp`: when evaluating a `core_lambda`, capture the current `environment` into the created `closure`.
+- When evaluating a `closure` application, the base environment should be the captured environment, NOT the caller's environment. Copy the closure's captured environment, extend it with the new evaluated arguments, and evaluate the lambda body within that extended environment.
+- Add tests in `eval_direct.test.cpp` to verify lexical scope (e.g. `(((lambda (x) (lambda (y) (+ x y))) 3) 4)` should return `7`).
 
 ## Constraints
 
-- Update `eval_direct.hpp` for `core_application<MaxList>`. Currently, it assumes the function evaluates to a `builtin`. Add support for when the operator evaluates to a `closure`.
-- When a `closure` is applied, retrieve the `core_lambda` node it points to in the `core_tree`.
-- Check arity (number of provided arguments must match `lambda.params.size()`).
-- Copy the current environment and define the evaluated arguments using the parameter names. (Full parent-linked lexical environments are Step 23, so just extending a copy of the current environment is sufficient).
-- Evaluate the lambda's body with the extended environment.
-- Add tests in `eval_direct.test.cpp` for evaluating something like `((lambda (x) (+ x 1)) 5)`.
+- Ensure the structures stay `constexpr`-friendly.
+- Be careful with circular type dependencies between `value` and `env`. `env` stores `value`s; if `closure` is in `value` and requires `env`, you can forward-declare or restructure definition order.
+- Maintain tests, keeping things green.
 
 ## Files expected to change
 
-- `src/smd/schemepoc/eval_direct.hpp` (add closure application handling)
-- `src/smd/schemepoc/eval_direct.test.cpp` (add end-to-end tests for lambda application)
-- `checklist.md` (check off step 22)
-- `handoff-next.md` (prepare for step 23)
+- `src/smd/schemepoc/value.hpp` (add captured env to closure, resolve loop)
+- `src/smd/schemepoc/eval_direct.hpp` (capture env on creation, use captured env on apply)
+- `src/smd/schemepoc/eval_direct.test.cpp` (add lexical capture tests)
+- `checklist.md` (check off step 23)
+- `handoff-next.md` (prepare for step 24)
