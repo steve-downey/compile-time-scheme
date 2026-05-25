@@ -38,7 +38,7 @@ using atom = std::variant<atom_integer, atom_symbol>;
         auto rest = digits.value().rest;
 
         int sign = negative ? -1 : 1;
-        int n    = 0;
+        int n = 0;
         for (int i = 0; i < d.size(); ++i)
             n = n * 10 + (d[i] - '0');
         return parse_result<atom_integer>{
@@ -54,9 +54,9 @@ using atom = std::variant<atom_integer, atom_symbol>;
             return parse_result<atom_symbol>{first.error()};
         auto rest_cur = first.value().rest;
         auto tail = many<64>(satisfy(is_symbol_char, "symbol char"))(rest_cur);
-        auto end_cur  = tail.value().rest;
-        int  len = end_cur.position().offset - start.position().offset;
-        auto name    = start.remaining().substr(0, len);
+        auto end_cur = tail.value().rest;
+        int len = end_cur.position().offset - start.position().offset;
+        auto name = start.remaining().substr(0, len);
         return parse_result<atom_symbol>{
             parse_state<atom_symbol>{atom_symbol{name}, end_cur}};
     }};
