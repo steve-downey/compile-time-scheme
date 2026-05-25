@@ -3,6 +3,7 @@
 #ifndef SRC_SMD_SCHEMEPOC_FIX_HPP
 #define SRC_SMD_SCHEMEPOC_FIX_HPP
 
+#include <smd/schemepoc/functor.hpp>
 #include <utility>
 
 namespace smd::schemepoc {
@@ -17,7 +18,8 @@ struct fix {
 
 // fold_fix recursively folds a fix<F> tree using a carrier-algebra.
 // R is the carrier type (return type of algebra).
-// fmap must be findable via ADL for the specific F<...> layer type.
+// fmap is invoked via the CPO smd::schemepoc::fmap, which delegates to
+// functor_typeclass.
 template <class R, template <class> class F, class Algebra>
 constexpr auto fold_fix(fix<F> const &tree, Algebra algebra) -> R {
     auto mapped = fmap(tree.inner, [&](auto const &child) -> R {
