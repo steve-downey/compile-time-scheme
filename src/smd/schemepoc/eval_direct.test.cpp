@@ -490,7 +490,7 @@ TEST_CASE("EvalDirectTest - ApplicationArityMismatch") {
     auto vr = eval_direct<32, 16, 16>(ct, core_arena,
                                       default_env<core_type<32, 16>, 16>());
     REQUIRE_FALSE(vr.has_value());
-    REQUIRE(vr.error().message == "arity mismatch");
+    REQUIRE(std::string_view(vr.error().message) == "arity mismatch");
 }
 
 TEST_CASE("EvalDirectTest - ApplicationNonFunction") {
@@ -506,7 +506,8 @@ TEST_CASE("EvalDirectTest - ApplicationNonFunction") {
     auto vr = eval_direct<32, 16, 16>(ct, core_arena,
                                       default_env<core_type<32, 16>, 16>());
     REQUIRE_FALSE(vr.has_value());
-    REQUIRE(vr.error().message == "attempted to call non-function");
+    REQUIRE(std::string_view(vr.error().message) ==
+            "attempted to call non-function");
 }
 
 TEST_CASE("EvalDirectTest - LexicalCapture1") {
@@ -598,5 +599,5 @@ TEST_CASE("EvalDirectTest - AddBadType") {
     auto vr = eval_direct<32, 16, 16>(ct, core_arena,
                                       default_env<core_type<32, 16>, 16>());
     REQUIRE_FALSE(vr.has_value());
-    REQUIRE(vr.error().message == "type error");
+    REQUIRE(std::string_view(vr.error().message) == "type error");
 }

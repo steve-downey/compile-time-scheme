@@ -111,7 +111,7 @@ eval_direct(core_type<MaxNodes, MaxList> const &node,
                 return parse_error{{}, "arity mismatch"};
 
             auto new_env = clo.captured ? *clo.captured : environment;
-            for (std::size_t i = 0; i < app.args.size(); ++i) {
+            for (int i = 0; i < app.args.size(); ++i) {
                 auto arg_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
                     arena.get(app.args[i]), arena, environment);
                 if (!arg_r.has_value())
