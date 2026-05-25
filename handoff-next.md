@@ -1,153 +1,142 @@
-# Next step: Step 14 (generic fixpoint playground)
+# Next step: Step 15 (CPS closure backend facade, arithmetic only)
 
 ## Goal
 
-Add a small, isolated `fix<F>` and `fold_fix` experiment without converting
-the main arena-based compiler. This step introduces recursion-scheme machinery
-in a safe sandbox. The existing compiler pipeline must not be modified.
+Add `cps.hpp` and `cps_arithmetic.test.cpp` that compile a `core_tree` node to a
+continuation-passing-style callable object. No lambdas yet — only arithmetic
+expressions that `eval_direct` already handles. The first implementation is
+interpreter-backed (calls `eval_direct` inside the CPS closure). The boundary
+and test contract are what matter.
 
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/fix.hpp         (new)
-src/smd/schemepoc/fix.test.cpp    (new)
-src/smd/schemepoc/CMakeLists.txt  (add new files)
-checklist.md                      (mark step done)
-handoff-next.md                   (update for step 15)
+src/smd/schemepoc/cps.hpp              (new)
+src/smd/schemepoc/cps_arithmetic.test.cpp  (new)
+src/smd/schemepoc/CMakeLists.txt       (add new files)
+checklist.md                           (mark step done)
+handoff-next.md                        (update for step 16)
 ```
 
-No existing files need to change.
+No existing pipeline files need to change.
 
 ## Context from previous steps
 
-Steps 11-13 completed the first full pipeline milestone and a presentation layer:
+Steps 11–14 completed:
 
-- `value.hpp`: `enum class builtin_op { add, multiply }`, `struct builtin`,
+- `value.hpp`: `enum class builtin_op { add, multiply }`, `struct builtin { builtin_op op; }`,
   `using value = std::variant<int, bool, builtin>`,
   `template <int MaxBindings> class env`,
   `template <int MaxBindings> constexpr auto default_env() -> env<MaxBindings>`
-- `eval_direct.hpp`: `template <int MaxNodes, int MaxList, int MaxBindings> constexpr auto eval_direct(core_tree<MaxNodes, MaxList> const &ct, node_id root, env<MaxBindings> const &environment) -> result<value>`
-- `elaborator.hpp`: all core types, `elaborate(datum_tree)` function
-- `reader.hpp`: `read_datum<MaxNodes, MaxList>(cursor{sv})` returning `parse_result<datum_tree<...>>`
-- `parser_ops.hpp`: `parser_applicative_ops`, `parser_alternative_ops`,
-  `struct parser_ops : parser_applicative_ops, parser_alternative_ops {}`,
-  `inline constexpr parser_ops parser_v{}`
+- `eval_direct.hpp`:
+  `template <int MaxNodes, int MaxList, int MaxBindings>`
+  `constexpr auto eval_direct(core_tree<MaxNodes, MaxList> const&, node_id, env<MaxBindings> const&) -> result<value>`
+- `elaborator.hpp`: all core types (`core_integer`, `core_boolean`, `core_symbol`,
+  `core_if`, `core_application<MaxList>`, `node_id`, `core_tree<MaxNodes, MaxList>`),
+  `constexpr auto elaborate(datum_tree<...>) -> result<core_tree<...>>`
+- `reader.hpp`: `read_datum<MaxNodes, MaxList>(cursor{sv}) -> parse_result<datum_tree<...>>`
+- `parser_ops.hpp`: typeclass-object facade over the parser free functions
+- `fix.hpp`: `template <template <class> class F> class fix`,
+  `template <class R, template <class> class F, class Algebra>`
+  `constexpr auto fold_fix(fix<F> const&, Algebra) -> R`
 
-105 tests pass. `make compile`, `make test`, `make lint` are all green.
+106 tests pass. `make compile`, `make test`, `make lint` are all green.
 
 ## Required implementation
 
-The `fix.hpp` header must define `fix<F>` and `fold_fix` in
-`namespace smd::schemepoc`. The `fix` type wraps a single layer of a
-functorial expression family:
+### cps.hpp
+
+Define `cps_code<F>` and `compile_cps` in `namespace smd::schemepoc`:
 
 ```cpp
-template <template <class> class F>
-class fix {
-  public:
-    using layer_type = F<fix<F>>;
+template <class F>
+struct cps_code {
+    F f;
 
-    constexpr explicit fix(layer_type layer);
-
-    [[nodiscard]] constexpr auto layer() const -> layer_type const &;
-
-  private:
-    layer_type layer_;
+    template <class Env, class K>
+    constexpr auto operator()(Env const& env, K k) const {
+        return f(env, k);
+    }
 };
+
+template <class F>
+cps_code(F) -> cps_code<F>;
 ```
 
-`fold_fix` folds a `fix<F>` tree using a carrier-algebra. It requires that
-`fmap` is findable via ADL for the layer type:
+`compile_cps` returns a `cps_code` backed by `eval_direct`:
 
 ```cpp
-template <template <class> class F, class Algebra>
-constexpr auto fold_fix(fix<F> const &tree, Algebra algebra) {
-    auto mapped = fmap(tree.layer(), [&](auto const &child) {
-        return fold_fix(child, algebra);
-    });
-    return algebra(mapped);
+template <int MaxNodes, int MaxList, int MaxBindings>
+[[nodiscard]] constexpr auto compile_cps(
+    core_tree<MaxNodes, MaxList> const& core,
+    node_id root) {
+    return cps_code{[core, root](auto const& env, auto k) constexpr {
+        auto v = eval_direct(core, root, env);
+        if (!v.has_value())
+            return v;
+        return k(v.value());
+    }};
 }
 ```
 
-To test, define a tiny expression family in the test file (not the header):
+Note: `compile_cps` captures `core` by value into the lambda. `MaxBindings` is
+not a parameter to `compile_cps`; it is deduced from the `env` argument passed
+at call time.
 
+The `compile_cps` signature does NOT fix `MaxBindings`; instead the lambda's
+`auto const& env` lets any matching `env<N>` be passed.
+
+Headers needed: `elaborator.hpp`, `eval_direct.hpp`, `value.hpp`, `result.hpp`.
+
+### cps_arithmetic.test.cpp
+
+Build an arithmetic expression via reader + elaborator, compile it with
+`compile_cps`, and invoke with a continuation.
+
+Suggested test expression: `"(+ 3 4)"` → result should be `value{7}`.
+
+Test pattern:
 ```cpp
-template <class A>
-struct int_f {
-    int value{};
-};
-
-template <class A>
-struct add_f {
-    A left;
-    A right;
-};
-
-template <class A>
-using expr_f = std::variant<int_f<A>, add_f<A>>;
+constexpr auto src = std::string_view{"(+ 3 4)"};
+constexpr auto parsed = read_datum<64, 16>(cursor{src});
+// static_assert or require parsed.has_value()
+constexpr auto ct = elaborate(parsed.value().value);
+// static_assert or require ct.has_value()
+constexpr auto code = compile_cps(ct.value(), ct.value().root());
+constexpr auto env0 = default_env<16>();
+constexpr auto result = code(env0, [](value v) constexpr {
+    return smd::schemepoc::result<value>{v};
+});
+static_assert(result.value() == value{7});
 ```
 
-Define `fmap` for `expr_f<A>` in the test file as well:
+Include the component header first and twice. Include a runtime
+`TEST_CASE("CpsArithmeticTest - HeaderIsIdempotent")`.
 
-```cpp
-template <class A, class Fn>
-constexpr auto fmap(expr_f<A> const &layer, Fn fn) {
-    return std::visit(
-        [&](auto const &node) -> expr_f<decltype(fn(node.left))> {
-            // int_f has no children; add_f maps both children
-            ...
-        },
-        layer);
-}
-```
-
-The eval algebra maps `expr_f<int>` to `int`:
-
-```cpp
-constexpr auto eval_algebra = [](expr_f<int> layer) -> int {
-    return std::visit([](auto const &node) -> int { ... }, layer);
-};
-```
-
-Test that `(1 + 2) + 3` evaluated through `fold_fix` gives `6`.
-
-Keep tests as `static_assert` where possible. Include a runtime
-`TEST_CASE("FixTest - HeaderIsIdempotent")`.
-
-## CMakeLists.txt changes
+### CMakeLists.txt changes
 
 Add to `FILE_SET HEADERS`:
-- `fix.hpp`
+- `cps.hpp`
 
 Add to `target_sources` for `schemepoc_test`:
-- `fix.test.cpp`
+- `cps_arithmetic.test.cpp`
 
-Follow the same pattern as `parser_ops.hpp` / `parser_ops.test.cpp`.
-
-## Required commands
-
-```bash
-make compile
-make test
-make lint
-```
+Follow the same pattern as `fix.hpp` / `fix.test.cpp`.
 
 ## Design notes
 
-- `fmap` must be defined by the user of `fix`, not inside `fix.hpp` itself.
-  `fix.hpp` depends on ADL to find `fmap` for each specific functor family.
-- `fix<F>` is value-semantics. No heap allocation.
-- Do not use `std::recursive_variant` or `std::any`.
-- `constexpr` throughout where GCC16 supports it for `std::variant`.
+- `compile_cps` is interpreter-backed in step 15. Steps 16–18 will replace
+  the interpreter with a true bottom-up CPS compiler.
+- `cps_code<F>` uses concrete templated callables, not `std::move_only_function`
+  or `std::any`. This is intentional for constexpr compatibility.
+- `K` (the continuation) must return `result<value>` so that errors propagate.
+- Do not add lambda support, closures, or defunctionalization yet.
 
 ## Do not do
 
-- Do not change any existing files except `CMakeLists.txt`, `checklist.md`,
-  and `handoff-next.md`.
-- Do not refactor `reader.hpp`, `elaborator.hpp`, `eval_direct.hpp`, or
-  any other pipeline file onto `fix<F>`.
+- Do not change `eval_direct.hpp`, `elaborator.hpp`, `value.hpp`, `reader.hpp`,
+  `fix.hpp`, or any other existing pipeline file.
 - Do not add `using namespace` in headers.
-- Do not add CPS, closure backend, or sender changes.
-- Do not proceed to Step 15 (CPS closure backend) in the same commit.
-- Do not change architecture decisions without documenting the reason in
-  `handoff.md`.
+- Do not implement a true bottom-up CPS compiler (that is step 16).
+- Do not add CPS for lambdas (that is step 20+).
+- Do not proceed to step 16 in the same commit.

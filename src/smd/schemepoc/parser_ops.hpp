@@ -21,8 +21,8 @@ struct parser_applicative_ops {
 
     template <class PF, class PA>
     [[nodiscard]] constexpr auto apply(PF pf, PA pa) const {
-        return smd::schemepoc::lift2(
-            pf, pa, [](auto fn, auto val) { return fn(val); });
+        return smd::schemepoc::lift2(pf, pa,
+                                     [](auto fn, auto val) { return fn(val); });
     }
 
     template <class F, class PA, class PB>
