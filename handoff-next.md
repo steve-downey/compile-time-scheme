@@ -1,108 +1,128 @@
-# Next step: Step 19 (public one-shot API)
+# Next step: Step 20 (lambda syntax — elaborator hardening)
 
 ## Goal
 
-Expose a clean, minimal public API over the full pipeline so that demo
-snippets and future Godbolt extractions can use a single header.  The
-concrete deliverable is a variable template `compiled_closure<"...">` that
-evaluates a Scheme expression at compile time and holds the resulting
-`closure_program` as a `constexpr` object.
+Harden the elaborator's `lambda` handling with the one constraint that is
+currently missing: duplicate-parameter detection.
+The elaborator already parses `(lambda (params) body)` and stores
+`core_lambda<MaxList>`, but it does not yet reject `(lambda (x x) body)`.
+Add that check and add more thorough elaboration tests.
+Do **not** touch `cps_dispatch` — lambda still returns "unsupported form"
+at the CPS level; that comes in steps 21–22.
 
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/schemepoc.hpp       (add compiled_closure variable template)
-src/smd/schemepoc/schemepoc.test.cpp  (add tests for public API)
-checklist.md                          (mark step done)
-handoff-next.md                       (update for step 20)
+src/smd/schemepoc/elaborator.hpp      (add duplicate-param check)
+src/smd/schemepoc/elaborator.test.cpp (add DuplicateParam error test,
+                                        multi-param and complex-body tests)
+checklist.md                           (mark step done)
+handoff-next.md                        (update for step 21)
 ```
 
-No new headers are needed.  The public API lives in `schemepoc.hpp`.
+No other files need to change.
 
 ## Current state
 
-`schemepoc.hpp` is a near-empty shell:
+`elaborator.hpp` `elaborate_list` (around line 118–141) already:
+- Recognizes the `lambda` special form
+- Checks that each param is a `datum_symbol`
+- Stores `core_lambda<MaxList>{params, body_id}`
+
+What it does **not** do: check for duplicate param names.
+
+`cps.hpp` `cps_dispatch` (last branch, around line 128–129) returns an
+error for `core_lambda`:
+```cpp
+// core_lambda, core_define, core_quote: out of scope for step 17
+return result<value>{parse_error{{}, "unsupported form"}};
+```
+Leave that as-is.
+
+## Required implementation
+
+In `elaborate_list`, after building `params`, scan for duplicates:
 
 ```cpp
-// 44cc988c-7353-43aa-a7d3-8840f92371a6
-namespace smd::schemepoc {} // namespace smd::schemepoc
-// 44cc988c-7353-43aa-a7d3-8840f92371a6 end
-```
-
-`schemepoc.test.cpp` has only the `HeaderIsIdempotent` stub test.
-
-The full pipeline is already implemented:
-
-```
-read_datum<MaxNodes, MaxList>(cursor{src})   -> parse_result<datum_tree>
-elaborate(datum_tree)                        -> result<core_tree>
-compile_cps(core_tree, root_id)              -> cps_code<F>
-closure_program{cps_code}                   -> operator()(env) -> result<value>
-compile_to_closure<MaxNodes, MaxList>(src)   -> result<closure_program<F>>
-```
-
-`compile_to_closure` is in `closure_backend.hpp` (added in step 18).
-
-## Target API for step 19
-
-```cpp
-// source_literal: NTTP carrier for string literals.
-template <std::size_t N>
-struct source_literal {
-    char text[N]{};
-    constexpr source_literal(char const (&input)[N]) {
-        std::copy_n(input, N, text);
+// Check for duplicate parameter names.
+for (int i = 0; i < params.size(); ++i) {
+    for (int j = i + 1; j < params.size(); ++j) {
+        if (params[i] == params[j])
+            return parse_error{{}, "lambda: duplicate parameter"};
     }
-    constexpr auto view() const -> std::string_view { return {text, N - 1}; }
-};
-
-// compiled_closure: evaluates Source at compile time.
-// Use: constexpr auto prog = compiled_closure<"(+ 1 2)">;
-//      auto r = prog(default_env<16>());
-template <source_literal Source>
-inline constexpr auto compiled_closure =
-    compile_to_closure(Source.view()).value();
+}
 ```
 
-`source_literal` allows a string literal to be a non-type template parameter
-(C++20 class NTTP).  `compile_to_closure` uses default arena sizes
-`<32, 16>`.
+Insert that block before `auto body_r = elaborate_node(...)`.
 
-## Static_assert test pattern
+## Required tests (in elaborator.test.cpp)
 
-Tests in `schemepoc.test.cpp` should use the immediately-invoked lambda
-pattern for any test that holds an intermediate `core_tree` or `cps_code`
-object.  The `compiled_closure` variable template itself is fine at namespace
-scope because it is `inline constexpr` — there is one ODR-safe instance per
-TU and the size is the same as a `closure_program<F>` (which captures a
-`core_tree<32,16>` inside the lambda, ~17 KB).
+1. **Duplicate param → error**
+   ```cpp
+   // "(lambda (x x) x)" -> elaboration error (duplicate parameter)
+   static_assert([] {
+       auto dr = read_datum<32, 16>(cursor{"(lambda (x x) x)"sv});
+       if (!dr.has_value()) return false;
+       auto er = elaborate(dr.value().value);
+       return !er.has_value(); // must fail
+   }());
+   ```
 
-For `static_assert` tests over `compiled_closure`, invoke it inside the
-assertion expression, not via a named `constexpr auto`:
+2. **Multi-param lambda → correct shape**
+   ```cpp
+   // "(lambda (x y) (+ x y))" -> core_lambda with 2 params
+   static_assert([] {
+       auto dr = read_datum<32, 16>(cursor{"(lambda (x y) (+ x y))"sv});
+       if (!dr.has_value()) return false;
+       auto er = elaborate(dr.value().value);
+       if (!er.has_value()) return false;
+       auto const &ct = er.value();
+       auto const &root = ct.get(ct.size() - 1);
+       if (!std::holds_alternative<core_lambda<16>>(root)) return false;
+       auto const &lam = std::get<core_lambda<16>>(root);
+       return lam.params.size() == 2 &&
+              lam.params[0] == "x"sv &&
+              lam.params[1] == "y"sv;
+   }());
+   ```
 
-```cpp
-static_assert([] {
-    auto env0 = default_env<16>();
-    auto r = compiled_closure<"(+ 1 (* 2 3))">(env0);
-    return r.has_value() && std::get<int>(r.value()) == 7;
-}());
-```
+3. **Complex body → correct shape** (lambda whose body is a call)
+   ```cpp
+   // "(lambda (x) (+ x 1))" -> core_lambda at root, body is core_application
+   static_assert([] {
+       auto dr = read_datum<32, 16>(cursor{"(lambda (x) (+ x 1))"sv});
+       if (!dr.has_value()) return false;
+       auto er = elaborate(dr.value().value);
+       if (!er.has_value()) return false;
+       auto const &ct = er.value();
+       auto const &root = ct.get(ct.size() - 1);
+       if (!std::holds_alternative<core_lambda<16>>(root)) return false;
+       auto const &lam = std::get<core_lambda<16>>(root);
+       return std::holds_alternative<core_application<16>>(ct.get(lam.body));
+   }());
+   ```
 
-## Compilation memory
+Add matching `TEST_CASE` blocks (Catch2 runtime versions) for all three.
 
-Large `core_tree<32,16>` objects are captured inside `cps_code` and therefore
-inside `closure_program` and `compiled_closure`.  At 20 parallel jobs GCC may
-OOM during the static instantiation phase.  If compile fails with OOM, limit
-parallelism:
+## What to confirm but NOT change
+
+- `cps.hpp` `cps_dispatch` continues to return "unsupported form" for
+  `core_lambda`.  Do not add closure values or lambda evaluation here.
+- `value.hpp` `value` remains `std::variant<int, bool, builtin>`.
+- `schemepoc.hpp` `compiled_closure` is unchanged.
+- `closure_backend.hpp` is unchanged.
+
+## Required commands
 
 ```bash
-cmake --build .build/build-gcc-16 --config Asan --target all -- -k 0 -j4
+make compile
+make test
+make lint
 ```
 
 ## Do not do
 
-- Do not implement lambda or closure capture (steps 20–21).
-- Do not implement a define form (step 20+).
-- Do not change the arena sizes from the defaults (32, 16).
-- Do not add a runtime `main` or example program (that comes later).
-- Do not proceed to step 20 in the same commit.
+- Do not add a closure type to `value` (step 21).
+- Do not make `cps_dispatch` handle `core_lambda` (step 21+).
+- Do not implement function application for user lambdas (step 22).
+- Do not proceed to step 21 in the same commit.
