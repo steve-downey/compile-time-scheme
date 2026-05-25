@@ -41,7 +41,7 @@
 - [x] Step 10: datum-to-core elaborator for literals, variables, calls
 - [x] Step 11: direct evaluator for core arithmetic
 - [x] Step 12: elaborate `if`
-- [ ] Step 13: typeclass-object facade for parser operations
+- [x] Step 13: typeclass-object facade for parser operations
 - [ ] Step 14: generic fixpoint playground
 - [ ] Step 15: CPS closure backend facade
 - [ ] Step 16: bottom-up CPS direction decision
