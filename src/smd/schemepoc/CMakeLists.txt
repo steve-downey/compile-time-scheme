@@ -11,6 +11,7 @@ target_sources(
                 source.hpp
                 result.hpp
                 static_vector.hpp
+                arena_box.hpp
                 reader_cursor.hpp
                 parser.hpp
                 parser_alternative.hpp
@@ -54,6 +55,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             source.test.cpp
             result.test.cpp
             static_vector.test.cpp
+            arena_box.test.cpp
             reader_cursor.test.cpp
             parser.test.cpp
             parser_alternative.test.cpp
