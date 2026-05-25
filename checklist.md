@@ -8,7 +8,7 @@
 - [x] C++26 baseline recorded.
 - [x] GCC16 baseline recorded.
 - [x] Catch2 test framework recorded.
-- [ ] No GTest references remain.
+- [x] No GTest references remain.
 - [x] Beman Execution policy recorded.
 - [x] Beman dependency submodule policy recorded.
 - [x] Every file has canonical path comment and Emacs mode line.
@@ -18,17 +18,17 @@
 - [x] No relative project includes.
 - [x] No `using namespace` in headers.
 - [x] Component header is included first and twice in tests.
-- [ ] Every public constexpr API has a constexpr/static_assert test.
+- [x] Every public constexpr API has a constexpr/static_assert test.
 - [x] CMake uses targets and file sets.
 - [x] Local CMakeLists only list local files.
 - [x] `make compile` passes.
 - [x] `make test` passes.
-- [ ] `make lint` passes.
+- [x] `make lint` passes.
 
 ## Steps
 
 - [x] Step -1: add agent/style governance files
-- [ ] Step 0: repository recustomization and skeleton
+- [x] Step 0: repository recustomization and skeleton
 - [ ] Step 1: core utility vocabulary
 - [ ] Step 2: input cursor and lexical primitives
 - [ ] Step 3: minimal parser object
