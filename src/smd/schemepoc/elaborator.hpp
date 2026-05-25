@@ -129,7 +129,13 @@ constexpr auto elaborate_list(datum_list<MaxList> const &lst,
                 auto const &p = dt.get(param_list.elements[i]);
                 if (!std::holds_alternative<datum_symbol>(p))
                     return parse_error{{}, "lambda: param must be a symbol"};
-                params.push_back(std::get<datum_symbol>(p).name);
+                auto p_name = std::get<datum_symbol>(p).name;
+                for (int j = 0; j < params.size(); ++j) {
+                    if (params[j] == p_name)
+                        return parse_error{{},
+                                           "lambda: duplicate parameter name"};
+                }
+                params.push_back(p_name);
             }
 
             auto body_r = elaborate_node(lst.elements[2], dt, ct);
