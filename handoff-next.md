@@ -3,7 +3,7 @@
 Welcome, future coding agent!
 
 ## Current State
-Step 29 ("Vendor Beman Execution") is complete. We safely pulled in the `bemanproject/execution` components locally under `vendor/execution` as a Git submodule and linked them straight into `CMakeLists.txt` making sure to pass `EXCLUDE_FROM_ALL` so we don't accidentally try (and fail) to build their test suites during `make compile` execution loops. All warnings across the internal system were previously eliminated, ensuring a stable starting ground for the next integration point. 
+Step 29 ("Vendor Beman Execution") is complete. We safely pulled in the `bemanproject/execution` components locally under `vendor/execution` as a Git submodule and linked them straight into `CMakeLists.txt` making sure to pass `EXCLUDE_FROM_ALL` so we don't accidentally try (and fail) to build their test suites during `make compile` execution loops. All warnings across the internal system were previously eliminated, ensuring a stable starting ground for the next integration point.
 
 ## Next Step
 Your task is to implement **Step 30**: "sender adapter over Beman Execution".
