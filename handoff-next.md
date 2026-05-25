@@ -1,23 +1,25 @@
-# Next step: Step 21 (runtime closure values)
+# Next step: Step 22 (function application)
 
 ## Goal
 
-Now that `lambda` syntax is elaborated and can produce `core_lambda` AST nodes, we need to introduce a runtime value to represent a lambda at runtime.
+Now that we have `closure` values representing lambdas at runtime, we need to implement evaluating function application where the operator evaluates to a `closure`.
 
-This step does *not* include full function application or lexical capture (those are steps 22 and 23). The sole objective is to model the `closure` value and have evaluation of a `core_lambda` node yield this value.
+The goal is to update `eval_direct.hpp` to handle `core_application` when the operator evaluates to a `closure`, bind the arguments to the parameters, and evaluate the lambda's body.
+
+Lexical capture (environments nested in closures) is deferred to Step 23. For Step 22, it is sufficient that applying a closure evaluates the body in an environment extended with the arguments.
 
 ## Constraints
 
-- Update `smd::schemepoc::value` in `src/smd/schemepoc/value.hpp` to include a `closure` type.
-- The `closure` type needs enough information to reference the lambda parameters and body (e.g., holding the `node_id` of the `core_lambda` node).
-- Lexical capture is step 23, so you do not need to capture the runtime environment yet; an empty capture or no capture is acceptable for this step.
-- Update interpreters (`eval_direct.hpp`, etc.) so that evaluating a `core_lambda` yields a `closure` value instead of returning "unsupported form".
-- Create testing ensuring evaluation correctly results in a closure value type.
+- Update `eval_direct.hpp` for `core_application<MaxList>`. Currently, it assumes the function evaluates to a `builtin`. Add support for when the operator evaluates to a `closure`.
+- When a `closure` is applied, retrieve the `core_lambda` node it points to in the `core_tree`.
+- Check arity (number of provided arguments must match `lambda.params.size()`).
+- Copy the current environment and define the evaluated arguments using the parameter names. (Full parent-linked lexical environments are Step 23, so just extending a copy of the current environment is sufficient).
+- Evaluate the lambda's body with the extended environment.
+- Add tests in `eval_direct.test.cpp` for evaluating something like `((lambda (x) (+ x 1)) 5)`.
 
 ## Files expected to change
 
-- `src/smd/schemepoc/value.hpp` (add `closure` struct and add to `value` variant)
-- `src/smd/schemepoc/eval_direct.hpp` (evaluate `core_lambda` -> `closure`)
-- `src/smd/schemepoc/value.test.cpp` or `eval_direct.test.cpp` (add tests)
-- `checklist.md` (check off step 21)
-- `handoff-next.md` (prepare for step 22)
+- `src/smd/schemepoc/eval_direct.hpp` (add closure application handling)
+- `src/smd/schemepoc/eval_direct.test.cpp` (add end-to-end tests for lambda application)
+- `checklist.md` (check off step 22)
+- `handoff-next.md` (prepare for step 23)

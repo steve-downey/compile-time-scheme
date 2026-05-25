@@ -29,6 +29,20 @@ static_assert([] {
            std::get<int>(vr.value()) == 7;
 }());
 
+// Lambda yielding closure
+static_assert([] {
+    auto dr = read_datum<32, 16>(cursor{"(lambda (x) x)"sv});
+    if (!dr.has_value())
+        return false;
+    auto er = elaborate(dr.value().value);
+    if (!er.has_value())
+        return false;
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    return vr.has_value() && std::holds_alternative<closure>(vr.value()) &&
+           std::get<closure>(vr.value()).node == ct.size() - 1;
+}());
+
 // "42" -> value holding int{42}
 static_assert([] {
     auto dr = read_datum<32, 16>(cursor{"42"sv});
@@ -247,4 +261,19 @@ TEST_CASE("EvalDirectTest - UnboundVariable") {
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
     REQUIRE_FALSE(vr.has_value());
+}
+
+TEST_CASE("EvalDirectTest - EvalLambdaYieldsClosure") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+    auto dr = read_datum<32, 16>(cursor{"(lambda (x) x)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<closure>(vr.value()));
+    auto closure_val = std::get<closure>(vr.value());
+    REQUIRE(closure_val.node == ct.size() - 1);
 }
