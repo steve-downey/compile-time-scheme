@@ -17,7 +17,7 @@ constexpr auto read_datum_node(cursor cur, datum_tree<MaxNodes, MaxList> &tree)
     -> parse_result<node_id> {
     cur = skip_intertoken_space(cur);
     if (cur.empty())
-        return parse_error{cur.position(), "datum"};
+        return parse_error{cur.position(), "unexpected end of input"};
 
     char c = cur.peek();
 
@@ -51,7 +51,7 @@ constexpr auto read_datum_node(cursor cur, datum_tree<MaxNodes, MaxList> &tree)
         while (true) {
             after = skip_intertoken_space(after);
             if (after.empty())
-                return parse_error{after.position(), ")"};
+                return parse_error{after.position(), "expected ')'"};
             if (after.peek() == ')') {
                 node_id id = tree.add(list);
                 return parse_state<node_id>{id, after.bump()};
@@ -80,7 +80,7 @@ constexpr auto read_datum_node(cursor cur, datum_tree<MaxNodes, MaxList> &tree)
         }
     }
 
-    return parse_error{cur.position(), "datum"};
+    return parse_error{cur.position(), "expected datum"};
 }
 
 } // namespace detail
