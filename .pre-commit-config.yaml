@@ -29,12 +29,14 @@ repos:
 
   # Markdown linting
   # Config file: .markdownlint.yaml
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.43.0
-    hooks:
-      - id: markdownlint
-        args: ['--disable', 'MD013', ' --']
-        exclude: ^papers/
+  # Requires nodeenv which needs network access to download Node.js.
+  # Uncomment when nodeenv/SSL issues are resolved in your environment.
+  # - repo: https://github.com/igorshubovych/markdownlint-cli
+  #   rev: v0.43.0
+  #   hooks:
+  #     - id: markdownlint
+  #       args: ['--disable', 'MD013', ' --']
+  #       exclude: ^papers/
 
   # Config file: .codespell_ignore
   - repo: https://github.com/codespell-project/codespell
@@ -47,12 +49,14 @@ repos:
             (papers|latex)/.*
           )$
 
-  - repo: https://github.com/checkmake/checkmake.git
-    # Or another commit hash or version
-    rev: 0.2.2
-    hooks:
-      # Use this hook to let pre-commit build checkmake in its sandbox
-      - id: checkmake
+  # Requires Go toolchain download which needs network access.
+  # Uncomment when nodeenv/SSL issues are resolved in your environment.
+  # - repo: https://github.com/checkmake/checkmake.git
+  #   # Or another commit hash or version
+  #   rev: 0.2.2
+  #   hooks:
+  #     # Use this hook to let pre-commit build checkmake in its sandbox
+  #     - id: checkmake
 
   #  MBake Makefile formatting
   - repo: https://github.com/EbodShojaei/bake
@@ -61,10 +65,12 @@ repos:
       # - id: mbake-format
       #   args: ["--config=.github/bake.toml"]
       - id: mbake-validate
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.16.3
-    hooks:
-      - id: gitleaks
+  # Requires Go toolchain download which needs network access.
+  # Uncomment when nodeenv/SSL issues are resolved in your environment.
+  # - repo: https://github.com/gitleaks/gitleaks
+  #   rev: v8.16.3
+  #   hooks:
+  #     - id: gitleaks
   - repo: https://github.com/jumanjihouse/pre-commit-hooks
     rev: 3.0.0
     hooks:
