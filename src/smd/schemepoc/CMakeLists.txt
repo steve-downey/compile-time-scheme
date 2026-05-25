@@ -23,6 +23,7 @@ target_sources(
                 parser_ops.hpp
                 fix.hpp
                 cps.hpp
+                closure_backend.hpp
     PRIVATE schemepoc.cpp version.cpp
 )
 
@@ -66,6 +67,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             fix.test.cpp
             cps_arithmetic.test.cpp
             cps.test.cpp
+            closure_backend.test.cpp
     )
 
     target_link_libraries(schemepoc_test PRIVATE schemepoc.schemepoc)

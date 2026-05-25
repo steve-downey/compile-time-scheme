@@ -46,7 +46,7 @@
 - [x] Step 15: CPS closure backend facade
 - [x] Step 16: bottom-up CPS direction decision
 - [x] Step 17: defunctionalized CPS program
-- [ ] Step 18: closure materialization over CPS program
+- [x] Step 18: closure materialization over CPS program
 - [ ] Step 19: public one-shot API
 - [ ] Step 20: lambda syntax
 - [ ] Step 21: runtime closure values
