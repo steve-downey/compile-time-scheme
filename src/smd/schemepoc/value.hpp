@@ -7,6 +7,7 @@
 #include <smd/schemepoc/result.hpp>
 #include <smd/schemepoc/static_vector.hpp>
 
+#include <span>
 #include <string_view>
 #include <variant>
 
@@ -84,7 +85,21 @@ struct symbol {
 };
 
 template <typename Core>
-using value = std::variant<int, bool, builtin, closure<Core>, symbol>;
+struct foreign_function {
+    using val_t = std::variant<int, bool, builtin, closure<Core>, symbol,
+                               foreign_function>;
+    using sig_t = result<val_t> (*)(std::span<val_t const>);
+    sig_t fn;
+
+    friend constexpr auto operator==(foreign_function const &lhs,
+                                     foreign_function const &rhs) -> bool {
+        return lhs.fn == rhs.fn;
+    }
+};
+
+template <typename Core>
+using value = std::variant<int, bool, builtin, closure<Core>, symbol,
+                           foreign_function<Core>>;
 
 template <typename Core, int MaxBindings>
 class env {
