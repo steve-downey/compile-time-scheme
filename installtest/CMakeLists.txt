@@ -11,7 +11,12 @@ enable_testing()
 
 # Find the installed package
 set(NAME_INSTALL_DIR "../.install/lib/cmake/schemepoc.schemepoc/")
-find_package(schemepoc.schemepoc REQUIRED PATHS ${NAME_INSTALL_DIR} NO_DEFAULT_PATH)
+find_package(
+    schemepoc.schemepoc
+    REQUIRED
+    PATHS ${NAME_INSTALL_DIR}
+    NO_DEFAULT_PATH
+)
 
 # Add the test executable
 add_executable(TestInstalledLibrary test.cpp)

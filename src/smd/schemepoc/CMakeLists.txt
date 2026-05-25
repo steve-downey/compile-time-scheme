@@ -2,8 +2,10 @@ include(GNUInstallDirs)
 
 target_sources(
     schemepoc.schemepoc
-    PUBLIC FILE_SET schemepoc_schemepoc_headers TYPE HEADERS FILES schemepoc.hpp
-        version.hpp
+    PUBLIC
+        FILE_SET schemepoc_schemepoc_headers
+            TYPE HEADERS
+            FILES schemepoc.hpp version.hpp
     PRIVATE schemepoc.cpp version.cpp
 )
 

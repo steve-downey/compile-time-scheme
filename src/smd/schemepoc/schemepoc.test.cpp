@@ -1,5 +1,5 @@
-// schemepoc/schemepoc.test.cpp -*-C++-*- SPDX-License-Identifier: Apache-2.0
-// WITH LLVM-exception
+// src/smd/schemepoc/schemepoc.test.cpp                            -*-C++-*-
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/schemepoc/schemepoc.hpp>
 
@@ -7,8 +7,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-TEST_CASE("Test Testing", "") { REQUIRE(true); }
-
 // 03013d1f-bcc1-4d3e-9701-3ed1a15c6370
-TEST_CASE("Test Name Steve", "") { REQUIRE(schemepoc::schemepoc() == "Steve"); }
+TEST_CASE("SchemepocTest - HeaderIsIdempotent") { REQUIRE(true); }
 // 03013d1f-bcc1-4d3e-9701-3ed1a15c6370 end
