@@ -74,3 +74,13 @@ The code in infra is Apache 2.0 licensed, see https://github.com/bemanproject/in
 The css in `etc/`  is exported from emacs based on the modus tinted themes via `org-html-htmlize-generate-css` .
 
 The Makefile that drives the workflow is mine, is Apache 2.0 licensed, and take what you need from it. No part of it is interesting enough to be protected.
+
+# Try it on Compiler Explorer (Godbolt)
+
+You can try this project on Compiler Explorer without installing anything locally.
+
+1. Go to [Compiler Explorer](https://godbolt.org/).
+2. Create a new C++ pane.
+3. Paste the contents of `src/examples/godbolt_arithmetic.cpp` into the editor.
+4. Add the `-std=c++26` compiler flag to a recent GCC (e.g. GCC 14+ or GCC Trunk).
+5. If the project isn't immediately available via Godbolt's library configurations, you can pull the headers in Godbolt by pointing to the raw Github files, or using Godbolt's CMake project support. Since Compiler Explorer handles CMake projects, select the CMake build environment and upload the repository as a ZIP, or paste the single file into the Compiler Explorer editor if using single header amalgamation when available. Note: currently the project contains multiple headers, so using Godbolt's CMake project mode is recommended.

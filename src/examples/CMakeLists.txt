@@ -14,3 +14,14 @@ install(
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     EXCLUDE_FROM_ALL
 )
+
+add_executable(godbolt_arithmetic)
+target_sources(godbolt_arithmetic PRIVATE godbolt_arithmetic.cpp)
+target_link_libraries(godbolt_arithmetic PRIVATE schemepoc.schemepoc)
+
+install(
+    TARGETS godbolt_arithmetic
+    COMPONENT schemepoc.schemepoc.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
