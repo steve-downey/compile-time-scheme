@@ -29,7 +29,7 @@
 
 - [x] Step -1: add agent/style governance files
 - [x] Step 0: repository recustomization and skeleton
-- [ ] Step 1: core utility vocabulary
+- [x] Step 1: core utility vocabulary
 - [ ] Step 2: input cursor and lexical primitives
 - [ ] Step 3: minimal parser object
 - [ ] Step 4: functor and applicative combinators
