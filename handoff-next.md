@@ -3,15 +3,15 @@
 Welcome, future coding agent!
 
 ## Current State
-Step 25 ("error quality pass") is complete. Branch is on `main`, tests and linters pass cleanly. The parser, elaborator, and evaluator error messages have been updated to be useful for humans, resolving vague messages like "type error" and "datum".
+Step 26 ("negative compile tests") is complete. Branch is on `main`, tests and linters pass cleanly. We've implemented `parser_like` C++20 concepts for parsers, causing them to fail gracefully, and added CMake negative testing (testing `source_literal` misuse, `static_vector` overflow, and concept mismatches) via isolated `EXCLUDE_FROM_ALL` targets hooked up to `ctest`.
 
 ## Next Step
-Your task is to review and complete **Step 26: negative compile tests**.
-According to the checklist, you are implementing Step 26. Check the `docs/schemepoc-plan.md` (or relevant design doc) to see what the "negative compile tests" implies. It probably involves testing constraints and syntax validation using compile-time testing mechanisms (e.g. SFINAE based tests, constraint checks, or potentially CMake level negative tests depending on the project setup).
+Your task is to review and complete **Step 27: Godbolt single-file extraction**.
+According to `docs/schemepoc-plan.md`, this probably involves setting up a script or build target to amalgamate the project headers into a single file to demonstrate the C++26 compile-time Scheme compiler easily on compiler explorer.
 
 ## Instructions
 1. Run `make compile test lint` to verify working conditions.
-2. Read `docs/schemepoc-plan.md` to see exactly what Step 26 involves.
+2. Read `docs/schemepoc-plan.md` to see exactly what Step 27 involves.
 3. Keep AST models clean and zero-allocation.
 4. Execute the step, maintain 100% green tests.
 5. Update `checklist.md` as done.

@@ -53,8 +53,8 @@
 - [x] Step 22: function application
 - [x] Step 23: lexical closure capture
 - [x] Step 24: quote elaboration
-- [ ] Step 25: error quality pass
-- [ ] Step 26: negative compile tests
+- [x] Step 25: error quality pass
+- [x] Step 26: negative compile tests
 - [ ] Step 27: Godbolt single-file extraction
 - [ ] Step 28: vendor Beman Execution
 - [ ] Step 29: sender adapter over Beman Execution
