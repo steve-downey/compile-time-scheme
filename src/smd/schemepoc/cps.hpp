@@ -15,7 +15,7 @@ struct cps_code {
     F f;
 
     template <class Env, class K>
-    constexpr auto operator()(Env const& env, K k) const {
+    constexpr auto operator()(Env const &env, K k) const {
         return f(env, k);
     }
 };
@@ -24,10 +24,9 @@ template <class F>
 cps_code(F) -> cps_code<F>;
 
 template <int MaxNodes, int MaxList>
-[[nodiscard]] constexpr auto compile_cps(
-    core_tree<MaxNodes, MaxList> const& core,
-    node_id                             root) {
-    return cps_code{[core, root](auto const& env, auto k) constexpr {
+[[nodiscard]] constexpr auto
+compile_cps(core_tree<MaxNodes, MaxList> const &core, node_id root) {
+    return cps_code{[core, root](auto const &env, auto k) constexpr {
         auto v = eval_direct(core, root, env);
         if (!v.has_value())
             return v;
