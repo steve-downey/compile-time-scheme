@@ -18,8 +18,8 @@ static_assert([] {
     auto p = parser_v.alt(char_p('a'), char_p('b'));
     auto ra = p(cursor{"a"});
     auto rb = p(cursor{"b"});
-    return ra.has_value() && ra.value().value == 'a' &&
-           rb.has_value() && rb.value().value == 'b';
+    return ra.has_value() && ra.value().value == 'a' && rb.has_value() &&
+           rb.value().value == 'b';
 }());
 
 static_assert([] {

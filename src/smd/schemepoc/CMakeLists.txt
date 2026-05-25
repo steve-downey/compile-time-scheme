@@ -21,6 +21,7 @@ target_sources(
                 value.hpp
                 eval_direct.hpp
                 parser_ops.hpp
+                fix.hpp
     PRIVATE schemepoc.cpp version.cpp
 )
 
@@ -61,6 +62,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             value.test.cpp
             eval_direct.test.cpp
             parser_ops.test.cpp
+            fix.test.cpp
     )
 
     target_link_libraries(schemepoc_test PRIVATE schemepoc.schemepoc)

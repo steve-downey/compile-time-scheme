@@ -42,7 +42,7 @@
 - [x] Step 11: direct evaluator for core arithmetic
 - [x] Step 12: elaborate `if`
 - [x] Step 13: typeclass-object facade for parser operations
-- [ ] Step 14: generic fixpoint playground
+- [x] Step 14: generic fixpoint playground
 - [ ] Step 15: CPS closure backend facade
 - [ ] Step 16: bottom-up CPS direction decision
 - [ ] Step 17: defunctionalized CPS program
