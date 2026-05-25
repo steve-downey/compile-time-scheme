@@ -68,6 +68,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             eval_direct.test.cpp
             parser_ops.test.cpp
             fix.test.cpp
+            ffi.test.cpp
             cps_arithmetic.test.cpp
             cps.test.cpp
             closure_backend.test.cpp
