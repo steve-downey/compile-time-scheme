@@ -16,16 +16,14 @@ using namespace std::string_view_literals;
 static_assert([] {
     auto e = default_env<8>();
     auto r = e.lookup("+"sv);
-    return r.has_value() &&
-           std::holds_alternative<builtin>(r.value()) &&
+    return r.has_value() && std::holds_alternative<builtin>(r.value()) &&
            std::get<builtin>(r.value()).op == builtin_op::add;
 }());
 
 static_assert([] {
     auto e = default_env<8>();
     auto r = e.lookup("*"sv);
-    return r.has_value() &&
-           std::holds_alternative<builtin>(r.value()) &&
+    return r.has_value() && std::holds_alternative<builtin>(r.value()) &&
            std::get<builtin>(r.value()).op == builtin_op::multiply;
 }());
 
@@ -39,8 +37,7 @@ static_assert([] {
     auto e = default_env<8>();
     e.define("x"sv, value{42});
     auto r = e.lookup("x"sv);
-    return r.has_value() &&
-           std::holds_alternative<int>(r.value()) &&
+    return r.has_value() && std::holds_alternative<int>(r.value()) &&
            std::get<int>(r.value()) == 42;
 }());
 
@@ -49,8 +46,7 @@ static_assert([] {
     e.define("x"sv, value{1});
     e.define("x"sv, value{2});
     auto r = e.lookup("x"sv);
-    return r.has_value() &&
-           std::holds_alternative<int>(r.value()) &&
+    return r.has_value() && std::holds_alternative<int>(r.value()) &&
            std::get<int>(r.value()) == 2;
 }());
 

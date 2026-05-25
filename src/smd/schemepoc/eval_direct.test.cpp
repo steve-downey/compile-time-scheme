@@ -25,8 +25,7 @@ static_assert([] {
         return false;
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
-    return vr.has_value() &&
-           std::holds_alternative<int>(vr.value()) &&
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 7;
 }());
 
@@ -40,8 +39,7 @@ static_assert([] {
         return false;
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
-    return vr.has_value() &&
-           std::holds_alternative<int>(vr.value()) &&
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 42;
 }());
 
@@ -55,8 +53,7 @@ static_assert([] {
         return false;
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
-    return vr.has_value() &&
-           std::holds_alternative<bool>(vr.value()) &&
+    return vr.has_value() && std::holds_alternative<bool>(vr.value()) &&
            std::get<bool>(vr.value()) == true;
 }());
 
@@ -70,8 +67,7 @@ static_assert([] {
         return false;
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
-    return vr.has_value() &&
-           std::holds_alternative<int>(vr.value()) &&
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 3;
 }());
 
@@ -85,8 +81,7 @@ static_assert([] {
         return false;
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
-    return vr.has_value() &&
-           std::holds_alternative<int>(vr.value()) &&
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 12;
 }());
 
@@ -100,8 +95,7 @@ static_assert([] {
         return false;
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
-    return vr.has_value() &&
-           std::holds_alternative<int>(vr.value()) &&
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 1;
 }());
 
@@ -115,8 +109,7 @@ static_assert([] {
         return false;
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
-    return vr.has_value() &&
-           std::holds_alternative<int>(vr.value()) &&
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 2;
 }());
 

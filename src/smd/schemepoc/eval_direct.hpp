@@ -12,10 +12,10 @@
 namespace smd::schemepoc {
 
 template <int MaxNodes, int MaxList, int MaxBindings>
-[[nodiscard]] constexpr auto eval_direct(
-    core_tree<MaxNodes, MaxList> const &ct,
-    node_id root,
-    env<MaxBindings> const &environment) -> result<value> {
+[[nodiscard]] constexpr auto eval_direct(core_tree<MaxNodes, MaxList> const &ct,
+                                         node_id root,
+                                         env<MaxBindings> const &environment)
+    -> result<value> {
 
     auto const &node = ct.get(root);
 
@@ -34,8 +34,7 @@ template <int MaxNodes, int MaxList, int MaxBindings>
         if (!cond_r.has_value())
             return cond_r.error();
         auto const &cond_val = cond_r.value();
-        if (std::holds_alternative<bool>(cond_val) &&
-            !std::get<bool>(cond_val))
+        if (std::holds_alternative<bool>(cond_val) && !std::get<bool>(cond_val))
             return eval_direct(ct, cif.alternative, environment);
         return eval_direct(ct, cif.consequent, environment);
     }
