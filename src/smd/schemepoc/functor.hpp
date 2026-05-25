@@ -25,8 +25,8 @@ inline constexpr auto functor_typeclass = std::false_type{};
 
 struct fmap_fn {
     template <class F, class T,
-              const auto& TC = functor_typeclass<std::remove_cvref_t<T>>>
-    constexpr auto operator()(F&& f, T&& value) const {
+              const auto &TC = functor_typeclass<std::remove_cvref_t<T>>>
+    constexpr auto operator()(F &&f, T &&value) const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.fmap(std::forward<F>(f), std::forward<T>(value));
     }
