@@ -15,21 +15,24 @@ objects, without yet involving the sender backend.
 
 `cps.hpp` now contains a genuine CPS transformation:
 
-```
-detail::identity_k         — fixed-type identity continuation (value -> result<value>)
-detail::cps_dispatch<...>  — structural recursive evaluator threading cont and k
-cps_of(core, id, cont)     — returns cps_code{lambda capturing (core, id, cont)}
-compile_cps(core, root)    — convenience wrapper: cps_of(core, root, identity_k{})
+```txt
+detail::identity_k        — fixed-type identity continuation (value -> result<value>)
+detail::cps_dispatch<...> — structural recursive evaluator threading cont and k
+cps_of(core, id, cont)    — returns cps_code{lambda capturing (core, id, cont)}
+compile_cps(core, root)   — convenience wrapper: cps_of(core, root, identity_k{})
 ```
 
 `cps_dispatch` dispatches on five node kinds:
+
 - `core_integer`, `core_boolean` — immediate value, call cont then k
 - `core_symbol` — env lookup, call cont then k (or propagate error)
 - `core_if` — evaluate condition with identity cont/k, branch, tail-call
-- `core_application` — evaluate func and each arg with identity cont/k, apply builtin, call cont then k
+- `core_application` — evaluate func and each arg with identity cont/k,
+  apply builtin, call cont then k
 - `core_lambda`, `core_define`, `core_quote` — return error ("unsupported form")
 
 Two template instantiations of `cps_dispatch` are used in practice:
+
 1. `<Cont, Env, K>` for the outermost call
 2. `<identity_k, Env, identity_k>` for all intermediate sub-expression evaluations
 
@@ -70,7 +73,7 @@ checklist.
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/cps_closure.hpp     (new: cps_frame, cps_stack, materialize)
+src/smd/schemepoc/cps_closure.hpp      (new: cps_frame, cps_stack, materialize)
 src/smd/schemepoc/cps_closure.test.cpp (new: tests for materialized closures)
 src/smd/schemepoc/CMakeLists.txt       (add cps_closure.hpp to FILE_SET,
                                         cps_closure.test.cpp to test target)
@@ -97,6 +100,7 @@ Do NOT declare `constexpr auto ct = ...` at namespace scope — large
 ## Safety notes
 
 **Compilation memory:** for a cold build, limit parallelism:
+
 ```bash
 cmake --build .build/build-gcc-16 --config Asan --target all -- -k 0 -j4
 ```
