@@ -12,50 +12,59 @@
 namespace smd::schemepoc {
 
 template <int MaxNodes, int MaxList, int MaxBindings>
-[[nodiscard]] constexpr auto eval_direct(core_tree<MaxNodes, MaxList> const &ct,
-                                         node_id root,
-                                         env<MaxBindings> const &environment)
-    -> result<value> {
+[[nodiscard]] constexpr auto
+eval_direct(core_type<MaxNodes, MaxList> const &node,
+            const tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &arena,
+            env<core_type<MaxNodes, MaxList>, MaxBindings> const &environment)
+    -> result<value<core_type<MaxNodes, MaxList>>> {
 
-    auto const &node = ct.get(root);
+    using Core = core_type<MaxNodes, MaxList>;
 
-    if (std::holds_alternative<core_integer>(node))
-        return value{std::get<core_integer>(node).value};
+    if (std::holds_alternative<core_integer>(node.inner))
+        return value<Core>{std::get<core_integer>(node.inner).value};
 
-    if (std::holds_alternative<core_boolean>(node))
-        return value{std::get<core_boolean>(node).value};
+    if (std::holds_alternative<core_boolean>(node.inner))
+        return value<Core>{std::get<core_boolean>(node.inner).value};
 
-    if (std::holds_alternative<core_symbol>(node))
-        return environment.lookup(std::get<core_symbol>(node).name);
+    if (std::holds_alternative<core_symbol>(node.inner))
+        return environment.lookup(std::get<core_symbol>(node.inner).name);
 
-    if (std::holds_alternative<core_quote>(node)) {
-        auto const &cq = std::get<core_quote>(node);
+    if (std::holds_alternative<core_quote>(node.inner)) {
+        auto const &cq = std::get<core_quote>(node.inner);
         if (std::holds_alternative<int>(cq.atom))
-            return value{std::get<int>(cq.atom)};
+            return value<Core>{std::get<int>(cq.atom)};
         if (std::holds_alternative<bool>(cq.atom))
-            return value{std::get<bool>(cq.atom)};
-        return value{symbol{std::get<std::string_view>(cq.atom)}};
+            return value<Core>{std::get<bool>(cq.atom)};
+        return value<Core>{symbol{std::get<std::string_view>(cq.atom)}};
     }
 
-    if (std::holds_alternative<core_if>(node)) {
-        auto const &cif = std::get<core_if>(node);
-        auto cond_r = eval_direct(ct, cif.condition, environment);
+    if (std::holds_alternative<core_if<Core, MaxNodes>>(node.inner)) {
+        auto const &cif = std::get<core_if<Core, MaxNodes>>(node.inner);
+        auto cond_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+            arena.get(cif.condition), arena, environment);
         if (!cond_r.has_value())
             return cond_r.error();
         auto const &cond_val = cond_r.value();
         if (std::holds_alternative<bool>(cond_val) && !std::get<bool>(cond_val))
-            return eval_direct(ct, cif.alternative, environment);
-        return eval_direct(ct, cif.consequent, environment);
+            return eval_direct<MaxNodes, MaxList, MaxBindings>(
+                arena.get(cif.alternative), arena, environment);
+        return eval_direct<MaxNodes, MaxList, MaxBindings>(
+            arena.get(cif.consequent), arena, environment);
     }
 
-    if (std::holds_alternative<core_lambda<MaxList>>(node)) {
-        return value{
-            closure{root, constexpr_box<env<16>>{new env<16>{environment}}}};
+    if (std::holds_alternative<core_lambda<Core, MaxNodes, MaxList>>(
+            node.inner)) {
+        return value<Core>{closure<Core>{
+            &node,
+            constexpr_box<env<Core, 16>>{new env<Core, 16>{environment}}}};
     }
 
-    if (std::holds_alternative<core_application<MaxList>>(node)) {
-        auto const &app = std::get<core_application<MaxList>>(node);
-        auto func_r = eval_direct(ct, app.func, environment);
+    if (std::holds_alternative<core_application<Core, MaxNodes, MaxList>>(
+            node.inner)) {
+        auto const &app =
+            std::get<core_application<Core, MaxNodes, MaxList>>(node.inner);
+        auto func_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+            arena.get(app.func), arena, environment);
         if (!func_r.has_value())
             return func_r.error();
 
@@ -65,13 +74,15 @@ template <int MaxNodes, int MaxList, int MaxBindings>
             if (app.args.size() != 2)
                 return parse_error{{}, "arity mismatch"};
 
-            auto arg0_r = eval_direct(ct, app.args[0], environment);
+            auto arg0_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                arena.get(app.args[0]), arena, environment);
             if (!arg0_r.has_value())
                 return arg0_r.error();
             if (!std::holds_alternative<int>(arg0_r.value()))
                 return parse_error{{}, "type error"};
 
-            auto arg1_r = eval_direct(ct, app.args[1], environment);
+            auto arg1_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                arena.get(app.args[1]), arena, environment);
             if (!arg1_r.has_value())
                 return arg1_r.error();
             if (!std::holds_alternative<int>(arg1_r.value()))
@@ -81,31 +92,35 @@ template <int MaxNodes, int MaxList, int MaxBindings>
             int b = std::get<int>(arg1_r.value());
 
             if (bi.op == builtin_op::add)
-                return value{a + b};
-            return value{a * b};
+                return value<Core>{a + b};
+            return value<Core>{a * b};
         }
 
-        if (std::holds_alternative<closure>(func_r.value())) {
-            auto const &clo = std::get<closure>(func_r.value());
-            auto const &lam_node = ct.get(clo.node);
+        if (std::holds_alternative<closure<Core>>(func_r.value())) {
+            auto const &clo = std::get<closure<Core>>(func_r.value());
+            auto const &lam_node = *clo.node;
             // This cast should never fail if AST is valid, but we handle it
             // anyway
-            if (!std::holds_alternative<core_lambda<MaxList>>(lam_node))
+            if (!std::holds_alternative<core_lambda<Core, MaxNodes, MaxList>>(
+                    lam_node.inner))
                 return parse_error{{}, "type error"};
 
-            auto const &lam = std::get<core_lambda<MaxList>>(lam_node);
+            auto const &lam =
+                std::get<core_lambda<Core, MaxNodes, MaxList>>(lam_node.inner);
             if (app.args.size() != lam.params.size())
                 return parse_error{{}, "arity mismatch"};
 
             auto new_env = clo.captured ? *clo.captured : environment;
             for (std::size_t i = 0; i < app.args.size(); ++i) {
-                auto arg_r = eval_direct(ct, app.args[i], environment);
+                auto arg_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                    arena.get(app.args[i]), arena, environment);
                 if (!arg_r.has_value())
                     return arg_r.error();
                 new_env.define(lam.params[i], arg_r.value());
             }
 
-            return eval_direct(ct, lam.body, new_env);
+            return eval_direct<MaxNodes, MaxList, MaxBindings>(
+                arena.get(lam.body), arena, new_env);
         }
 
         return parse_error{{}, "attempted to call non-function"};

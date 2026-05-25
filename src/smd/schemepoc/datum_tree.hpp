@@ -3,6 +3,8 @@
 #ifndef SRC_SMD_SCHEMEPOC_DATUM_TREE_HPP
 #define SRC_SMD_SCHEMEPOC_DATUM_TREE_HPP
 
+#include <smd/schemepoc/arena_box.hpp>
+#include <smd/schemepoc/fix.hpp>
 #include <smd/schemepoc/static_vector.hpp>
 
 #include <string_view>
@@ -10,53 +12,38 @@
 
 namespace smd::schemepoc {
 
-using node_id = int;
-inline constexpr node_id invalid_node = -1;
-
 struct datum_integer {
-    int value;
+    int value{};
 };
 
 struct datum_symbol {
-    std::string_view name;
+    std::string_view name{};
 };
 
 struct datum_boolean {
-    bool value;
+    bool value{};
 };
 
-template <int MaxList>
+template <typename R, int MaxNodes, int MaxList>
 struct datum_list {
-    static_vector<node_id, MaxList> elements{};
+    static_vector<arena_box<R, MaxNodes>, MaxList> elements{};
 };
 
+template <typename R, int MaxNodes>
 struct datum_quote {
-    node_id quoted{invalid_node};
+    arena_box<R, MaxNodes> quoted{};
 };
-
-template <int MaxList>
-using datum_node = std::variant<datum_integer, datum_symbol, datum_boolean,
-                                datum_list<MaxList>, datum_quote>;
 
 template <int MaxNodes, int MaxList>
-class datum_tree {
-  public:
-    constexpr auto add(datum_node<MaxList> value) -> node_id {
-        node_id id = nodes_.size();
-        nodes_.push_back(std::move(value));
-        return id;
-    }
-
-    [[nodiscard]] constexpr auto get(node_id id) const
-        -> datum_node<MaxList> const & {
-        return nodes_[id];
-    }
-
-    [[nodiscard]] constexpr auto size() const -> int { return nodes_.size(); }
-
-  private:
-    static_vector<datum_node<MaxList>, MaxNodes> nodes_{};
+struct datum_f_factory {
+    template <typename R>
+    using type = std::variant<datum_integer, datum_symbol, datum_boolean,
+                              datum_list<R, MaxNodes, MaxList>,
+                              datum_quote<R, MaxNodes>>;
 };
+
+template <int MaxNodes, int MaxList>
+using datum_type = fix<datum_f_factory<MaxNodes, MaxList>::template type>;
 
 } // namespace smd::schemepoc
 
