@@ -92,8 +92,8 @@ template <int MaxNodes, int MaxList>
     auto r = detail::read_datum_node(cur, tree);
     if (!r.has_value())
         return r.error();
-    return parse_state<datum_tree<MaxNodes, MaxList>>{
-        std::move(tree), r.value().rest};
+    return parse_state<datum_tree<MaxNodes, MaxList>>{std::move(tree),
+                                                      r.value().rest};
 }
 
 } // namespace smd::schemepoc
