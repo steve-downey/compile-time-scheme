@@ -1,26 +1,17 @@
-# Next step: Step 23 (lexical closure capture)
+# Next Agent Directions
 
-## Goal
+Welcome, future coding agent!
 
-Currently, `closure` values only store the `node_id` of their `core_lambda` and do not capture their defining lexical environment. We need to implement lexical environment capture so closures can access variables bound outside their parameters.
+## Current State
+Step 24 ("quote elaboration") is complete. Branch is on `step-24`, tests and linters pass cleanly. We hit a major architectural C++26 `constexpr` issue in Step 24 involving non-trivial destructors leaking into `compiled_closure`, which taught us *never* to add allocating evaluation types like `value` inside `core_node`/`core_tree` variants. The codebase safely evaluates quoted symbols into direct light evaluation literals under the hood now.
 
-## Details
+## Next Step
+Your task is to review and complete **Step 25: error quality pass**.
+According to the checklist, you are implementing Step 25. Check the `docs/schemepoc-plan.md` (or relevant design doc) to see what the "error quality pass" implies. It probably involves evaluating parser errors, elaboration errors, and ensuring they pass accurately to results. 
 
-- Update the `closure` type (in `value.hpp`) to store a copy of the lexical `env` present when the lambda was evaluated. Since `env` is currently templated on `MaxBindings` (often `16`), consider how to embed an environment within a `closure`. Since we are relying on fixed-capacity structures, adding `env<16>` to `closure` directly may be an acceptable first step if type dependencies align (or templating `closure` / `value` if necessary, though this cascades... a fixed type or pointer could work, but be mindful of `constexpr` allocation).
-- Update `eval_direct.hpp`: when evaluating a `core_lambda`, capture the current `environment` into the created `closure`.
-- When evaluating a `closure` application, the base environment should be the captured environment, NOT the caller's environment. Copy the closure's captured environment, extend it with the new evaluated arguments, and evaluate the lambda body within that extended environment.
-- Add tests in `eval_direct.test.cpp` to verify lexical scope (e.g. `(((lambda (x) (lambda (y) (+ x y))) 3) 4)` should return `7`).
-
-## Constraints
-
-- Ensure the structures stay `constexpr`-friendly.
-- Be careful with circular type dependencies between `value` and `env`. `env` stores `value`s; if `closure` is in `value` and requires `env`, you can forward-declare or restructure definition order.
-- Maintain tests, keeping things green.
-
-## Files expected to change
-
-- `src/smd/schemepoc/value.hpp` (add captured env to closure, resolve loop)
-- `src/smd/schemepoc/eval_direct.hpp` (capture env on creation, use captured env on apply)
-- `src/smd/schemepoc/eval_direct.test.cpp` (add lexical capture tests)
-- `checklist.md` (check off step 23)
-- `handoff-next.md` (prepare for step 24)
+## Instructions
+1. Run `make compile test lint` to verify working conditions.
+2. Read `docs/schemepoc-plan.md` to see exactly what Step 25 involves.
+3. Keep AST models clean and zero-allocation.
+4. Execute the step, maintain 100% green tests.
+5. Merge branch or handoff.

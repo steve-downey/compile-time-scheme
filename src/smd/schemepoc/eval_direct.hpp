@@ -28,6 +28,15 @@ template <int MaxNodes, int MaxList, int MaxBindings>
     if (std::holds_alternative<core_symbol>(node))
         return environment.lookup(std::get<core_symbol>(node).name);
 
+    if (std::holds_alternative<core_quote>(node)) {
+        auto const &cq = std::get<core_quote>(node);
+        if (std::holds_alternative<int>(cq.atom))
+            return value{std::get<int>(cq.atom)};
+        if (std::holds_alternative<bool>(cq.atom))
+            return value{std::get<bool>(cq.atom)};
+        return value{symbol{std::get<std::string_view>(cq.atom)}};
+    }
+
     if (std::holds_alternative<core_if>(node)) {
         auto const &cif = std::get<core_if>(node);
         auto cond_r = eval_direct(ct, cif.condition, environment);
