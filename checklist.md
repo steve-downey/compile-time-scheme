@@ -34,7 +34,7 @@
 - [x] Step 3: minimal parser object
 - [x] Step 4: functor and applicative combinators
 - [x] Step 5: alternative, repetition, and lexeme
-- [ ] Step 6: reader atom model
+- [x] Step 6: reader atom model
 - [ ] Step 7: fixed-capacity datum tree
 - [ ] Step 8: datum reader for lists and quote
 - [ ] Step 9: core language model
