@@ -3,7 +3,7 @@
 Welcome, future coding agent!
 
 ## Current State
-We completed a massive architectural refactoring to remove `arena_box` from AST tree structures and use an integer ID decoupled resolution pointing to generic `tree_arena` memory pools (`datum_arena` and `core_arena`). This decoupled memory approach helps ensure strict compliance with C++26 `constexpr` compilation validation requirements for standard closure structures. During this refactor we updated `cps.hpp` compiler abstractions to capture `tree_arena` *by value*, bypassing reference lifetime limitations inherent in constexpr execution of returning lambdas. 
+We completed a massive architectural refactoring to remove `arena_box` from AST tree structures and use an integer ID decoupled resolution pointing to generic `tree_arena` memory pools (`datum_arena` and `core_arena`). This decoupled memory approach helps ensure strict compliance with C++26 `constexpr` compilation validation requirements for standard closure structures. During this refactor we updated `cps.hpp` compiler abstractions to capture `tree_arena` *by value*, bypassing reference lifetime limitations inherent in constexpr execution of returning lambdas.
 The test structures have been fully un-hidden and are building clearly.
 All `make compile test lint` bounds passed cleanly!
 
