@@ -1,45 +1,61 @@
-# Next step: Step 1
+# Next step: Step 2
 
 ## Goal
 
-Add the compile-time support vocabulary used by all later phases: source positions, a result type, and a fixed-capacity vector.
+Add a constexpr cursor over `std::string_view` and lexical classification functions for Scheme datum reading.
+The cursor tracks offset, line, and column as it advances through input.
 
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/source.hpp
-src/smd/schemepoc/result.hpp
-src/smd/schemepoc/static_vector.hpp
-src/smd/schemepoc/source.test.cpp
-src/smd/schemepoc/result.test.cpp
-src/smd/schemepoc/static_vector.test.cpp
+src/smd/schemepoc/reader_cursor.hpp
+src/smd/schemepoc/reader_cursor.test.cpp
 src/smd/schemepoc/CMakeLists.txt
 ```
 
 ## Context from previous step
 
-Step 0 established the skeleton:
-- `version.hpp`/`.cpp`/`.test.cpp` provide `version_major`, `version_minor`, `version_patch` as `inline constexpr int` in `smd::schemepoc`.
-- `schemepoc.hpp`/`.cpp`/`.test.cpp` are minimal placeholders (empty namespace, idempotency test only).
-- `hello.cpp` example prints the version.
-- All files use `smd::schemepoc` namespace, canonical path comments, SPDX, and classical include guards.
-- Tests use Catch2 with double-include verification.
-- `make compile`, `make test`, `make lint` all pass.
-- Governance files (`AGENTS.md`, `CLAUDE.md`, `docs/codestyle.org`, `docs/CODING_RULES.md`, `docs/schemepoc-plan.md`, `handoff.md`, `checklist.md`) are committed.
+Step 1 added the core utility vocabulary:
+
+- `source.hpp`: `source_pos` (offset/line/column), `source_span` (first/last), `parse_error` (where/message).
+  All constexpr.
+  `source_pos` and `source_span` use defaulted `operator==`.
+  `parse_error` uses a custom `operator==` that compares `char const*` messages by string content (not pointer identity), handling nullptr.
+- `result.hpp`: `result<T>` wrapping `std::variant<T, parse_error>`.
+  Provides `has_value()`, `value()`, `error()`.
+  Constexpr.
+  Includes `<smd/schemepoc/source.hpp>` and `<variant>`.
+- `static_vector.hpp`: `static_vector<T, Capacity>` backed by `std::array<T, Capacity>`.
+  Provides `push_back`, `size`, `empty`, `operator[]` (mutable and const).
+  Uses `assert()` for capacity overflow.
+  Constexpr.
+  Includes `<array>` and `<cassert>`.
+- All three are header-only with no `.cpp` files.
+- All headers use classical `#ifndef`/`#define` guards.
+- Tests use Catch2, double-include verification, and `static_assert` for constexpr contracts.
+- `make compile` and `make test` pass (18 tests).
+- `make lint` passes for all non-network hooks (markdownlint requires Node.js download which fails on SSL in this environment; that is a pre-existing infrastructure issue, not a code issue).
 
 ## Required implementation details
 
-- `source.hpp`: `source_pos` (offset/line/column), `source_span` (first/last), `parse_error` (where/message). All constexpr, all with defaulted `operator==`.
-- `result.hpp`: `result<T>` wrapping `std::variant<T, parse_error>`. Provides `has_value()`, `value()`, `error()`. Constexpr.
-- `static_vector.hpp`: `static_vector<T, Capacity>` backed by `std::array<T, Capacity>`. Provides `push_back`, `size`, `empty`, `operator[]`. Constexpr. Use a simple assertion for capacity overflow.
-- All three are header-only (no `.cpp` files needed unless you want a translation unit anchor).
-- Add `static_assert` / constexpr tests for each type.
+- `reader_cursor.hpp`: `cursor` class with explicit constructor from `std::string_view`.
+  Methods: `empty()`, `peek()`, `bump()` (returns new cursor), `position()` (returns `source_pos`), `remaining()` (returns `std::string_view`).
+  `bump()` must advance offset, and update line/column (newline increments line, resets column).
+- Free functions: `is_space(char)`, `is_initial_symbol_char(char)`, `is_symbol_char(char)`, `is_delimiter(char)`, `skip_intertoken_space(cursor)`.
+- Symbol classification: initial = alphabetic or `+ - * / = < > ! ?`; rest = initial or digit.
+- Delimiter: whitespace, `(`, `)`, `'`, end of input.
+- Do not support comments yet.
+- All constexpr.
+- `cursor` must include `<smd/schemepoc/source.hpp>` for `source_pos`.
 
 ## Required tests
 
-- `source.test.cpp`: header idempotency, `source_pos` default construction and equality.
-- `result.test.cpp`: header idempotency, construct from value, construct from error, `has_value()` true/false paths.
-- `static_vector.test.cpp`: header idempotency, `push_back`/`size`/`operator[]` in constexpr context, `static_assert` on a small vector.
+- Header idempotency.
+- `static_assert` that `is_delimiter('(')` and `is_delimiter(')')` are true.
+- `static_assert` that `skip_intertoken_space` on `"  x"` peeks `'x'`.
+- Cursor tracks offset, line, and column correctly through `bump()`.
+- `is_initial_symbol_char` and `is_symbol_char` classifications.
+- `skip_intertoken_space` skips whitespace and stops at non-whitespace.
 
 ## Required commands
 
@@ -51,8 +67,8 @@ make lint
 
 ## Do not do
 
-- Do not proceed to Step 2.
+- Do not proceed to Step 3.
+- Do not add parser combinators yet.
+- Do not add comment support yet.
 - Do not introduce optional dependencies unless this step requires them.
 - Do not change architecture decisions without documenting the reason in `handoff.md`.
-- Do not design a general allocator for `static_vector`.
-- Do not add parser code yet.
