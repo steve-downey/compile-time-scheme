@@ -191,6 +191,36 @@ static_assert([] {
            std::get<int>(vr.value()) == 7;
 }());
 
+// "(((lambda (x) (lambda (y) (+ x y))) 3) 4)" -> value holding int{7}
+static_assert([] {
+    auto dr = read_datum<32, 16>(
+        cursor{"(((lambda (x) (lambda (y) (+ x y))) 3) 4)"sv});
+    if (!dr.has_value())
+        return false;
+    auto er = elaborate(dr.value().value);
+    if (!er.has_value())
+        return false;
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 7;
+}());
+
+// "((lambda (x) ((lambda (y) (+ x y)) 2)) 40)" -> value holding int{42}
+static_assert([] {
+    auto dr = read_datum<32, 16>(
+        cursor{"((lambda (x) ((lambda (y) (+ x y)) 2)) 40)"sv});
+    if (!dr.has_value())
+        return false;
+    auto er = elaborate(dr.value().value);
+    if (!er.has_value())
+        return false;
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 42;
+}());
+
 } // namespace
 
 TEST_CASE("EvalDirectTest - HeaderIsIdempotent") { REQUIRE(true); }
@@ -386,4 +416,34 @@ TEST_CASE("EvalDirectTest - ApplicationNonFunction") {
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
     REQUIRE_FALSE(vr.has_value());
     REQUIRE(vr.error().message == "type error");
+}
+
+TEST_CASE("EvalDirectTest - LexicalCapture1") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+    auto dr = read_datum<32, 16>(
+        cursor{"(((lambda (x) (lambda (y) (+ x y))) 3) 4)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<int>(vr.value()));
+    REQUIRE(std::get<int>(vr.value()) == 7);
+}
+
+TEST_CASE("EvalDirectTest - LexicalCapture2") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+    auto dr = read_datum<32, 16>(
+        cursor{"((lambda (x) ((lambda (y) (+ x y)) 2)) 40)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<int>(vr.value()));
+    REQUIRE(std::get<int>(vr.value()) == 42);
 }

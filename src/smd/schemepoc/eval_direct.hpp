@@ -40,7 +40,8 @@ template <int MaxNodes, int MaxList, int MaxBindings>
     }
 
     if (std::holds_alternative<core_lambda<MaxList>>(node)) {
-        return value{closure{root}};
+        return value{
+            closure{root, constexpr_box<env<16>>{new env<16>{environment}}}};
     }
 
     if (std::holds_alternative<core_application<MaxList>>(node)) {
@@ -87,7 +88,7 @@ template <int MaxNodes, int MaxList, int MaxBindings>
             if (app.args.size() != lam.params.size())
                 return parse_error{{}, "arity error"};
 
-            auto new_env = environment;
+            auto new_env = clo.captured ? *clo.captured : environment;
             for (std::size_t i = 0; i < app.args.size(); ++i) {
                 auto arg_r = eval_direct(ct, app.args[i], environment);
                 if (!arg_r.has_value())

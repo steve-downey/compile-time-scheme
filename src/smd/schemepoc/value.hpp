@@ -19,9 +19,58 @@ struct builtin {
     friend constexpr auto operator==(builtin, builtin) -> bool = default;
 };
 
+// Forward declaration of env to resolve circular dependency
+template <int MaxBindings>
+class env;
+
+// A custom copyable constexpr unique pointer to avoid escaping allocations
+// and allow value/closure to be copied naturally in constexpr.
+template <class T>
+struct constexpr_box {
+    T *ptr = nullptr;
+    constexpr constexpr_box() = default;
+    constexpr explicit constexpr_box(T *p) : ptr(p) {}
+    constexpr constexpr_box(constexpr_box const &other) {
+        if (other.ptr)
+            ptr = new T(*other.ptr);
+    }
+    constexpr constexpr_box(constexpr_box &&other) noexcept {
+        ptr = other.ptr;
+        other.ptr = nullptr;
+    }
+    constexpr auto operator=(constexpr_box const &other) -> constexpr_box & {
+        if (this == &other)
+            return *this;
+        delete ptr;
+        if (other.ptr)
+            ptr = new T(*other.ptr);
+        else
+            ptr = nullptr;
+        return *this;
+    }
+    constexpr auto operator=(constexpr_box &&other) noexcept
+        -> constexpr_box & {
+        delete ptr;
+        ptr = other.ptr;
+        other.ptr = nullptr;
+        return *this;
+    }
+    constexpr ~constexpr_box() { delete ptr; }
+    constexpr auto operator*() const -> T & { return *ptr; }
+    constexpr auto operator->() const -> T * { return ptr; }
+    constexpr explicit operator bool() const { return ptr != nullptr; }
+    constexpr auto get() const -> T * { return ptr; }
+};
+
 struct closure {
     node_id node;
-    friend constexpr auto operator==(closure, closure) -> bool = default;
+    constexpr_box<env<16>> captured; // capture env<16> directly
+
+    friend constexpr auto operator==(closure const &lhs, closure const &rhs)
+        -> bool {
+        // Simple structural equality for test purposes.
+        return lhs.node == rhs.node;
+    }
 };
 
 using value = std::variant<int, bool, builtin, closure>;
