@@ -149,6 +149,48 @@ static_assert([] {
     return !vr.has_value();
 }());
 
+// "((lambda (x) x) 42)" -> value holding int{42}
+static_assert([] {
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x) x) 42)"sv});
+    if (!dr.has_value())
+        return false;
+    auto er = elaborate(dr.value().value);
+    if (!er.has_value())
+        return false;
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 42;
+}());
+
+// "((lambda (x) (+ x 1)) 5)" -> value holding int{6}
+static_assert([] {
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x) (+ x 1)) 5)"sv});
+    if (!dr.has_value())
+        return false;
+    auto er = elaborate(dr.value().value);
+    if (!er.has_value())
+        return false;
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 6;
+}());
+
+// "((lambda (x y) (+ x y)) 3 4)" -> value holding int{7}
+static_assert([] {
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x y) (+ x y)) 3 4)"sv});
+    if (!dr.has_value())
+        return false;
+    auto er = elaborate(dr.value().value);
+    if (!er.has_value())
+        return false;
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 7;
+}());
+
 } // namespace
 
 TEST_CASE("EvalDirectTest - HeaderIsIdempotent") { REQUIRE(true); }
@@ -276,4 +318,72 @@ TEST_CASE("EvalDirectTest - EvalLambdaYieldsClosure") {
     REQUIRE(std::holds_alternative<closure>(vr.value()));
     auto closure_val = std::get<closure>(vr.value());
     REQUIRE(closure_val.node == ct.size() - 1);
+}
+
+TEST_CASE("EvalDirectTest - ApplicationIdentity") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x) x) 42)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<int>(vr.value()));
+    REQUIRE(std::get<int>(vr.value()) == 42);
+}
+
+TEST_CASE("EvalDirectTest - ApplicationAdd") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x) (+ x 1)) 5)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<int>(vr.value()));
+    REQUIRE(std::get<int>(vr.value()) == 6);
+}
+
+TEST_CASE("EvalDirectTest - ApplicationAddMultiArgs") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x y) (+ x y)) 3 4)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<int>(vr.value()));
+    REQUIRE(std::get<int>(vr.value()) == 7);
+}
+
+TEST_CASE("EvalDirectTest - ApplicationArityMismatch") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+    auto dr = read_datum<32, 16>(cursor{"((lambda (x y) x) 1)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    REQUIRE_FALSE(vr.has_value());
+    REQUIRE(vr.error().message == "arity error");
+}
+
+TEST_CASE("EvalDirectTest - ApplicationNonFunction") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+    auto dr = read_datum<32, 16>(cursor{"(1 2 3)"sv});
+    REQUIRE(dr.has_value());
+    auto er = elaborate(dr.value().value);
+    REQUIRE(er.has_value());
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    REQUIRE_FALSE(vr.has_value());
+    REQUIRE(vr.error().message == "type error");
 }
