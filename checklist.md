@@ -51,7 +51,7 @@
 - [x] Step 20: lambda syntax
 - [x] Step 21: runtime closure values
 - [x] Step 22: function application
-- [ ] Step 23: lexical closure capture
+- [x] Step 23: lexical closure capture
 - [ ] Step 24: quote elaboration
 - [ ] Step 25: error quality pass
 - [ ] Step 26: negative compile tests
