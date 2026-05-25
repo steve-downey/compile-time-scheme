@@ -26,123 +26,124 @@ cps_code(F) -> cps_code<F>;
 
 namespace detail {
 
-// Fixed-type identity continuation: avoids spawning new lambda types on each
-// recursive cps_dispatch instantiation and keeps template depth bounded.
+template <class Core>
 struct identity_k {
-    constexpr auto operator()(value v) const -> result<value> { return v; }
+    constexpr auto operator()(value<Core> v) const -> result<value<Core>> {
+        return v;
+    }
 };
 
-// cps_dispatch(core, id, cont, env, k)
-//   Evaluates node `id` structurally, threads cont and k through.
-//   cont: value -> result<value> — applied to the node's final value.
-//   k:    value -> result<value> — the outermost continuation.
-//
-// Two template instantiations exist in practice:
-//   1. <Cont, K> for the outermost call
-//   2. <identity_k, identity_k> for all intermediate sub-expression evaluations
-// Neither causes circular template instantiation.
 template <int MaxNodes, int MaxList, class Cont, class Env, class K>
-constexpr auto cps_dispatch(core_tree<MaxNodes, MaxList> const &core,
-                            node_id id, Cont const &cont, Env const &env,
-                            K const &k) -> result<value> {
-    auto const &node = core.get(id);
+constexpr auto
+cps_dispatch(core_type<MaxNodes, MaxList> const &node,
+             const tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &arena,
+             Cont const &cont, Env const &env, K const &k)
+    -> result<value<core_type<MaxNodes, MaxList>>> {
+    using Core = core_type<MaxNodes, MaxList>;
 
-    if (std::holds_alternative<core_integer>(node)) {
-        auto r = cont(value{std::get<core_integer>(node).value});
+    if (std::holds_alternative<core_integer>(node.inner)) {
+        auto r = cont(value<Core>{std::get<core_integer>(node.inner).value});
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_boolean>(node)) {
-        auto r = cont(value{std::get<core_boolean>(node).value});
+    if (std::holds_alternative<core_boolean>(node.inner)) {
+        auto r = cont(value<Core>{std::get<core_boolean>(node.inner).value});
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_symbol>(node)) {
-        auto lr = env.lookup(std::get<core_symbol>(node).name);
+    if (std::holds_alternative<core_symbol>(node.inner)) {
+        auto lr = env.lookup(std::get<core_symbol>(node.inner).name);
         if (!lr.has_value())
-            return result<value>{lr.error()};
+            return result<value<Core>>{lr.error()};
         auto r = cont(lr.value());
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_if>(node)) {
-        auto const &cif = std::get<core_if>(node);
-        auto cond_r =
-            cps_dispatch(core, cif.condition, identity_k{}, env, identity_k{});
+    if (std::holds_alternative<core_if<Core, MaxNodes>>(node.inner)) {
+        auto const &cif = std::get<core_if<Core, MaxNodes>>(node.inner);
+        auto cond_r = cps_dispatch<MaxNodes, MaxList>(arena.get(cif.condition),
+                                                      arena, identity_k<Core>{},
+                                                      env, identity_k<Core>{});
         if (!cond_r.has_value())
             return cond_r;
         bool taken = !std::holds_alternative<bool>(cond_r.value()) ||
                      std::get<bool>(cond_r.value());
-        node_id branch = taken ? cif.consequent : cif.alternative;
-        return cps_dispatch(core, branch, cont, env, k);
+        auto const &branch = taken ? cif.consequent : cif.alternative;
+        return cps_dispatch<MaxNodes, MaxList>(arena.get(branch), arena, cont,
+                                               env, k);
     }
 
-    if (std::holds_alternative<core_quote>(node)) {
-        auto const &cq = std::get<core_quote>(node);
-        value v;
+    if (std::holds_alternative<core_quote>(node.inner)) {
+        auto const &cq = std::get<core_quote>(node.inner);
+        value<Core> v;
         if (std::holds_alternative<int>(cq.atom))
-            v = value{std::get<int>(cq.atom)};
+            v = value<Core>{std::get<int>(cq.atom)};
         else if (std::holds_alternative<bool>(cq.atom))
-            v = value{std::get<bool>(cq.atom)};
+            v = value<Core>{std::get<bool>(cq.atom)};
         else
-            v = value{symbol{std::get<std::string_view>(cq.atom)}};
-
+            v = value<Core>{symbol{std::get<std::string_view>(cq.atom)}};
         auto r = cont(v);
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_lambda<MaxList>>(node)) {
-        value v{closure{id, constexpr_box<schemepoc::env<16>>{
-                                new schemepoc::env<16>{env}}}};
+    if (std::holds_alternative<core_lambda<Core, MaxNodes, MaxList>>(
+            node.inner)) {
+        value<Core> v{
+            closure<Core>{&node, constexpr_box<schemepoc::env<Core, 16>>{
+                                     new schemepoc::env<Core, 16>{env}}}};
         auto r = cont(v);
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_application<MaxList>>(node)) {
-        auto const &app = std::get<core_application<MaxList>>(node);
+    if (std::holds_alternative<core_application<Core, MaxNodes, MaxList>>(
+            node.inner)) {
+        auto const &app =
+            std::get<core_application<Core, MaxNodes, MaxList>>(node.inner);
 
-        auto func_r =
-            cps_dispatch(core, app.func, identity_k{}, env, identity_k{});
+        auto func_r = cps_dispatch<MaxNodes, MaxList>(arena.get(app.func),
+                                                      arena, identity_k<Core>{},
+                                                      env, identity_k<Core>{});
         if (!func_r.has_value())
             return func_r;
 
         if (std::holds_alternative<builtin>(func_r.value())) {
             auto const &bi = std::get<builtin>(func_r.value());
-
             if (app.args.size() != 2)
-                return result<value>{parse_error{{}, "arity mismatch"}};
+                return result<value<Core>>{parse_error{{}, "arity mismatch"}};
 
-            auto arg0_r = cps_dispatch(core, app.args[0], identity_k{}, env,
-                                       identity_k{});
+            auto arg0_r = cps_dispatch<MaxNodes, MaxList>(
+                arena.get(app.args[0]), arena, identity_k<Core>{}, env,
+                identity_k<Core>{});
             if (!arg0_r.has_value())
                 return arg0_r;
             if (!std::holds_alternative<int>(arg0_r.value()))
-                return result<value>{parse_error{{}, "type error"}};
+                return result<value<Core>>{parse_error{{}, "type error"}};
             int a = std::get<int>(arg0_r.value());
 
-            auto arg1_r = cps_dispatch(core, app.args[1], identity_k{}, env,
-                                       identity_k{});
+            auto arg1_r = cps_dispatch<MaxNodes, MaxList>(
+                arena.get(app.args[1]), arena, identity_k<Core>{}, env,
+                identity_k<Core>{});
             if (!arg1_r.has_value())
                 return arg1_r;
             if (!std::holds_alternative<int>(arg1_r.value()))
-                return result<value>{parse_error{{}, "type error"}};
+                return result<value<Core>>{parse_error{{}, "type error"}};
             int b = std::get<int>(arg1_r.value());
 
-            value app_val;
+            value<Core> app_val;
             if (bi.op == builtin_op::add)
-                app_val = value{a + b};
+                app_val = value<Core>{a + b};
             else
-                app_val = value{a * b};
+                app_val = value<Core>{a * b};
 
             auto r = cont(app_val);
             if (!r.has_value())
@@ -150,54 +151,57 @@ constexpr auto cps_dispatch(core_tree<MaxNodes, MaxList> const &core,
             return k(r.value());
         }
 
-        if (std::holds_alternative<closure>(func_r.value())) {
-            auto const &clo = std::get<closure>(func_r.value());
-            auto const &lam_node = core.get(clo.node);
+        if (std::holds_alternative<closure<Core>>(func_r.value())) {
+            auto const &clo = std::get<closure<Core>>(func_r.value());
+            auto const &lam_node = *clo.node;
 
-            if (!std::holds_alternative<core_lambda<MaxList>>(lam_node))
-                return result<value>{parse_error{{}, "type error"}};
-
-            auto const &lam = std::get<core_lambda<MaxList>>(lam_node);
+            if (!std::holds_alternative<core_lambda<Core, MaxNodes, MaxList>>(
+                    lam_node.inner))
+                return result<value<Core>>{parse_error{{}, "type error"}};
+            auto const &lam =
+                std::get<core_lambda<Core, MaxNodes, MaxList>>(lam_node.inner);
             if (app.args.size() != lam.params.size())
-                return result<value>{parse_error{{}, "arity mismatch"}};
+                return result<value<Core>>{parse_error{{}, "arity mismatch"}};
 
             auto new_env = clo.captured ? *clo.captured : env;
             for (std::size_t i = 0; i < app.args.size(); ++i) {
-                auto arg_r = cps_dispatch(core, app.args[i], identity_k{}, env,
-                                          identity_k{});
+                auto arg_r = cps_dispatch<MaxNodes, MaxList>(
+                    arena.get(app.args[i]), arena, identity_k<Core>{}, env,
+                    identity_k<Core>{});
                 if (!arg_r.has_value())
                     return arg_r;
                 new_env.define(lam.params[i], arg_r.value());
             }
-
-            return cps_dispatch(core, lam.body, cont, new_env, k);
+            return cps_dispatch<MaxNodes, MaxList>(arena.get(lam.body), arena,
+                                                   cont, new_env, k);
         }
 
-        return result<value>{parse_error{{}, "attempted to call non-function"}};
+        return result<value<Core>>{
+            parse_error{{}, "attempted to call non-function"}};
     }
-
-    return result<value>{parse_error{{}, "cps_dispatch: unsupported form"}};
+    return result<value<Core>>{
+        parse_error{{}, "cps_dispatch: unsupported form"}};
 }
 
 } // namespace detail
 
-// cps_of(core, id, cont)
-//   Returns a cps_code whose operator()(env, k) evaluates node `id` in CPS,
-//   passes the result to cont, then passes cont's result to k.
-//   cont is the current (inner) continuation; k is the outer continuation
-//   supplied at call-time.  For the outermost call, cont is the identity.
 template <int MaxNodes, int MaxList, class Cont>
-[[nodiscard]] constexpr auto cps_of(core_tree<MaxNodes, MaxList> const &core,
-                                    node_id id, Cont cont) {
-    return cps_code{[core, id, cont](auto const &env, auto k) constexpr {
-        return detail::cps_dispatch(core, id, cont, env, k);
+[[nodiscard]] constexpr auto
+cps_of(core_type<MaxNodes, MaxList> const &node,
+       tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> arena, Cont cont) {
+    using Core = core_type<MaxNodes, MaxList>;
+    return cps_code{[node, arena, cont](auto const &env, auto k) constexpr {
+        return detail::cps_dispatch<MaxNodes, MaxList>(node, arena, cont, env,
+                                                       k);
     }};
 }
 
 template <int MaxNodes, int MaxList>
 [[nodiscard]] constexpr auto
-compile_cps(core_tree<MaxNodes, MaxList> const &core, node_id root) {
-    return cps_of(core, root, detail::identity_k{});
+compile_cps(core_type<MaxNodes, MaxList> const &node,
+            tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> arena) {
+    using Core = core_type<MaxNodes, MaxList>;
+    return cps_of<MaxNodes, MaxList>(node, arena, detail::identity_k<Core>{});
 }
 
 } // namespace smd::schemepoc
