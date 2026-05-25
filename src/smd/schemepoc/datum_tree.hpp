@@ -35,11 +35,8 @@ struct datum_quote {
 };
 
 template <int MaxList>
-using datum_node = std::variant<datum_integer,
-                                datum_symbol,
-                                datum_boolean,
-                                datum_list<MaxList>,
-                                datum_quote>;
+using datum_node = std::variant<datum_integer, datum_symbol, datum_boolean,
+                                datum_list<MaxList>, datum_quote>;
 
 template <int MaxNodes, int MaxList>
 class datum_tree {
