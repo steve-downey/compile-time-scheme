@@ -1,7 +1,7 @@
 # Plan to apply `arena_box` and `Fix<F>` broadly
 
 ## Phase 1: Establish the Fixpoint Infrastructure
-We already have `src/smd/schemepoc/arena_box.hpp` and `test`. 
+We already have `src/smd/schemepoc/arena_box.hpp` and `test`.
 We also have `src/smd/schemepoc/fix.hpp` which defines `Fix<F>` and `fmap` etc. (Wait, let's check `fix.hpp` to ensure we have `fmap`, `fold_fix`, `refold` etc. or if we need to write them.)
 
 ## Phase 2: Refactor `datum_tree.hpp` and `reader.hpp`

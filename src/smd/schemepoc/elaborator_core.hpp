@@ -10,10 +10,18 @@
 
 namespace smd::schemepoc {
 
-struct core_integer { int value; };
-struct core_boolean { bool value; };
-struct core_symbol { std::string_view name; };
-struct core_quote { std::variant<int, bool, std::string_view> atom; };
+struct core_integer {
+    int value;
+};
+struct core_boolean {
+    bool value;
+};
+struct core_symbol {
+    std::string_view name;
+};
+struct core_quote {
+    std::variant<int, bool, std::string_view> atom;
+};
 
 template <typename R, int MaxNodes>
 struct core_if {
@@ -43,16 +51,11 @@ struct core_define {
 template <int MaxNodes, int MaxList>
 struct core_f_factory {
     template <typename R>
-    using type = std::variant<
-        core_integer, 
-        core_boolean, 
-        core_symbol, 
-        core_quote, 
-        core_if<R, MaxNodes>,
-        core_lambda<R, MaxNodes, MaxList>, 
-        core_application<R, MaxNodes, MaxList>, 
-        core_define<R, MaxNodes>
-    >;
+    using type =
+        std::variant<core_integer, core_boolean, core_symbol, core_quote,
+                     core_if<R, MaxNodes>, core_lambda<R, MaxNodes, MaxList>,
+                     core_application<R, MaxNodes, MaxList>,
+                     core_define<R, MaxNodes>>;
 };
 
 template <int MaxNodes, int MaxList>
