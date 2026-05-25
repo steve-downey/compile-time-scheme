@@ -60,7 +60,7 @@ template <class P>
 [[nodiscard]] constexpr auto optional(P p) {
     return parser{[p](cursor cur) {
         using V = decltype(p(cur).value().value);
-        auto r  = p(cur);
+        auto r = p(cur);
         if (r.has_value()) {
             return parse_result<std::optional<V>>{
                 parse_state<std::optional<V>>{r.value().value, r.value().rest}};
@@ -74,11 +74,11 @@ template <class P>
 [[nodiscard]] constexpr auto lexeme(P p) {
     return parser{[p](cursor cur) {
         auto start = skip_intertoken_space(cur);
-        auto r     = p(start);
+        auto r = p(start);
         if (!r.has_value())
             return r;
         auto rest = skip_intertoken_space(r.value().rest);
-        using V   = decltype(r.value().value);
+        using V = decltype(r.value().value);
         return parse_result<V>{parse_state<V>{r.value().value, rest}};
     }};
 }
