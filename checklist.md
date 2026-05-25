@@ -48,7 +48,7 @@
 - [x] Step 17: defunctionalized CPS program
 - [x] Step 18: closure materialization over CPS program
 - [x] Step 19: public one-shot API
-- [ ] Step 20: lambda syntax
+- [x] Step 20: lambda syntax
 - [ ] Step 21: runtime closure values
 - [ ] Step 22: function application
 - [ ] Step 23: lexical closure capture

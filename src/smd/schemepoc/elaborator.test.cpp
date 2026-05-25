@@ -259,18 +259,80 @@ TEST_CASE("ElaboratorTest - If") {
 TEST_CASE("ElaboratorTest - Lambda") {
     using namespace smd::schemepoc;
     using namespace std::string_view_literals;
-    auto dr = read_datum<32, 16>(cursor{"(lambda (x) x)"sv});
-    REQUIRE(dr.has_value());
-    auto er = elaborate(dr.value().value);
-    REQUIRE(er.has_value());
-    auto const &ct = er.value();
-    auto const &root_node = ct.get(ct.size() - 1);
-    REQUIRE(std::holds_alternative<core_lambda<16>>(root_node));
-    auto const &lam = std::get<core_lambda<16>>(root_node);
-    REQUIRE(lam.params.size() == 1);
-    REQUIRE(lam.params[0] == "x"sv);
-    REQUIRE(std::holds_alternative<core_symbol>(ct.get(lam.body)));
-    REQUIRE(std::get<core_symbol>(ct.get(lam.body)).name == "x"sv);
+
+    {
+        auto dr = read_datum<32, 16>(cursor{"(lambda (x) x)"sv});
+        REQUIRE(dr.has_value());
+        auto er = elaborate(dr.value().value);
+        REQUIRE(er.has_value());
+        auto const &ct = er.value();
+        auto const &root_node = ct.get(ct.size() - 1);
+        REQUIRE(std::holds_alternative<core_lambda<16>>(root_node));
+        auto const &lam = std::get<core_lambda<16>>(root_node);
+        REQUIRE(lam.params.size() == 1);
+        REQUIRE(lam.params[0] == "x"sv);
+        REQUIRE(std::holds_alternative<core_symbol>(ct.get(lam.body)));
+        REQUIRE(std::get<core_symbol>(ct.get(lam.body)).name == "x"sv);
+    }
+
+    {
+        auto dr = read_datum<32, 16>(cursor{"(lambda (x y z) x)"sv});
+        REQUIRE(dr.has_value());
+        auto er = elaborate(dr.value().value);
+        REQUIRE(er.has_value());
+        auto const &ct = er.value();
+        auto const &root_node = ct.get(ct.size() - 1);
+        REQUIRE(std::holds_alternative<core_lambda<16>>(root_node));
+        auto const &lam = std::get<core_lambda<16>>(root_node);
+        REQUIRE(lam.params.size() == 3);
+        REQUIRE(lam.params[0] == "x"sv);
+        REQUIRE(lam.params[1] == "y"sv);
+        REQUIRE(lam.params[2] == "z"sv);
+    }
+
+    {
+        auto dr = read_datum<32, 16>(cursor{"(lambda () x)"sv});
+        REQUIRE(dr.has_value());
+        auto er = elaborate(dr.value().value);
+        REQUIRE(er.has_value());
+        auto const &ct = er.value();
+        auto const &root_node = ct.get(ct.size() - 1);
+        REQUIRE(std::holds_alternative<core_lambda<16>>(root_node));
+        auto const &lam = std::get<core_lambda<16>>(root_node);
+        REQUIRE(lam.params.size() == 0);
+    }
+
+    {
+        auto dr = read_datum<32, 16>(cursor{"(lambda (x y x) x)"sv});
+        REQUIRE(dr.has_value());
+        auto er = elaborate(dr.value().value);
+        REQUIRE(!er.has_value());
+        REQUIRE(er.error().message == "lambda: duplicate parameter name"sv);
+    }
+
+    {
+        auto dr = read_datum<32, 16>(cursor{"(lambda (x 1) x)"sv});
+        REQUIRE(dr.has_value());
+        auto er = elaborate(dr.value().value);
+        REQUIRE(!er.has_value());
+        REQUIRE(er.error().message == "lambda: param must be a symbol"sv);
+    }
+
+    {
+        auto dr = read_datum<32, 16>(cursor{"(lambda (x))"sv});
+        REQUIRE(dr.has_value());
+        auto er = elaborate(dr.value().value);
+        REQUIRE(!er.has_value());
+        REQUIRE(er.error().message == "lambda: expected params and body"sv);
+    }
+
+    {
+        auto dr = read_datum<32, 16>(cursor{"(lambda x x)"sv});
+        REQUIRE(dr.has_value());
+        auto er = elaborate(dr.value().value);
+        REQUIRE(!er.has_value());
+        REQUIRE(er.error().message == "lambda: params must be a list"sv);
+    }
 }
 
 TEST_CASE("ElaboratorTest - Application") {

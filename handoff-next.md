@@ -1,32 +1,23 @@
-# Next step: Step 20 (lambda syntax)
+# Next step: Step 21 (runtime closure values)
 
 ## Goal
 
-Add `lambda` syntax to the elaborator. We are not implementing closure values or lexical capture yet, just the structural elaboration of the form.
+Now that `lambda` syntax is elaborated and can produce `core_lambda` AST nodes, we need to introduce a runtime value to represent a lambda at runtime.
 
-The reader already parses lists and symbols without problem.
+This step does *not* include full function application or lexical capture (those are steps 22 and 23). The sole objective is to model the `closure` value and have evaluation of a `core_lambda` node yield this value.
 
-## Elaboration rule
+## Constraints
 
-```txt
-(lambda (param*) body) -> lambda node
-```
-
-Constraints:
-- `params` must be a list of symbols.
-- `body` is exactly one expression currently (no implicit `begin` yet, unless you want to add it).
-- Duplicate parameter names should be rejected as an error.
+- Update `smd::schemepoc::value` in `src/smd/schemepoc/value.hpp` to include a `closure` type.
+- The `closure` type needs enough information to reference the lambda parameters and body (e.g., holding the `node_id` of the `core_lambda` node).
+- Lexical capture is step 23, so you do not need to capture the runtime environment yet; an empty capture or no capture is acceptable for this step.
+- Update interpreters (`eval_direct.hpp`, etc.) so that evaluating a `core_lambda` yields a `closure` value instead of returning "unsupported form".
+- Create testing ensuring evaluation correctly results in a closure value type.
 
 ## Files expected to change
 
-- `src/smd/schemepoc/core_tree.hpp` (add `lambda_node` struct and ensure it's in the variant).
-- `src/smd/schemepoc/elaborator.hpp` (recognize the `lambda` symbol and extract params and body).
-- `src/smd/schemepoc/test/elaborator.test.cpp` or equivalent test file (tests for successfully validating or rejecting lambdas).
-- `checklist.md` (check off step 20).
-- `handoff-next.md` (prepare for step 21).
-
-## Notes
-
-- Remember to follow `AGENTS.md` and `docs/codestyle.org`.
-- Create a feature branch and worktree if the implementation is non-trivial.
-- Test thoroughly (e.g. valid single param, multiple params, no params, errors on duplicate param, error on non-symbol param, error on missing body).
+- `src/smd/schemepoc/value.hpp` (add `closure` struct and add to `value` variant)
+- `src/smd/schemepoc/eval_direct.hpp` (evaluate `core_lambda` -> `closure`)
+- `src/smd/schemepoc/value.test.cpp` or `eval_direct.test.cpp` (add tests)
+- `checklist.md` (check off step 21)
+- `handoff-next.md` (prepare for step 22)
