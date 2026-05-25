@@ -1,26 +1,51 @@
-# Next step: Step 8
+# Next step: Step 9
 
 ## Goal
 
-Add the reader grammar for lists and quote.
-The reader must be able to parse `(`, `)`, `'`, and nested lists of atoms,
-producing a `datum_tree` by consuming a source string.
-Do not add the elaborator or any core language model — that is Step 9.
+Add the elaborator.  The elaborator consumes a `datum_tree` produced by the
+reader and classifies special forms, producing an elaborated core tree.
+
+The elaborator owns recognition of `if`, `lambda`, `quote`, `define`, and
+application.  Nothing in the reader or datum_tree may be changed to support
+this — the datum_tree is immutable data; the elaborator reads it and builds
+a new tree.
+
+Do not add CPS transformation, closure conversion, or any backend — those
+are later steps.
 
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/reader.hpp          (new)
-src/smd/schemepoc/reader.test.cpp     (new)
+src/smd/schemepoc/elaborator.hpp      (new)
+src/smd/schemepoc/elaborator.test.cpp (new)
 src/smd/schemepoc/CMakeLists.txt      (add new files)
 ```
 
-`datum_tree.hpp`, `reader_atom.hpp`, `parser.hpp`, `parser_alternative.hpp`,
-and `reader_cursor.hpp` do not need changes.
+`reader.hpp`, `datum_tree.hpp`, and all earlier files do not need changes.
 
 ## Context from previous steps
 
-Step 7 completed `datum_tree.hpp` in `namespace smd::schemepoc`:
+Step 8 completed `reader.hpp` in `namespace smd::schemepoc`:
+
+```cpp
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto read_datum(cursor cur)
+    -> parse_result<datum_tree<MaxNodes, MaxList>>;
+```
+
+`read_datum` parses a Scheme datum expression bottom-up into a `datum_tree`.
+It handles:
+- integers (`datum_integer`), symbols (`datum_symbol`), booleans
+  (`datum_boolean{true/false}` for `#t`/`#f`)
+- lists (`datum_list<MaxList>` whose `elements` is a
+  `static_vector<node_id, MaxList>` of child node IDs)
+- quote shorthand (`datum_quote{quoted}` whose `quoted` is the inner
+  node ID)
+
+The root datum is always the *last* node added to the tree (highest node_id).
+`datum_tree::size() - 1` is the root.
+
+Step 7 completed `datum_tree.hpp`:
 
 ```cpp
 using node_id = int;
@@ -45,89 +70,104 @@ class datum_tree {
     constexpr auto add(datum_node<MaxList> value) -> node_id;
     [[nodiscard]] constexpr auto get(node_id id) const -> datum_node<MaxList> const &;
     [[nodiscard]] constexpr auto size() const -> int;
-  private:
-    static_vector<datum_node<MaxList>, MaxNodes> nodes_{};
 };
 ```
 
-Step 6 completed `reader_atom.hpp`:
+78 tests pass.  `make compile`, `make test`, `make lint` are all green.
+
+## Elaborated core model
+
+Define the elaborated AST in `elaborator.hpp`.  Suggested node kinds:
 
 ```cpp
-struct atom_integer { int value; };
-struct atom_symbol  { std::string_view name; };
-using atom = std::variant<atom_integer, atom_symbol>;
+struct core_integer { int value; };
+struct core_boolean { bool value; };
+struct core_symbol  { std::string_view name; };   // variable reference
+struct core_quote   { node_id datum; };            // quoted constant (keeps datum node_id)
 
-[[nodiscard]] constexpr auto integer_p();  // -> parse_result<atom_integer>
-[[nodiscard]] constexpr auto symbol_p();   // -> parse_result<atom_symbol>
+struct core_if {
+    node_id condition;
+    node_id consequent;
+    node_id alternative;
+};
+
+struct core_lambda {
+    // parameter names stored as a static_vector of string_view
+    static_vector<std::string_view, MaxParams> params;
+    node_id body;
+};
+
+struct core_application {
+    node_id func;
+    static_vector<node_id, MaxArgs> args;
+};
+
+struct core_define {
+    std::string_view name;
+    node_id value;
+};
 ```
 
-Step 1 provided `static_vector<T,N>`, `source_pos`, `source_span`,
-`parse_error`, and `result<T>` in `static_vector.hpp`, `source.hpp`, `result.hpp`.
-
-Step 2 provided `parser<F>`, `cursor`, `parse_result<T>`, `parse_state<T>`,
-`char_p`, `satisfy`, `pure`, `sequence_left`, `sequence_right`, `map`, `lift2`,
-`alternation` in `parser.hpp`.
-
-Step 4 provided `many<N>`, `some<N>`, `optional`, `lexeme` in
-`parser_alternative.hpp`.
-
-67 tests pass. `make compile`, `make test`, `make lint` are all green.
-
-## Reader model
-
-Define a function (or set of functions) in `reader.hpp` that parses a
-complete Scheme datum expression into a `datum_tree`.
+Choose template parameters `MaxParams` and `MaxArgs` that parallel
+`MaxList`.  A `core_node` variant and a `core_tree` arena class parallel
+`datum_node` / `datum_tree`.
 
 Suggested entry point:
 
 ```cpp
 template <int MaxNodes, int MaxList>
-[[nodiscard]] constexpr auto read_datum(cursor cur)
-    -> result<datum_tree<MaxNodes, MaxList>>;
+[[nodiscard]] constexpr auto elaborate(datum_tree<MaxNodes, MaxList> const &dt)
+    -> result<core_tree<MaxNodes, MaxList>>;
 ```
 
-The reader must handle:
+Where `core_tree` mirrors `datum_tree` (arena of `core_node` variants
+indexed by `node_id`).
 
-- Integer atoms: delegate to `integer_p()`, store as `datum_integer`.
-- Symbol atoms: delegate to `symbol_p()`, store as `datum_symbol`.
-- Boolean literals `#t` and `#f`: store as `datum_boolean`.
-- Lists: `(` followed by zero or more datums followed by `)`.
-  Store as `datum_list` with child node IDs; the list node is added last.
-- Quote shorthand: `'<datum>` → `datum_quote{inner}` where `inner` is the
-  node ID of the quoted datum.
-- Whitespace between tokens is consumed by `lexeme` or `skip_intertoken_space`.
+## Elaboration rules
 
-The reader must not classify special forms (`if`, `lambda`, `define`, etc.).
-Those are the elaborator's job (Step 9 and beyond).
+Walk the `datum_tree` from the root node (index `dt.size() - 1`) recursively.
 
-The tree is built bottom-up: atoms are added first, then enclosing lists.
+- `datum_integer{n}` → `core_integer{n}`
+- `datum_boolean{b}` → `core_boolean{b}`
+- `datum_symbol{s}` → `core_symbol{s}`
+- `datum_quote{inner}` → `core_quote{inner}` (keep the datum node_id as-is;
+  the quoted data lives in the datum_tree)
+- `datum_list` whose first element is a symbol:
+  - `"if"` with 3 remaining children → `core_if`
+  - `"lambda"` with `datum_list` as first child (params) and one body →
+    `core_lambda`
+  - `"define"` with a symbol and one value → `core_define`
+  - `"quote"` with one child → `core_quote`
+  - anything else → `core_application` (elaborate head and each arg)
+- `datum_list` whose first element is not a symbol → `core_application`
+- Empty `datum_list` → elaboration error (empty application)
 
-Implementation note: mutual recursion between `read_datum` and list parsing
-is expected. Because the parser combinators are lambda-based, you may need
-to pass the tree by reference and use an explicit recursive helper function
-rather than composing parsers directly, since parsers cannot refer to
-themselves by name. A plain recursive `constexpr` function is fine.
+Return a `result<core_tree<...>>` where failure carries a `parse_error`
+describing what went wrong (reuse `parse_error` from `source.hpp`).
 
 ## Required tests
 
-In `reader.test.cpp`, use `static_assert` for constexpr contracts:
+Use `static_assert` for constexpr contracts:
 
-- Parse `"42"` → tree with one `datum_integer{42}` node.
-- Parse `"foo"` → tree with one `datum_symbol{"foo"}` node.
-- Parse `"#t"` → tree with one `datum_boolean{true}` node.
-- Parse `"()"` → tree with one empty `datum_list`.
-- Parse `"(1 2)"` → tree with three nodes: two integers and a list.
-- Parse `"'x"` → tree with two nodes: a symbol and a quote wrapping it.
-- Parse `"(1 (2 3))"` → nested list; check node count and structure.
+- Elaborate the datum for `"42"` → `core_integer{42}` at root.
+- Elaborate `"foo"` → `core_symbol{"foo"}` at root.
+- Elaborate `"#t"` → `core_boolean{true}` at root.
+- Elaborate `"'x"` → `core_quote` at root wrapping the symbol datum.
+- Elaborate `"(if #t 1 2)"` → `core_if` at root with correct children.
+- Elaborate `"(lambda (x) x)"` → `core_lambda` at root with param `"x"`
+  and body being `core_symbol{"x"}`.
+- Elaborate `"(foo 1 2)"` → `core_application` at root.
+- Elaborate `"(define x 42)"` → `core_define` at root.
+- Elaborate `"()"` → elaboration error (empty application).
 
-Runtime `TEST_CASE` variants are welcome but constexpr contracts must use
+Runtime `TEST_CASE` variants are welcome; constexpr contracts must use
 `static_assert`.
 
 ## CMakeLists.txt
 
-Add `reader.hpp` to the `FILE_SET HEADERS` block and
-`reader.test.cpp` to the `target_sources` for `schemepoc_test`.
-Follow the same pattern as `datum_tree.hpp` / `datum_tree.test.cpp`.
+Add `elaborator.hpp` to `FILE_SET HEADERS` and
+`elaborator.test.cpp` to `target_sources` for `schemepoc_test`.
+Follow the same pattern as `reader.hpp` / `reader.test.cpp`.
 
 ## Required commands
 
@@ -139,11 +179,9 @@ make lint
 
 ## Do not do
 
-- Do not add the elaborator or core language model — that is Step 9.
+- Do not add CPS transformation or any backend — those are later steps.
 - Do not add `std::string` or any heap allocation.
-- Do not merge `datum_integer`/`datum_symbol` with `atom_integer`/`atom_symbol`
-  from `reader_atom.hpp`.
-- Do not change `datum_tree.hpp`, `reader_atom.hpp`, `parser.hpp`,
-  `parser_alternative.hpp`, `reader_cursor.hpp`.
+- Do not change `datum_tree.hpp`, `reader.hpp`, or any earlier file.
 - Do not use raw function pointers.
+- Do not use `using namespace` in headers.
 - Do not change architecture decisions without documenting in `handoff.md`.
