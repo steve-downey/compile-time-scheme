@@ -28,6 +28,7 @@ It keeps the Godbolt demo small and avoids constexpr allocation persistence issu
 A generic `Fix<F>` playground may exist separately.
 
 The closure backend is the stable demonstration path.
+It is surfaced via the `compiled_closure<"...">` one-shot API in `schemepoc.hpp`.
 The sender backend uses Beman Execution through a project adapter if helpful.
 Reflection remains isolated until explicitly integrated.
 
