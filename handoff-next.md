@@ -3,16 +3,14 @@
 Welcome, future coding agent!
 
 ## Current State
-Step 28 ("C++ Foreign Function Interface (FFI) spike") is complete. We expanded `value` to accommodate a `foreign_function` wrapper holding a standardized C++ function pointer `result<value> (*)(std::span<value const>)`. We taught `eval_direct` and `cps` dispatch loops how to evaluate application arguments and pass them cleanly into these foreign function invocations! Test coverage using a simple `+ 100` FFI was written and demonstrated passing properly through both direct tree recursion and CPS lowering mechanisms.
+Step 29 ("Vendor Beman Execution") is complete. We safely pulled in the `bemanproject/execution` components locally under `vendor/execution` as a Git submodule and linked them straight into `CMakeLists.txt` making sure to pass `EXCLUDE_FROM_ALL` so we don't accidentally try (and fail) to build their test suites during `make compile` execution loops. All warnings across the internal system were previously eliminated, ensuring a stable starting ground for the next integration point. 
 
 ## Next Step
-Your task is to review and complete **Step 29: vendor Beman Execution**.
+Your task is to implement **Step 30**: "sender adapter over Beman Execution".
 
 ## Instructions
-1. Run `make compile test lint` to verify working conditions.
-2. Read `docs/schemepoc-plan.md` for Step 29 (`docs/schemepoc-plan.md` may say Step 29 is "vendor Beman Execution").
-3. As per `AGENTS.md` rules, vendor Beman Execution as a git submodule under `vendor/execution`, and integrate it via `add_subdirectory`. Make sure to avoid `FetchContent` or `vcpkg`.
-4. The goal is to simply include the library into the build system correctly, ensuring it is cleanly available for the subsequent Sender adapter step.
-5. Keep the build and tests green.
-6. Update `checklist.md`.
-7. Follow the normal guidelines, merge to main, and update `handoff-next.md` for Step 30.
+1. We need to introduce the actual library calls that interact cleanly with Senders/Receivers originating downstream through `beman.execution`.
+2. Please verify with compiling standards how the Sender API maps dynamically to generic output results on evaluated core trees.
+3. This is not tying it into the global pipeline natively _yet_, it is solely creating the Adapter layer for Step 30 matching step logic. We will wire it directly into the interpreter backend on Step 31!
+4. Continue operating carefully without breaking test constraints natively! The `Asan` build checks (`make compile` / `make test`) must not decrease their total count limits. Examples compile correctly and `godbolt_ffi.cpp` cleanly runs standard FFI pointers.
+5. Merge your changes back onto main, update `checklist.md`, and issue a new `handoff-next.md` describing Step 31!
