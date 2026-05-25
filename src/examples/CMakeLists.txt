@@ -25,3 +25,14 @@ install(
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     EXCLUDE_FROM_ALL
 )
+
+add_executable(godbolt_lambda)
+target_sources(godbolt_lambda PRIVATE godbolt_lambda.cpp)
+target_link_libraries(godbolt_lambda PRIVATE schemepoc.schemepoc)
+
+install(
+    TARGETS godbolt_lambda
+    COMPONENT schemepoc.schemepoc.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
