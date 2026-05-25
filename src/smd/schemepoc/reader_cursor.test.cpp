@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/schemepoc/reader_cursor.hpp>
-#include <smd/schemepoc/reader_cursor.hpp>  // test 2nd include OK
+#include <smd/schemepoc/reader_cursor.hpp> // test 2nd include OK
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -46,7 +46,7 @@ TEST_CASE("ReaderCursorTest - BumpAdvancesOffset") {
 
 TEST_CASE("ReaderCursorTest - BumpOnNewlineUpdatesLineAndResetsColumn") {
     constexpr cursor c{"a\nb"};
-    constexpr cursor after_a  = c.bump();
+    constexpr cursor after_a = c.bump();
     constexpr cursor after_nl = after_a.bump();
     STATIC_REQUIRE(after_nl.position().line == 2);
     STATIC_REQUIRE(after_nl.position().column == 1);
