@@ -23,6 +23,7 @@ target_sources(
                 eval_direct.hpp
                 parser_ops.hpp
                 fix.hpp
+                functor.hpp
                 cps.hpp
                 closure_backend.hpp
     PRIVATE schemepoc.cpp version.cpp
