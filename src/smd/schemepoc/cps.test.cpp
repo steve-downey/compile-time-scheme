@@ -23,8 +23,8 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const &ct  = er.value();
-    auto        env = default_env<16>();
+    auto const &ct = er.value();
+    auto env = default_env<16>();
     auto code = compile_cps(ct, ct.size() - 1);
     auto r = code(env, [](value v) constexpr -> result<value> { return v; });
     return r.has_value() && std::holds_alternative<bool>(r.value()) &&
@@ -39,8 +39,8 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const &ct  = er.value();
-    auto        env = default_env<16>();
+    auto const &ct = er.value();
+    auto env = default_env<16>();
     auto code = compile_cps(ct, ct.size() - 1);
     auto r = code(env, [](value v) constexpr -> result<value> { return v; });
     return r.has_value() && std::holds_alternative<bool>(r.value()) &&
@@ -55,8 +55,8 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const &ct  = er.value();
-    auto        env = default_env<16>();
+    auto const &ct = er.value();
+    auto env = default_env<16>();
     auto code = compile_cps(ct, ct.size() - 1);
     auto r = code(env, [](value v) constexpr -> result<value> { return v; });
     return r.has_value() && std::holds_alternative<int>(r.value()) &&
@@ -71,8 +71,8 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const &ct  = er.value();
-    auto        env = default_env<16>();
+    auto const &ct = er.value();
+    auto env = default_env<16>();
     auto code = compile_cps(ct, ct.size() - 1);
     auto r = code(env, [](value v) constexpr -> result<value> { return v; });
     return r.has_value() && std::holds_alternative<int>(r.value()) &&
@@ -87,8 +87,8 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const &ct  = er.value();
-    auto        env = default_env<16>();
+    auto const &ct = er.value();
+    auto env = default_env<16>();
     auto code = compile_cps(ct, ct.size() - 1);
     auto r = code(env, [](value v) constexpr -> result<value> { return v; });
     return r.has_value() && std::holds_alternative<int>(r.value()) &&
@@ -103,8 +103,8 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const &ct  = er.value();
-    auto        env = default_env<16>();
+    auto const &ct = er.value();
+    auto env = default_env<16>();
     auto code = compile_cps(ct, ct.size() - 1);
     auto r = code(env, [](value v) constexpr -> result<value> { return v; });
     return !r.has_value();
@@ -118,8 +118,8 @@ static_assert([] {
     auto er = elaborate(dr.value().value);
     if (!er.has_value())
         return false;
-    auto const &ct  = er.value();
-    auto        env = default_env<16>();
+    auto const &ct = er.value();
+    auto env = default_env<16>();
     auto code =
         cps_of(ct, ct.size() - 1, [](value v) -> result<value> { return v; });
     auto r = code(env, [](value v) constexpr -> result<value> { return v; });
@@ -136,10 +136,10 @@ TEST_CASE("CpsTest - BooleanTrue") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const &ct   = er.value();
-    auto        env0 = default_env<16>();
-    auto        code = compile_cps(ct, ct.size() - 1);
-    auto        r    = code(env0, [](value v) -> result<value> { return v; });
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<bool>(r.value()));
     REQUIRE(std::get<bool>(r.value()) == true);
@@ -150,10 +150,10 @@ TEST_CASE("CpsTest - BooleanFalse") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const &ct   = er.value();
-    auto        env0 = default_env<16>();
-    auto        code = compile_cps(ct, ct.size() - 1);
-    auto        r    = code(env0, [](value v) -> result<value> { return v; });
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<bool>(r.value()));
     REQUIRE(std::get<bool>(r.value()) == false);
@@ -164,10 +164,10 @@ TEST_CASE("CpsTest - IfTrueBranch") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const &ct   = er.value();
-    auto        env0 = default_env<16>();
-    auto        code = compile_cps(ct, ct.size() - 1);
-    auto        r    = code(env0, [](value v) -> result<value> { return v; });
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 1);
@@ -178,10 +178,10 @@ TEST_CASE("CpsTest - IfFalseBranch") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const &ct   = er.value();
-    auto        env0 = default_env<16>();
-    auto        code = compile_cps(ct, ct.size() - 1);
-    auto        r    = code(env0, [](value v) -> result<value> { return v; });
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 2);
@@ -192,10 +192,10 @@ TEST_CASE("CpsTest - IfWithExpressionInBranch") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const &ct   = er.value();
-    auto        env0 = default_env<16>();
-    auto        code = compile_cps(ct, ct.size() - 1);
-    auto        r    = code(env0, [](value v) -> result<value> { return v; });
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 3);
@@ -206,10 +206,10 @@ TEST_CASE("CpsTest - IfErrorInCondition") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const &ct   = er.value();
-    auto        env0 = default_env<16>();
-    auto        code = compile_cps(ct, ct.size() - 1);
-    auto        r    = code(env0, [](value v) -> result<value> { return v; });
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code = compile_cps(ct, ct.size() - 1);
+    auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE_FALSE(r.has_value());
 }
 
@@ -218,9 +218,10 @@ TEST_CASE("CpsTest - CpsOfDirectly") {
     REQUIRE(dr.has_value());
     auto er = elaborate(dr.value().value);
     REQUIRE(er.has_value());
-    auto const &ct   = er.value();
-    auto        env0 = default_env<16>();
-    auto code = cps_of(ct, ct.size() - 1, [](value v) -> result<value> { return v; });
+    auto const &ct = er.value();
+    auto env0 = default_env<16>();
+    auto code =
+        cps_of(ct, ct.size() - 1, [](value v) -> result<value> { return v; });
     auto r = code(env0, [](value v) -> result<value> { return v; });
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
