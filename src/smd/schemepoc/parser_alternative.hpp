@@ -11,12 +11,12 @@
 
 namespace smd::schemepoc {
 
-template <class PA, class PB>
+template <parser_like PA, parser_like PB>
 [[nodiscard]] constexpr auto alt(PA pa, PB pb) {
     return pa | pb;
 }
 
-template <int Capacity, class P>
+template <int Capacity, parser_like P>
 [[nodiscard]] constexpr auto many(P p) {
     return parser{[p](cursor cur) {
         using V = decltype(p(cur).value().value);
@@ -33,7 +33,7 @@ template <int Capacity, class P>
     }};
 }
 
-template <int Capacity, class P>
+template <int Capacity, parser_like P>
 [[nodiscard]] constexpr auto some(P p) {
     return parser{[p](cursor cur) {
         using V = decltype(p(cur).value().value);
@@ -56,7 +56,7 @@ template <int Capacity, class P>
     }};
 }
 
-template <class P>
+template <parser_like P>
 [[nodiscard]] constexpr auto optional(P p) {
     return parser{[p](cursor cur) {
         using V = decltype(p(cur).value().value);
@@ -70,7 +70,7 @@ template <class P>
     }};
 }
 
-template <class P>
+template <parser_like P>
 [[nodiscard]] constexpr auto lexeme(P p) {
     return parser{[p](cursor cur) {
         auto start = skip_intertoken_space(cur);
