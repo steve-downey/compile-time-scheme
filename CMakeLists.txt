@@ -50,6 +50,7 @@ Consider using CMAKE_PROJECT_TOP_LEVEL_INCLUDES=./cmake/use-fetch-content.cmake 
     endif()
 endif()
 
+set(BEMAN_USE_MODULES OFF CACHE BOOL "Disable modules" FORCE)
 add_subdirectory(vendor/execution EXCLUDE_FROM_ALL)
 
 add_subdirectory(src)
