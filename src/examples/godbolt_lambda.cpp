@@ -2,34 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <iostream>
-#include <smd/schemepoc/eval_direct.hpp>
 #include <smd/schemepoc/schemepoc.hpp>
 
-template <smd::schemepoc::source_literal Source>
-struct compiled_program {
-    static constexpr auto tree = [] {
-        auto dr = smd::schemepoc::read_datum<64, 32>(
-            smd::schemepoc::cursor{Source.view()});
-        auto er = smd::schemepoc::elaborate(dr.value().value);
-        return er.value();
-    }();
-
-    template <int MaxBindings>
-    constexpr auto
-    operator()(smd::schemepoc::env<MaxBindings> const &env) const {
-        return smd::schemepoc::eval_direct(tree, tree.size() - 1, env);
-    }
-};
-
-template <smd::schemepoc::source_literal Source>
-inline constexpr compiled_program<Source> compiled_eval{};
+constexpr auto program =
+    smd::schemepoc::compiled_closure<"((lambda (x) (+ 1 (* x x))) argc)">;
 
 int main(int argc, char **) {
     auto env = smd::schemepoc::default_env<16>();
     env.define("argc", smd::schemepoc::value{argc});
 
-    // Evaluate a lambda using argc
-    auto result = compiled_eval<"((lambda (x) (+ 1 (* x x))) argc)">(env);
+    auto result = program(env);
 
     if (result.has_value()) {
         std::cout << std::get<int>(result.value()) << '\n';
