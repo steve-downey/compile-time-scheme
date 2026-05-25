@@ -13,7 +13,7 @@ namespace detail {
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_quote(
     datum_type<MaxNodes, MaxList> const &d,
-    const tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> &arena)
+    const tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> & /*arena*/)
     -> result<std::variant<int, bool, std::string_view>> {
     if (std::holds_alternative<datum_integer>(d.inner)) {
         return std::variant<int, bool, std::string_view>{
