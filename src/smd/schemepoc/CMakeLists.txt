@@ -76,3 +76,66 @@ if(SCHEMEPOC_ENABLE_TESTING)
     include(Catch)
     catch_discover_tests(schemepoc_test)
 endif()
+
+if(SCHEMEPOC_ENABLE_TESTING)
+    # Negative Compile Test: source_literal rejects non-string-literal usage
+    add_library(
+        test_neg_source_literal
+        OBJECT
+        EXCLUDE_FROM_ALL
+        test_neg_source_literal.cpp
+    )
+    target_link_libraries(test_neg_source_literal PRIVATE schemepoc.schemepoc)
+    add_test(
+        NAME NegativeTest.SourceLiteralRejectsNonString
+        COMMAND
+            ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target
+            test_neg_source_literal --config $<CONFIG>
+    )
+    set_tests_properties(
+        NegativeTest.SourceLiteralRejectsNonString
+        PROPERTIES
+            PASS_REGULAR_EXPRESSION "class template argument deduction failed"
+    )
+
+    # Negative Compile Test: static_vector overflow in consteval context
+    add_library(
+        test_neg_static_vector
+        OBJECT
+        EXCLUDE_FROM_ALL
+        test_neg_static_vector.cpp
+    )
+    target_link_libraries(test_neg_static_vector PRIVATE schemepoc.schemepoc)
+    add_test(
+        NAME NegativeTest.StaticVectorOverflow
+        COMMAND
+            ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target
+            test_neg_static_vector --config $<CONFIG>
+    )
+    set_tests_properties(
+        NegativeTest.StaticVectorOverflow
+        PROPERTIES
+            PASS_REGULAR_EXPRESSION
+                "size_ < Capacity|in ‘constexpr’ expansion of"
+    )
+
+    # Negative Compile Test: parser combinator misuse produces specific concept diagnostic
+    add_library(
+        test_neg_parser_concept
+        OBJECT
+        EXCLUDE_FROM_ALL
+        test_neg_parser_concept.cpp
+    )
+    target_link_libraries(test_neg_parser_concept PRIVATE schemepoc.schemepoc)
+    add_test(
+        NAME NegativeTest.ParserConceptMisuse
+        COMMAND
+            ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target
+            test_neg_parser_concept --config $<CONFIG>
+    )
+    set_tests_properties(
+        NegativeTest.ParserConceptMisuse
+        PROPERTIES
+            PASS_REGULAR_EXPRESSION "constraints not satisfied|parser_like"
+    )
+endif()

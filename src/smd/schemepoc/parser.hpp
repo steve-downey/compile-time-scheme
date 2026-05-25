@@ -8,6 +8,9 @@
 
 namespace smd::schemepoc {
 
+template <class P>
+concept parser_like = requires(P p, cursor c) { p(c); };
+
 template <class T>
 struct parse_state {
     T value;
@@ -52,7 +55,7 @@ template <class T>
                    "expected char");
 }
 
-template <class PA, class F>
+template <parser_like PA, class F>
 [[nodiscard]] constexpr auto map(PA pa, F f) {
     return parser{[pa, f](cursor cur) {
         auto r = pa(cur);
@@ -66,7 +69,7 @@ template <class PA, class F>
     }};
 }
 
-template <class PA, class PB, class F>
+template <parser_like PA, parser_like PB, class F>
 [[nodiscard]] constexpr auto lift2(PA pa, PB pb, F f) {
     return parser{[pa, pb, f](cursor cur) {
         auto ra = pa(cur);
@@ -85,17 +88,17 @@ template <class PA, class PB, class F>
     }};
 }
 
-template <class PA, class PB>
+template <parser_like PA, parser_like PB>
 [[nodiscard]] constexpr auto sequence_left(PA pa, PB pb) {
     return lift2(pa, pb, [](auto a, auto) { return a; });
 }
 
-template <class PA, class PB>
+template <parser_like PA, parser_like PB>
 [[nodiscard]] constexpr auto sequence_right(PA pa, PB pb) {
     return lift2(pa, pb, [](auto, auto b) { return b; });
 }
 
-template <class PA, class PB>
+template <parser_like PA, parser_like PB>
 [[nodiscard]] constexpr auto operator|(PA pa, PB pb) {
     return parser{[pa, pb](cursor cur) {
         auto start = cur.position().offset;
