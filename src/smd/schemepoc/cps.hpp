@@ -83,6 +83,31 @@ constexpr auto cps_dispatch(core_tree<MaxNodes, MaxList> const &core,
         return cps_dispatch(core, branch, cont, env, k);
     }
 
+    if (std::holds_alternative<core_quote>(node)) {
+        auto const &cq = std::get<core_quote>(node);
+        value v;
+        if (std::holds_alternative<int>(cq.atom))
+            v = value{std::get<int>(cq.atom)};
+        else if (std::holds_alternative<bool>(cq.atom))
+            v = value{std::get<bool>(cq.atom)};
+        else
+            v = value{symbol{std::get<std::string_view>(cq.atom)}};
+
+        auto r = cont(v);
+        if (!r.has_value())
+            return r;
+        return k(r.value());
+    }
+
+    if (std::holds_alternative<core_lambda<MaxList>>(node)) {
+        value v{closure{id, constexpr_box<schemepoc::env<16>>{
+                                new schemepoc::env<16>{env}}}};
+        auto r = cont(v);
+        if (!r.has_value())
+            return r;
+        return k(r.value());
+    }
+
     if (std::holds_alternative<core_application<MaxList>>(node)) {
         auto const &app = std::get<core_application<MaxList>>(node);
 
@@ -90,43 +115,68 @@ constexpr auto cps_dispatch(core_tree<MaxNodes, MaxList> const &core,
             cps_dispatch(core, app.func, identity_k{}, env, identity_k{});
         if (!func_r.has_value())
             return func_r;
-        if (!std::holds_alternative<builtin>(func_r.value()))
-            return result<value>{parse_error{{}, "type error"}};
-        auto bi = std::get<builtin>(func_r.value());
 
-        if (app.args.size() != 2)
-            return result<value>{parse_error{{}, "type error"}};
+        if (std::holds_alternative<builtin>(func_r.value())) {
+            auto const &bi = std::get<builtin>(func_r.value());
 
-        auto arg0_r =
-            cps_dispatch(core, app.args[0], identity_k{}, env, identity_k{});
-        if (!arg0_r.has_value())
-            return arg0_r;
-        if (!std::holds_alternative<int>(arg0_r.value()))
-            return result<value>{parse_error{{}, "type error"}};
-        int a = std::get<int>(arg0_r.value());
+            if (app.args.size() != 2)
+                return result<value>{parse_error{{}, "arity mismatch"}};
 
-        auto arg1_r =
-            cps_dispatch(core, app.args[1], identity_k{}, env, identity_k{});
-        if (!arg1_r.has_value())
-            return arg1_r;
-        if (!std::holds_alternative<int>(arg1_r.value()))
-            return result<value>{parse_error{{}, "type error"}};
-        int b = std::get<int>(arg1_r.value());
+            auto arg0_r = cps_dispatch(core, app.args[0], identity_k{}, env,
+                                       identity_k{});
+            if (!arg0_r.has_value())
+                return arg0_r;
+            if (!std::holds_alternative<int>(arg0_r.value()))
+                return result<value>{parse_error{{}, "type error"}};
+            int a = std::get<int>(arg0_r.value());
 
-        value app_val;
-        if (bi.op == builtin_op::add)
-            app_val = value{a + b};
-        else
-            app_val = value{a * b};
+            auto arg1_r = cps_dispatch(core, app.args[1], identity_k{}, env,
+                                       identity_k{});
+            if (!arg1_r.has_value())
+                return arg1_r;
+            if (!std::holds_alternative<int>(arg1_r.value()))
+                return result<value>{parse_error{{}, "type error"}};
+            int b = std::get<int>(arg1_r.value());
 
-        auto r = cont(app_val);
-        if (!r.has_value())
-            return r;
-        return k(r.value());
+            value app_val;
+            if (bi.op == builtin_op::add)
+                app_val = value{a + b};
+            else
+                app_val = value{a * b};
+
+            auto r = cont(app_val);
+            if (!r.has_value())
+                return r;
+            return k(r.value());
+        }
+
+        if (std::holds_alternative<closure>(func_r.value())) {
+            auto const &clo = std::get<closure>(func_r.value());
+            auto const &lam_node = core.get(clo.node);
+
+            if (!std::holds_alternative<core_lambda<MaxList>>(lam_node))
+                return result<value>{parse_error{{}, "type error"}};
+
+            auto const &lam = std::get<core_lambda<MaxList>>(lam_node);
+            if (app.args.size() != lam.params.size())
+                return result<value>{parse_error{{}, "arity mismatch"}};
+
+            auto new_env = clo.captured ? *clo.captured : env;
+            for (std::size_t i = 0; i < app.args.size(); ++i) {
+                auto arg_r = cps_dispatch(core, app.args[i], identity_k{}, env,
+                                          identity_k{});
+                if (!arg_r.has_value())
+                    return arg_r;
+                new_env.define(lam.params[i], arg_r.value());
+            }
+
+            return cps_dispatch(core, lam.body, cont, new_env, k);
+        }
+
+        return result<value>{parse_error{{}, "attempted to call non-function"}};
     }
 
-    // core_lambda, core_define, core_quote: out of scope for step 17
-    return result<value>{parse_error{{}, "unsupported form"}};
+    return result<value>{parse_error{{}, "cps_dispatch: unsupported form"}};
 }
 
 } // namespace detail
