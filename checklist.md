@@ -50,7 +50,7 @@
 - [x] Step 19: public one-shot API
 - [x] Step 20: lambda syntax
 - [x] Step 21: runtime closure values
-- [ ] Step 22: function application
+- [x] Step 22: function application
 - [ ] Step 23: lexical closure capture
 - [ ] Step 24: quote elaboration
 - [ ] Step 25: error quality pass
