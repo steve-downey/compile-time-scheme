@@ -13,8 +13,14 @@ namespace smd::schemepoc {
 namespace detail {
 
 template <int MaxNodes, int MaxList>
-constexpr auto read_datum_node(cursor cur, datum_tree<MaxNodes, MaxList> &tree)
-    -> parse_result<node_id> {
+constexpr auto
+read_datum_node(cursor cur,
+                tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> &arena)
+    -> parse_result<datum_type<MaxNodes, MaxList>> {
+    using datum = datum_type<MaxNodes, MaxList>;
+    using datum_f =
+        typename datum_f_factory<MaxNodes, MaxList>::template type<datum>;
+
     cur = skip_intertoken_space(cur);
     if (cur.empty())
         return parse_error{cur.position(), "unexpected end of input"};
@@ -28,8 +34,8 @@ constexpr auto read_datum_node(cursor cur, datum_tree<MaxNodes, MaxList> &tree)
             if (b == 't' || b == 'f') {
                 cursor after_bool = after.bump();
                 if (after_bool.empty() || is_delimiter(after_bool.peek())) {
-                    node_id id = tree.add(datum_boolean{b == 't'});
-                    return parse_state<node_id>{id, after_bool};
+                    datum d{datum_f{datum_boolean{b == 't'}}};
+                    return parse_state<datum>{d, after_bool};
                 }
             }
         }
@@ -38,28 +44,29 @@ constexpr auto read_datum_node(cursor cur, datum_tree<MaxNodes, MaxList> &tree)
 
     if (c == '\'') {
         cursor after = cur.bump();
-        auto inner = read_datum_node(after, tree);
+        auto inner = read_datum_node<MaxNodes, MaxList>(after, arena);
         if (!inner.has_value())
             return inner;
-        node_id id = tree.add(datum_quote{inner.value().value});
-        return parse_state<node_id>{id, inner.value().rest};
+        datum d{datum_f{datum_quote<datum, MaxNodes>{
+            make_arena_box(arena, inner.value().value)}}};
+        return parse_state<datum>{d, inner.value().rest};
     }
 
     if (c == '(') {
         cursor after = cur.bump();
-        datum_list<MaxList> list{};
+        datum_list<datum, MaxNodes, MaxList> list{};
         while (true) {
             after = skip_intertoken_space(after);
             if (after.empty())
                 return parse_error{after.position(), "expected ')'"};
             if (after.peek() == ')') {
-                node_id id = tree.add(list);
-                return parse_state<node_id>{id, after.bump()};
+                datum d{datum_f{list}};
+                return parse_state<datum>{d, after.bump()};
             }
-            auto elem = read_datum_node(after, tree);
+            auto elem = read_datum_node<MaxNodes, MaxList>(after, arena);
             if (!elem.has_value())
                 return elem;
-            list.elements.push_back(elem.value().value);
+            list.elements.push_back(make_arena_box(arena, elem.value().value));
             after = elem.value().rest;
         }
     }
@@ -67,16 +74,16 @@ constexpr auto read_datum_node(cursor cur, datum_tree<MaxNodes, MaxList> &tree)
     {
         auto int_r = integer_p()(cur);
         if (int_r.has_value()) {
-            node_id id = tree.add(datum_integer{int_r.value().value.value});
-            return parse_state<node_id>{id, int_r.value().rest};
+            datum d{datum_f{datum_integer{int_r.value().value.value}}};
+            return parse_state<datum>{d, int_r.value().rest};
         }
     }
 
     {
         auto sym_r = symbol_p()(cur);
         if (sym_r.has_value()) {
-            node_id id = tree.add(datum_symbol{sym_r.value().value.name});
-            return parse_state<node_id>{id, sym_r.value().rest};
+            datum d{datum_f{datum_symbol{sym_r.value().value.name}}};
+            return parse_state<datum>{d, sym_r.value().rest};
         }
     }
 
@@ -86,16 +93,15 @@ constexpr auto read_datum_node(cursor cur, datum_tree<MaxNodes, MaxList> &tree)
 } // namespace detail
 
 template <int MaxNodes, int MaxList>
-[[nodiscard]] constexpr auto read_datum(cursor cur)
-    -> parse_result<datum_tree<MaxNodes, MaxList>> {
-    datum_tree<MaxNodes, MaxList> tree{};
-    auto r = detail::read_datum_node(cur, tree);
+[[nodiscard]] constexpr auto
+read_datum(cursor cur,
+           tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> &arena)
+    -> result<parse_state<datum_type<MaxNodes, MaxList>>> {
+    auto r = detail::read_datum_node<MaxNodes, MaxList>(cur, arena);
     if (!r.has_value())
         return r.error();
-    return parse_state<datum_tree<MaxNodes, MaxList>>{std::move(tree),
-                                                      r.value().rest};
+    return r.value();
 }
-
 } // namespace smd::schemepoc
 
 #endif

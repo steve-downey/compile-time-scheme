@@ -26,6 +26,7 @@ If any rule conflicts with `docs/codestyle.org`, follow `docs/codestyle.org`.
 - Document blockers in `handoff-next.md`.
 - Update `checklist.md` when the step is complete.
 - Update `handoff.md` with durable facts.
+- Keep `docs/compiler_architecture.org` and its transcluded UUID code annotations up to date.
 - Rewrite `handoff-next.md` for the next clean agent.
 
 ## Required commands

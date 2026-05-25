@@ -20,6 +20,11 @@ class static_vector {
     [[nodiscard]] constexpr auto operator[](int index) -> T &;
     [[nodiscard]] constexpr auto operator[](int index) const -> T const &;
 
+    constexpr auto begin() -> T * { return storage_.data(); }
+    constexpr auto begin() const -> const T * { return storage_.data(); }
+    constexpr auto end() -> T * { return storage_.data() + size_; }
+    constexpr auto end() const -> const T * { return storage_.data() + size_; }
+
   private:
     std::array<T, Capacity> storage_{};
     int size_{};

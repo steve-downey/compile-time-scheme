@@ -16,38 +16,41 @@ namespace smd::schemepoc {
 // closure_program: a callable compiled object.
 // Wraps a cps_code so it can be invoked with just an environment,
 // using the identity as the outermost continuation.
-template <class CpsCode>
+template <int MaxNodes, int MaxList, class CpsCode>
 struct closure_program {
+    using Core = core_type<MaxNodes, MaxList>;
     CpsCode code;
 
     template <int MaxBindings>
-    constexpr auto operator()(env<MaxBindings> const &environment) const
-        -> result<value> {
-        return code(environment, detail::identity_k{});
+    constexpr auto operator()(env<Core, MaxBindings> const &environment) const
+        -> result<value<Core>> {
+        return code(environment, detail::identity_k<Core>{});
     }
 };
 
-template <class CpsCode>
-closure_program(CpsCode) -> closure_program<CpsCode>;
-
 // compile_to_closure: full pipeline from source string to callable closure.
-// Chains read -> elaborate -> compile_cps.
+// Chains read -> elaborate -> compile_cps<MaxNodes, MaxList>.
 // Returns result<closure_program<...>>; error propagates from any stage.
 template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] constexpr auto compile_to_closure(std::string_view src) {
-    using CT = core_tree<MaxNodes, MaxList>;
-    using CpsCodeT = decltype(compile_cps(std::declval<CT const &>(),
-                                          std::declval<node_id>()));
-    using ProgramT = closure_program<CpsCodeT>;
+    using Core = core_type<MaxNodes, MaxList>;
+    using CpsCodeT = decltype(compile_cps<MaxNodes, MaxList>(
+        std::declval<Core const &>(),
+        std::declval<tree_arena<Core, MaxNodes> const &>()));
+    using ProgramT = closure_program<MaxNodes, MaxList, CpsCodeT>;
 
-    auto dr = read_datum<MaxNodes, MaxList>(cursor{src});
+    tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> arena_dr;
+    auto dr = read_datum<MaxNodes, MaxList>(cursor{src}, arena_dr);
     if (!dr.has_value())
         return result<ProgramT>{dr.error()};
-    auto er = elaborate(dr.value().value);
+    tree_arena<Core, MaxNodes> core_arena;
+    auto er =
+        elaborate<MaxNodes, MaxList>(dr.value().value, arena_dr, core_arena);
     if (!er.has_value())
         return result<ProgramT>{er.error()};
-    auto const &ct = er.value();
-    return result<ProgramT>{ProgramT{compile_cps(ct, ct.size() - 1)}};
+    auto const &ct_root = er.value();
+    return result<ProgramT>{
+        ProgramT{compile_cps<MaxNodes, MaxList>(ct_root, core_arena)}};
 }
 
 } // namespace smd::schemepoc

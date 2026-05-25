@@ -1,0 +1,86 @@
+#+OPTIONS: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+OPTIONS: ':nil *:t -:t ::t <:t H:4 \n:nil ^:nil arch:headline author:t
+#+TITLE: Compiler Architecture: Scheme-Light in C++26
+#+SUBTITLE: Techniques and Explanations for C++ Developers
+#+AUTHOR: Agent
+#+LANGUAGE: en
+#+STARTUP: showall
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="../etc/modus-operandi-tinted.css"/>
+
+* Introduction
+
+This document details the compile-time compiler architecture for SchemePoC, a Scheme-light compiler proof-of-concept targeting C++26.
+
+For many C++ developers, compiler jargon and functional programming idioms can feel like a completely different language. This document translates those concepts into familiar C++ terms. We are building a compiler entirely inside C++ standard constant expressions (`constexpr`).
+
+Rather than parsing strings directly into executable code in one messy step, this compiler uses a *staged pipeline*. It breaks the problem into distinct transforming phases:
+
+1. **Reader**: Strings -> Reader Datum Tree
+2. **Elaborator**: Reader Datum Tree -> Core Semantic Tree
+3. **CPS IR**: Core Semantic Tree -> Continuation-Passing Style Intermediate Representation
+4. **Backend**: CPS IR -> Executable C++ Objects (Closures or Sender Graphs)
+
+* Phase 1: Applicative Parser Combinators
+
+Parsing text manually with "recursive descent" (writing a massive tree of `if/else` and `while` loops to eat characters) is error-prone. Instead, we use **parser combinators**. Think of combinators as small, composable C++ objects. You build a parser for a complex grammar by snapping together smaller parsers (e.g., "parse a digit", "parse a letter") using operations like "and then", "or", and "many".
+
+In C++26 `constexpr` contexts, we run into a limitation: you cannot easily juggle C++ lambdas that capture variables and convert them into function pointers. To solve this, our "applicative" library represents parsers as literal C++ callable objects (functors with `operator()`).
+
+#+transclude: [[file:../src/smd/schemepoc/parser.hpp::9b876402-ddc1-48af-910e-0d12fc462d7c]] :lines 2- :src cpp :end "9b876402-ddc1-48af-910e-0d12fc462d7c end"
+
+* Phase 2: Reader Datum Tree (Understanding "Atoms")
+
+In languages like C++, the text you type is directly representing instructions. In Lisp and Scheme, the text you type represents **data structures** (lists). This concept is called "homoiconicity", and it's why Lisp has so many parentheses.
+
+The Reader's only job is to turn text into lists and **atoms**. In this context, an **atom** is simply any fundamental piece of data that isn't a list. The number `42` is an atom. The boolean `#t` (true) is an atom. The symbol `foo` is an atom.
+
+At this stage, the compiler doesn't know if the list `(+ 1 2)` is a mathematical operation or just a literal list of three items. It merely builds the tree of atoms and lists. Because standard heap-allocated trees (using `new` or `std::vector`) cannot easily survive across the C++26 compile-to-runtime boundary, we construct this tree in a "flat arena"—a fixed-size array where nodes refer to each other by integer indexes (`node_id`).
+
+#+transclude: [[file:../src/smd/schemepoc/datum_tree.hpp::c1faeaf1-d7d8-4f18-a681-7973dc1630dd]] :lines 2- :src cpp :end "c1faeaf1-d7d8-4f18-a681-7973dc1630dd end"
+
+* Phase 3: Elaboration and Core Semantic IR
+
+**Elaboration** is compiler jargon for "figuring out what the code actually means."
+
+Once we have a tree of lists and atoms, the Elaborator walks that tree and assigns C++ semantic types to it. If it sees a list starting with the symbol `if`—like `(if #t 1 2)`—it "elaborates" that into a `core_if` structure representing a conditional branch. If it sees a regular list like `(+ 1 2)`, it elaborates it into a `core_application` (a function call).
+
+Elaboration is where syntax errors are caught natively before we ever try to execute them. By keeping reading (Phase 2) and elaboration (Phase 3) separate, the code remains much simpler.
+
+#+transclude: [[file:../src/smd/schemepoc/elaborator.hpp::30571cc2-6e27-4b77-ad54-8e146cc7deae]] :lines 2- :src cpp :end "30571cc2-6e27-4b77-ad54-8e146cc7deae end"
+
+* Phase 4: CPS vs. Direct Evaluation (`eval_direct`)
+
+There are two primary ways to evaluate an abstract syntax tree:
+
+**1. Direct Evaluation (`eval_direct`)**:
+This is the simple interpreter approach. You write a C++ function that takes a tree node, figures out what to do, computes the result, and `return`s it. If a node has children (e.g. arguments to a function), `eval_direct` calls itself recursively. The downside? Deeply nested programs will blow up the C++ call stack. Also, supporting advanced control flow (like early returns or tail-call optimization) is difficult when you're chained to standard C++ `return` semantics.
+
+**2. Continuation-Passing Style (CPS)**:
+CPS is an alternative plumbing method for programs. Instead of a function *returning* a value, every function takes an extra argument: a callback representing "what to do next with the result." This callback is called the **continuation**.
+
+If you want to compute `(A + B) * C` in CPS:
+1. Compute `A`, pass it to a continuation.
+2. In that continuation, compute `B`.
+3. Pass `A` and `B` to the `+` function, along with a continuation for `*`.
+4. In that continuation, take the sum, evaluate `C`, and pass them to the `*` function...
+
+Why do this? Because if you never standardly `return`, but instead always call "what happens next", you explicitly expose the control flow. Tail calls just become regular function calls that don't add to the stack. Furthermore, this maps *perfectly* to asynchronous programming in modern C++. A "continuation" in compiler jargon is exactly the same concept as a `.then()` or a `receiver` in C++ async execution (like Beman senders).
+
+#+transclude: [[file:../src/smd/schemepoc/cps.hpp::dc28ffbd-aa58-47ff-9923-28841a0e1948]] :lines 2- :src cpp :end "dc28ffbd-aa58-47ff-9923-28841a0e1948 end"
+
+* Phase 5: Closure Backend Materialization
+
+For C++ developers, it may seem confusing that a language can be executed using *only* Closures and CPS.
+
+A **Closure** is essentially a `struct` containing a function pointer (or `operator()`) alongside the local variables it captured from its surrounding scope (like a capturing C++ lambda).
+If you combine:
+- **Closures** (to preserve state and context).
+- **CPS** (to handle branching, looping, and returning by calling a "what happens next" callback).
+
+You have all the ingredients necessary for a Turing-complete runtime. You don't need a virtual machine with a stack pointer and assembly instructions.
+
+This Backend phase takes our CPS representation and translates it into completely standard, strongly-typed C++ closure objects. We don't use heavy type-erased wrappers like `std::move_only_function` or `std::any` because they introduce overhead (virtual calls, dynamic allocation). Instead, we emit exact, statically-known template wrappers.
+
+Because we used CPS, this phase is structurally identical to building a C++26 sender graph (`sync_wait(when_all(...))`), preparing the compiler natively for future async integration.
+
+#+transclude: [[file:../src/smd/schemepoc/closure_backend.hpp::a6bf5e59-ae94-4b53-b0eb-8f5592fdb0b7]] :lines 2- :src cpp :end "a6bf5e59-ae94-4b53-b0eb-8f5592fdb0b7 end"
