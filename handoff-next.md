@@ -1,61 +1,93 @@
-# Next step: Step 2
+# Next step: Step 3
 
 ## Goal
 
-Add a constexpr cursor over `std::string_view` and lexical classification functions for Scheme datum reading.
-The cursor tracks offset, line, and column as it advances through input.
+Add the minimal parser object: a constexpr wrapper around a callable object, plus
+`parse_state<T>`, `parse_result<T>`, `pure`, `satisfy`, and `char_p`.
+
+Do not add combinators yet (those are Step 4).
 
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/reader_cursor.hpp
-src/smd/schemepoc/reader_cursor.test.cpp
+src/smd/schemepoc/parser.hpp
+src/smd/schemepoc/parser.test.cpp
 src/smd/schemepoc/CMakeLists.txt
 ```
 
-## Context from previous step
+## Context from previous steps
 
-Step 1 added the core utility vocabulary:
+Step 2 added `reader_cursor.hpp` with:
 
-- `source.hpp`: `source_pos` (offset/line/column), `source_span` (first/last), `parse_error` (where/message).
-  All constexpr.
-  `source_pos` and `source_span` use defaulted `operator==`.
-  `parse_error` uses a custom `operator==` that compares `char const*` messages by string content (not pointer identity), handling nullptr.
-- `result.hpp`: `result<T>` wrapping `std::variant<T, parse_error>`.
-  Provides `has_value()`, `value()`, `error()`.
-  Constexpr.
-  Includes `<smd/schemepoc/source.hpp>` and `<variant>`.
-- `static_vector.hpp`: `static_vector<T, Capacity>` backed by `std::array<T, Capacity>`.
-  Provides `push_back`, `size`, `empty`, `operator[]` (mutable and const).
-  Uses `assert()` for capacity overflow.
-  Constexpr.
-  Includes `<array>` and `<cassert>`.
-- All three are header-only with no `.cpp` files.
-- All headers use classical `#ifndef`/`#define` guards.
-- Tests use Catch2, double-include verification, and `static_assert` for constexpr contracts.
-- `make compile` and `make test` pass (18 tests).
-- `make lint` passes for all non-network hooks (markdownlint requires Node.js download which fails on SSL in this environment; that is a pre-existing infrastructure issue, not a code issue).
+- `cursor`: explicit constructor from `std::string_view`. Methods: `empty()`, `peek()`,
+  `bump()` (returns new cursor advancing offset and tracking line/column), `position()`
+  (returns `source_pos`), `remaining()` (returns `std::string_view`).
+- Free functions: `is_space(char)`, `is_initial_symbol_char(char)`, `is_symbol_char(char)`,
+  `is_delimiter(char)`, `skip_intertoken_space(cursor)`.
+- All constexpr. Header-only, classical `#ifndef` guards.
+
+Step 1 provided:
+
+- `source.hpp`: `source_pos` (offset/line/col), `source_span`, `parse_error`. All constexpr.
+- `result.hpp`: `result<T>` over `std::variant<T, parse_error>`. Provides `has_value()`,
+  `value()`, `error()`. Constexpr.
+- `static_vector.hpp`: fixed-capacity constexpr container.
+
+`make compile` and `make test` pass (30 tests). `make lint` passes.
 
 ## Required implementation details
 
-- `reader_cursor.hpp`: `cursor` class with explicit constructor from `std::string_view`.
-  Methods: `empty()`, `peek()`, `bump()` (returns new cursor), `position()` (returns `source_pos`), `remaining()` (returns `std::string_view`).
-  `bump()` must advance offset, and update line/column (newline increments line, resets column).
-- Free functions: `is_space(char)`, `is_initial_symbol_char(char)`, `is_symbol_char(char)`, `is_delimiter(char)`, `skip_intertoken_space(cursor)`.
-- Symbol classification: initial = alphabetic or `+ - * / = < > ! ?`; rest = initial or digit.
-- Delimiter: whitespace, `(`, `)`, `'`, end of input.
-- Do not support comments yet.
-- All constexpr.
-- `cursor` must include `<smd/schemepoc/source.hpp>` for `source_pos`.
+`parser.hpp` must define these in `namespace smd::schemepoc`:
+
+```cpp
+template <class T>
+struct parse_state {
+    T value;
+    cursor rest;
+};
+
+template <class T>
+using parse_result = result<parse_state<T>>;
+
+template <class F>
+class parser {
+  public:
+    constexpr explicit parser(F f);
+    constexpr auto operator()(cursor cur) const;
+  private:
+    F f_;
+};
+
+template <class F>
+parser(F) -> parser<F>;
+
+template <class T>
+[[nodiscard]] constexpr auto pure(T value);
+
+[[nodiscard]] constexpr auto satisfy(auto pred, char const* expected);
+[[nodiscard]] constexpr auto char_p(char expected);
+```
+
+- `parser` wraps a callable `F`; `operator()` invokes `f_` with the cursor.
+- `pure(value)` returns a parser that always succeeds and leaves the cursor unchanged.
+- `satisfy(pred, expected)`: if the cursor is non-empty and `pred(peek())` is true, returns
+  a `parse_state` with the peeked character and `bump()`ed cursor; otherwise returns a
+  `parse_error` at `cur.position()` with `expected` as the message.
+- `char_p(c)`: `satisfy` specialization that matches exactly `c`.
+- Do not use raw function pointers anywhere. Parser combinators must capture parser objects
+  by value so lambdas can hold them.
+- Include `<smd/schemepoc/result.hpp>` and `<smd/schemepoc/reader_cursor.hpp>`.
 
 ## Required tests
 
 - Header idempotency.
-- `static_assert` that `is_delimiter('(')` and `is_delimiter(')')` are true.
-- `static_assert` that `skip_intertoken_space` on `"  x"` peeks `'x'`.
-- Cursor tracks offset, line, and column correctly through `bump()`.
-- `is_initial_symbol_char` and `is_symbol_char` classifications.
-- `skip_intertoken_space` skips whitespace and stops at non-whitespace.
+- `static_assert` that `char_p('x')(cursor{"xyz"})` has value, `value().value == 'x'`,
+  and `value().rest.peek() == 'y'`.
+- `static_assert` that `pure(42)(cursor{"abc"})` has value `42` and cursor unchanged.
+- `char_p` on wrong character returns error.
+- `satisfy` on empty cursor returns error.
+- Runtime `TEST_CASE` variants using `REQUIRE` / `REQUIRE_FALSE` are welcome but the
+  constexpr contracts must use `static_assert`.
 
 ## Required commands
 
@@ -67,8 +99,8 @@ make lint
 
 ## Do not do
 
-- Do not proceed to Step 3.
-- Do not add parser combinators yet.
-- Do not add comment support yet.
-- Do not introduce optional dependencies unless this step requires them.
+- Do not proceed to Step 4.
+- Do not add `map`, `apply`, `sequence_left`, `sequence_right`, or `lift2` yet.
+- Do not add comment support to the cursor.
+- Do not use raw function pointers.
 - Do not change architecture decisions without documenting the reason in `handoff.md`.
