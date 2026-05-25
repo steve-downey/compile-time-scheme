@@ -1,142 +1,150 @@
-# Next step: Step 15 (CPS closure backend facade, arithmetic only)
+# Next step: Step 16 (bottom-up CPS direction decision)
 
 ## Goal
 
-Add `cps.hpp` and `cps_arithmetic.test.cpp` that compile a `core_tree` node to a
-continuation-passing-style callable object. No lambdas yet — only arithmetic
-expressions that `eval_direct` already handles. The first implementation is
-interpreter-backed (calls `eval_direct` inside the CPS closure). The boundary
-and test contract are what matter.
+Decide whether the bottom-up CPS compiler for step 17 will be
+**structural** (recursing directly over `core_tree` nodes) or
+**Fix<F>-based** (using `fold_fix` over the expression fixpoint type
+from step 14).  Produce a design-spike file `docs/cps-direction.md`
+that records the decision, the tradeoffs considered, and the sketch of
+the chosen approach.  No new production headers or test files are added
+in step 16.
 
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/cps.hpp              (new)
-src/smd/schemepoc/cps_arithmetic.test.cpp  (new)
-src/smd/schemepoc/CMakeLists.txt       (add new files)
-checklist.md                           (mark step done)
-handoff-next.md                        (update for step 16)
+docs/cps-direction.md          (new — design spike and decision record)
+checklist.md                   (mark step done)
+handoff-next.md                (update for step 17)
 ```
 
-No existing pipeline files need to change.
+No `src/` files change in step 16.
 
 ## Context from previous steps
 
-Steps 11–14 completed:
+Steps 11–15 completed:
 
-- `value.hpp`: `enum class builtin_op { add, multiply }`, `struct builtin { builtin_op op; }`,
+- `value.hpp`: `enum class builtin_op { add, multiply }`, `struct builtin`,
   `using value = std::variant<int, bool, builtin>`,
   `template <int MaxBindings> class env`,
   `template <int MaxBindings> constexpr auto default_env() -> env<MaxBindings>`
 - `eval_direct.hpp`:
   `template <int MaxNodes, int MaxList, int MaxBindings>`
   `constexpr auto eval_direct(core_tree<MaxNodes, MaxList> const&, node_id, env<MaxBindings> const&) -> result<value>`
-- `elaborator.hpp`: all core types (`core_integer`, `core_boolean`, `core_symbol`,
-  `core_if`, `core_application<MaxList>`, `node_id`, `core_tree<MaxNodes, MaxList>`),
-  `constexpr auto elaborate(datum_tree<...>) -> result<core_tree<...>>`
-- `reader.hpp`: `read_datum<MaxNodes, MaxList>(cursor{sv}) -> parse_result<datum_tree<...>>`
-- `parser_ops.hpp`: typeclass-object facade over the parser free functions
+- `cps.hpp`:
+  `template <class F> struct cps_code { F f; operator()(Env, K) }`,
+  CTAD guide `cps_code(F) -> cps_code<F>`,
+  `template <int MaxNodes, int MaxList>`
+  `constexpr auto compile_cps(core_tree<MaxNodes, MaxList> const&, node_id) -> cps_code<...>`
+  (interpreter-backed: wraps `eval_direct` in a CPS closure)
+- `elaborator.hpp`: all core types, `constexpr auto elaborate(...) -> result<core_tree<...>>`
+- `reader.hpp`: `read_datum<MaxNodes, MaxList>(cursor) -> parse_result<datum_tree<...>>`
 - `fix.hpp`: `template <template <class> class F> class fix`,
   `template <class R, template <class> class F, class Algebra>`
   `constexpr auto fold_fix(fix<F> const&, Algebra) -> R`
 
-106 tests pass. `make compile`, `make test`, `make lint` are all green.
+111 tests pass. `make compile`, `make test`, `make lint` are all green.
 
-## Required implementation
+## Key design question for step 16
 
-### cps.hpp
+`core_tree<MaxNodes, MaxList>` is a **flat arena**: nodes are stored in a
+`static_vector<core_node<MaxList>, MaxNodes>` and referenced by `node_id`
+(integer index).  It is NOT a recursive data type.  `fix<F>` requires a
+recursive type.
 
-Define `cps_code<F>` and `compile_cps` in `namespace smd::schemepoc`:
+Therefore the bottom-up CPS compiler has two options:
 
-```cpp
-template <class F>
-struct cps_code {
-    F f;
+### Option A — structural recursion over the flat arena
 
-    template <class Env, class K>
-    constexpr auto operator()(Env const& env, K k) const {
-        return f(env, k);
-    }
-};
+Walk `core_tree` directly.  A recursive function `cps_of(core_tree&, node_id, continuation)`
+dispatches on the node variant and recurses via `node_id`.  The continuation
+is passed as a template parameter (or `auto`) to avoid erasing it.
 
-template <class F>
-cps_code(F) -> cps_code<F>;
+**Pros:** No additional data structure.  Directly composes with the
+arena that elaborate already produces.
+
+**Cons:** Every call to `cps_of` instantiates a new template from the
+continuation type, potentially creating a chain of nested types as deep
+as the tree.  For a tree of depth D, the continuation type at depth 0
+wraps the continuation at depth 1, which wraps depth D.  Type depth is
+O(D).  GCC can handle this for small D (arithmetic only, D <= ~4), but
+it may become expensive for deeper expressions.
+
+### Option B — Fix<F>-based fold
+
+Convert `core_tree` to `fix<expr_f>` first (a separate pass), then apply
+`fold_fix` with a CPS algebra.  Step 14's `fix.hpp` already provides
+`fold_fix`.
+
+**Pros:** Clean algebraic structure.  The algebra is a single function.
+Well suited to the step-14 playground.
+
+**Cons:** Requires a conversion pass from the flat arena to a recursive
+`fix<expr_f>` type.  The `fix<F>` node uses `new`/`delete` so it is not
+a literal type and cannot appear in `static_assert` constexpr tests.
+This breaks the existing compile-time test discipline.
+
+### Recommended decision
+
+**Option A** (structural recursion over the flat arena) for steps 17-18.
+The tree depth for the arithmetic-only phase is at most 3-4 levels, which
+is safe for nested template continuation types.  `fix<F>` is not a literal
+type and would lose the `static_assert` test discipline that the project
+depends on.  The `fix<F>` playground (step 14) remains a standalone
+experiment.
+
+The `docs/cps-direction.md` should record this decision, sketch the
+`cps_of` signature for step 17, and note when/if `fix<F>` becomes viable
+(e.g., once `constexpr new` allocation lands and `fix<F>` can be literal).
+
+## Safety notes for the next Claude
+
+**Compilation memory:**
+The previous Claude session OOMed the machine compiling step 15.  The
+root causes were template/type errors in the test file combined with ninja
+running 20 parallel GCC jobs.  The safe compilation incantation is:
+
+```bash
+make compile
 ```
 
-`compile_cps` returns a `cps_code` backed by `eval_direct`:
+The build is now clean and incremental builds are fast.  If you are doing
+a from-scratch build (e.g., after a CMake reconfigure), limit parallelism:
 
-```cpp
-template <int MaxNodes, int MaxList, int MaxBindings>
-[[nodiscard]] constexpr auto compile_cps(
-    core_tree<MaxNodes, MaxList> const& core,
-    node_id root) {
-    return cps_code{[core, root](auto const& env, auto k) constexpr {
-        auto v = eval_direct(core, root, env);
-        if (!v.has_value())
-            return v;
-        return k(v.value());
-    }};
-}
+```bash
+cmake --build .build/build-gcc-16 --config Asan --target all -- -k 0 -j4
 ```
 
-Note: `compile_cps` captures `core` by value into the lambda. `MaxBindings` is
-not a parameter to `compile_cps`; it is deduced from the `env` argument passed
-at call time.
+Do NOT use `ulimit -v` for the build -- ASan requires ~15 TB of virtual
+address space and fails immediately under `ulimit -v`.
 
-The `compile_cps` signature does NOT fix `MaxBindings`; instead the lambda's
-`auto const& env` lets any matching `env<N>` be passed.
+**Test pattern discipline:**
+All `static_assert` tests must use the immediately-invoked lambda pattern:
 
-Headers needed: `elaborator.hpp`, `eval_direct.hpp`, `value.hpp`, `result.hpp`.
-
-### cps_arithmetic.test.cpp
-
-Build an arithmetic expression via reader + elaborator, compile it with
-`compile_cps`, and invoke with a continuation.
-
-Suggested test expression: `"(+ 3 4)"` → result should be `value{7}`.
-
-Test pattern:
 ```cpp
-constexpr auto src = std::string_view{"(+ 3 4)"};
-constexpr auto parsed = read_datum<64, 16>(cursor{src});
-// static_assert or require parsed.has_value()
-constexpr auto ct = elaborate(parsed.value().value);
-// static_assert or require ct.has_value()
-constexpr auto code = compile_cps(ct.value(), ct.value().root());
-constexpr auto env0 = default_env<16>();
-constexpr auto result = code(env0, [](value v) constexpr {
-    return smd::schemepoc::result<value>{v};
-});
-static_assert(result.value() == value{7});
+static_assert([] {
+    // local auto variables, not constexpr auto
+    ...
+    return bool_result;
+}());
 ```
 
-Include the component header first and twice. Include a runtime
-`TEST_CASE("CpsArithmeticTest - HeaderIsIdempotent")`.
+Do NOT use `constexpr auto` for large intermediate objects (`core_tree`,
+`cps_code`) at namespace or function scope.  GCC's constexpr evaluator
+tracks full copies of these large objects; at 17 KB per `core_tree<32,16>`
+with 20 parallel jobs the machine will OOM.
 
-### CMakeLists.txt changes
+**Root access:**
+`core_tree<N,M>` has no `.root()` method.  Use `ct.size() - 1` for the
+root node index.
 
-Add to `FILE_SET HEADERS`:
-- `cps.hpp`
-
-Add to `target_sources` for `schemepoc_test`:
-- `cps_arithmetic.test.cpp`
-
-Follow the same pattern as `fix.hpp` / `fix.test.cpp`.
-
-## Design notes
-
-- `compile_cps` is interpreter-backed in step 15. Steps 16–18 will replace
-  the interpreter with a true bottom-up CPS compiler.
-- `cps_code<F>` uses concrete templated callables, not `std::move_only_function`
-  or `std::any`. This is intentional for constexpr compatibility.
-- `K` (the continuation) must return `result<value>` so that errors propagate.
-- Do not add lambda support, closures, or defunctionalization yet.
+**Template parameters:**
+`compile_cps` has only `<int MaxNodes, int MaxList>` -- no `MaxBindings`
+parameter.  The env type is deduced by the lambda's `auto const& env`.
 
 ## Do not do
 
-- Do not change `eval_direct.hpp`, `elaborator.hpp`, `value.hpp`, `reader.hpp`,
-  `fix.hpp`, or any other existing pipeline file.
-- Do not add `using namespace` in headers.
-- Do not implement a true bottom-up CPS compiler (that is step 16).
-- Do not add CPS for lambdas (that is step 20+).
-- Do not proceed to step 16 in the same commit.
+- Do not write any `src/` production headers or test files in step 16.
+- Do not implement the bottom-up CPS compiler (that is step 17).
+- Do not add lambda support (step 20+).
+- Do not proceed to step 17 in the same commit.
