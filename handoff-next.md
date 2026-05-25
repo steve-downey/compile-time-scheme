@@ -1,162 +1,111 @@
-# Next step: Step 17 (defunctionalized CPS program)
+# Next step: Step 18 (closure materialization over CPS program)
 
 ## Goal
 
-Implement a true bottom-up CPS compiler that transforms a `core_tree` into a
-`cps_code` by structural recursion over the flat arena, threading
-continuations as template parameters.  Replace the interpreter-backed
-`compile_cps` stub in `cps.hpp` with a genuine CPS transformation.
+Step 18 introduces closure materialization: given the CPS program produced by
+`compile_cps`, produce a set of named C++ closure structs (one per CPS
+continuation) that can be stored, passed around, and eventually linked into a
+Beman Execution sender chain.
+
+The immediate scope for step 18 is modest: extract the continuations that are
+already implicit in `cps_dispatch` into explicitly named, constexpr-storable
+objects, without yet involving the sender backend.
+
+## Current state after step 17
+
+`cps.hpp` now contains a genuine CPS transformation:
+
+```
+detail::identity_k         — fixed-type identity continuation (value -> result<value>)
+detail::cps_dispatch<...>  — structural recursive evaluator threading cont and k
+cps_of(core, id, cont)     — returns cps_code{lambda capturing (core, id, cont)}
+compile_cps(core, root)    — convenience wrapper: cps_of(core, root, identity_k{})
+```
+
+`cps_dispatch` dispatches on five node kinds:
+- `core_integer`, `core_boolean` — immediate value, call cont then k
+- `core_symbol` — env lookup, call cont then k (or propagate error)
+- `core_if` — evaluate condition with identity cont/k, branch, tail-call
+- `core_application` — evaluate func and each arg with identity cont/k, apply builtin, call cont then k
+- `core_lambda`, `core_define`, `core_quote` — return error ("unsupported form")
+
+Two template instantiations of `cps_dispatch` are used in practice:
+1. `<Cont, Env, K>` for the outermost call
+2. `<identity_k, Env, identity_k>` for all intermediate sub-expression evaluations
+
+The `eval_direct` include was removed from `cps.hpp`; `compile_cps` no longer
+calls `eval_direct`.
+
+## What step 18 should do
+
+The checklist entry is: **Step 18: closure materialization over CPS program.**
+
+The likely shape of step 18 is to introduce a `cps_closure.hpp` that defines:
+
+1. A `cps_frame` variant type representing each kind of CPS continuation frame
+   (one constructor per "what to do after evaluating a sub-expression"):
+   - After evaluating the condition of an `if`: branch and continue
+   - After evaluating the function position of an application: evaluate args
+   - After evaluating each argument: accumulate, eventually apply
+
+2. A `cps_stack` (or similar) that holds a static_vector of `cps_frame` values,
+   so the continuation is represented as an explicit data structure rather than
+   as nested C++ template types.
+
+3. A `materialize(core, root)` function that converts the `core_tree` into a
+   sequence of `cps_frame` objects using an iterative worklist algorithm
+   (push continuations onto the stack, process nodes).
+
+The goal is that the materialized representation is a literal type (all
+`static_vector`, no heap), directly usable in `static_assert` tests.
+
+## Design note from step 16/17
+
+The `cps_dispatch` approach is correct but still builds continuations as
+nested C++ lambda types at call time.  Step 18 makes the continuation chain
+EXPLICIT as a runtime data structure (the frame stack) rather than implicit
+in the C++ type system.  This is the "defunctionalization" mentioned in the
+checklist.
 
 ## Files expected to change
 
 ```txt
-src/smd/schemepoc/cps.hpp              (replace compile_cps stub; add cps_of)
-src/smd/schemepoc/cps.test.cpp         (extend CPS tests for structural cases)
-checklist.md                           (mark step done)
-handoff-next.md                        (update for step 18)
+src/smd/schemepoc/cps_closure.hpp     (new: cps_frame, cps_stack, materialize)
+src/smd/schemepoc/cps_closure.test.cpp (new: tests for materialized closures)
+src/smd/schemepoc/CMakeLists.txt       (add cps_closure.hpp to FILE_SET,
+                                        cps_closure.test.cpp to test target)
+checklist.md                           (mark step 18 done)
+handoff-next.md                        (update for step 19)
 ```
 
-No new header files are needed — `cps_of` lives in `cps.hpp`.
+## Test discipline
 
-## Decision from step 16
-
-**Structural recursion over the flat `core_tree` arena** was chosen.
-
-`fix<F>` is not a literal type (it allocates on the heap with `new`/`delete`)
-and cannot appear in `static_assert` tests.  The project's compile-time test
-discipline requires all public constexpr APIs to be exercised in a
-`static_assert`.  See `docs/cps-direction.md` for the full rationale.
-
-## Current state of cps.hpp
-
-The existing `compile_cps` is an interpreter-backed stub:
-
-```cpp
-template <int MaxNodes, int MaxList>
-[[nodiscard]] constexpr auto compile_cps(
-    core_tree<MaxNodes, MaxList> const& core,
-    node_id                             root) {
-    return cps_code{[core, root](auto const& env, auto k) constexpr {
-        auto v = eval_direct(core, root, env);
-        if (!v.has_value())
-            return v;
-        return k(v.value());
-    }};
-}
-```
-
-Step 17 replaces this with a real structural CPS transformation via `cps_of`.
-
-## Target API for step 17
-
-```cpp
-// cps_of(core, id, cont)
-//   -> a cps_code whose operator()(env, k) evaluates node `id` in CPS,
-//      then passes the result to cont, then passes cont's result to k.
-//
-// cont is the current (inner) continuation; k is the outer continuation
-// supplied at call-time.  For the outermost call, cont is the identity.
-template <int MaxNodes, int MaxList, class Cont>
-[[nodiscard]] constexpr auto cps_of(
-    core_tree<MaxNodes, MaxList> const& core,
-    node_id                             id,
-    Cont                                cont);
-```
-
-Expose a convenience wrapper that matches the existing public name:
-
-```cpp
-template <int MaxNodes, int MaxList>
-[[nodiscard]] constexpr auto compile_cps(
-    core_tree<MaxNodes, MaxList> const& core,
-    node_id                             root) {
-    return cps_of(core, root, [](value v) { return result<value>{v}; });
-}
-```
-
-## CPS transformation rules
-
-For each node kind in `core_node<MaxList>`:
-
-| Node | CPS form |
-|------|----------|
-| `core_integer{v}` | immediately call `cont(v)` |
-| `core_boolean{v}` | immediately call `cont(v)` |
-| `core_symbol{name}` | look up `name` in env; call `cont(v)` |
-| `core_if{c, t, f}` | CPS-eval `c`; branch; CPS-eval `t` or `f` |
-| `core_application{func, args}` | CPS-eval `func`; CPS-eval each arg; apply |
-
-Lambda (`core_lambda`) and define (`core_define`) are out of scope for step 17
-(they arrive in steps 20–21).  Return an error result if encountered.
-
-## Continuation threading
-
-Each recursive call to `cps_of` produces a new `cps_code` whose `F` type
-wraps the previous continuation.  The type depth is O(expression depth).
-For arithmetic-only expressions depth is at most 3–4 levels.
-
-Example for `(+ a b)` where `+` applies the builtin add:
-
-```
-cps_of(app_node, id_cont)
-  -> cps_code { eval func in CPS, then
-       cps_of(arg_a, cont_a) where cont_a:
-         cps_of(arg_b, cont_b) where cont_b:
-           apply func_value to [a_val, b_val]
-           cont(result) }
-```
-
-## Static_assert test pattern
-
-All tests must use the immediately-invoked lambda pattern.  Do NOT declare
-`constexpr auto ct = ...` at namespace or function scope — large
-`core_tree<32,16>` objects (~17 KB each) cause GCC to OOM at 20 parallel
-jobs.
+All tests must use the immediately-invoked lambda pattern inside `static_assert`:
 
 ```cpp
 static_assert([] {
-    auto ct = make_some_core_tree();           // inside the lambda
-    auto code = compile_cps(ct, ct.size() - 1);
-    auto r = code(default_env<8>(), [](value v) { return result<value>{v}; });
-    return r.has_value() && std::get<int>(r.value()) == 42;
+    auto ct = ...;  // build core_tree inside lambda
+    auto frames = materialize(ct, ct.size() - 1);
+    // inspect frames...
+    return ...;
 }());
 ```
 
-`ct.size() - 1` is the root node (arena grows left-to-right).
+Do NOT declare `constexpr auto ct = ...` at namespace scope — large
+`core_tree<32,16>` objects (~17 KB) cause GCC to OOM at 20 parallel jobs.
 
 ## Safety notes
 
-**Compilation memory:**
-Incremental `make compile` is fast.  For a cold build, limit parallelism:
-
+**Compilation memory:** for a cold build, limit parallelism:
 ```bash
 cmake --build .build/build-gcc-16 --config Asan --target all -- -k 0 -j4
 ```
 
-Do NOT use `ulimit -v` — ASan requires ~15 TB of virtual address space.
-
-**Template depth:**
-Avoid deep recursion in `cps_of` itself — prefer iteration when processing
-argument lists, only recurse for the tree structure.
-
-**Error propagation:**
-`result<value>` propagates errors.  `cps_of` for an unsupported node kind
-(e.g., `core_lambda` in step 17) returns a `cps_code` that immediately
-returns an error result without calling `cont` or `k`.
-
-**compile_cps keeps the same signature:**
-The existing `cps.test.cpp` tests call `compile_cps(core, root_id)`.
-Preserve that signature.  The internal implementation changes, but tests
-that already pass must continue to pass.
-
-**No eval_direct dependency:**
-Step 17's `compile_cps` must not call `eval_direct`.  The goal is a genuine
-CPS transformation.  Remove the `#include <smd/schemepoc/eval_direct.hpp>`
-from `cps.hpp` once `compile_cps` no longer needs it.
+**Do not** use `ulimit -v` — ASan requires ~15 TB of virtual address space.
 
 ## Do not do
 
-- Do not implement lambda or closure capture (steps 20–21).
-- Do not implement a define form (step 20+).
+- Do not touch `cps_dispatch` or `compile_cps` internals (step 17 is done).
 - Do not implement the sender backend (steps 28–30).
-- Do not proceed to step 18 in the same commit.
+- Do not implement lambda/closure capture (steps 20–23).
+- Do not proceed to step 19 in the same commit.
