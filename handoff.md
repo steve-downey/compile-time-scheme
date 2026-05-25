@@ -120,3 +120,9 @@ Headers, implementations, and tests live together by component.
 - Test files include the component header first and twice.
 - Prefer `constexpr` everywhere practical.
 - Use C++26 directly.
+
+## Architecture facts
+
+- `core_tree` and `core_node` internal variant structures must NEVER embed `value` or `closure` types (or anything containing dynamically allocating types). The entire AST nodes must be trivially destructible. This is to avoid constructor/destructor boundary leak errors in C++26 `constexpr` evaluating closures out to global space (`compiled_closure`).
+- `value`, `environment`, and `closure` are distinct concepts that only exist during evaluation (`eval_direct`). They do not bleed into the `core_node` AST variations. For example, `core_quote` stores a variant of literal constants (`int`, `bool`, `std::string_view`) rather than `value` directly.
+- Nested lambda capturing and lexical closure state tracking is explicitly managed with a custom `constexpr_box<env<MaxList>>` type which wraps pointer manual lifetime in `value.hpp`.

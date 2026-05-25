@@ -73,7 +73,15 @@ struct closure {
     }
 };
 
-using value = std::variant<int, bool, builtin, closure>;
+struct symbol {
+    std::string_view name;
+    friend constexpr auto operator==(symbol const &lhs, symbol const &rhs)
+        -> bool {
+        return lhs.name == rhs.name;
+    }
+};
+
+using value = std::variant<int, bool, builtin, closure, symbol>;
 
 template <int MaxBindings>
 class env {

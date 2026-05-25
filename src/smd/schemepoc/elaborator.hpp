@@ -25,7 +25,7 @@ struct core_symbol {
 };
 
 struct core_quote {
-    node_id datum;
+    std::variant<int, bool, std::string_view> atom;
 };
 
 struct core_if {
@@ -77,6 +77,26 @@ class core_tree {
 };
 
 namespace detail {
+
+template <int MaxNodes, int MaxList>
+constexpr auto elaborate_quote(node_id datum_id,
+                               datum_tree<MaxNodes, MaxList> const &dt)
+    -> result<std::variant<int, bool, std::string_view>> {
+    auto const &node = dt.get(datum_id);
+    if (std::holds_alternative<datum_integer>(node)) {
+        return std::variant<int, bool, std::string_view>{
+            std::get<datum_integer>(node).value};
+    }
+    if (std::holds_alternative<datum_boolean>(node)) {
+        return std::variant<int, bool, std::string_view>{
+            std::get<datum_boolean>(node).value};
+    }
+    if (std::holds_alternative<datum_symbol>(node)) {
+        return std::variant<int, bool, std::string_view>{
+            std::get<datum_symbol>(node).name};
+    }
+    return parse_error{{}, "quote: lists/nested quotes not yet supported"};
+}
 
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_node(node_id datum_id,
@@ -165,7 +185,10 @@ constexpr auto elaborate_list(datum_list<MaxList> const &lst,
         if (sym == "quote") {
             if (lst.elements.size() != 2)
                 return parse_error{{}, "quote: expected one subform"};
-            node_id id = ct.add(core_quote{lst.elements[1]});
+            auto atom_r = elaborate_quote(lst.elements[1], dt);
+            if (!atom_r.has_value())
+                return atom_r.error();
+            node_id id = ct.add(core_quote{atom_r.value()});
             return id;
         }
     }
@@ -206,7 +229,10 @@ constexpr auto elaborate_node(node_id datum_id,
         return id;
     }
     if (std::holds_alternative<datum_quote>(node)) {
-        node_id id = ct.add(core_quote{std::get<datum_quote>(node).quoted});
+        auto atom_r = elaborate_quote(std::get<datum_quote>(node).quoted, dt);
+        if (!atom_r.has_value())
+            return atom_r.error();
+        node_id id = ct.add(core_quote{atom_r.value()});
         return id;
     }
     if (std::holds_alternative<datum_list<MaxList>>(node)) {

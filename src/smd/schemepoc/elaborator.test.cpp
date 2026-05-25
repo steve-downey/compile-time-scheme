@@ -75,10 +75,9 @@ static_assert([] {
     auto const &root_node = ct.get(ct.size() - 1);
     if (!std::holds_alternative<core_quote>(root_node))
         return false;
-    node_id quoted_datum = std::get<core_quote>(root_node).datum;
-    auto const &quoted_node = dt.get(quoted_datum);
-    return std::holds_alternative<datum_symbol>(quoted_node) &&
-           std::get<datum_symbol>(quoted_node).name == "x"sv;
+    auto atom = std::get<core_quote>(root_node).atom;
+    return std::holds_alternative<std::string_view>(atom) &&
+           std::get<std::string_view>(atom) == "x"sv;
 }());
 
 // "(if #t 1 2)" -> core_if at root with correct children
@@ -232,9 +231,9 @@ TEST_CASE("ElaboratorTest - QuoteShorthand") {
     REQUIRE(er.has_value());
     auto const &ct = er.value();
     REQUIRE(std::holds_alternative<core_quote>(ct.get(ct.size() - 1)));
-    node_id quoted_datum = std::get<core_quote>(ct.get(ct.size() - 1)).datum;
-    REQUIRE(std::holds_alternative<datum_symbol>(dt.get(quoted_datum)));
-    REQUIRE(std::get<datum_symbol>(dt.get(quoted_datum)).name == "x"sv);
+    auto atom = std::get<core_quote>(ct.get(ct.size() - 1)).atom;
+    REQUIRE(std::holds_alternative<std::string_view>(atom));
+    REQUIRE(std::get<std::string_view>(atom) == "x"sv);
 }
 
 TEST_CASE("ElaboratorTest - If") {
@@ -387,7 +386,7 @@ TEST_CASE("ElaboratorTest - QuoteSpecialForm") {
     auto const &ct = er.value();
     auto const &root_node = ct.get(ct.size() - 1);
     REQUIRE(std::holds_alternative<core_quote>(root_node));
-    node_id quoted_datum = std::get<core_quote>(root_node).datum;
-    REQUIRE(std::holds_alternative<datum_symbol>(dt.get(quoted_datum)));
-    REQUIRE(std::get<datum_symbol>(dt.get(quoted_datum)).name == "x"sv);
+    auto atom = std::get<core_quote>(root_node).atom;
+    REQUIRE(std::holds_alternative<std::string_view>(atom));
+    REQUIRE(std::get<std::string_view>(atom) == "x"sv);
 }
