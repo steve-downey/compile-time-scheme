@@ -5,11 +5,9 @@
 
 #include <iostream>
 
-constexpr auto program =
-    smd::schemepoc::compiled_closure<"(+ 1 (* 2 3))">;
+constexpr auto program = smd::schemepoc::compiled_closure<"(+ 1 (* 2 3))">;
 
-int main()
-{
+int main() {
     auto result = program(smd::schemepoc::default_env<16>()).value();
     std::cout << std::get<int>(result) << '\n';
 }
