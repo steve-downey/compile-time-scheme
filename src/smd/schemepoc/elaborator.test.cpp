@@ -96,7 +96,7 @@ static_assert([] {
     auto const &cif = std::get<core_if>(root_node);
     auto const &cond = ct.get(cif.condition);
     auto const &cons = ct.get(cif.consequent);
-    auto const &alt  = ct.get(cif.alternative);
+    auto const &alt = ct.get(cif.alternative);
     if (!std::holds_alternative<core_boolean>(cond))
         return false;
     if (std::get<core_boolean>(cond).value != true)

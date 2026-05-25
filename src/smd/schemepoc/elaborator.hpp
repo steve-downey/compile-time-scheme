@@ -99,7 +99,8 @@ constexpr auto elaborate_list(datum_list<MaxList> const &lst,
 
         if (sym == "if") {
             if (lst.elements.size() != 4)
-                return parse_error{{}, "if: expected condition, consequent, alternative"};
+                return parse_error{
+                    {}, "if: expected condition, consequent, alternative"};
             auto cond_r = elaborate_node(lst.elements[1], dt, ct);
             if (!cond_r.has_value())
                 return cond_r.error();
@@ -191,8 +192,7 @@ constexpr auto elaborate_node(node_id datum_id,
         return id;
     }
     if (std::holds_alternative<datum_boolean>(node)) {
-        node_id id =
-            ct.add(core_boolean{std::get<datum_boolean>(node).value});
+        node_id id = ct.add(core_boolean{std::get<datum_boolean>(node).value});
         return id;
     }
     if (std::holds_alternative<datum_symbol>(node)) {
@@ -200,8 +200,7 @@ constexpr auto elaborate_node(node_id datum_id,
         return id;
     }
     if (std::holds_alternative<datum_quote>(node)) {
-        node_id id =
-            ct.add(core_quote{std::get<datum_quote>(node).quoted});
+        node_id id = ct.add(core_quote{std::get<datum_quote>(node).quoted});
         return id;
     }
     if (std::holds_alternative<datum_list<MaxList>>(node)) {

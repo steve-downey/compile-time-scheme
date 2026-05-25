@@ -18,6 +18,8 @@ target_sources(
                 datum_tree.hpp
                 reader.hpp
                 elaborator.hpp
+                value.hpp
+                eval_direct.hpp
     PRIVATE schemepoc.cpp version.cpp
 )
 
@@ -55,6 +57,8 @@ if(SCHEMEPOC_ENABLE_TESTING)
             datum_tree.test.cpp
             reader.test.cpp
             elaborator.test.cpp
+            value.test.cpp
+            eval_direct.test.cpp
     )
 
     target_link_libraries(schemepoc_test PRIVATE schemepoc.schemepoc)
