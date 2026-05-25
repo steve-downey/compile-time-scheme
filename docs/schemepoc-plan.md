@@ -121,6 +121,7 @@ If any rule conflicts with `docs/codestyle.org`, follow `docs/codestyle.org`.
 - Document blockers in `handoff-next.md`.
 - Update `checklist.md` when the step is complete.
 - Update `handoff.md` with durable facts.
+- Keep `docs/compiler_architecture.org` and its transcluded UUID code annotations up to date.
 - Rewrite `handoff-next.md` for the next clean agent.
 
 ## Required commands
@@ -731,12 +732,13 @@ Public include spelling:
 - [ ] Step 25: error quality pass
 - [ ] Step 26: negative compile tests
 - [ ] Step 27: Godbolt single-file extraction
-- [ ] Step 28: vendor Beman Execution
-- [ ] Step 29: sender adapter over Beman Execution
-- [ ] Step 30: sender backend over CPS program using Beman Execution
-- [ ] Step 31: optional Beman Task integration, only if needed
-- [ ] Step 32: reflection spike
-- [ ] Step 33: documentation consolidation
+- [ ] Step 28: C++ Foreign Function Interface (FFI) spike
+- [ ] Step 29: vendor Beman Execution
+- [ ] Step 30: sender adapter over Beman Execution
+- [ ] Step 31: sender backend over CPS program using Beman Execution
+- [ ] Step 32: optional Beman Task integration, only if needed
+- [ ] Step 33: reflection spike
+- [ ] Step 34: documentation consolidation
 ```
 
 ---
@@ -3240,9 +3242,10 @@ Step 11 -> end-to-end compile-time arithmetic evaluator
 Step 18 -> compile-time compiled runtime executable closure object
 Step 23 -> lexical closures
 Step 27 -> Godbolt demo
-Step 28 -> Beman Execution vendored and integrated
-Step 30 -> sender-shaped backend through Beman Execution
-Step 32 -> reflection spike
+Step 28 -> FFI spike
+Step 29 -> Beman Execution vendored and integrated
+Step 31 -> sender-shaped backend through Beman Execution
+Step 33 -> reflection spike
 ```
 
 The plan intentionally gives repeated green milestones instead of one giant speculative branch.
