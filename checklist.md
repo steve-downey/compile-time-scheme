@@ -57,7 +57,7 @@
 - [x] Step 26: negative compile tests
 - [x] Step 27: Godbolt single-file extraction
 - [x] Step 28: C++ Foreign Function Interface (FFI) spike
-- [ ] Step 29: vendor Beman Execution
+- [x] Step 29: vendor Beman Execution
 - [ ] Step 30: sender adapter over Beman Execution
 - [ ] Step 31: sender backend over CPS program using Beman Execution
 - [ ] Step 32: optional Beman Task integration, only if needed
