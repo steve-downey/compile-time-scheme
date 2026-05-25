@@ -3,7 +3,8 @@ include(GNUInstallDirs)
 target_sources(
     schemepoc.schemepoc
     PUBLIC FILE_SET schemepoc_schemepoc_headers TYPE HEADERS FILES schemepoc.hpp
-    PRIVATE schemepoc.cpp
+        version.hpp
+    PRIVATE schemepoc.cpp version.cpp
 )
 
 ## Tests
@@ -25,7 +26,7 @@ endif()
 if(SCHEMEPOC_ENABLE_TESTING)
     add_executable(schemepoc_test)
 
-    target_sources(schemepoc_test PRIVATE schemepoc.test.cpp)
+    target_sources(schemepoc_test PRIVATE schemepoc.test.cpp version.test.cpp)
 
     target_link_libraries(schemepoc_test PRIVATE schemepoc.schemepoc)
     target_link_libraries(schemepoc_test PRIVATE Catch2::Catch2WithMain)
