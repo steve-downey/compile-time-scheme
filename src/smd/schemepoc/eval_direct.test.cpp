@@ -402,7 +402,7 @@ TEST_CASE("EvalDirectTest - ApplicationArityMismatch") {
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
     REQUIRE_FALSE(vr.has_value());
-    REQUIRE(vr.error().message == "arity error");
+    REQUIRE(vr.error().message == "arity mismatch");
 }
 
 TEST_CASE("EvalDirectTest - ApplicationNonFunction") {
@@ -415,7 +415,7 @@ TEST_CASE("EvalDirectTest - ApplicationNonFunction") {
     auto const &ct = er.value();
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
     REQUIRE_FALSE(vr.has_value());
-    REQUIRE(vr.error().message == "type error");
+    REQUIRE(vr.error().message == "attempted to call non-function");
 }
 
 TEST_CASE("EvalDirectTest - LexicalCapture1") {
@@ -483,3 +483,14 @@ static_assert([] {
     auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
     return std::get<symbol>(vr.value()).name == "x"sv;
 }());
+
+TEST_CASE("EvalDirectTest - AddBadType") {
+    using namespace smd::schemepoc;
+    using namespace std::string_view_literals;
+    auto dr = read_datum<32, 16>(cursor{"(+ #t 1)"sv});
+    auto er = elaborate(dr.value().value);
+    auto const &ct = er.value();
+    auto vr = eval_direct(ct, ct.size() - 1, default_env<16>());
+    REQUIRE_FALSE(vr.has_value());
+    REQUIRE(vr.error().message == "type error");
+}

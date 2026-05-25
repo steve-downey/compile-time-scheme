@@ -119,8 +119,7 @@ constexpr auto elaborate_list(datum_list<MaxList> const &lst,
 
         if (sym == "if") {
             if (lst.elements.size() != 4)
-                return parse_error{
-                    {}, "if: expected condition, consequent, alternative"};
+                return parse_error{{}, "if arity"};
             auto cond_r = elaborate_node(lst.elements[1], dt, ct);
             if (!cond_r.has_value())
                 return cond_r.error();
@@ -137,10 +136,10 @@ constexpr auto elaborate_list(datum_list<MaxList> const &lst,
 
         if (sym == "lambda") {
             if (lst.elements.size() != 3)
-                return parse_error{{}, "lambda: expected params and body"};
+                return parse_error{{}, "unknown special form shape"};
             auto const &params_datum = dt.get(lst.elements[1]);
             if (!std::holds_alternative<datum_list<MaxList>>(params_datum))
-                return parse_error{{}, "lambda: params must be a list"};
+                return parse_error{{}, "lambda malformed parameter list"};
             auto const &param_list =
                 std::get<datum_list<MaxList>>(params_datum);
 
@@ -148,12 +147,11 @@ constexpr auto elaborate_list(datum_list<MaxList> const &lst,
             for (int i = 0; i < param_list.elements.size(); ++i) {
                 auto const &p = dt.get(param_list.elements[i]);
                 if (!std::holds_alternative<datum_symbol>(p))
-                    return parse_error{{}, "lambda: param must be a symbol"};
+                    return parse_error{{}, "lambda malformed parameter list"};
                 auto p_name = std::get<datum_symbol>(p).name;
                 for (int j = 0; j < params.size(); ++j) {
                     if (params[j] == p_name)
-                        return parse_error{{},
-                                           "lambda: duplicate parameter name"};
+                        return parse_error{{}, "duplicate parameter"};
                 }
                 params.push_back(p_name);
             }
@@ -168,10 +166,10 @@ constexpr auto elaborate_list(datum_list<MaxList> const &lst,
 
         if (sym == "define") {
             if (lst.elements.size() != 3)
-                return parse_error{{}, "define: expected name and value"};
+                return parse_error{{}, "unknown special form shape"};
             auto const &name_datum = dt.get(lst.elements[1]);
             if (!std::holds_alternative<datum_symbol>(name_datum))
-                return parse_error{{}, "define: name must be a symbol"};
+                return parse_error{{}, "unknown special form shape"};
             std::string_view name = std::get<datum_symbol>(name_datum).name;
 
             auto value_r = elaborate_node(lst.elements[2], dt, ct);
@@ -184,7 +182,7 @@ constexpr auto elaborate_list(datum_list<MaxList> const &lst,
 
         if (sym == "quote") {
             if (lst.elements.size() != 2)
-                return parse_error{{}, "quote: expected one subform"};
+                return parse_error{{}, "unknown special form shape"};
             auto atom_r = elaborate_quote(lst.elements[1], dt);
             if (!atom_r.has_value())
                 return atom_r.error();

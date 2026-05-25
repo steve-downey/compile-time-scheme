@@ -63,7 +63,7 @@ template <int MaxNodes, int MaxList, int MaxBindings>
             auto const &bi = std::get<builtin>(func_r.value());
 
             if (app.args.size() != 2)
-                return parse_error{{}, "type error"};
+                return parse_error{{}, "arity mismatch"};
 
             auto arg0_r = eval_direct(ct, app.args[0], environment);
             if (!arg0_r.has_value())
@@ -95,7 +95,7 @@ template <int MaxNodes, int MaxList, int MaxBindings>
 
             auto const &lam = std::get<core_lambda<MaxList>>(lam_node);
             if (app.args.size() != lam.params.size())
-                return parse_error{{}, "arity error"};
+                return parse_error{{}, "arity mismatch"};
 
             auto new_env = clo.captured ? *clo.captured : environment;
             for (std::size_t i = 0; i < app.args.size(); ++i) {
@@ -108,7 +108,7 @@ template <int MaxNodes, int MaxList, int MaxBindings>
             return eval_direct(ct, lam.body, new_env);
         }
 
-        return parse_error{{}, "type error"};
+        return parse_error{{}, "attempted to call non-function"};
     }
 
     return parse_error{{}, "eval_direct: unsupported form"};
