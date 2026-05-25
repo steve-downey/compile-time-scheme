@@ -35,7 +35,7 @@ closure_program(CpsCode) -> closure_program<CpsCode>;
 // Returns result<closure_program<...>>; error propagates from any stage.
 template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] constexpr auto compile_to_closure(std::string_view src) {
-    using CT       = core_tree<MaxNodes, MaxList>;
+    using CT = core_tree<MaxNodes, MaxList>;
     using CpsCodeT = decltype(compile_cps(std::declval<CT const &>(),
                                           std::declval<node_id>()));
     using ProgramT = closure_program<CpsCodeT>;
