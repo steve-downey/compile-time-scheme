@@ -31,8 +31,8 @@
 - [x] Step 0: repository recustomization and skeleton
 - [x] Step 1: core utility vocabulary
 - [x] Step 2: input cursor and lexical primitives
-- [ ] Step 3: minimal parser object
-- [ ] Step 4: functor and applicative combinators
+- [x] Step 3: minimal parser object
+- [x] Step 4: functor and applicative combinators
 - [ ] Step 5: alternative, repetition, and lexeme
 - [ ] Step 6: reader atom model
 - [ ] Step 7: fixed-capacity datum tree
