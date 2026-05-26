@@ -26,7 +26,7 @@ Parsing text manually with "recursive descent" (writing a massive tree of `if/el
 
 In C++26 `constexpr` contexts, we run into a limitation: you cannot easily juggle C++ lambdas that capture variables and convert them into function pointers. To solve this, our "applicative" library represents parsers as literal C++ callable objects (functors with `operator()`).
 
-#+transclude: [[file:../src/smd/schemepoc/parser.hpp::9b876402-ddc1-48af-910e-0d12fc462d7c]] :lines 2- :src cpp :end "9b876402-ddc1-48af-910e-0d12fc462d7c end"
+#+transclude: [[file:../src/smd/smdscheme/parser/parser.hpp::9b876402-ddc1-48af-910e-0d12fc462d7c]] :lines 2- :src cpp :end "9b876402-ddc1-48af-910e-0d12fc462d7c end"
 
 * Phase 2: Reader Datum Tree (Understanding "Atoms")
 
@@ -36,7 +36,7 @@ The Reader's only job is to turn text into lists and **atoms**. In this context,
 
 At this stage, the compiler doesn't know if the list `(+ 1 2)` is a mathematical operation or just a literal list of three items. It merely builds the tree of atoms and lists. Because standard heap-allocated trees (using `new` or `std::vector`) cannot easily survive across the C++26 compile-to-runtime boundary, we construct this tree in a "flat arena"—a fixed-size array where nodes refer to each other by integer indexes (`node_id`).
 
-#+transclude: [[file:../src/smd/schemepoc/datum_tree.hpp::c1faeaf1-d7d8-4f18-a681-7973dc1630dd]] :lines 2- :src cpp :end "c1faeaf1-d7d8-4f18-a681-7973dc1630dd end"
+#+transclude: [[file:../src/smd/smdscheme/reader/datum_tree.hpp::c1faeaf1-d7d8-4f18-a681-7973dc1630dd]] :lines 2- :src cpp :end "c1faeaf1-d7d8-4f18-a681-7973dc1630dd end"
 
 * Phase 3: Elaboration and Core Semantic IR
 
@@ -46,7 +46,7 @@ Once we have a tree of lists and atoms, the Elaborator walks that tree and assig
 
 Elaboration is where syntax errors are caught natively before we ever try to execute them. By keeping reading (Phase 2) and elaboration (Phase 3) separate, the code remains much simpler.
 
-#+transclude: [[file:../src/smd/schemepoc/elaborator.hpp::30571cc2-6e27-4b77-ad54-8e146cc7deae]] :lines 2- :src cpp :end "30571cc2-6e27-4b77-ad54-8e146cc7deae end"
+#+transclude: [[file:../src/smd/smdscheme/elaborator/elaborator.hpp::30571cc2-6e27-4b77-ad54-8e146cc7deae]] :lines 2- :src cpp :end "30571cc2-6e27-4b77-ad54-8e146cc7deae end"
 
 * Phase 4: CPS vs. Direct Evaluation (`eval_direct`)
 
@@ -66,7 +66,7 @@ If you want to compute `(A + B) * C` in CPS:
 
 Why do this? Because if you never standardly `return`, but instead always call "what happens next", you explicitly expose the control flow. Tail calls just become regular function calls that don't add to the stack. Furthermore, this maps *perfectly* to asynchronous programming in modern C++. A "continuation" in compiler jargon is exactly the same concept as a `.then()` or a `receiver` in C++ async execution (like Beman senders).
 
-#+transclude: [[file:../src/smd/schemepoc/cps.hpp::dc28ffbd-aa58-47ff-9923-28841a0e1948]] :lines 2- :src cpp :end "dc28ffbd-aa58-47ff-9923-28841a0e1948 end"
+#+transclude: [[file:../src/smd/smdscheme/cps/cps.hpp::dc28ffbd-aa58-47ff-9923-28841a0e1948]] :lines 2- :src cpp :end "dc28ffbd-aa58-47ff-9923-28841a0e1948 end"
 
 * Phase 5: Closure Backend Materialization
 
@@ -83,7 +83,7 @@ This Backend phase takes our CPS representation and translates it into completel
 
 Because we used CPS, this phase is structurally identical to building a C++26 sender graph (`sync_wait(when_all(...))`), preparing the compiler natively for future async integration.
 
-#+transclude: [[file:../src/smd/schemepoc/closure_backend.hpp::a6bf5e59-ae94-4b53-b0eb-8f5592fdb0b7]] :lines 2- :src cpp :end "a6bf5e59-ae94-4b53-b0eb-8f5592fdb0b7 end"
+#+transclude: [[file:../src/smd/smdscheme/closure/closure_backend.hpp::a6bf5e59-ae94-4b53-b0eb-8f5592fdb0b7]] :lines 2- :src cpp :end "a6bf5e59-ae94-4b53-b0eb-8f5592fdb0b7 end"
 
 * Phase 6: Sender Backend and Asynchronous Execution
 
@@ -93,7 +93,7 @@ In traditional C++ asynchronous environments (like `std::execution` from C++26 /
 
 The Sender Backend walks our Core Semantic AST exactly like the Closure backend does, but instead of constructing plain callable functors, it builds a robust graph of asynchronous `sender` objects (utilizing components like `beman::task::task`). Variables captured in the environment are awaited asynchronously when function applications occur. This architecture guarantees that Scheme programs can invoke C++ co-routines seamlessly, and it leverages the target machine's thread pools for transparent concurrency underneath the simple Scheme code.
 
-#+transclude: [[file:../src/smd/schemepoc/sender_backend.hpp::87e88913-dd13-4994-b2fe-04cb6ffa34ee]] :lines 2- :src cpp :end "87e88913-dd13-4994-b2fe-04cb6ffa34ee end"
+#+transclude: [[file:../src/smd/smdscheme/sender/sender_backend.hpp::87e88913-dd13-4994-b2fe-04cb6ffa34ee]] :lines 2- :src cpp :end "87e88913-dd13-4994-b2fe-04cb6ffa34ee end"
 
 * Phase 7: Data Reification with C++26 Reflection (`std::meta::info`)
 
@@ -105,4 +105,4 @@ We use this feature in the Reification phase to take the environment layouts cal
 
 This results in environment sizes that are as zero-cost as though a C++ expert manually wrote a distinct structure for every single lambda parameter capture.
 
-#+transclude: [[file:../src/smd/schemepoc/reflection_reify.hpp::d0092f7c-b9de-440d-ac67-02e4e48c5aa4]] :lines 2- :src cpp :end "d0092f7c-b9de-440d-ac67-02e4e48c5aa4 end"
+#+transclude: [[file:../src/smd/smdscheme/reflection/reflection_reify.hpp::d0092f7c-b9de-440d-ac67-02e4e48c5aa4]] :lines 2- :src cpp :end "d0092f7c-b9de-440d-ac67-02e4e48c5aa4 end"

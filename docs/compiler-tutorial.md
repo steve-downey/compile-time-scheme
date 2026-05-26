@@ -2,6 +2,8 @@
 
 *Note: This tutorial also functions as a chronological, bottom-up outline of our compiler construction plan. It is a living document. When reality diverges from the plan, these docs MUST be updated to accurately reflect the true state of the codebase.*
 
+> **Structural note:** After the seven phases described here were completed, the source layout was reorganized. All components that originally lived under `src/smd/schemepoc/` in namespace `smd::schemepoc` were moved into per-module subdirectories: `src/smd/smdscheme/<module>/`, with corresponding namespaces `smd::smdscheme::<module>` (e.g. `smd::smdscheme::parser`, `smd::smdscheme::reader`, `smd::smdscheme::elaborator`, etc.). The pipeline and phase boundaries described in this tutorial are unchanged.
+
 Welcome to the SchemePoC compiler tutorial! Most C++ developers use compilers every day, but diving into compiler *internals*—especially one operating entirely at compile-time (`constexpr`) with functional programming techniques—can feel impenetrable.
 
 This tutorial flips the perspective. Instead of presenting a finished monolith, it walks you from the absolute bottom (reading individual characters) to the very top (executing functional closures asynchronously), explaining the *why* of each phase.

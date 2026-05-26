@@ -1,5 +1,7 @@
 # SchemePoC Agent Execution Plan
 
+> **Historical note:** This plan was executed against the original layout where all source lived under `src/smd/schemepoc/` in namespace `smd::schemepoc`. After the plan was completed, the codebase was refactored into a per-module hierarchy: `src/smd/smdscheme/<module>/` with namespace `smd::smdscheme::<module>`. File paths and namespace references in this document reflect the original layout and are preserved as-is to avoid rewriting history.
+
 This is the operational plan for building `smd/schemepoc`, a Scheme-light compile-time compiler proof of concept in C++26 on GCC16.
 
 The project starts from a Copier-rendered baseline based on `github.com/steve-downey/example`.
