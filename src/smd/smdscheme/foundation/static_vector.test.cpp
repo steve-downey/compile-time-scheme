@@ -6,7 +6,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using smd::schemepoc::static_vector;
+using smd::smdscheme::foundation::static_vector;
 
 constexpr auto make_vec() {
     static_vector<int, 4> xs;

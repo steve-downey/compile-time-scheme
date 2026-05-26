@@ -1,19 +1,19 @@
 // src/smd/schemepoc/parser.test.cpp                               -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/schemepoc/parser.hpp>
-#include <smd/schemepoc/parser.hpp> // test 2nd include OK
+#include <smd/smdscheme/parser/parser.hpp>
+#include <smd/smdscheme/parser/parser.hpp> // test 2nd include OK
 
 #include <catch2/catch_test_macros.hpp>
 
-using smd::schemepoc::char_p;
-using smd::schemepoc::cursor;
-using smd::schemepoc::lift2;
-using smd::schemepoc::map;
-using smd::schemepoc::pure;
-using smd::schemepoc::satisfy;
-using smd::schemepoc::sequence_left;
-using smd::schemepoc::sequence_right;
+using smd::smdscheme::parser::char_p;
+using smd::smdscheme::parser::cursor;
+using smd::smdscheme::parser::lift2;
+using smd::smdscheme::parser::map;
+using smd::smdscheme::parser::pure;
+using smd::smdscheme::parser::satisfy;
+using smd::smdscheme::parser::sequence_left;
+using smd::smdscheme::parser::sequence_right;
 
 static_assert(char_p('x')(cursor{"xyz"}).has_value());
 static_assert(char_p('x')(cursor{"xyz"}).value().value == 'x');

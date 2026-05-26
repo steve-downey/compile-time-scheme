@@ -1,14 +1,14 @@
 // src/smd/schemepoc/elaborator_core.hpp                           -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_ELABORATOR_CORE_HPP
-#define SRC_SMD_SCHEMEPOC_ELABORATOR_CORE_HPP
+#ifndef SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_CORE_HPP
+#define SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_CORE_HPP
 
-#include <smd/schemepoc/datum_tree.hpp> // needed for static_vector and basic types
-#include <smd/schemepoc/fix.hpp>
+#include <smd/smdscheme/cps/fix.hpp>
+#include <smd/smdscheme/reader/datum_tree.hpp> // needed for foundation::static_vector and basic types
 #include <string_view>
 #include <variant>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::elaborator {
 
 struct core_integer {
     int value;
@@ -25,27 +25,27 @@ struct core_quote {
 
 template <typename R, int MaxNodes>
 struct core_if {
-    arena_box<R, MaxNodes> condition;
-    arena_box<R, MaxNodes> consequent;
-    arena_box<R, MaxNodes> alternative;
+    foundation::arena_box<R, MaxNodes> condition;
+    foundation::arena_box<R, MaxNodes> consequent;
+    foundation::arena_box<R, MaxNodes> alternative;
 };
 
 template <typename R, int MaxNodes, int MaxList>
 struct core_lambda {
-    static_vector<std::string_view, MaxList> params;
-    arena_box<R, MaxNodes> body;
+    foundation::static_vector<std::string_view, MaxList> params;
+    foundation::arena_box<R, MaxNodes> body;
 };
 
 template <typename R, int MaxNodes, int MaxList>
 struct core_application {
-    arena_box<R, MaxNodes> func;
-    static_vector<arena_box<R, MaxNodes>, MaxList> args;
+    foundation::arena_box<R, MaxNodes> func;
+    foundation::static_vector<foundation::arena_box<R, MaxNodes>, MaxList> args;
 };
 
 template <typename R, int MaxNodes>
 struct core_define {
     std::string_view name;
-    arena_box<R, MaxNodes> value;
+    foundation::arena_box<R, MaxNodes> value;
 };
 
 template <int MaxNodes, int MaxList>
@@ -59,14 +59,14 @@ struct core_f_factory {
 };
 
 template <int MaxNodes, int MaxList>
-using core_type = fix<core_f_factory<MaxNodes, MaxList>::template type>;
+using core_type = cps::fix<core_f_factory<MaxNodes, MaxList>::template type>;
 
 template <int MaxNodes, int MaxList>
 struct elaborated_core {
     using core = core_type<MaxNodes, MaxList>;
-    tree_arena<core, MaxNodes> arena;
+    foundation::tree_arena<core, MaxNodes> arena;
     core root;
 };
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::elaborator
 #endif

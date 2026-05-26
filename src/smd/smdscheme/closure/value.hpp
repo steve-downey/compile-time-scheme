@@ -1,17 +1,17 @@
 // src/smd/schemepoc/value.hpp                                     -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_VALUE_HPP
-#define SRC_SMD_SCHEMEPOC_VALUE_HPP
+#ifndef SRC_SMD_SMDSCHEME_CLOSURE_VALUE_HPP
+#define SRC_SMD_SMDSCHEME_CLOSURE_VALUE_HPP
 
-#include <smd/schemepoc/datum_tree.hpp>
-#include <smd/schemepoc/result.hpp>
-#include <smd/schemepoc/static_vector.hpp>
+#include <smd/smdscheme/foundation/result.hpp>
+#include <smd/smdscheme/foundation/static_vector.hpp>
+#include <smd/smdscheme/reader/datum_tree.hpp>
 
 #include <span>
 #include <string_view>
 #include <variant>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::closure {
 
 enum class builtin_op { add, multiply };
 
@@ -88,7 +88,7 @@ template <typename Core>
 struct foreign_function {
     using val_t = std::variant<int, bool, builtin, closure<Core>, symbol,
                                foreign_function>;
-    using sig_t = result<val_t> (*)(std::span<val_t const>);
+    using sig_t = foundation::result<val_t> (*)(std::span<val_t const>);
     sig_t fn;
 
     friend constexpr auto operator==(foreign_function const &lhs,
@@ -106,14 +106,14 @@ class env {
   public:
     constexpr auto define(std::string_view name, value<Core> val) -> void;
     [[nodiscard]] constexpr auto lookup(std::string_view name) const
-        -> result<value<Core>>;
+        -> foundation::result<value<Core>>;
 
   private:
     struct binding {
         std::string_view name;
         value<Core> val;
     };
-    static_vector<binding, MaxBindings> bindings_{};
+    foundation::static_vector<binding, MaxBindings> bindings_{};
 };
 
 template <typename Core, int MaxBindings>
@@ -124,12 +124,12 @@ constexpr auto env<Core, MaxBindings>::define(std::string_view name,
 
 template <typename Core, int MaxBindings>
 constexpr auto env<Core, MaxBindings>::lookup(std::string_view name) const
-    -> result<value<Core>> {
+    -> foundation::result<value<Core>> {
     for (int i = bindings_.size() - 1; i >= 0; --i) {
         if (bindings_[i].name == name)
             return bindings_[i].val;
     }
-    return parse_error{{}, "unbound variable"};
+    return foundation::parse_error{{}, "unbound variable"};
 }
 
 template <typename Core, int MaxBindings>
@@ -140,6 +140,6 @@ template <typename Core, int MaxBindings>
     return e;
 }
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::closure
 
 #endif

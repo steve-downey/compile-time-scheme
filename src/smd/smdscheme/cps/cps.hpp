@@ -1,15 +1,15 @@
 // src/smd/schemepoc/cps.hpp                                       -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_CPS_HPP
-#define SRC_SMD_SCHEMEPOC_CPS_HPP
+#ifndef SRC_SMD_SMDSCHEME_CPS_CPS_HPP
+#define SRC_SMD_SMDSCHEME_CPS_CPS_HPP
 
-#include <smd/schemepoc/elaborator.hpp>
-#include <smd/schemepoc/result.hpp>
-#include <smd/schemepoc/value.hpp>
+#include <smd/smdscheme/closure/value.hpp>
+#include <smd/smdscheme/elaborator/elaborator.hpp>
+#include <smd/smdscheme/foundation/result.hpp>
 
 #include <variant>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::cps {
 
 template <class F>
 struct cps_code {
@@ -28,45 +28,53 @@ namespace detail {
 
 template <class Core>
 struct identity_k {
-    constexpr auto operator()(value<Core> v) const -> result<value<Core>> {
+    constexpr auto operator()(closure::value<Core> v) const
+        -> foundation::result<closure::value<Core>> {
         return v;
     }
 };
 
 template <int MaxNodes, int MaxList, class Cont, class Env, class K>
-constexpr auto
-cps_dispatch(core_type<MaxNodes, MaxList> const &node,
-             const tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &arena,
-             Cont const &cont, Env const &env, K const &k)
-    -> result<value<core_type<MaxNodes, MaxList>>> {
-    using Core = core_type<MaxNodes, MaxList>;
+constexpr auto cps_dispatch(
+    elaborator::core_type<MaxNodes, MaxList> const &node,
+    const foundation::tree_arena<elaborator::core_type<MaxNodes, MaxList>,
+                                 MaxNodes> &arena,
+    Cont const &cont, Env const &env, K const &k)
+    -> foundation::result<
+        closure::value<elaborator::core_type<MaxNodes, MaxList>>> {
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
 
-    if (std::holds_alternative<core_integer>(node.inner)) {
-        auto r = cont(value<Core>{std::get<core_integer>(node.inner).value});
+    if (std::holds_alternative<elaborator::core_integer>(node.inner)) {
+        auto r = cont(closure::value<Core>{
+            std::get<elaborator::core_integer>(node.inner).value});
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_boolean>(node.inner)) {
-        auto r = cont(value<Core>{std::get<core_boolean>(node.inner).value});
+    if (std::holds_alternative<elaborator::core_boolean>(node.inner)) {
+        auto r = cont(closure::value<Core>{
+            std::get<elaborator::core_boolean>(node.inner).value});
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_symbol>(node.inner)) {
-        auto lr = env.lookup(std::get<core_symbol>(node.inner).name);
+    if (std::holds_alternative<elaborator::core_symbol>(node.inner)) {
+        auto lr =
+            env.lookup(std::get<elaborator::core_symbol>(node.inner).name);
         if (!lr.has_value())
-            return result<value<Core>>{lr.error()};
+            return foundation::result<closure::value<Core>>{lr.error()};
         auto r = cont(lr.value());
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_if<Core, MaxNodes>>(node.inner)) {
-        auto const &cif = std::get<core_if<Core, MaxNodes>>(node.inner);
+    if (std::holds_alternative<elaborator::core_if<Core, MaxNodes>>(
+            node.inner)) {
+        auto const &cif =
+            std::get<elaborator::core_if<Core, MaxNodes>>(node.inner);
         auto cond_r = cps_dispatch<MaxNodes, MaxList>(arena.get(cif.condition),
                                                       arena, identity_k<Core>{},
                                                       env, identity_k<Core>{});
@@ -79,36 +87,39 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
                                                env, k);
     }
 
-    if (std::holds_alternative<core_quote>(node.inner)) {
-        auto const &cq = std::get<core_quote>(node.inner);
-        value<Core> v;
+    if (std::holds_alternative<elaborator::core_quote>(node.inner)) {
+        auto const &cq = std::get<elaborator::core_quote>(node.inner);
+        closure::value<Core> v;
         if (std::holds_alternative<int>(cq.atom))
-            v = value<Core>{std::get<int>(cq.atom)};
+            v = closure::value<Core>{std::get<int>(cq.atom)};
         else if (std::holds_alternative<bool>(cq.atom))
-            v = value<Core>{std::get<bool>(cq.atom)};
+            v = closure::value<Core>{std::get<bool>(cq.atom)};
         else
-            v = value<Core>{symbol{std::get<std::string_view>(cq.atom)}};
+            v = closure::value<Core>{
+                closure::symbol{std::get<std::string_view>(cq.atom)}};
         auto r = cont(v);
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_lambda<Core, MaxNodes, MaxList>>(
-            node.inner)) {
-        value<Core> v{
-            closure<Core>{&node, constexpr_box<schemepoc::env<Core, 16>>{
-                                     new schemepoc::env<Core, 16>{env}}}};
+    if (std::holds_alternative<
+            elaborator::core_lambda<Core, MaxNodes, MaxList>>(node.inner)) {
+        closure::value<Core> v{closure::closure<Core>{
+            &node, closure::constexpr_box<closure::env<Core, 16>>{
+                       new closure::env<Core, 16>{env}}}};
         auto r = cont(v);
         if (!r.has_value())
             return r;
         return k(r.value());
     }
 
-    if (std::holds_alternative<core_application<Core, MaxNodes, MaxList>>(
+    if (std::holds_alternative<
+            elaborator::core_application<Core, MaxNodes, MaxList>>(
             node.inner)) {
         auto const &app =
-            std::get<core_application<Core, MaxNodes, MaxList>>(node.inner);
+            std::get<elaborator::core_application<Core, MaxNodes, MaxList>>(
+                node.inner);
 
         auto func_r = cps_dispatch<MaxNodes, MaxList>(arena.get(app.func),
                                                       arena, identity_k<Core>{},
@@ -116,10 +127,11 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
         if (!func_r.has_value())
             return func_r;
 
-        if (std::holds_alternative<builtin>(func_r.value())) {
-            auto const &bi = std::get<builtin>(func_r.value());
+        if (std::holds_alternative<closure::builtin>(func_r.value())) {
+            auto const &bi = std::get<closure::builtin>(func_r.value());
             if (app.args.size() != 2)
-                return result<value<Core>>{parse_error{{}, "arity mismatch"}};
+                return foundation::result<closure::value<Core>>{
+                    foundation::parse_error{{}, "arity mismatch"}};
 
             auto arg0_r = cps_dispatch<MaxNodes, MaxList>(
                 arena.get(app.args[0]), arena, identity_k<Core>{}, env,
@@ -127,7 +139,8 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
             if (!arg0_r.has_value())
                 return arg0_r;
             if (!std::holds_alternative<int>(arg0_r.value()))
-                return result<value<Core>>{parse_error{{}, "type error"}};
+                return foundation::result<closure::value<Core>>{
+                    foundation::parse_error{{}, "type error"}};
             int a = std::get<int>(arg0_r.value());
 
             auto arg1_r = cps_dispatch<MaxNodes, MaxList>(
@@ -136,14 +149,15 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
             if (!arg1_r.has_value())
                 return arg1_r;
             if (!std::holds_alternative<int>(arg1_r.value()))
-                return result<value<Core>>{parse_error{{}, "type error"}};
+                return foundation::result<closure::value<Core>>{
+                    foundation::parse_error{{}, "type error"}};
             int b = std::get<int>(arg1_r.value());
 
-            value<Core> app_val;
-            if (bi.op == builtin_op::add)
-                app_val = value<Core>{a + b};
+            closure::value<Core> app_val;
+            if (bi.op == closure::builtin_op::add)
+                app_val = closure::value<Core>{a + b};
             else
-                app_val = value<Core>{a * b};
+                app_val = closure::value<Core>{a * b};
 
             auto r = cont(app_val);
             if (!r.has_value())
@@ -151,17 +165,21 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
             return k(r.value());
         }
 
-        if (std::holds_alternative<closure<Core>>(func_r.value())) {
-            auto const &clo = std::get<closure<Core>>(func_r.value());
+        if (std::holds_alternative<closure::closure<Core>>(func_r.value())) {
+            auto const &clo = std::get<closure::closure<Core>>(func_r.value());
             auto const &lam_node = *clo.node;
 
-            if (!std::holds_alternative<core_lambda<Core, MaxNodes, MaxList>>(
+            if (!std::holds_alternative<
+                    elaborator::core_lambda<Core, MaxNodes, MaxList>>(
                     lam_node.inner))
-                return result<value<Core>>{parse_error{{}, "type error"}};
+                return foundation::result<closure::value<Core>>{
+                    foundation::parse_error{{}, "type error"}};
             auto const &lam =
-                std::get<core_lambda<Core, MaxNodes, MaxList>>(lam_node.inner);
+                std::get<elaborator::core_lambda<Core, MaxNodes, MaxList>>(
+                    lam_node.inner);
             if (app.args.size() != lam.params.size())
-                return result<value<Core>>{parse_error{{}, "arity mismatch"}};
+                return foundation::result<closure::value<Core>>{
+                    foundation::parse_error{{}, "arity mismatch"}};
 
             auto new_env = clo.captured ? *clo.captured : env;
             for (int i = 0; i < app.args.size(); ++i) {
@@ -176,10 +194,13 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
                                                    cont, new_env, k);
         }
 
-        if (std::holds_alternative<foreign_function<Core>>(func_r.value())) {
-            auto const &ff = std::get<foreign_function<Core>>(func_r.value());
+        if (std::holds_alternative<closure::foreign_function<Core>>(
+                func_r.value())) {
+            auto const &ff =
+                std::get<closure::foreign_function<Core>>(func_r.value());
 
-            static_vector<value<Core>, MaxNodes> evaluated_args;
+            foundation::static_vector<closure::value<Core>, MaxNodes>
+                evaluated_args;
             for (auto const &arg_id : app.args) {
                 auto arg_r = cps_dispatch<MaxNodes, MaxList>(
                     arena.get(arg_id), arena, identity_k<Core>{}, env,
@@ -189,10 +210,10 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
                 evaluated_args.push_back(arg_r.value());
             }
 
-            auto ff_r = ff.fn(std::span<value<Core> const>(
+            auto ff_r = ff.fn(std::span<closure::value<Core> const>(
                 evaluated_args.begin(), evaluated_args.end()));
             if (!ff_r.has_value())
-                return result<value<Core>>{ff_r.error()};
+                return foundation::result<closure::value<Core>>{ff_r.error()};
 
             auto r = cont(ff_r.value());
             if (!r.has_value())
@@ -200,19 +221,21 @@ cps_dispatch(core_type<MaxNodes, MaxList> const &node,
             return k(r.value());
         }
 
-        return result<value<Core>>{
-            parse_error{{}, "attempted to call non-function"}};
+        return foundation::result<closure::value<Core>>{
+            foundation::parse_error{{}, "attempted to call non-function"}};
     }
-    return result<value<Core>>{
-        parse_error{{}, "cps_dispatch: unsupported form"}};
+    return foundation::result<closure::value<Core>>{
+        foundation::parse_error{{}, "cps_dispatch: unsupported form"}};
 }
 
 } // namespace detail
 
 template <int MaxNodes, int MaxList, class Cont>
-[[nodiscard]] constexpr auto
-cps_of(core_type<MaxNodes, MaxList> const &node,
-       tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> arena, Cont cont) {
+[[nodiscard]] constexpr auto cps_of(
+    elaborator::core_type<MaxNodes, MaxList> const &node,
+    foundation::tree_arena<elaborator::core_type<MaxNodes, MaxList>, MaxNodes>
+        arena,
+    Cont cont) {
     return cps_code{[node, arena, cont](auto const &env, auto k) constexpr {
         return detail::cps_dispatch<MaxNodes, MaxList>(node, arena, cont, env,
                                                        k);
@@ -220,13 +243,14 @@ cps_of(core_type<MaxNodes, MaxList> const &node,
 }
 
 template <int MaxNodes, int MaxList>
-[[nodiscard]] constexpr auto
-compile_cps(core_type<MaxNodes, MaxList> const &node,
-            tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> arena) {
-    using Core = core_type<MaxNodes, MaxList>;
+[[nodiscard]] constexpr auto compile_cps(
+    elaborator::core_type<MaxNodes, MaxList> const &node,
+    foundation::tree_arena<elaborator::core_type<MaxNodes, MaxList>, MaxNodes>
+        arena) {
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
     return cps_of<MaxNodes, MaxList>(node, arena, detail::identity_k<Core>{});
 }
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::cps
 
 #endif

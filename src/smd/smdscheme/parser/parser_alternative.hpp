@@ -1,15 +1,15 @@
 // src/smd/schemepoc/parser_alternative.hpp                        -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_PARSER_ALTERNATIVE_HPP
-#define SRC_SMD_SCHEMEPOC_PARSER_ALTERNATIVE_HPP
+#ifndef SRC_SMD_SMDSCHEME_PARSER_PARSER_ALTERNATIVE_HPP
+#define SRC_SMD_SMDSCHEME_PARSER_PARSER_ALTERNATIVE_HPP
 
-#include <smd/schemepoc/parser.hpp>
-#include <smd/schemepoc/reader_cursor.hpp>
-#include <smd/schemepoc/static_vector.hpp>
+#include <smd/smdscheme/foundation/static_vector.hpp>
+#include <smd/smdscheme/parser/parser.hpp>
+#include <smd/smdscheme/parser/reader_cursor.hpp>
 
 #include <optional>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::parser {
 
 template <parser_like PA, parser_like PB>
 [[nodiscard]] constexpr auto alt(PA pa, PB pb) {
@@ -20,7 +20,7 @@ template <int Capacity, parser_like P>
 [[nodiscard]] constexpr auto many(P p) {
     return parser{[p](cursor cur) {
         using V = decltype(p(cur).value().value);
-        static_vector<V, Capacity> result{};
+        foundation::static_vector<V, Capacity> result{};
         while (result.size() < Capacity) {
             auto r = p(cur);
             if (!r.has_value())
@@ -28,8 +28,8 @@ template <int Capacity, parser_like P>
             result.push_back(r.value().value);
             cur = r.value().rest;
         }
-        return parse_result<static_vector<V, Capacity>>{
-            parse_state<static_vector<V, Capacity>>{result, cur}};
+        return parse_result<foundation::static_vector<V, Capacity>>{
+            parse_state<foundation::static_vector<V, Capacity>>{result, cur}};
     }};
 }
 
@@ -39,9 +39,10 @@ template <int Capacity, parser_like P>
         using V = decltype(p(cur).value().value);
         auto first = p(cur);
         if (!first.has_value()) {
-            return parse_result<static_vector<V, Capacity>>{first.error()};
+            return parse_result<foundation::static_vector<V, Capacity>>{
+                first.error()};
         }
-        static_vector<V, Capacity> result{};
+        foundation::static_vector<V, Capacity> result{};
         result.push_back(first.value().value);
         cur = first.value().rest;
         while (result.size() < Capacity) {
@@ -51,8 +52,8 @@ template <int Capacity, parser_like P>
             result.push_back(r.value().value);
             cur = r.value().rest;
         }
-        return parse_result<static_vector<V, Capacity>>{
-            parse_state<static_vector<V, Capacity>>{result, cur}};
+        return parse_result<foundation::static_vector<V, Capacity>>{
+            parse_state<foundation::static_vector<V, Capacity>>{result, cur}};
     }};
 }
 
@@ -83,6 +84,6 @@ template <parser_like P>
     }};
 }
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::parser
 
 #endif

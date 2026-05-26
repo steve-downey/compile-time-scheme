@@ -1,17 +1,17 @@
 // src/smd/schemepoc/reader_cursor.hpp                             -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_READER_CURSOR_HPP
-#define SRC_SMD_SCHEMEPOC_READER_CURSOR_HPP
+#ifndef SRC_SMD_SMDSCHEME_PARSER_READER_CURSOR_HPP
+#define SRC_SMD_SMDSCHEME_PARSER_READER_CURSOR_HPP
 
-#include <smd/schemepoc/source.hpp>
+#include <smd/smdscheme/foundation/source.hpp>
 
 #include <string_view>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::parser {
 
 class cursor {
     std::string_view input_{};
-    source_pos pos_{};
+    foundation::source_pos pos_{};
 
   public:
     constexpr explicit cursor(std::string_view input) : input_{input} {}
@@ -36,7 +36,7 @@ class cursor {
         return next;
     }
 
-    constexpr auto position() const -> source_pos { return pos_; }
+    constexpr auto position() const -> foundation::source_pos { return pos_; }
 
     constexpr auto remaining() const -> std::string_view { return input_; }
 };
@@ -68,6 +68,6 @@ constexpr auto skip_intertoken_space(cursor cur) -> cursor {
     return cur;
 }
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::parser
 
 #endif
