@@ -1,12 +1,12 @@
 // src/smd/schemepoc/functor.hpp                                 -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_FUNCTOR_HPP
-#define SRC_SMD_SCHEMEPOC_FUNCTOR_HPP
+#ifndef SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP
+#define SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP
 
 #include <type_traits>
 #include <utility>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::parser {
 
 template <class Impl>
 struct Functor : protected Impl {
@@ -34,6 +34,6 @@ struct fmap_fn {
 
 inline constexpr fmap_fn fmap{};
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::parser
 
 #endif

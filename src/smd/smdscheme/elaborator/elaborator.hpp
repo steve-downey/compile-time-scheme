@@ -1,63 +1,68 @@
 // src/smd/schemepoc/elaborator.hpp                                -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_ELABORATOR_HPP
-#define SRC_SMD_SCHEMEPOC_ELABORATOR_HPP
+#ifndef SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_HPP
+#define SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_HPP
 
-#include <smd/schemepoc/elaborator_core.hpp>
-#include <smd/schemepoc/reader.hpp>
-#include <smd/schemepoc/result.hpp>
+#include <smd/smdscheme/elaborator/elaborator_core.hpp>
+#include <smd/smdscheme/foundation/result.hpp>
+#include <smd/smdscheme/reader/reader.hpp>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::elaborator {
 namespace detail {
 
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_quote(
-    datum_type<MaxNodes, MaxList> const &d,
-    const tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> & /*arena*/)
-    -> result<std::variant<int, bool, std::string_view>> {
-    if (std::holds_alternative<datum_integer>(d.inner)) {
+    reader::datum_type<MaxNodes, MaxList> const &d,
+    const foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
+                                 MaxNodes> & /*arena*/)
+    -> foundation::result<std::variant<int, bool, std::string_view>> {
+    if (std::holds_alternative<reader::datum_integer>(d.inner)) {
         return std::variant<int, bool, std::string_view>{
-            std::get<datum_integer>(d.inner).value};
+            std::get<reader::datum_integer>(d.inner).value};
     }
-    if (std::holds_alternative<datum_boolean>(d.inner)) {
+    if (std::holds_alternative<reader::datum_boolean>(d.inner)) {
         return std::variant<int, bool, std::string_view>{
-            std::get<datum_boolean>(d.inner).value};
+            std::get<reader::datum_boolean>(d.inner).value};
     }
-    if (std::holds_alternative<datum_symbol>(d.inner)) {
+    if (std::holds_alternative<reader::datum_symbol>(d.inner)) {
         return std::variant<int, bool, std::string_view>{
-            std::get<datum_symbol>(d.inner).name};
+            std::get<reader::datum_symbol>(d.inner).name};
     }
-    return parse_error{{}, "quote: lists/nested quotes not yet supported"};
+    return foundation::parse_error{
+        {}, "quote: lists/nested quotes not yet supported"};
 }
 
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_node(
-    datum_type<MaxNodes, MaxList> const &d,
-    const tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> &datum_arena,
-    tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
-    -> result<core_type<MaxNodes, MaxList>>;
+    reader::datum_type<MaxNodes, MaxList> const &d,
+    const foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
+                                 MaxNodes> &datum_arena,
+    foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
+    -> foundation::result<core_type<MaxNodes, MaxList>>;
 
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_list(
-    datum_list<datum_type<MaxNodes, MaxList>, MaxNodes, MaxList> const &lst,
-    const tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> &datum_arena,
-    tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
-    -> result<core_type<MaxNodes, MaxList>> {
+    reader::datum_list<reader::datum_type<MaxNodes, MaxList>, MaxNodes,
+                       MaxList> const &lst,
+    const foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
+                                 MaxNodes> &datum_arena,
+    foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
+    -> foundation::result<core_type<MaxNodes, MaxList>> {
     using core = core_type<MaxNodes, MaxList>;
     using core_f =
         typename core_f_factory<MaxNodes, MaxList>::template type<core>;
 
     if (lst.elements.empty()) {
-        return parse_error{{}, "empty application"};
+        return foundation::parse_error{{}, "empty application"};
     }
 
     auto const &first = datum_arena.get(lst.elements[0]);
-    if (std::holds_alternative<datum_symbol>(first.inner)) {
-        auto name = std::get<datum_symbol>(first.inner).name;
+    if (std::holds_alternative<reader::datum_symbol>(first.inner)) {
+        auto name = std::get<reader::datum_symbol>(first.inner).name;
 
         if (name == "if") {
             if (lst.elements.size() != 4)
-                return parse_error{{}, "if: expected 3 arguments"};
+                return foundation::parse_error{{}, "if: expected 3 arguments"};
 
             auto cond_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[1]), datum_arena, core_arena);
@@ -82,20 +87,23 @@ constexpr auto elaborate_list(
 
         if (name == "quote") {
             if (lst.elements.size() != 2)
-                return parse_error{{}, "quote: expected 1 argument"};
+                return foundation::parse_error{{},
+                                               "quote: expected 1 argument"};
             auto atom_r = elaborate_quote<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[1]), datum_arena);
             if (!atom_r.has_value())
-                return parse_error{{}, atom_r.error().message};
+                return foundation::parse_error{{}, atom_r.error().message};
             return core{core_f{core_quote{atom_r.value()}}};
         }
 
         if (name == "define") {
             if (lst.elements.size() != 3)
-                return parse_error{{}, "define: expected name and value"};
+                return foundation::parse_error{
+                    {}, "define: expected name and value"};
             auto const &name_node = datum_arena.get(lst.elements[1]);
-            if (!std::holds_alternative<datum_symbol>(name_node.inner))
-                return parse_error{{}, "define: name must be a symbol"};
+            if (!std::holds_alternative<reader::datum_symbol>(name_node.inner))
+                return foundation::parse_error{{},
+                                               "define: name must be a symbol"};
 
             auto val_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[2]), datum_arena, core_arena);
@@ -103,34 +111,38 @@ constexpr auto elaborate_list(
                 return val_r;
 
             return core{core_f{core_define<core, MaxNodes>{
-                std::get<datum_symbol>(name_node.inner).name,
+                std::get<reader::datum_symbol>(name_node.inner).name,
                 make_arena_box(core_arena, std::move(val_r.value()))}}};
         }
 
         if (name == "lambda") {
             if (lst.elements.size() != 3)
-                return parse_error{{},
-                                   "lambda: expected formals and body (only 1 "
-                                   "expr body supported)"};
+                return foundation::parse_error{
+                    {},
+                    "lambda: expected formals and body (only 1 "
+                    "expr body supported)"};
 
             auto const &formals_node = datum_arena.get(lst.elements[1]);
-            if (!std::holds_alternative<datum_list<
-                    datum_type<MaxNodes, MaxList>, MaxNodes, MaxList>>(
+            if (!std::holds_alternative<reader::datum_list<
+                    reader::datum_type<MaxNodes, MaxList>, MaxNodes, MaxList>>(
                     formals_node.inner))
-                return parse_error{{}, "lambda: formals must be a list"};
+                return foundation::parse_error{
+                    {}, "lambda: formals must be a list"};
 
             core_lambda<core, MaxNodes, MaxList> lam{};
-            auto const &formals = std::get<
-                datum_list<datum_type<MaxNodes, MaxList>, MaxNodes, MaxList>>(
+            auto const &formals = std::get<reader::datum_list<
+                reader::datum_type<MaxNodes, MaxList>, MaxNodes, MaxList>>(
                 formals_node.inner);
             for (int i = 0; i < formals.elements.size(); ++i) {
                 auto const &p = datum_arena.get(formals.elements[i]);
-                if (!std::holds_alternative<datum_symbol>(p.inner))
-                    return parse_error{{}, "lambda: formal must be a symbol"};
-                auto p_name = std::get<datum_symbol>(p.inner).name;
+                if (!std::holds_alternative<reader::datum_symbol>(p.inner))
+                    return foundation::parse_error{
+                        {}, "lambda: formal must be a symbol"};
+                auto p_name = std::get<reader::datum_symbol>(p.inner).name;
                 for (auto const &existing : lam.params) {
                     if (existing == p_name)
-                        return parse_error{{}, "duplicate parameter"};
+                        return foundation::parse_error{{},
+                                                       "duplicate parameter"};
                 }
                 lam.params.push_back(p_name);
             }
@@ -168,57 +180,59 @@ constexpr auto elaborate_list(
 
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_node(
-    datum_type<MaxNodes, MaxList> const &d,
-    const tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> &datum_arena,
-    tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
-    -> result<core_type<MaxNodes, MaxList>> {
+    reader::datum_type<MaxNodes, MaxList> const &d,
+    const foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
+                                 MaxNodes> &datum_arena,
+    foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
+    -> foundation::result<core_type<MaxNodes, MaxList>> {
     using core = core_type<MaxNodes, MaxList>;
     using core_f =
         typename core_f_factory<MaxNodes, MaxList>::template type<core>;
 
-    if (std::holds_alternative<datum_integer>(d.inner)) {
+    if (std::holds_alternative<reader::datum_integer>(d.inner)) {
+        return core{core_f{
+            core_integer{std::get<reader::datum_integer>(d.inner).value}}};
+    }
+    if (std::holds_alternative<reader::datum_boolean>(d.inner)) {
+        return core{core_f{
+            core_boolean{std::get<reader::datum_boolean>(d.inner).value}}};
+    }
+    if (std::holds_alternative<reader::datum_symbol>(d.inner)) {
         return core{
-            core_f{core_integer{std::get<datum_integer>(d.inner).value}}};
+            core_f{core_symbol{std::get<reader::datum_symbol>(d.inner).name}}};
     }
-    if (std::holds_alternative<datum_boolean>(d.inner)) {
-        return core{
-            core_f{core_boolean{std::get<datum_boolean>(d.inner).value}}};
-    }
-    if (std::holds_alternative<datum_symbol>(d.inner)) {
-        return core{core_f{core_symbol{std::get<datum_symbol>(d.inner).name}}};
-    }
-    if (std::holds_alternative<
-            datum_quote<datum_type<MaxNodes, MaxList>, MaxNodes>>(d.inner)) {
+    if (std::holds_alternative<reader::datum_quote<
+            reader::datum_type<MaxNodes, MaxList>, MaxNodes>>(d.inner)) {
         auto const &q =
-            std::get<datum_quote<datum_type<MaxNodes, MaxList>, MaxNodes>>(
-                d.inner);
+            std::get<reader::datum_quote<reader::datum_type<MaxNodes, MaxList>,
+                                         MaxNodes>>(d.inner);
         auto atom_r = elaborate_quote<MaxNodes, MaxList>(
             datum_arena.get(q.quoted), datum_arena);
         if (!atom_r.has_value())
             return atom_r.error();
         return core{core_f{core_quote{atom_r.value()}}};
     }
-    if (std::holds_alternative<
-            datum_list<datum_type<MaxNodes, MaxList>, MaxNodes, MaxList>>(
+    if (std::holds_alternative<reader::datum_list<
+            reader::datum_type<MaxNodes, MaxList>, MaxNodes, MaxList>>(
             d.inner)) {
         return elaborate_list<MaxNodes, MaxList>(
-            std::get<
-                datum_list<datum_type<MaxNodes, MaxList>, MaxNodes, MaxList>>(
-                d.inner),
+            std::get<reader::datum_list<reader::datum_type<MaxNodes, MaxList>,
+                                        MaxNodes, MaxList>>(d.inner),
             datum_arena, core_arena);
     }
 
-    return parse_error{{}, "elaborator: unsupported node type"};
+    return foundation::parse_error{{}, "elaborator: unsupported node type"};
 }
 
 } // namespace detail
 
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate(
-    datum_type<MaxNodes, MaxList> const &pd,
-    const tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> &datum_arena,
-    tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
-    -> result<core_type<MaxNodes, MaxList>> {
+    reader::datum_type<MaxNodes, MaxList> const &pd,
+    const foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
+                                 MaxNodes> &datum_arena,
+    foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
+    -> foundation::result<core_type<MaxNodes, MaxList>> {
     auto r =
         detail::elaborate_node<MaxNodes, MaxList>(pd, datum_arena, core_arena);
     if (!r.has_value())
@@ -226,6 +240,6 @@ constexpr auto elaborate(
     return r.value();
 }
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::elaborator
 
 #endif

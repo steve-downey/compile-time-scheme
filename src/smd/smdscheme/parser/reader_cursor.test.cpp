@@ -1,17 +1,17 @@
 // src/smd/schemepoc/reader_cursor.test.cpp                        -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/schemepoc/reader_cursor.hpp>
-#include <smd/schemepoc/reader_cursor.hpp> // test 2nd include OK
+#include <smd/smdscheme/parser/reader_cursor.hpp>
+#include <smd/smdscheme/parser/reader_cursor.hpp> // test 2nd include OK
 
 #include <catch2/catch_test_macros.hpp>
 
-using smd::schemepoc::cursor;
-using smd::schemepoc::is_delimiter;
-using smd::schemepoc::is_initial_symbol_char;
-using smd::schemepoc::is_space;
-using smd::schemepoc::is_symbol_char;
-using smd::schemepoc::skip_intertoken_space;
+using smd::smdscheme::parser::cursor;
+using smd::smdscheme::parser::is_delimiter;
+using smd::smdscheme::parser::is_initial_symbol_char;
+using smd::smdscheme::parser::is_space;
+using smd::smdscheme::parser::is_symbol_char;
+using smd::smdscheme::parser::skip_intertoken_space;
 
 static_assert(is_delimiter('('));
 static_assert(is_delimiter(')'));

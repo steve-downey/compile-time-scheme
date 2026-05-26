@@ -1,14 +1,14 @@
 // src/smd/schemepoc/parser_alternative.test.cpp                   -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/schemepoc/parser_alternative.hpp>
-#include <smd/schemepoc/parser_alternative.hpp> // test 2nd include OK
+#include <smd/smdscheme/parser/parser_alternative.hpp>
+#include <smd/smdscheme/parser/parser_alternative.hpp> // test 2nd include OK
 
 #include <catch2/catch_test_macros.hpp>
 
 namespace {
 
-using namespace smd::schemepoc;
+using namespace smd::smdscheme::parser;
 
 // alt
 static_assert(alt(char_p('a'), char_p('b'))(cursor{"a"}).value().value == 'a');

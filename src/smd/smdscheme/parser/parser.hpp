@@ -1,12 +1,12 @@
 // src/smd/schemepoc/parser.hpp                                    -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_PARSER_HPP
-#define SRC_SMD_SCHEMEPOC_PARSER_HPP
+#ifndef SRC_SMD_SMDSCHEME_PARSER_PARSER_HPP
+#define SRC_SMD_SMDSCHEME_PARSER_PARSER_HPP
 
-#include <smd/schemepoc/reader_cursor.hpp>
-#include <smd/schemepoc/result.hpp>
+#include <smd/smdscheme/foundation/result.hpp>
+#include <smd/smdscheme/parser/reader_cursor.hpp>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::parser {
 
 template <class P>
 concept parser_like = requires(P p, cursor c) { p(c); };
@@ -18,7 +18,7 @@ struct parse_state {
 };
 
 template <class T>
-using parse_result = result<parse_state<T>>;
+using parse_result = foundation::result<parse_state<T>>;
 
 template <class F>
 class parser {
@@ -46,7 +46,7 @@ template <class T>
         if (!cur.empty() && pred(cur.peek())) {
             return parse_state<char>{cur.peek(), cur.bump()};
         }
-        return parse_error{cur.position(), expected};
+        return foundation::parse_error{cur.position(), expected};
     }};
 }
 
@@ -111,6 +111,6 @@ template <parser_like PA, parser_like PB>
     }};
 }
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::parser
 
 #endif

@@ -1,16 +1,16 @@
 // src/smd/schemepoc/datum_tree.hpp                                -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_DATUM_TREE_HPP
-#define SRC_SMD_SCHEMEPOC_DATUM_TREE_HPP
+#ifndef SRC_SMD_SMDSCHEME_READER_DATUM_TREE_HPP
+#define SRC_SMD_SMDSCHEME_READER_DATUM_TREE_HPP
 
-#include <smd/schemepoc/arena_box.hpp>
-#include <smd/schemepoc/fix.hpp>
-#include <smd/schemepoc/static_vector.hpp>
+#include <smd/smdscheme/cps/fix.hpp>
+#include <smd/smdscheme/foundation/arena_box.hpp>
+#include <smd/smdscheme/foundation/static_vector.hpp>
 
 #include <string_view>
 #include <variant>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::reader {
 
 struct datum_integer {
     int value{};
@@ -26,12 +26,13 @@ struct datum_boolean {
 
 template <typename R, int MaxNodes, int MaxList>
 struct datum_list {
-    static_vector<arena_box<R, MaxNodes>, MaxList> elements{};
+    foundation::static_vector<foundation::arena_box<R, MaxNodes>, MaxList>
+        elements{};
 };
 
 template <typename R, int MaxNodes>
 struct datum_quote {
-    arena_box<R, MaxNodes> quoted{};
+    foundation::arena_box<R, MaxNodes> quoted{};
 };
 
 template <int MaxNodes, int MaxList>
@@ -43,8 +44,8 @@ struct datum_f_factory {
 };
 
 template <int MaxNodes, int MaxList>
-using datum_type = fix<datum_f_factory<MaxNodes, MaxList>::template type>;
+using datum_type = cps::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::reader
 
 #endif

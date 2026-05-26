@@ -17,10 +17,11 @@ class result {
 
     [[nodiscard]] constexpr auto has_value() const -> bool;
     [[nodiscard]] constexpr auto value() const -> T const &;
-    [[nodiscard]] constexpr auto error() const -> parse_error const &;
+    [[nodiscard]] constexpr auto error() const
+        -> foundation::parse_error const &;
 
   private:
-    std::variant<T, parse_error> data_;
+    std::variant<T, foundation::parse_error> data_;
 };
 
 template <class T>
@@ -40,8 +41,8 @@ constexpr auto result<T>::value() const -> T const & {
 }
 
 template <class T>
-constexpr auto result<T>::error() const -> parse_error const & {
-    return std::get<parse_error>(data_);
+constexpr auto result<T>::error() const -> foundation::parse_error const & {
+    return std::get<foundation::parse_error>(data_);
 }
 
 } // namespace smd::smdscheme::foundation
