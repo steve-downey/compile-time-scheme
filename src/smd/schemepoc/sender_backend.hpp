@@ -12,6 +12,7 @@
 
 namespace smd::schemepoc {
 namespace sender_backend {
+// 87e88913-dd13-4994-b2fe-04cb6ffa34ee
 
 // NOTE: Creating a fully dynamic sender graph from a runtime AST without
 // type erasure (std::any/any_sender) or coroutines (Beman Task) hits
@@ -194,6 +195,7 @@ template <int MaxNodes = 32, int MaxList = 16>
     auto const &ct_root = er.value();
     return result<ProgramT>{ProgramT{ct_root, core_arena}};
 }
+// 87e88913-dd13-4994-b2fe-04cb6ffa34ee end
 
 } // namespace smd::schemepoc
 #endif

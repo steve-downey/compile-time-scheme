@@ -9,6 +9,7 @@
 #include <string_view>
 
 namespace smd::schemepoc {
+// d0092f7c-b9de-440d-ac67-02e4e48c5aa4
 
 // A compile-time description of a captured environment variable
 struct capture_desc {
@@ -31,6 +32,7 @@ consteval void compile_environment(std::vector<capture_desc> captures) {
     }
     std::meta::define_aggregate(^^reified_environment<Tag>, members);
 }
+// d0092f7c-b9de-440d-ac67-02e4e48c5aa4 end
 
 } // namespace smd::schemepoc
 

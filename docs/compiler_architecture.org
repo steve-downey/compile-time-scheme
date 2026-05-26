@@ -84,3 +84,26 @@ This Backend phase takes our CPS representation and translates it into completel
 Because we used CPS, this phase is structurally identical to building a C++26 sender graph (`sync_wait(when_all(...))`), preparing the compiler natively for future async integration.
 
 #+transclude: [[file:../src/smd/schemepoc/closure_backend.hpp::a6bf5e59-ae94-4b53-b0eb-8f5592fdb0b7]] :lines 2- :src cpp :end "a6bf5e59-ae94-4b53-b0eb-8f5592fdb0b7 end"
+
+* Phase 6: Sender Backend and Asynchronous Execution
+
+Once the execution has been mapped out in Continuation-Passing Style (CPS) using standard C++ Closures, it becomes remarkably straightforward to adapt to standard C++ Asynchronous Execution. 
+
+In traditional C++ asynchronous environments (like `std::execution` from C++26 / Beman `sender/receiver` models), an operation doesn't immediately return a result; it *sends* its result to a *receiver*. Look closely: a "receiver" is conceptually identical to a "continuation" in CPS.
+
+The Sender Backend walks our Core Semantic AST exactly like the Closure backend does, but instead of constructing plain callable functors, it builds a robust graph of asynchronous `sender` objects (utilizing components like `beman::task::task`). Variables captured in the environment are awaited asynchronously when function applications occur. This architecture guarantees that Scheme programs can invoke C++ co-routines seamlessly, and it leverages the target machine's thread pools for transparent concurrency underneath the simple Scheme code.
+
+#+transclude: [[file:../src/smd/schemepoc/sender_backend.hpp::87e88913-dd13-4994-b2fe-04cb6ffa34ee]] :lines 2- :src cpp :end "87e88913-dd13-4994-b2fe-04cb6ffa34ee end"
+
+* Phase 7: Data Reification with C++26 Reflection (`std::meta::info`)
+
+In an ordinary compiler targeting C++, data environments and captured scopes are rigidly defined structures (`struct { int a; char b; };`). To mimic dynamic scope capturing (like an environment map dictating variables available to a Scheme Lambda), one might traditionally reach into `std::map<std::string, std::any>`. But that implies heap allocations at runtime, virtual dispatch, and cache misses.
+
+C++26 introduces **Reflection**: the ability to interact with types as first-class `constexpr` values (`std::meta::info`).
+
+We use this feature in the Reification phase to take the environment layouts calculated entirely inside our compile-time ast `constexpr` code, and command the compiler to dynamically generate hard-coded `struct` representations that match exactly. Using `std::meta::define_aggregate`, we essentially instruct the C++ compiler: "I analyzed this Scheme function. It expects two integers and a boolean. Generate a bespoke C++ `struct` to perfectly fit this requirement, and let's map it across."
+
+This results in environment sizes that are as zero-cost as though a C++ expert manually wrote a distinct structure for every single lambda parameter capture.
+
+#+transclude: [[file:../src/smd/schemepoc/reflection_reify.hpp::d0092f7c-b9de-440d-ac67-02e4e48c5aa4]] :lines 2- :src cpp :end "d0092f7c-b9de-440d-ac67-02e4e48c5aa4 end"
+
