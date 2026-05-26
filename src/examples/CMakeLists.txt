@@ -72,3 +72,43 @@ set_tests_properties(
     PROPERTIES
         PASS_REGULAR_EXPRESSION "FFI Called with: 2026 and 10.*Result: 2036"
 )
+
+add_executable(advanced_reflection_ffi)
+target_sources(advanced_reflection_ffi PRIVATE advanced_reflection_ffi.cpp)
+target_link_libraries(advanced_reflection_ffi PRIVATE schemepoc.schemepoc)
+target_compile_options(advanced_reflection_ffi PRIVATE -freflection)
+
+install(
+    TARGETS advanced_reflection_ffi
+    COMPONENT schemepoc.schemepoc.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
+
+add_test(NAME examples_advanced_reflection_ffi COMMAND advanced_reflection_ffi)
+set_tests_properties(
+    examples_advanced_reflection_ffi
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION
+            "Scheme executing evaluation step for n = 6.*Final Scheme Result Output: 720"
+)
+
+add_executable(advanced_sender_ffi)
+target_sources(advanced_sender_ffi PRIVATE advanced_sender_ffi.cpp)
+target_link_libraries(advanced_sender_ffi PRIVATE schemepoc.schemepoc)
+target_compile_options(advanced_sender_ffi PRIVATE -freflection)
+
+install(
+    TARGETS advanced_sender_ffi
+    COMPONENT schemepoc.schemepoc.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
+
+add_test(NAME examples_advanced_sender_ffi COMMAND advanced_sender_ffi)
+set_tests_properties(
+    examples_advanced_sender_ffi
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION
+            "Final Scheme Result Output: 5"
+)

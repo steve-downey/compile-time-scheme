@@ -59,7 +59,7 @@
 - [x] Step 28: C++ Foreign Function Interface (FFI) spike
 - [x] Step 29: vendor Beman Execution
 - [x] Step 30: sender adapter over Beman Execution
-- [ ] Step 31: sender backend over CPS program using Beman Execution
-- [ ] Step 32: optional Beman Task integration, only if needed
-- [ ] Step 33: reflection spike
-- [ ] Step 34: documentation consolidation
+- [x] Step 31: sender backend over CPS program using Beman Execution
+- [x] Step 32: optional Beman Task integration, only if needed
+- [x] Step 33: reflection spike
+- [x] Step 34: documentation consolidation

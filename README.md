@@ -1,86 +1,50 @@
-# Scheme for C++26 Compile Time
+# SchemePoC: Compile-Time Scheme-Light in C++26
 
 [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12577/baseline)](https://www.bestpractices.dev/projects/12577)
 
-This repo is my current set of best practices for C++ projects. It does evolve somewhat over time.
+SchemePoC is a proof-of-concept **compile-time Scheme compiler and evaluator** targeting C++26 and GCC 16. It leverages the latest C++ language features (like deep `constexpr` evaluation, C++26 reflection spike, and coroutines via Beman Task) to safely parse, elaborate, and evaluate a small LISP/Scheme-like language natively at compile time.
 
-This is a snapshot as of today, Sat Apr 11 05:26:37 PM BST 2026.
+## Architecture
 
-The code is trivial so that I can repurpose the framework quickly. A library that returns my name, a test that confirms that works, and an example hello `schemepoc` that uses the library.
+The project is structured as a staged pipeline to cleanly separate parsing from semantic elaboration and evaluation:
 
-The C++ src is all in the ./src directory, including the headers and tests. Take a look at [The Pitchfork Layout Spec](https://www.w3.org/publications/spec-generator/?type=bikeshed-spec&output=html&die-on=fatal&md-date=&url=https%3A%2F%2Fraw.githubusercontent.com%2Fvector-of-bool%2Fpitchfork%2Fdevelop%2Fdata%2Fspec.bs&file=) for some discussion about merged layouts. Short answer is that include directories are an install location, not a source location, but that the directory layouts must still be coherent. Tests are co-located because tests are important and the further away they are, the more they will be dropped.
+1. **Source String**: Raw `char` sequence input.
+2. **Reader (`src/smd/schemepoc/reader.hpp`)**: Parses the input string into a raw S-expression/Datum tree. It uses an arena allocator designed for `constexpr` to avoid heap persistence issues across compile-time boundaries.
+3. **Elaborator (`src/smd/schemepoc/elaborator.hpp`)**: Traverses the generic datum tree to classify specific semantic Scheme forms (like literals, symbols, `if` statements, `lambda`, and applications) into a strongly typed `core_tree`.
+4. **Evaluator (`src/smd/schemepoc/eval_direct.hpp`)**: Direct tree-walking evaluator representing standard synchronous execution.
+5. **CPS Transformation (`src/smd/schemepoc/cps.hpp`)**: Continuation-Passing Style structural transformation, paving the way for advanced non-blocking branch flows.
+6. **Closure Backend (`src/smd/schemepoc/closure_backend.hpp`)**: Compiles the CPS-transformed elements into explicitly typed C++ function closures for zero-overhead evaluation.
+7. **Sender Backend (`src/smd/schemepoc/sender_backend.hpp`)**: An asynchronous compiler backend relying on C++ Execution primitives (`beman::task`) to resolve Scheme branch flows directly natively inside C++ coroutines, bypassing `variant` recursion limits.
+8. **Reflection Spike (`src/smd/schemepoc/reflection_reify.hpp`)**: Demonstrates translating captured environment metadata straight into generated C++ aggregates using the experimental C++26 `std::meta` (`-freflection`).
 
-The CMake is contemporary, post-modern, so not just target oriented, it is also file set oriented.
+## Build Instructions
 
-GitHub Actions are set up to make sure everything I expect to work actually does.
+This project requires GCC 16 to support the C++26 reflection and core constant-evaluation semantics required by the implementations.
 
-There is a top-level Makefile to drive workflow. Its default is to build and run all tests for the project.
+The build system leverages CMake, the Beman project's infrastructure, and a local Python virtual environment managed by `uv`.
 
-The project levergages `uv` and PyPI to install the tools that it requires. It installs them into a local virtual environment so as not to make system wide changes.
-
-The [pre-commit](https://github.com/pre-commit/pre-commit) framework is used to drive linters both locally and in GitHub Actions. Clang format is enforced, as is a CMake format. I've given up doing this by hand. Yaml is even worse. Spellcheck, for code, also.
-
-The infra directory is vendored in from the [Beman Project](https://github.com/bemanproject/infra) supporting [infra](https://github.com/bemanproject/infra) project. Right now for install of the project. Many of the GitHub actions in .github/workflows/ also use Beman scripts and tools. The CMakePresets.txt exists largely to support those tools. I find the workflow [Makefile](./Makefile) easier to extend with less combanitorial explosion.
-
-Complers are expected to be available on PATH with versioned names, such as `g++-15` or `clang++-21`. Toolchains are in the ./etc/ directory.
-
-`make` by itself uses the system `c++` compiler. For others, e.g., `make TOOLCHAIN=gcc-15` will use the etc/gcc-15-toolchain.cmake toolchain, which sets CXX to be gcc-15. By default the build and test is address sanitized, plus some compatible sanitizers. Alternatives are specified with CONFIG, e.g. `make TOOLCHAIN=gcc-15 CONFIG=RelWithDebInfo`.
-
-
-# Building Presentations with Emacs and Org-Transclusion
-
-This example project uses [nobiot's org-transclusion](https://github.com/nobiot/org-transclusion) and org-export to produce an HTML file for use in presentations. This allows checking that the code is correct but also limited to what is useful.
-
-The export can be run by `make presentation`, which builds and runs the tests for the project and runs the org export afterwards.
-
-The `infra` directory is vendored in from the Beman Project via `git subtree`.
-
-The makefile provides a variety of tools. It will install most borrowing from PyPI as long as `uv` is available. The installation is in a local `.venv` so as not to mess up the rest of your environment.
-
-```shell
-(schemepoc) sdowney@pwyll:~/src/surround/schemepoc (main ±)
-$ make help
-clean                          Clean the build artifacts
-clean-venv                     Delete python virtual env
-compile                        Compile the project
-compile_commands.json          symlink the current compile commands db
-compile-headers                Compile the headers
-coverage                       Build and run the tests with the GCOV profile and process the results
-ctest                          Run CTest on current build
-dev-shell                      Shell with the venv activated
-docs                           Build the docs with Doxygen
-help                           Show this help.
-install                        Install the project
-install-uv                     install uv via `pipx install uv`
-lint                           Run all configured tools in pre-commit
-lint-manual                    Run all manual tools in pre-commit
-mrdocs                         Build the docs with MrDocs
-realclean                      Delete the build directory
-show-venv                      Debugging target - show venv details
-test                           Rebuild and run tests
-testinstall                    Test the installed package
-venv                           Create python virtual env
-view-coverage                  View the coverage report
+```bash
+make          # default: build and run all tests with Asan enabled
+make compile  # compile only
+make test     # rebuild and run Catch2 test binaries
+make ctest    # run CTest on the current build
+make lint     # run pre-commit linters (clang-format, cmake, codespell, etc.)
 ```
 
-`docs` and `mrdocs` are not included in the example at the moment.
+## Documentation
 
-`lint` uses pre-commit to drive the various lint tools.
+The `docs/` folder contains deeply explored architectural documentation explaining how the compiler transitions concepts across boundaries natively:
+- `docs/compiler_architecture.org`: Describes the phases from Parser through Closure Materialization.
+- `docs/schemepoc-plan.md`: The initial roadmap detailing the 34 chronological steps used to achieve this repository state.
+- `docs/Compile-Time Scheme-Light in C++26.md`: Preliminary research documentation that sets out the guiding philosophy of the project combining CPS, applicator parsers, and execution layers in C++26.
+- `docs/constexpr-allocations.md`: Details how `constexpr_box` and Arena identifiers resolve standard `std::vector` leaks at C++ boundaries.
 
-Use this project as you see fit.
+## Try it on Compiler Explorer (Godbolt)
 
-The code in infra is Apache 2.0 licensed, see https://github.com/bemanproject/infra for more details. The CMakeLists.txt is derived from https://github.com/bemanproject/exemplar the purpose of which is to be a concrete but boring example of a well behaved CMake C++ project using the current tools and practices.
+You can try the direct S-expression arithmetic or lambda examples embedded within the `src/examples` code natively in GCC 16 (trunk) via [Compiler Explorer](https://godbolt.org/) instantly by copying `src/examples/godbolt_arithmetic.cpp` or `src/examples/advanced_reflection_ffi.cpp` using the `-std=c++26 -freflection` flag.
 
-The css in `etc/`  is exported from emacs based on the modus tinted themes via `org-html-htmlize-generate-css` .
+## Licensing
 
-The Makefile that drives the workflow is mine, is Apache 2.0 licensed, and take what you need from it. No part of it is interesting enough to be protected.
+Code follows the Apache 2.0 license with LLVM exception.
 
-# Try it on Compiler Explorer (Godbolt)
-
-You can try this project on Compiler Explorer without installing anything locally.
-
-1. Go to [Compiler Explorer](https://godbolt.org/).
-2. Create a new C++ pane.
-3. Paste the contents of `src/examples/godbolt_arithmetic.cpp` or `src/examples/godbolt_lambda.cpp` into the editor.
-4. Add the `-std=c++26` compiler flag to a recent GCC (e.g. GCC 14+ or GCC Trunk).
-5. If the project isn't immediately available via Godbolt's library configurations, you can pull the headers in Godbolt by pointing to the raw Github files, or using Godbolt's CMake project support. Since Compiler Explorer handles CMake projects, select the CMake build environment and upload the repository as a ZIP, or paste the single file into the Compiler Explorer editor if using single header amalgamation when available. Note: currently the project contains multiple headers, so using Godbolt's CMake project mode is recommended.
+Enjoy evaluating Scheme inside C++ templates!
