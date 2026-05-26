@@ -1,4 +1,4 @@
-#include <smd/schemepoc/static_vector.hpp>
+#include <smd/smdscheme/foundation/static_vector.hpp>
 
 int main() {
     using namespace smd::schemepoc;

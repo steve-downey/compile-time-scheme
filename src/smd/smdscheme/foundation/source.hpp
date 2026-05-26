@@ -1,9 +1,9 @@
 // src/smd/schemepoc/source.hpp                                  -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_SOURCE_HPP
-#define SRC_SMD_SCHEMEPOC_SOURCE_HPP
+#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_SOURCE_HPP
+#define SRC_SMD_SMDSCHEME_FOUNDATION_SOURCE_HPP
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::foundation {
 
 struct source_pos {
     int offset{};
@@ -49,6 +49,6 @@ struct parse_error {
     }
 };
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::foundation
 
 #endif
