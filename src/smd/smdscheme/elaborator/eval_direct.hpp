@@ -1,0 +1,183 @@
+// src/smd/schemepoc/eval_direct.hpp                               -*-C++-*-
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+#ifndef SRC_SMD_SCHEMEPOC_EVAL_DIRECT_HPP
+#define SRC_SMD_SCHEMEPOC_EVAL_DIRECT_HPP
+
+#include <smd/smdscheme/closure/value.hpp>
+#include <smd/smdscheme/elaborator/elaborator.hpp>
+#include <smd/smdscheme/foundation/result.hpp>
+#include <smd/smdscheme/foundation/static_vector.hpp>
+
+#include <span>
+#include <variant>
+
+namespace smd::smdscheme {
+
+template <int MaxNodes, int MaxList, int MaxBindings>
+[[nodiscard]] constexpr auto eval_direct(
+    elaborator::core_type<MaxNodes, MaxList> const &node,
+    const foundation::tree_arena<elaborator::core_type<MaxNodes, MaxList>,
+                                 MaxNodes> &arena,
+    closure::env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> const
+        &environment)
+    -> foundation::result<
+        closure::value<elaborator::core_type<MaxNodes, MaxList>>> {
+    static_assert(MaxBindings == 16,
+                  "eval_direct currently requires closure::env<Core,16>");
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
+
+    if (std::holds_alternative<elaborator::core_integer>(node.inner)) {
+        return closure::value<Core>{
+            std::get<elaborator::core_integer>(node.inner).value};
+    }
+
+    if (std::holds_alternative<elaborator::core_boolean>(node.inner)) {
+        return closure::value<Core>{
+            std::get<elaborator::core_boolean>(node.inner).value};
+    }
+
+    if (std::holds_alternative<elaborator::core_symbol>(node.inner)) {
+        return environment.lookup(
+            std::get<elaborator::core_symbol>(node.inner).name);
+    }
+
+    if (std::holds_alternative<elaborator::core_quote>(node.inner)) {
+        auto const &cq = std::get<elaborator::core_quote>(node.inner);
+        if (std::holds_alternative<int>(cq.atom)) {
+            return closure::value<Core>{std::get<int>(cq.atom)};
+        }
+        if (std::holds_alternative<bool>(cq.atom)) {
+            return closure::value<Core>{std::get<bool>(cq.atom)};
+        }
+        return closure::value<Core>{
+            closure::symbol{std::get<std::string_view>(cq.atom)}};
+    }
+
+    if (std::holds_alternative<elaborator::core_if<Core, MaxNodes>>(
+            node.inner)) {
+        auto const &cif =
+            std::get<elaborator::core_if<Core, MaxNodes>>(node.inner);
+        auto cond_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+            arena.get(cif.condition), arena, environment);
+        if (!cond_r.has_value()) {
+            return cond_r.error();
+        }
+        auto const &cond_val = cond_r.value();
+        if (std::holds_alternative<bool>(cond_val) &&
+            !std::get<bool>(cond_val)) {
+            return eval_direct<MaxNodes, MaxList, MaxBindings>(
+                arena.get(cif.alternative), arena, environment);
+        }
+        return eval_direct<MaxNodes, MaxList, MaxBindings>(
+            arena.get(cif.consequent), arena, environment);
+    }
+
+    if (std::holds_alternative<
+            elaborator::core_lambda<Core, MaxNodes, MaxList>>(node.inner)) {
+        return closure::value<Core>{closure::closure<Core>{
+            &node, closure::constexpr_box<closure::env<Core, 16>>{
+                       new closure::env<Core, 16>{environment}}}};
+    }
+
+    if (std::holds_alternative<
+            elaborator::core_application<Core, MaxNodes, MaxList>>(
+            node.inner)) {
+        auto const &app =
+            std::get<elaborator::core_application<Core, MaxNodes, MaxList>>(
+                node.inner);
+        auto func_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+            arena.get(app.func), arena, environment);
+        if (!func_r.has_value()) {
+            return func_r.error();
+        }
+
+        if (std::holds_alternative<closure::builtin>(func_r.value())) {
+            auto const &bi = std::get<closure::builtin>(func_r.value());
+            if (app.args.size() != 2) {
+                return foundation::parse_error{{}, "arity mismatch"};
+            }
+
+            auto arg0_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                arena.get(app.args[0]), arena, environment);
+            if (!arg0_r.has_value()) {
+                return arg0_r.error();
+            }
+            if (!std::holds_alternative<int>(arg0_r.value())) {
+                return foundation::parse_error{{}, "type error"};
+            }
+
+            auto arg1_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                arena.get(app.args[1]), arena, environment);
+            if (!arg1_r.has_value()) {
+                return arg1_r.error();
+            }
+            if (!std::holds_alternative<int>(arg1_r.value())) {
+                return foundation::parse_error{{}, "type error"};
+            }
+
+            int a = std::get<int>(arg0_r.value());
+            int b = std::get<int>(arg1_r.value());
+            if (bi.op == closure::builtin_op::add) {
+                return closure::value<Core>{a + b};
+            }
+            return closure::value<Core>{a * b};
+        }
+
+        if (std::holds_alternative<closure::closure<Core>>(func_r.value())) {
+            auto const &clo = std::get<closure::closure<Core>>(func_r.value());
+            auto const &lam_node = *clo.node;
+            if (!std::holds_alternative<
+                    elaborator::core_lambda<Core, MaxNodes, MaxList>>(
+                    lam_node.inner)) {
+                return foundation::parse_error{{}, "type error"};
+            }
+
+            auto const &lam =
+                std::get<elaborator::core_lambda<Core, MaxNodes, MaxList>>(
+                    lam_node.inner);
+            if (app.args.size() != lam.params.size()) {
+                return foundation::parse_error{{}, "arity mismatch"};
+            }
+
+            auto new_env = clo.captured ? *clo.captured
+                                        : closure::env<Core, 16>{environment};
+            for (int i = 0; i < app.args.size(); ++i) {
+                auto arg_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                    arena.get(app.args[i]), arena, environment);
+                if (!arg_r.has_value()) {
+                    return arg_r.error();
+                }
+                new_env.define(lam.params[i], arg_r.value());
+            }
+
+            return eval_direct<MaxNodes, MaxList, 16>(arena.get(lam.body),
+                                                      arena, new_env);
+        }
+
+        if (std::holds_alternative<closure::foreign_function<Core>>(
+                func_r.value())) {
+            auto const &ff =
+                std::get<closure::foreign_function<Core>>(func_r.value());
+            foundation::static_vector<closure::value<Core>, MaxNodes>
+                evaluated_args;
+            for (auto const &arg_id : app.args) {
+                auto arg_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                    arena.get(arg_id), arena, environment);
+                if (!arg_r.has_value()) {
+                    return arg_r.error();
+                }
+                evaluated_args.push_back(arg_r.value());
+            }
+            return ff.fn(std::span<closure::value<Core> const>(
+                evaluated_args.begin(), evaluated_args.end()));
+        }
+
+        return foundation::parse_error{{}, "attempted to call non-function"};
+    }
+
+    return foundation::parse_error{{}, "eval_direct: unsupported form"};
+}
+
+} // namespace smd::smdscheme
+
+#endif

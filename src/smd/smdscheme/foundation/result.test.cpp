@@ -6,9 +6,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-using smd::schemepoc::parse_error;
-using smd::schemepoc::result;
-using smd::schemepoc::source_pos;
+using smd::smdscheme::foundation::parse_error;
+using smd::smdscheme::foundation::result;
+using smd::smdscheme::foundation::source_pos;
 
 static_assert(result<int>{42}.has_value());
 static_assert(result<int>{42}.value() == 42);

@@ -10,23 +10,25 @@ struct source_pos {
     int line{1};
     int column{1};
 
-    friend constexpr auto operator==(source_pos, source_pos) -> bool = default;
+    friend constexpr auto operator==(foundation::source_pos,
+                                     foundation::source_pos) -> bool = default;
 };
 
 struct source_span {
-    source_pos first{};
-    source_pos last{};
+    foundation::source_pos first{};
+    foundation::source_pos last{};
 
     friend constexpr auto operator==(source_span, source_span)
         -> bool = default;
 };
 
 struct parse_error {
-    source_pos where{};
+    foundation::source_pos where{};
     char const *message{};
 
-    friend constexpr auto operator==(parse_error const &lhs,
-                                     parse_error const &rhs) -> bool {
+    friend constexpr auto operator==(foundation::parse_error const &lhs,
+                                     foundation::parse_error const &rhs)
+        -> bool {
         if (!(lhs.where == rhs.where)) {
             return false;
         }

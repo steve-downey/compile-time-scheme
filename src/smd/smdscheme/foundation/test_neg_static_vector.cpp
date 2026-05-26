@@ -1,7 +1,7 @@
 #include <smd/smdscheme/foundation/static_vector.hpp>
 
 int main() {
-    using namespace smd::schemepoc;
+    using namespace smd::smdscheme::foundation;
     constexpr auto overflow = [] {
         static_vector<int, 2> vec{};
         vec.push_back(1);
