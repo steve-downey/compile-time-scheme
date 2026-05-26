@@ -8,19 +8,19 @@ This tutorial flips the perspective. Instead of presenting a finished monolith, 
 
 ---
 
-## Phase 1: Foundation and Utilities (Steps -1 to 1)
+## Phase 1: Foundation and Utilities
 
 Before parsing a language, we need robust plumbing.
-- **Steps accomplished:** Setting up deterministic styles (`codestyle.org`), governance (`AGENTS.md`), and core C++ utilities (like `static_vector` and a monadic `result` type).
+- **Implementation:** Setting up deterministic styles (`codestyle.org`), governance (`AGENTS.md`), and core C++ utilities (like `static_vector` and a monadic `result` type).
 
 **The Why:** Compilers need strict error handling and memory management. In `constexpr` C++26, traditional heap allocation (like standard `std::vector`s carrying data into runtime) is prohibited from persisting. We establish zero-allocation tools like `static_vector` early to ensure everything we build can survive the compile-time execution environment boundaries.
 
 ---
 
-## Phase 2: The Front-End (Lexing & Parser Combinators) (Steps 2 to 5)
+## Phase 2: The Front-End (Lexing & Parser Combinators)
 
 How do we turn raw strings like `"(+ 1 2)"` into something structural?
-- **Steps accomplished:** Building an input cursor, and implementing "Parser Combinators" (`functor`, `applicative`, `alternative`, `lexeme` operations).
+- **Implementation:** Building an input cursor, and implementing "Parser Combinators" (`functor`, `applicative`, `alternative`, `lexeme` operations).
 
 **The Why:** Most textbook compilers teach "recursive descent" parsing—writing a giant web of `while` and `if` statements that consume characters. This is notoriously fragile. Instead, we use [Parser Combinators](https://en.wikipedia.org/wiki/Parser_combinator) (popularized by Haskell libraries like [Parsec](https://hackage.haskell.org/package/parsec)).
 
@@ -28,28 +28,28 @@ In this model, a "parser" is simply a callable C++ object. You snap together sma
 
 ---
 
-## Phase 3: The Reader and the `Datum` Tree (Steps 6 to 8)
+## Phase 3: The Reader and the `Datum` Tree
 
 Lisp and Scheme are *homoiconic* languages; the code is written in the exact same format as the language's native data structures (nested lists).
-- **Steps accomplished:** Building the reader atom model (symbols, booleans, integers), constructing a fixed-capacity `Datum` tree, and parsing lists and quotes.
+- **Implementation:** Building the reader atom model (symbols, booleans, integers), constructing a fixed-capacity `Datum` tree, and parsing lists and quotes.
 
 **The Why:** A common mistake is trying to figure out what code "means" at the exact moment you parse it. We don't do that. The Reader's *only* job is to convert strings into a tree of data (`DatumF`). It doesn't know that `(if #t 1 2)` is a conditional branch; it just sees a list of four items. By isolating syntax ingestion, the Reader remains extremely simple. To honor C++26 `constexpr` allocation limits, the tree is a "flat arena"—a fixed array of nodes referencing one another via integer indexes (`node_id`).
 
 ---
 
-## Phase 4: Elaboration & Semantic Analysis (Steps 9 to 13)
+## Phase 4: Elaboration & Semantic Analysis
 
 Now we teach the compiler what the code *means*.
-- **Steps accomplished:** Designing the `Core` language model. The Elaborator translates the raw `Datum` data tree into a `Core` semantic AST. We handle special forms (`if`, `quote`, `lambda`), recognize variables, and build a "direct evaluator" (`eval_direct`) to test basic arithmetic.
+- **Implementation:** Designing the `Core` language model. The Elaborator translates the raw `Datum` data tree into a `Core` semantic AST. We handle special forms (`if`, `quote`, `lambda`), recognize variables, and build a "direct evaluator" (`eval_direct`) to test basic arithmetic.
 
 **The Why:** **Elaboration** is compiler jargon for semantic binding. The Elaborator walks the dumb list of atoms, recognizes that `if` is in the first position, and translates that specific `Datum` node into a strongly-typed `core_if` structural node. By separating this step, we centralize all of our syntax validation (e.g. "Did they pass too many arguments to `if`?"). If there's an error, it is caught here, natively, before execution ever begins.
 
 ---
 
-## Phase 5: The Middle-End: Continuation-Passing Style (Steps 14 to 17)
+## Phase 5: The Middle-End: Continuation-Passing Style
 
 This is the central semantic pivot.
-- **Steps accomplished:** Introducing the Fixpoint playground, establishing a Continuation-Passing Style (CPS) engine, and defunctionalizing it.
+- **Implementation:** Introducing the Fixpoint playground, establishing a Continuation-Passing Style (CPS) engine, and defunctionalizing it.
 
 **The Why:** How do you execute the AST? The naïve (`eval_direct`) approach uses standard C++ function calls holding the execution state on the C++ stack. A deeply nested Scheme program will cause a C++ stack overflow.
 
@@ -60,10 +60,10 @@ This model explicitly maps out control flow in data, preventing uncontrolled sta
 
 ---
 
-## Phase 6: The Back-End & Closure Materialization (Steps 18 to 26)
+## Phase 6: The Back-End & Closure Materialization
 
 How do we actually run this?
-- **Steps accomplished:** Materializing closures over the CPS program. Implementing `lambda` syntax, runtime values, function application, capturing lexical scope, and negative compile tests.
+- **Implementation:** Materializing closures over the CPS program. Implementing `lambda` syntax, runtime values, function application, capturing lexical scope, and negative compile tests.
 
 **The Why:** A [Closure](https://en.wikipedia.org/wiki/Closure_(computer_programming)) in functional programming is just a code block tightly strapped to the contextual variables it needs to run. In C++, this is essentially a `struct` with some stored fields and an `operator()`.
 
@@ -71,10 +71,10 @@ Rather than using heavy polymorphic wrappers like `std::move_only_function` (whi
 
 ---
 
-## Phase 7: Future Horizons Achieved: Async, Reflection, and Godbolt (Steps 27 to 34)
+## Phase 7: Future Horizons Achieved: Async, Reflection, and Godbolt
 
 Where did we go after the core language worked?
-- **Accomplished Steps:** Godbolt deployment scripts natively translating multi-file tree dependency inclusion into single compiler explorer links, integrating Beman `std::execution` algorithms, building a scalable Sender backend directly upon the CPS program using C++26 standard co-routines, and injecting C++26 Reflection (`std::meta::info`) spikes to materialize structural aggregates on demand.
+- **Implementation:** Godbolt deployment scripts natively translating multi-file tree dependency inclusion into single compiler explorer links, integrating Beman `std::execution` algorithms, building a scalable Sender backend directly upon the CPS program using C++26 standard co-routines, and injecting C++26 Reflection (`std::meta::info`) spikes to materialize structural aggregates on demand.
 
 **The Why:** Because our core engine uses CPS (calling "what to do next"), it mapped *perfectly* onto asynchronous C++ code. Calling a continuation is essentially identical to chaining a `.then()` in standard C++ Async (`stdexec` / Send/Receiver models / Beman Tasks). When a Scheme user executes code, our Sender backend allows C++ to invisibly route the workloads asynchronously beneath the execution engine without any performance hit.
 
