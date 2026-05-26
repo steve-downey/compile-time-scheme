@@ -1,4 +1,8 @@
-target_link_libraries(schemepoc.schemepoc PUBLIC beman::execution_headers)
+target_link_libraries(
+    schemepoc.schemepoc
+    PUBLIC beman::execution_headers beman.task_headers
+)
+target_compile_options(schemepoc.schemepoc INTERFACE -freflection)
 include(GNUInstallDirs)
 
 target_sources(
@@ -22,12 +26,14 @@ target_sources(
                 elaborator.hpp
                 value.hpp
                 sender_adapter.hpp
+                sender_backend.hpp
                 eval_direct.hpp
                 parser_ops.hpp
                 fix.hpp
                 functor.hpp
                 cps.hpp
                 closure_backend.hpp
+                reflection_reify.hpp
     PRIVATE schemepoc.cpp version.cpp
 )
 
@@ -73,12 +79,15 @@ if(SCHEMEPOC_ENABLE_TESTING)
             ffi.test.cpp
             cps_arithmetic.test.cpp
             sender_adapter.test.cpp
+            sender_backend.test.cpp
             cps.test.cpp
             closure_backend.test.cpp
+            reflection_reify.test.cpp
     )
 
     target_link_libraries(schemepoc_test PRIVATE schemepoc.schemepoc)
     target_link_libraries(schemepoc_test PRIVATE Catch2::Catch2WithMain)
+    target_compile_options(schemepoc_test PRIVATE -freflection)
 
     include(Catch)
     catch_discover_tests(schemepoc_test)

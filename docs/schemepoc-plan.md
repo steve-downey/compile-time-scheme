@@ -3160,7 +3160,7 @@ It remains isolated because reflection is not needed for the first closure or se
 ## File
 
 ```txt
-src/smd/schemepoc/experimental/reflection_reify.hpp
+src/smd/schemepoc/reflection_reify.hpp
 ```
 
 ## Experiment

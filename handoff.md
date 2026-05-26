@@ -128,3 +128,7 @@ Headers, implementations, and tests live together by component.
 - Nested lambda capturing and lexical closure state tracking is explicitly managed with a custom `constexpr_box<env<MaxList>>` type which wraps pointer manual lifetime in `value.hpp`.
 - AST arrays (`core_type` and `datum_type`) rely on integer-ID-based `tree_arena` lookups instead of internal pointer structures. This strictly forces compiler execution boundaries when instantiating constexpr components.
 - The C++26 `constexpr` engine lambda execution requires `tree_arena` elements to be captured BY VALUE within returned compiler expressions (such as `cps_code`) to outlive source object lifetimes.
+
+- The sender backend (`sender_backend.hpp`) uses Beman Task (`vendor/task`) coroutines to model Scheme AST interpretations as asynchronous, non-blocking state machines over the `core_tree`. Returning a `task<result<value>>` breaks the static C++ variant recursion limits inherent to dynamically chained deeply-recursive AST structures statically.
+- The `sender_adapter.hpp` facades bridging Beman Task using standard primitives: `make_ready_future` (just/value return), `then`, variables capturing cleanly.
+- The `reflection_reify.hpp` spike successfully uses C++26 standard reflection (`std::meta::define_aggregate` via `^^int` and `-freflection`) to dynamically generate aggregate structures representing captured environments at compile time, completely outside evaluation mechanisms.

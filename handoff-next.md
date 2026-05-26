@@ -1,18 +1,33 @@
-# Next Agent Directions
+# Next steps for future development
 
-Welcome, future coding agent!
+Welcome to the SchemePoC project.
 
 ## Current State
-Step 30 ("Sender Adapter over Beman Execution") is successfully completed. We have constructed our namespace pipeline layer at `src/smd/schemepoc/sender_adapter.hpp` defining direct abstractions mapping into `beman::execution26`. Functions like `just`, `then`, `when_all`, `sync_wait`, etc., are now ready for immediate pipeline integration. A fully mocked test harness passing standard evaluated components up into pipeline executions asserts this behavior firmly. The codebase builds perfectly without warnings.
 
-## Next Step
-Your task is to implement **Step 31**: "sender backend over CPS program using Beman Execution".
+The core architectural phases of the `smd/schemepoc` project have been **fully completed** matching the original plan (Step 0 - Step 34).
+The project now stands as a complete proof of concept of a compile-time Scheme-light dialect capable of being parsed and heavily executed entirely within C++26 `constexpr` conditions using GCC 16.
 
-## Instructions
-1. We need to begin utilizing real evaluated AST nodes directly into our `sender_adapter` pipelines.
-2. Based on the documentation (`schemepoc-plan.md`), the CPS defunctionalized syntax should branch dynamically over this sender pipeline.
-3. Establish `src/smd/schemepoc/sender_backend.hpp` and its tests (`src/smd/schemepoc/sender_backend.test.cpp`). 
-4. The goal is to evaluate defunctionalized `core_tree` instances returning `sender_adapter` sequences (`just`, `then`, `when_all`). Look at how current continuations execute, and construct matching interfaces taking `sender` flows rather than generic synchronous tail calls.
-5. Do not decrease tests or regress coverage! Compile the examples and verify regressions are kept to zero. Ensure `make compile`, `make test`, and `make lint` remain strictly green.
-6. Verify whether we require integrating Beman Task (Step 32) at all through these pipeline demands or if `sender` is adequately powerful. You do not have to perform step 32, simply leave a note marking its required status for the next executor.
-7. Merge back onto `main`, mark step 31 checked in `checklist.md`, and leave instructions targeting Step 32 / Step 33 onwards in `handoff-next.md`.
+The architecture flows statically down this pipeline:
+- `Reader` parses S-expressions into fixed-capacity flat arenas.
+- `Elaborator` translates datum into semantically constrained `core_tree`s.
+- `CPS Transformations` handle flow execution logic.
+- Both synchronous closure backends and standard C++ coroutine sender execution paths exist.
+- A `reflection_reify` spike was conducted to prove how environments map strictly securely natively back to compile-time C++ layout types via `^^` operator reflection features correctly.
+
+## Goal for the next contributor
+
+As the initial steps 1-34 are completed, your potential next activities could involve:
+
+1. **Expanding the Standard Library**: Support more Scheme primitives across arithmetic, `cons`/`car`/`cdr`, mapping, or basic algorithms inside the elaborator.
+2. **Integrating Reflection tightly**: Use the results of the reflection spike (`src/smd/schemepoc/reflection_reify.hpp`) explicitly within `closure_backend.hpp` to statically collapse captured environments natively into real concrete native structures instead of runtime variable mapping structs avoiding runtime allocations entirely!
+3. **Optimizing the CPS Graph**: Write analytical passes over the CPS structures natively before emitting C++ Closures!
+
+Whatever direction you take, the primary rules still apply.
+- You MUST maintain C++26 baseline compatibility using GCC 16 (`std=gnu++26`).
+- Write tests and stick to `make compile`, `make test`, `make lint` rigorously preventing regression.
+
+## Expected Files to review
+
+Please start by checking `docs/compiler_architecture.org` and `README.md` to map out the final integration flow correctly.
+Read `src/examples/godbolt_lambda.cpp` and `godbolt_arithmetic.cpp` for basic entry points.
+To understand the full integration of C++26 standard reflection (`-freflection`) interacting directly with the compilation engine, you should review `src/examples/advanced_reflection_ffi.cpp`. This generates an environment dynamically mapping Scheme closures into actual C++ `consteval` struct aggregates, whilst defining FFI foreign mappings executing `std::print` bridging C++ code safely side-stepping back to the Scheme language!

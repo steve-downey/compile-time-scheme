@@ -4,12 +4,14 @@
 #include <iostream>
 #include <smd/schemepoc/schemepoc.hpp>
 
-using Core = smd::schemepoc::core_type<32, 16>;
+namespace scm = smd::schemepoc;
 
-constexpr auto program = smd::schemepoc::compiled_closure<"(+ 1 (* 2 3))">;
+using Core = scm::core_type<32, 16>;
+
+constexpr auto program = scm::compiled_closure<"(+ 1 (* 2 3))">;
 
 int main() {
-    auto env = smd::schemepoc::default_env<Core, 16>();
+    auto env = scm::default_env<Core, 16>();
     auto result = program(env);
 
     if (result.has_value()) {

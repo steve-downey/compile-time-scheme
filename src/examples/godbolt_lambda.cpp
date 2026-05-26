@@ -4,14 +4,16 @@
 #include <iostream>
 #include <smd/schemepoc/schemepoc.hpp>
 
-using Core = smd::schemepoc::core_type<32, 16>;
+namespace scm = smd::schemepoc;
+
+using Core = scm::core_type<32, 16>;
 
 constexpr auto program =
-    smd::schemepoc::compiled_closure<"((lambda (x) (+ 1 (* x x))) argc)">;
+    scm::compiled_closure<"((lambda (x) (+ 1 (* x x))) argc)">;
 
 int main(int argc, char **) {
-    auto env = smd::schemepoc::default_env<Core, 16>();
-    env.define("argc", smd::schemepoc::value<Core>{argc});
+    auto env = scm::default_env<Core, 16>();
+    env.define("argc", scm::value<Core>{argc});
 
     auto result = program(env);
 
