@@ -1,12 +1,12 @@
 // src/smd/schemepoc/static_vector.hpp                            -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_STATIC_VECTOR_HPP
-#define SRC_SMD_SCHEMEPOC_STATIC_VECTOR_HPP
+#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_STATIC_VECTOR_HPP
+#define SRC_SMD_SMDSCHEME_FOUNDATION_STATIC_VECTOR_HPP
 
 #include <array>
 #include <cassert>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::foundation {
 
 template <class T, int Capacity>
 class static_vector {
@@ -60,6 +60,6 @@ constexpr auto static_vector<T, Capacity>::operator[](int index) const
     return storage_[index];
 }
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::foundation
 
 #endif

@@ -1,13 +1,13 @@
 // src/smd/schemepoc/result.hpp                                   -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_RESULT_HPP
-#define SRC_SMD_SCHEMEPOC_RESULT_HPP
+#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_RESULT_HPP
+#define SRC_SMD_SMDSCHEME_FOUNDATION_RESULT_HPP
 
-#include <smd/schemepoc/source.hpp>
+#include <smd/smdscheme/foundation/source.hpp>
 
 #include <variant>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::foundation {
 
 template <class T>
 class result {
@@ -44,6 +44,6 @@ constexpr auto result<T>::error() const -> parse_error const & {
     return std::get<parse_error>(data_);
 }
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::foundation
 
 #endif

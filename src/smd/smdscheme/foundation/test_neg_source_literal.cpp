@@ -1,4 +1,4 @@
-#include <smd/schemepoc/schemepoc.hpp>
+#include <smd/smdscheme/foundation/schemepoc.hpp>
 
 int main() {
     using namespace smd::schemepoc;

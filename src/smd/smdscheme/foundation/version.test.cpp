@@ -1,8 +1,8 @@
 // src/smd/schemepoc/version.test.cpp                             -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/schemepoc/version.hpp>
-#include <smd/schemepoc/version.hpp> // test 2nd include OK
+#include <smd/smdscheme/foundation/version.hpp>
+#include <smd/smdscheme/foundation/version.hpp> // test 2nd include OK
 
 #include <catch2/catch_test_macros.hpp>
 

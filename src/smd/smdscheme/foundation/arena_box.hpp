@@ -1,12 +1,12 @@
 // src/smd/schemepoc/arena_box.hpp                                -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_ARENA_BOX_HPP
-#define SRC_SMD_SCHEMEPOC_ARENA_BOX_HPP
+#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_ARENA_BOX_HPP
+#define SRC_SMD_SMDSCHEME_FOUNDATION_ARENA_BOX_HPP
 
-#include <smd/schemepoc/static_vector.hpp>
+#include <smd/smdscheme/foundation/static_vector.hpp>
 #include <utility>
 
-namespace smd::schemepoc {
+namespace smd::smdscheme::foundation {
 
 template <typename T, int MaxNodes = 1024>
 struct arena_box {
@@ -45,6 +45,6 @@ constexpr auto make_arena_box(tree_arena<T, MaxNodes> &arena, Args &&...args)
         arena.allocate(T(std::forward<Args>(args)...)));
 }
 
-} // namespace smd::schemepoc
+} // namespace smd::smdscheme::foundation
 
 #endif
