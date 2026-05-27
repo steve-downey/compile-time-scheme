@@ -6,44 +6,44 @@ add_executable(hello)
 target_sources(hello PRIVATE hello.cpp)
 
 # Link example with the library.
-target_link_libraries(hello PRIVATE schemepoc.schemepoc)
+target_link_libraries(hello PRIVATE smdscheme.smdscheme)
 
 install(
     TARGETS hello
-    COMPONENT schemepoc.schemepoc.examples
+    COMPONENT smdscheme.smdscheme.examples
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     EXCLUDE_FROM_ALL
 )
 
 add_executable(godbolt_arithmetic)
 target_sources(godbolt_arithmetic PRIVATE godbolt_arithmetic.cpp)
-target_link_libraries(godbolt_arithmetic PRIVATE schemepoc.schemepoc)
+target_link_libraries(godbolt_arithmetic PRIVATE smdscheme.smdscheme)
 
 install(
     TARGETS godbolt_arithmetic
-    COMPONENT schemepoc.schemepoc.examples
+    COMPONENT smdscheme.smdscheme.examples
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     EXCLUDE_FROM_ALL
 )
 
 add_executable(godbolt_lambda)
 target_sources(godbolt_lambda PRIVATE godbolt_lambda.cpp)
-target_link_libraries(godbolt_lambda PRIVATE schemepoc.schemepoc)
+target_link_libraries(godbolt_lambda PRIVATE smdscheme.smdscheme)
 
 install(
     TARGETS godbolt_lambda
-    COMPONENT schemepoc.schemepoc.examples
+    COMPONENT smdscheme.smdscheme.examples
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     EXCLUDE_FROM_ALL
 )
 
 add_executable(godbolt_ffi)
 target_sources(godbolt_ffi PRIVATE godbolt_ffi.cpp)
-target_link_libraries(godbolt_ffi PRIVATE schemepoc.schemepoc)
+target_link_libraries(godbolt_ffi PRIVATE smdscheme.smdscheme)
 
 install(
     TARGETS godbolt_ffi
-    COMPONENT schemepoc.schemepoc.examples
+    COMPONENT smdscheme.smdscheme.examples
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     EXCLUDE_FROM_ALL
 )
@@ -51,7 +51,7 @@ install(
 add_test(NAME examples_hello COMMAND hello)
 set_tests_properties(
     examples_hello
-    PROPERTIES PASS_REGULAR_EXPRESSION "schemepoc v0.1.0"
+    PROPERTIES PASS_REGULAR_EXPRESSION "smdscheme v0.1.0"
 )
 
 add_test(NAME examples_godbolt_arithmetic COMMAND godbolt_arithmetic)
@@ -75,12 +75,12 @@ set_tests_properties(
 
 add_executable(advanced_reflection_ffi)
 target_sources(advanced_reflection_ffi PRIVATE advanced_reflection_ffi.cpp)
-target_link_libraries(advanced_reflection_ffi PRIVATE schemepoc.schemepoc)
+target_link_libraries(advanced_reflection_ffi PRIVATE smdscheme.smdscheme)
 target_compile_options(advanced_reflection_ffi PRIVATE -freflection)
 
 install(
     TARGETS advanced_reflection_ffi
-    COMPONENT schemepoc.schemepoc.examples
+    COMPONENT smdscheme.smdscheme.examples
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     EXCLUDE_FROM_ALL
 )
@@ -95,12 +95,12 @@ set_tests_properties(
 
 add_executable(advanced_sender_ffi)
 target_sources(advanced_sender_ffi PRIVATE advanced_sender_ffi.cpp)
-target_link_libraries(advanced_sender_ffi PRIVATE schemepoc.schemepoc)
+target_link_libraries(advanced_sender_ffi PRIVATE smdscheme.smdscheme)
 target_compile_options(advanced_sender_ffi PRIVATE -freflection)
 
 install(
     TARGETS advanced_sender_ffi
-    COMPONENT schemepoc.schemepoc.examples
+    COMPONENT smdscheme.smdscheme.examples
     DESTINATION ${CMAKE_INSTALL_BINDIR}
     EXCLUDE_FROM_ALL
 )
@@ -108,7 +108,5 @@ install(
 add_test(NAME examples_advanced_sender_ffi COMMAND advanced_sender_ffi)
 set_tests_properties(
     examples_advanced_sender_ffi
-    PROPERTIES
-        PASS_REGULAR_EXPRESSION
-            "Final Scheme Result Output: 5"
+    PROPERTIES PASS_REGULAR_EXPRESSION "Final Scheme Result Output: 5"
 )

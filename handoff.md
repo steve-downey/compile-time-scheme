@@ -132,3 +132,13 @@ Headers, implementations, and tests live together by component.
 - The sender backend (`sender_backend.hpp`) uses Beman Task (`vendor/task`) coroutines to model Scheme AST interpretations as asynchronous, non-blocking state machines over the `core_tree`. Returning a `task<result<value>>` breaks the static C++ variant recursion limits inherent to dynamically chained deeply-recursive AST structures statically.
 - The `sender_adapter.hpp` facades bridging Beman Task using standard primitives: `make_ready_future` (just/value return), `then`, variables capturing cleanly.
 - The `reflection_reify.hpp` spike successfully uses C++26 standard reflection (`std::meta::define_aggregate` via `^^int` and `-freflection`) to dynamically generate aggregate structures representing captured environments at compile time, completely outside evaluation mechanisms.
+
+## 2026-05-26 stabilization notes
+
+- The namespace-split tree under `src/smd/smdscheme/` now compiles and passes tests/lint after a targeted qualification repair pass.
+- `make compile`, `make test`, and `make lint` all pass in the current workspace state.
+- Parser adapter/tests were repaired to use `smd::smdscheme::parser` symbols explicitly where prior global lookups had been broken.
+- Foundation tests were repaired to use `smd::smdscheme::foundation` symbols explicitly.
+- CPS and sender paths were repaired for moved symbols in `closure` and `elaborator` namespaces.
+- `src/smd/smdscheme/elaborator/eval_direct.hpp` and `src/smd/smdscheme/elaborator/eval_direct.test.cpp` were rewritten to remove regex-introduced corruption and restore a compiling direct-evaluator path.
+- `src/examples/hello.cpp` now prints `smdscheme v<major>.<minor>.<patch>`, matching the example test expectation.

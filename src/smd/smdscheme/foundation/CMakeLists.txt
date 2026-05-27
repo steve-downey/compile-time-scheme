@@ -9,11 +9,18 @@ target_sources(
     PUBLIC
         FILE_SET smdscheme_foundation_headers
             TYPE HEADERS
+            BASE_DIRS ${PROJECT_SOURCE_DIR}/src
             FILES
                 version.hpp
                 source.hpp
                 result.hpp
                 static_vector.hpp
                 arena_box.hpp
+                fix.hpp
     PRIVATE version.cpp
 )
+
+include(infra/cmake/beman-install-library.cmake OPTIONAL)
+if(COMMAND beman_install_library)
+    beman_install_library(smdscheme.foundation TARGETS smdscheme.foundation NAMESPACE smd::)
+endif()

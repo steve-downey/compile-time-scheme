@@ -10,15 +10,15 @@ import sys
 def amalgamate(main_file):
     visited = set()
     out = []
-    
+
     # Catch `#include <smd/schemepoc/...>` or `#include "smd/schemepoc/..."`
     include_re = re.compile(r'^\s*#\s*include\s*[<"](smd/schemepoc/[^>"]+)[>"]', re.MULTILINE)
-    
+
     def process_file(filepath, is_main=False):
         if filepath in visited:
             return
         visited.add(filepath)
-        
+
         try:
             with open(filepath, 'r') as f:
                 content = f.read()
