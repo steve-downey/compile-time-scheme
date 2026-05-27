@@ -1,8 +1,10 @@
-// src/smd/smdscheme/reader/reader_atom.test.cpp                -*-C++-*-
+// src/smd/smdscheme/reader/atom.test.cpp                        -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/reader/reader_atom.hpp>
-#include <smd/smdscheme/reader/reader_atom.hpp> // test 2nd include OK
+#include <smd/smdscheme/reader/atom.hpp>
+#include <smd/smdscheme/reader/atom.hpp> // test 2nd include OK
+
+#include <smd/smdscheme/parser/cursor.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 

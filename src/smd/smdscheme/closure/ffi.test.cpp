@@ -6,6 +6,7 @@
 #include <smd/smdscheme/elaborator/elaborator.hpp>
 #include <smd/smdscheme/closure/eval_direct.hpp>
 #include <smd/smdscheme/reader/reader.hpp>
+#include <smd/smdscheme/parser/cursor.hpp>
 #include <smd/smdscheme/smdscheme.hpp>
 #include <span>
 #include <string_view>
