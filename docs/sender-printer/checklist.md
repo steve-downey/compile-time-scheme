@@ -11,7 +11,7 @@
 
 ## Step Checklist
 
-- [ ] **Step 1:** Create `scheme_node_data.hpp` + test — topology node struct
+- [x] **Step 1:** Create `scheme_node_data.hpp` + test — topology node struct
 - [ ] **Step 2:** Create `scheme_tree.hpp` + test — tree type for holding the topology
 - [ ] **Step 3:** Create `build_scheme_tree.hpp` + test — reflection bridge for `just` senders
 - [ ] **Step 4:** Extend `build_scheme_tree` for `then` and `when_all` + tests
