@@ -1,7 +1,7 @@
 # Step 2: Create scheme_tree type
 
-**Phase:** 1 — Runtime Topology  
-**Prereqs:** Step 1 (scheme_node_data exists)  
+**Phase:** 1 — Runtime Topology
+**Prereqs:** Step 1 (scheme_node_data exists)
 **Next step:** step-03.md
 
 ## What To Do
