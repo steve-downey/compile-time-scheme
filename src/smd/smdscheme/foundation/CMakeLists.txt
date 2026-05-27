@@ -16,6 +16,7 @@ target_sources(
                 result.hpp
                 static_vector.hpp
                 arena_box.hpp
+                fix.hpp
     PRIVATE version.cpp
 )
 

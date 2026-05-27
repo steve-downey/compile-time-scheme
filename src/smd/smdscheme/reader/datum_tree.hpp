@@ -3,7 +3,7 @@
 #ifndef SRC_SMD_SMDSCHEME_READER_DATUM_TREE_HPP
 #define SRC_SMD_SMDSCHEME_READER_DATUM_TREE_HPP
 
-#include <smd/smdscheme/cps/fix.hpp>
+#include <smd/smdscheme/foundation/fix.hpp>
 #include <smd/smdscheme/foundation/arena_box.hpp>
 #include <smd/smdscheme/foundation/static_vector.hpp>
 
@@ -44,7 +44,7 @@ struct datum_f_factory {
 };
 
 template <int MaxNodes, int MaxList>
-using datum_type = cps::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
+using datum_type = foundation::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
 
 } // namespace smd::smdscheme::reader
 

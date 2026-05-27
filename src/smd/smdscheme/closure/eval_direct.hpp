@@ -1,7 +1,7 @@
-// src/smd/schemepoc/eval_direct.hpp                               -*-C++-*-
+// src/smd/smdscheme/closure/eval_direct.hpp                               -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SCHEMEPOC_EVAL_DIRECT_HPP
-#define SRC_SMD_SCHEMEPOC_EVAL_DIRECT_HPP
+#ifndef SRC_SMD_SMDSCHEME_CLOSURE_EVAL_DIRECT_HPP
+#define SRC_SMD_SMDSCHEME_CLOSURE_EVAL_DIRECT_HPP
 
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/elaborator/elaborator.hpp>

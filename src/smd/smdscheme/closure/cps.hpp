@@ -1,7 +1,7 @@
-// src/smd/schemepoc/cps.hpp                                       -*-C++-*-
+// src/smd/smdscheme/closure/cps.hpp                                       -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SMDSCHEME_CPS_CPS_HPP
-#define SRC_SMD_SMDSCHEME_CPS_CPS_HPP
+#ifndef SRC_SMD_SMDSCHEME_CLOSURE_CPS_HPP
+#define SRC_SMD_SMDSCHEME_CLOSURE_CPS_HPP
 
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/elaborator/elaborator.hpp>

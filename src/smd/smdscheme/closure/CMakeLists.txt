@@ -7,9 +7,9 @@ target_sources(
         FILE_SET smdscheme_closure_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES value.hpp closure_backend.hpp
+            FILES value.hpp cps.hpp closure_backend.hpp eval_direct.hpp
 )
-target_link_libraries(smdscheme.closure PUBLIC smdscheme.cps)
+target_link_libraries(smdscheme.closure PUBLIC smdscheme.elaborator)
 
 include(infra/cmake/beman-install-library.cmake OPTIONAL)
 if(COMMAND beman_install_library)
