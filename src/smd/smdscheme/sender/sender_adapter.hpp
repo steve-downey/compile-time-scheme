@@ -1,8 +1,9 @@
-// src/smd/schemepoc/sender_adapter.hpp                               -*-C++-*-
+// src/smd/smdscheme/sender/sender_adapter.hpp                  -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_SENDER_SENDER_ADAPTER_HPP
 #define SRC_SMD_SMDSCHEME_SENDER_SENDER_ADAPTER_HPP
 
+// src/smd/smdscheme/sender/sender_adapter.hpp                  -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_SENDER_SENDER_ADAPTER_HPP#define SRC_SMD_SMDSCHEME_SENDER_SENDER_ADAPTER_HPP
 #include <beman/execution26/execution.hpp>
 #include <beman/task/task.hpp>
 

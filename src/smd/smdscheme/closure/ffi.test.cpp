@@ -1,4 +1,4 @@
-// src/smd/schemepoc/ffi.test.cpp                              -*-C++-*-
+// src/smd/smdscheme/closure/ffi.test.cpp                       -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <catch2/catch_test_macros.hpp>

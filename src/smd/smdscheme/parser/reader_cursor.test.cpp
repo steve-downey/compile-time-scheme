@@ -1,4 +1,4 @@
-// src/smd/schemepoc/reader_cursor.test.cpp                        -*-C++-*-
+// src/smd/smdscheme/parser/reader_cursor.test.cpp              -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/parser/reader_cursor.hpp>

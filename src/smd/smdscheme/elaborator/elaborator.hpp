@@ -1,8 +1,9 @@
-// src/smd/schemepoc/elaborator.hpp                                -*-C++-*-
+// src/smd/smdscheme/elaborator/elaborator.hpp                  -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_HPP
 #define SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_HPP
 
+// src/smd/smdscheme/elaborator/elaborator.hpp                  -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_HPP#define SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_HPP
 #include <smd/smdscheme/elaborator/elaborator_core.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/reader/reader.hpp>

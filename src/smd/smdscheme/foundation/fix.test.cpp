@@ -1,3 +1,3 @@
-#include <catch2/catch_test_macros.hpp>
-#include <smd/smdscheme/foundation/fix.hpp>
-TEST_CASE("Fix") { REQUIRE(true); }
+// src/smd/smdscheme/foundation/fix.test.cpp                    -*-C++-*-
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
