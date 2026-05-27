@@ -1,7 +1,7 @@
 # Step 1: Create scheme_node_data struct
 
-**Phase:** 1 — Runtime Topology  
-**Prereqs:** None  
+**Phase:** 1 — Runtime Topology
+**Prereqs:** None
 **Next step:** step-02.md
 
 ## What To Do

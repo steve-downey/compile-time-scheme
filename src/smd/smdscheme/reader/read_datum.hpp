@@ -1,12 +1,12 @@
-// src/smd/smdscheme/reader/read_datum.hpp                                -*-C++-*-
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// src/smd/smdscheme/reader/read_datum.hpp -*-C++-*- SPDX-License-Identifier:
+// Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_READER_READ_DATUM_HPP
 #define SRC_SMD_SMDSCHEME_READER_READ_DATUM_HPP
 
-#include <smd/smdscheme/parser/parser.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
-#include <smd/smdscheme/reader/datum_type.hpp>
+#include <smd/smdscheme/parser/parser.hpp>
 #include <smd/smdscheme/reader/atom.hpp>
+#include <smd/smdscheme/reader/datum_type.hpp>
 
 namespace smd::smdscheme::reader {
 

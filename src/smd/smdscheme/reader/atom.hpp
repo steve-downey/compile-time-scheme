@@ -3,9 +3,9 @@
 #ifndef SRC_SMD_SMDSCHEME_READER_ATOM_HPP
 #define SRC_SMD_SMDSCHEME_READER_ATOM_HPP
 
-#include <smd/smdscheme/parser/parser.hpp>
 #include <smd/smdscheme/parser/alt.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
+#include <smd/smdscheme/parser/parser.hpp>
 
 #include <optional>
 #include <string_view>

@@ -61,6 +61,11 @@ All steps MUST keep `make compile && make test` green.
 2. Read `handoff-next.md` (mutable notes from previous step)
 3. Read your step file (`step-NN.md`)
 4. Execute: create/modify files as instructed
-5. Verify: `make compile && make test`
-6. Update `handoff-next.md` with anything the next agent needs to know
-7. Update `checklist.md` marking your step complete
+5. Verify: `make compile && make test && make lint`
+6. Commit to the step branch; **do not merge to `main`**
+7. Update `handoff-next.md` with anything the next agent needs to know
+8. Update `checklist.md` marking your step complete
+
+## Branch Policy
+
+Each step works in a git worktree on its own branch. At the end of the step, commit all changes to that branch and stop. **Do not merge to `main`.** The human will `--no-ff` merge the step branch to `main` after review. All steps accumulate on their own branches until all steps are complete.

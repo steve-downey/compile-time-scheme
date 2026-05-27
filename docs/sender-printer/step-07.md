@@ -1,7 +1,7 @@
 # Step 7: Create dump_scheme_plan top-level API
 
-**Phase:** 4 — Integration  
-**Prereqs:** Steps 1–6 (all components exist)  
+**Phase:** 4 — Integration
+**Prereqs:** Steps 1–6 (all components exist)
 **Next step:** step-08.md
 
 ## What To Do

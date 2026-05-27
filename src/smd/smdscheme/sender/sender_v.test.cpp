@@ -1,5 +1,5 @@
-// src/smd/smdscheme/sender/sender_v.test.cpp                             -*-C++-*-
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// src/smd/smdscheme/sender/sender_v.test.cpp -*-C++-*- SPDX-License-Identifier:
+// Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/sender/sender_v.hpp>
 #include <smd/smdscheme/sender/sender_v.hpp> // idempotency
