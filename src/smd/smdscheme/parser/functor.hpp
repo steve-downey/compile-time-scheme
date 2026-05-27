@@ -1,8 +1,9 @@
-// src/smd/schemepoc/functor.hpp                                 -*-C++-*-
+// src/smd/smdscheme/parser/functor.hpp                         -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP
 #define SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP
 
+// src/smd/smdscheme/parser/functor.hpp                         -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP#define SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP
 #include <type_traits>
 #include <utility>
 

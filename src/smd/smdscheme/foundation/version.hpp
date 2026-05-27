@@ -1,8 +1,9 @@
-// src/smd/schemepoc/version.hpp                                  -*-C++-*-
+// src/smd/smdscheme/foundation/version.hpp                     -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_FOUNDATION_VERSION_HPP
 #define SRC_SMD_SMDSCHEME_FOUNDATION_VERSION_HPP
 
+// src/smd/smdscheme/foundation/version.hpp                     -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_VERSION_HPP#define SRC_SMD_SMDSCHEME_FOUNDATION_VERSION_HPP
 namespace smd::smdscheme::foundation {
 
 inline constexpr int version_major = 0;

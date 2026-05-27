@@ -1,4 +1,4 @@
-// src/smd/schemepoc/parser_ops.test.cpp                           -*-C++-*-
+// src/smd/smdscheme/parser/parser_ops.test.cpp                 -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/parser/parser_ops.hpp>

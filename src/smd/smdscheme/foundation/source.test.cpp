@@ -1,4 +1,4 @@
-// src/smd/schemepoc/source.test.cpp                              -*-C++-*-
+// src/smd/smdscheme/foundation/source.test.cpp                 -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/foundation/source.hpp>

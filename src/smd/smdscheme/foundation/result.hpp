@@ -1,8 +1,9 @@
-// src/smd/schemepoc/result.hpp                                   -*-C++-*-
+// src/smd/smdscheme/foundation/result.hpp                      -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_FOUNDATION_RESULT_HPP
 #define SRC_SMD_SMDSCHEME_FOUNDATION_RESULT_HPP
 
+// src/smd/smdscheme/foundation/result.hpp                      -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_RESULT_HPP#define SRC_SMD_SMDSCHEME_FOUNDATION_RESULT_HPP
 #include <smd/smdscheme/foundation/source.hpp>
 
 #include <variant>

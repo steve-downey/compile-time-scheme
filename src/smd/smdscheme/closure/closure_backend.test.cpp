@@ -1,5 +1,4 @@
-#if 0
-// src/smd/schemepoc/closure_backend.test.cpp                     -*-C++-*-
+// src/smd/smdscheme/closure/closure_backend.test.cpp           -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/closure/closure_backend.hpp>

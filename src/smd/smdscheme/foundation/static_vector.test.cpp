@@ -1,4 +1,4 @@
-// src/smd/schemepoc/static_vector.test.cpp                       -*-C++-*-
+// src/smd/smdscheme/foundation/static_vector.test.cpp          -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/foundation/static_vector.hpp>
