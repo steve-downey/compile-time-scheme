@@ -1,10 +1,10 @@
-// src/smd/smdscheme/sender/sender_cps.test.cpp                  -*-C++-*-
+// src/smd/smdscheme/sender/sender_cps_program.test.cpp                   -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/sender/sender_cps.hpp>
-#include <smd/smdscheme/sender/sender_cps.hpp> // test 2nd include OK
+#include <smd/smdscheme/sender/sender_cps_program.hpp>
+#include <smd/smdscheme/sender/sender_cps_program.hpp> // test 2nd include OK
 
-#include <smd/smdscheme/reader/reader.hpp>
+#include <smd/smdscheme/reader/read_datum.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 

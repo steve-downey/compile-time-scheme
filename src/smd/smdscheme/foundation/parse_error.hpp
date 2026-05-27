@@ -1,26 +1,11 @@
-// src/smd/smdscheme/foundation/source.hpp                      -*-C++-*-
+// src/smd/smdscheme/foundation/parse_error.hpp                  -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_SOURCE_HPP
-#define SRC_SMD_SMDSCHEME_FOUNDATION_SOURCE_HPP
+#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_PARSE_ERROR_HPP
+#define SRC_SMD_SMDSCHEME_FOUNDATION_PARSE_ERROR_HPP
+
+#include <smd/smdscheme/foundation/source_pos.hpp>
 
 namespace smd::smdscheme::foundation {
-
-struct source_pos {
-    int offset{};
-    int line{1};
-    int column{1};
-
-    friend constexpr auto operator==(foundation::source_pos,
-                                     foundation::source_pos) -> bool = default;
-};
-
-struct source_span {
-    foundation::source_pos first{};
-    foundation::source_pos last{};
-
-    friend constexpr auto operator==(source_span, source_span)
-        -> bool = default;
-};
 
 struct parse_error {
     foundation::source_pos where{};

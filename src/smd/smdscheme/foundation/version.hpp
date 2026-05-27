@@ -9,6 +9,12 @@ inline constexpr int version_major = 0;
 inline constexpr int version_minor = 1;
 inline constexpr int version_patch = 0;
 
+struct version {
+    static constexpr int major = version_major;
+    static constexpr int minor = version_minor;
+    static constexpr int patch = version_patch;
+};
+
 } // namespace smd::smdscheme::foundation
 
 #endif

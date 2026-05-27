@@ -7,7 +7,7 @@ target_sources(
         FILE_SET smdscheme_reflection_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES reflection_reify.hpp
+            FILES reified_environment.hpp
 )
 target_link_libraries(smdscheme.reflection PUBLIC smdscheme.foundation)
 

@@ -7,7 +7,7 @@ target_sources(
         FILE_SET smdscheme_reader_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES atom.hpp datum_tree.hpp reader.hpp
+            FILES atom.hpp datum_type.hpp read_datum.hpp
 )
 target_link_libraries(smdscheme.reader PUBLIC smdscheme.parser)
 

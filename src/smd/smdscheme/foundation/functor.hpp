@@ -9,7 +9,7 @@
 namespace smd::smdscheme::foundation {
 
 template <class Impl>
-struct Functor : protected Impl {
+struct functor : protected Impl {
     using Impl::fmap;
 
     template <class T, class U>

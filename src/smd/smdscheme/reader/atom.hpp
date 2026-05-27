@@ -4,7 +4,7 @@
 #define SRC_SMD_SMDSCHEME_READER_ATOM_HPP
 
 #include <smd/smdscheme/parser/parser.hpp>
-#include <smd/smdscheme/parser/parser_alternative.hpp>
+#include <smd/smdscheme/parser/alt.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
 
 #include <optional>

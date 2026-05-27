@@ -9,7 +9,7 @@ target_sources(
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
             FILES
                 parser.hpp
-                parser_alternative.hpp
+                alt.hpp
                 parser_ops.hpp
                 cursor.hpp
 )

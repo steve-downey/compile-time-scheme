@@ -4,7 +4,7 @@
 #define SRC_SMD_SMDSCHEME_CLOSURE_EVAL_DIRECT_HPP
 
 #include <smd/smdscheme/closure/value.hpp>
-#include <smd/smdscheme/elaborator/elaborator.hpp>
+#include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/foundation/static_vector.hpp>
 
