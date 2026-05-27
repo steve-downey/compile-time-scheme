@@ -1,8 +1,8 @@
-// src/smd/smdscheme/sender/sender_adapter.test.cpp             -*-C++-*-
+// src/smd/smdscheme/sender/sender_v.test.cpp                             -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/sender/sender_adapter.hpp>
-#include <smd/smdscheme/sender/sender_adapter.hpp> // idempotency
+#include <smd/smdscheme/sender/sender_v.hpp>
+#include <smd/smdscheme/sender/sender_v.hpp> // idempotency
 
 #include <catch2/catch_test_macros.hpp>
 #include <optional>
@@ -33,7 +33,7 @@ TEST_CASE("SenderAdapter - when_all") {
 }
 
 #include <smd/smdscheme/closure/value.hpp>
-#include <smd/smdscheme/elaborator/elaborator_core.hpp>
+#include <smd/smdscheme/elaborator/elaborated_core.hpp>
 
 using Core = smd::smdscheme::elaborator::core_type<32, 16>;
 

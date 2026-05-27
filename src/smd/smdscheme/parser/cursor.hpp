@@ -3,7 +3,7 @@
 #ifndef SRC_SMD_SMDSCHEME_PARSER_CURSOR_HPP
 #define SRC_SMD_SMDSCHEME_PARSER_CURSOR_HPP
 
-#include <smd/smdscheme/foundation/source.hpp>
+#include <smd/smdscheme/foundation/source_pos.hpp>
 
 #include <string_view>
 

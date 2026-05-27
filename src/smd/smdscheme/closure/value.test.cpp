@@ -1,7 +1,7 @@
 // src/smd/smdscheme/closure/value.test.cpp                     -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/elaborator/elaborator_core.hpp>
+#include <smd/smdscheme/elaborator/elaborated_core.hpp>
 using core = smd::smdscheme::elaborator::core_type<32, 16>;
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/closure/value.hpp> // test 2nd include OK

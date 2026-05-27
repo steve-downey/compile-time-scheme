@@ -1,8 +1,8 @@
-// src/smd/smdscheme/closure/closure_backend.test.cpp           -*-C++-*-
+// src/smd/smdscheme/closure/closure_program.test.cpp                     -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/closure/closure_backend.hpp>
-#include <smd/smdscheme/closure/closure_backend.hpp> // test 2nd include OK
+#include <smd/smdscheme/closure/closure_program.hpp>
+#include <smd/smdscheme/closure/closure_program.hpp> // test 2nd include OK
 
 #include <catch2/catch_test_macros.hpp>
 
