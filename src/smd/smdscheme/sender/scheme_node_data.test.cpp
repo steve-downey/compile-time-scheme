@@ -23,7 +23,8 @@ static_assert([] {
     n.node_id = 0;
     n.child_ids.push_back(1);
     n.child_ids.push_back(2);
-    return n.child_ids.size() == 2 && n.child_ids[0] == 1 && n.child_ids[1] == 2;
+    return n.child_ids.size() == 2 && n.child_ids[0] == 1 &&
+           n.child_ids[1] == 2;
 }());
 
 TEST_CASE("SchemeNodeDataTest - HeaderIsIdempotent") { REQUIRE(true); }
