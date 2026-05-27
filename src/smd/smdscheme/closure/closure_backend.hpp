@@ -4,7 +4,7 @@
 #define SRC_SMD_SMDSCHEME_CLOSURE_CLOSURE_BACKEND_HPP
 
 #include <smd/smdscheme/closure/value.hpp>
-#include <smd/smdscheme/cps/cps.hpp>
+#include <smd/smdscheme/closure/cps.hpp>
 #include <smd/smdscheme/elaborator/elaborator.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/reader/reader.hpp>
@@ -35,7 +35,7 @@ struct closure_program {
 template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] constexpr auto compile_to_closure(std::string_view src) {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
-    using CpsCodeT = decltype(compile_cps<MaxNodes, MaxList>(
+    using CpsCodeT = decltype(cps::compile_cps<MaxNodes, MaxList>(
         std::declval<Core const &>(),
         std::declval<foundation::tree_arena<Core, MaxNodes> const &>()));
     using ProgramT = closure_program<MaxNodes, MaxList, CpsCodeT>;

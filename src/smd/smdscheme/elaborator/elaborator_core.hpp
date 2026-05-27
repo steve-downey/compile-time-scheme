@@ -3,7 +3,7 @@
 #ifndef SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_CORE_HPP
 #define SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_CORE_HPP
 
-#include <smd/smdscheme/cps/fix.hpp>
+#include <smd/smdscheme/foundation/fix.hpp>
 #include <smd/smdscheme/reader/datum_tree.hpp> // needed for foundation::static_vector and basic types
 #include <string_view>
 #include <variant>
@@ -59,7 +59,7 @@ struct core_f_factory {
 };
 
 template <int MaxNodes, int MaxList>
-using core_type = cps::fix<core_f_factory<MaxNodes, MaxList>::template type>;
+using core_type = foundation::fix<core_f_factory<MaxNodes, MaxList>::template type>;
 
 template <int MaxNodes, int MaxList>
 struct elaborated_core {

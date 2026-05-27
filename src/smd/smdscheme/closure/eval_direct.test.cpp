@@ -1,8 +1,8 @@
-// src/smd/schemepoc/eval_direct.test.cpp                          -*-C++-*-
+// src/smd/smdscheme/closure/eval_direct.test.cpp                          -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/elaborator/eval_direct.hpp>
-#include <smd/smdscheme/elaborator/eval_direct.hpp> // test 2nd include OK
+#include <smd/smdscheme/closure/eval_direct.hpp>
+#include <smd/smdscheme/closure/eval_direct.hpp> // test 2nd include OK
 
 #include <smd/smdscheme/reader/reader.hpp>
 
