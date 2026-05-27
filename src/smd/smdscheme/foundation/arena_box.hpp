@@ -3,7 +3,6 @@
 #ifndef SRC_SMD_SMDSCHEME_FOUNDATION_ARENA_BOX_HPP
 #define SRC_SMD_SMDSCHEME_FOUNDATION_ARENA_BOX_HPP
 
-// src/smd/smdscheme/foundation/arena_box.hpp                   -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_ARENA_BOX_HPP#define SRC_SMD_SMDSCHEME_FOUNDATION_ARENA_BOX_HPP
 #include <smd/smdscheme/foundation/static_vector.hpp>
 #include <utility>
 

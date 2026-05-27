@@ -3,7 +3,6 @@
 #ifndef SRC_SMD_SMDSCHEME_PARSER_PARSER_HPP
 #define SRC_SMD_SMDSCHEME_PARSER_PARSER_HPP
 
-// src/smd/smdscheme/parser/parser.hpp                          -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_PARSER_PARSER_HPP#define SRC_SMD_SMDSCHEME_PARSER_PARSER_HPP
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/parser/reader_cursor.hpp>
 

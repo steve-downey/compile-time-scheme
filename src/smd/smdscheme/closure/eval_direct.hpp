@@ -3,7 +3,6 @@
 #ifndef SRC_SMD_SMDSCHEME_CLOSURE_EVAL_DIRECT_HPP
 #define SRC_SMD_SMDSCHEME_CLOSURE_EVAL_DIRECT_HPP
 
-// src/smd/smdscheme/closure/eval_direct.hpp                    -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_CLOSURE_EVAL_DIRECT_HPP#define SRC_SMD_SMDSCHEME_CLOSURE_EVAL_DIRECT_HPP
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/elaborator/elaborator.hpp>
 #include <smd/smdscheme/foundation/result.hpp>

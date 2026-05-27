@@ -3,7 +3,6 @@
 #ifndef SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_CORE_HPP
 #define SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_CORE_HPP
 
-// src/smd/smdscheme/elaborator/elaborator_core.hpp             -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_CORE_HPP#define SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATOR_CORE_HPP
 #include <smd/smdscheme/foundation/fix.hpp>
 #include <smd/smdscheme/reader/datum_tree.hpp> // needed for foundation::static_vector and basic types
 #include <string_view>
