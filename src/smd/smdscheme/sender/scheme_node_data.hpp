@@ -11,8 +11,8 @@ namespace smd::smdscheme::sender {
 
 struct scheme_node_data {
     int node_id{};
-    std::string_view sender_algo{};     // "just", "then", "when_all"
-    std::string_view scheme_context{};  // "Atom: 5", "Apply: +", etc.
+    std::string_view sender_algo{};    // "just", "then", "when_all"
+    std::string_view scheme_context{}; // "Atom: 5", "Apply: +", etc.
     foundation::static_vector<int, 8> child_ids{};
 
     friend constexpr auto operator==(scheme_node_data const &,
