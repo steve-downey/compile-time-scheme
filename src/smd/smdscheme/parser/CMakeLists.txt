@@ -11,7 +11,7 @@ target_sources(
                 parser.hpp
                 parser_alternative.hpp
                 parser_ops.hpp
-                reader_cursor.hpp
+                cursor.hpp
 )
 target_link_libraries(smdscheme.parser PUBLIC smdscheme.foundation)
 

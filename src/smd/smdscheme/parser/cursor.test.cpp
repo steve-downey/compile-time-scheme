@@ -1,8 +1,8 @@
-// src/smd/smdscheme/parser/reader_cursor.test.cpp              -*-C++-*-
+// src/smd/smdscheme/parser/cursor.test.cpp                      -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/parser/reader_cursor.hpp>
-#include <smd/smdscheme/parser/reader_cursor.hpp> // test 2nd include OK
+#include <smd/smdscheme/parser/cursor.hpp>
+#include <smd/smdscheme/parser/cursor.hpp> // test 2nd include OK
 
 #include <catch2/catch_test_macros.hpp>
 

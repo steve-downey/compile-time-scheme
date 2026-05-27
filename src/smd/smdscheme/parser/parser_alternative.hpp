@@ -5,7 +5,7 @@
 
 #include <smd/smdscheme/foundation/static_vector.hpp>
 #include <smd/smdscheme/parser/parser.hpp>
-#include <smd/smdscheme/parser/reader_cursor.hpp>
+#include <smd/smdscheme/parser/cursor.hpp>
 
 #include <optional>
 
