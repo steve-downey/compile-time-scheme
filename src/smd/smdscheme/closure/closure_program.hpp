@@ -1,13 +1,13 @@
-// src/smd/smdscheme/closure/closure_backend.hpp                -*-C++-*-
+// src/smd/smdscheme/closure/closure_program.hpp                          -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SMDSCHEME_CLOSURE_CLOSURE_BACKEND_HPP
-#define SRC_SMD_SMDSCHEME_CLOSURE_CLOSURE_BACKEND_HPP
+#ifndef SRC_SMD_SMDSCHEME_CLOSURE_CLOSURE_PROGRAM_HPP
+#define SRC_SMD_SMDSCHEME_CLOSURE_CLOSURE_PROGRAM_HPP
 
 #include <smd/smdscheme/closure/value.hpp>
-#include <smd/smdscheme/closure/cps.hpp>
-#include <smd/smdscheme/elaborator/elaborator.hpp>
+#include <smd/smdscheme/closure/cps_code.hpp>
+#include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
-#include <smd/smdscheme/reader/reader.hpp>
+#include <smd/smdscheme/reader/read_datum.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
 
 #include <string_view>

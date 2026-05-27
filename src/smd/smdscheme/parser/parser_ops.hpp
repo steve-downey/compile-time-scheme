@@ -4,7 +4,7 @@
 #define SRC_SMD_SMDSCHEME_PARSER_PARSER_OPS_HPP
 
 #include <smd/smdscheme/parser/parser.hpp>
-#include <smd/smdscheme/parser/parser_alternative.hpp>
+#include <smd/smdscheme/parser/alt.hpp>
 
 #include <type_traits>
 

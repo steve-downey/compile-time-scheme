@@ -7,7 +7,7 @@ target_sources(
         FILE_SET smdscheme_elaborator_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES elaborator_core.hpp elaborator.hpp
+            FILES elaborated_core.hpp elaborate.hpp
 )
 target_link_libraries(smdscheme.elaborator PUBLIC smdscheme.reader)
 

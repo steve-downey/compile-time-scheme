@@ -7,7 +7,7 @@ target_sources(
         FILE_SET smdscheme_closure_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES value.hpp cps.hpp closure_backend.hpp eval_direct.hpp
+            FILES value.hpp cps_code.hpp closure_program.hpp eval_direct.hpp
 )
 target_link_libraries(smdscheme.closure PUBLIC smdscheme.elaborator)
 

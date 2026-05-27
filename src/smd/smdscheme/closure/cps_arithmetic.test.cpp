@@ -1,10 +1,10 @@
 // src/smd/smdscheme/closure/cps_arithmetic.test.cpp            -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/closure/cps.hpp>
-#include <smd/smdscheme/closure/cps.hpp> // test 2nd include OK
+#include <smd/smdscheme/closure/cps_code.hpp>
+#include <smd/smdscheme/closure/cps_code.hpp> // test 2nd include OK
 
-#include <smd/smdscheme/reader/reader.hpp>
+#include <smd/smdscheme/reader/read_datum.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
 
 #include <catch2/catch_test_macros.hpp>

@@ -6,9 +6,9 @@
 #include <span>
 #include <string_view>
 
-#include <smd/smdscheme/reflection/reflection_reify.hpp>
-#include <smd/smdscheme/sender/sender_adapter.hpp>
-#include <smd/smdscheme/sender/sender_backend.hpp>
+#include <smd/smdscheme/reflection/reified_environment.hpp>
+#include <smd/smdscheme/sender/sender_v.hpp>
+#include <smd/smdscheme/sender/sender_program.hpp>
 #include <smd/smdscheme/smdscheme.hpp>
 
 namespace scm = smd::smdscheme;

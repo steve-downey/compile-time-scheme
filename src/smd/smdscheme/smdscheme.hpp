@@ -4,7 +4,7 @@
 #define SRC_SMD_SMDSCHEME_SMDSCHEME_HPP
 
 // 44cc988c-7353-43aa-a7d3-8840f92371a6
-#include <smd/smdscheme/closure/closure_backend.hpp>
+#include <smd/smdscheme/closure/closure_program.hpp>
 
 #include <algorithm>
 #include <cstddef>

@@ -1,15 +1,15 @@
-// src/smd/smdscheme/sender/sender_backend.hpp                  -*-C++-*-
+// src/smd/smdscheme/sender/sender_program.hpp                            -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SMDSCHEME_SENDER_SENDER_BACKEND_HPP
-#define SRC_SMD_SMDSCHEME_SENDER_SENDER_BACKEND_HPP
+#ifndef SRC_SMD_SMDSCHEME_SENDER_SENDER_PROGRAM_HPP
+#define SRC_SMD_SMDSCHEME_SENDER_SENDER_PROGRAM_HPP
 
 #include <smd/smdscheme/closure/value.hpp>
-#include <smd/smdscheme/elaborator/elaborator.hpp>
-#include <smd/smdscheme/elaborator/elaborator_core.hpp>
+#include <smd/smdscheme/elaborator/elaborate.hpp>
+#include <smd/smdscheme/elaborator/elaborated_core.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
-#include <smd/smdscheme/reader/reader.hpp>
+#include <smd/smdscheme/reader/read_datum.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
-#include <smd/smdscheme/sender/sender_adapter.hpp>
+#include <smd/smdscheme/sender/sender_v.hpp>
 
 namespace smd::smdscheme::sender {
 namespace sender_backend {

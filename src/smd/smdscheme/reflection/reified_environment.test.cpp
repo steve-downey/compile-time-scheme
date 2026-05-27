@@ -1,7 +1,7 @@
-// src/smd/smdscheme/reflection/reflection_reify.test.cpp       -*-C++-*-
+// src/smd/smdscheme/reflection/reified_environment.test.cpp              -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/reflection/reflection_reify.hpp>
+#include <smd/smdscheme/reflection/reified_environment.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 

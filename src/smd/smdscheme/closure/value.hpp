@@ -5,7 +5,7 @@
 
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/foundation/static_vector.hpp>
-#include <smd/smdscheme/reader/datum_tree.hpp>
+#include <smd/smdscheme/reader/datum_type.hpp>
 
 #include <span>
 #include <string_view>
