@@ -3,7 +3,6 @@
 #ifndef SRC_SMD_SMDSCHEME_FOUNDATION_STATIC_VECTOR_HPP
 #define SRC_SMD_SMDSCHEME_FOUNDATION_STATIC_VECTOR_HPP
 
-// src/smd/smdscheme/foundation/static_vector.hpp               -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_STATIC_VECTOR_HPP#define SRC_SMD_SMDSCHEME_FOUNDATION_STATIC_VECTOR_HPP
 #include <array>
 #include <cassert>
 
