@@ -87,7 +87,7 @@ Because we used CPS, this phase is structurally identical to building a C++26 se
 
 * Phase 6: Sender Backend and Asynchronous Execution
 
-Once the execution has been mapped out in Continuation-Passing Style (CPS) using standard C++ Closures, it becomes remarkably straightforward to adapt to standard C++ Asynchronous Execution. 
+Once the execution has been mapped out in Continuation-Passing Style (CPS) using standard C++ Closures, it becomes remarkably straightforward to adapt to standard C++ Asynchronous Execution.
 
 In traditional C++ asynchronous environments (like `std::execution` from C++26 / Beman `sender/receiver` models), an operation doesn't immediately return a result; it *sends* its result to a *receiver*. Look closely: a "receiver" is conceptually identical to a "continuation" in CPS.
 
@@ -106,4 +106,3 @@ We use this feature in the Reification phase to take the environment layouts cal
 This results in environment sizes that are as zero-cost as though a C++ expert manually wrote a distinct structure for every single lambda parameter capture.
 
 #+transclude: [[file:../src/smd/schemepoc/reflection_reify.hpp::d0092f7c-b9de-440d-ac67-02e4e48c5aa4]] :lines 2- :src cpp :end "d0092f7c-b9de-440d-ac67-02e4e48c5aa4 end"
-

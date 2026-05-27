@@ -27,29 +27,6 @@ option(
 
 set(CMAKE_VERIFY_INTERFACE_HEADER_SETS ON)
 
-# Create the library target and named header set for beman.optional
-add_library(schemepoc.schemepoc STATIC "")
-
-target_sources(
-    schemepoc.schemepoc
-    PUBLIC FILE_SET schemepoc_schemepoc_headers TYPE HEADERS BASE_DIRS src
-)
-
-if(SCHEMEPOC_ENABLE_TESTING)
-    find_package(Catch2 3 REQUIRED)
-    if(Catch2_FOUND)
-        include(Catch)
-    else()
-        message(
-            WARNING
-            "
-No provider for Catch2. Unable to build tests.
-Consider using CMAKE_PROJECT_TOP_LEVEL_INCLUDES=./cmake/use-fetch-content.cmake as documented in the README.md
-"
-        )
-    endif()
-endif()
-
 set(BEMAN_USE_MODULES OFF CACHE BOOL "Disable modules" FORCE)
 set(BEMAN_TASK_BUILD_EXAMPLES OFF CACHE BOOL "Disable task examples" FORCE)
 set(BEMAN_TASK_BUILD_TESTS OFF CACHE BOOL "Disable task tests" FORCE)
@@ -66,7 +43,7 @@ add_subdirectory(vendor/task EXCLUDE_FROM_ALL)
 add_subdirectory(src)
 
 include(infra/cmake/beman-install-library.cmake)
-beman_install_library(schemepoc.schemepoc TARGETS schemepoc.schemepoc NAMESPACE smd::)
+beman_install_library(smdscheme.smdscheme TARGETS smdscheme.smdscheme NAMESPACE smd::)
 
 # Coverage
 configure_file("cmake/gcovr.cfg.in" gcovr.cfg @ONLY)

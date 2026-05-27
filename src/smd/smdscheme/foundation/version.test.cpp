@@ -9,11 +9,11 @@
 TEST_CASE("VersionTest - HeaderIsIdempotent") { REQUIRE(true); }
 
 TEST_CASE("VersionTest - VersionIsAvailable") {
-    CHECK(smd::schemepoc::version_major == 0);
-    CHECK(smd::schemepoc::version_minor == 1);
-    CHECK(smd::schemepoc::version_patch == 0);
+    CHECK(smd::smdscheme::foundation::version_major == 0);
+    CHECK(smd::smdscheme::foundation::version_minor == 1);
+    CHECK(smd::smdscheme::foundation::version_patch == 0);
 }
 
-static_assert(smd::schemepoc::version_major == 0);
-static_assert(smd::schemepoc::version_minor == 1);
-static_assert(smd::schemepoc::version_patch == 0);
+static_assert(smd::smdscheme::foundation::version_major == 0);
+static_assert(smd::smdscheme::foundation::version_minor == 1);
+static_assert(smd::smdscheme::foundation::version_patch == 0);

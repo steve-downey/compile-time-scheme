@@ -16,3 +16,9 @@ uv.lock
 *.html
 /docs/html/
 /.claude/settings.local.json
+/.claude/
+
+# Local workflow artifacts
+/build.log
+/compile_out.txt
+*.o

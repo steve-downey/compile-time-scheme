@@ -2,18 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <iostream>
-#include <smd/schemepoc/schemepoc.hpp>
+#include <smd/smdscheme/smdscheme.hpp>
 
-namespace scm = smd::schemepoc;
+namespace scm = smd::smdscheme;
 
-using Core = scm::core_type<32, 16>;
+using Core = scm::elaborator::core_type<32, 16>;
 
 constexpr auto program =
     scm::compiled_closure<"((lambda (x) (+ 1 (* x x))) argc)">;
 
 int main(int argc, char **) {
-    auto env = scm::default_env<Core, 16>();
-    env.define("argc", scm::value<Core>{argc});
+    auto env = scm::closure::default_env<Core, 16>();
+    env.define("argc", scm::closure::value<Core>{argc});
 
     auto result = program(env);
 
