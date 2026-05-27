@@ -4,9 +4,9 @@
 #define SRC_SMD_SMDSCHEME_READER_READER_HPP
 
 #include <smd/smdscheme/parser/parser.hpp>
-#include <smd/smdscheme/parser/reader_cursor.hpp>
+#include <smd/smdscheme/parser/cursor.hpp>
 #include <smd/smdscheme/reader/datum_tree.hpp>
-#include <smd/smdscheme/reader/reader_atom.hpp>
+#include <smd/smdscheme/reader/atom.hpp>
 
 namespace smd::smdscheme::reader {
 

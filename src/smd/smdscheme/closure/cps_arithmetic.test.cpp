@@ -5,6 +5,7 @@
 #include <smd/smdscheme/closure/cps.hpp> // test 2nd include OK
 
 #include <smd/smdscheme/reader/reader.hpp>
+#include <smd/smdscheme/parser/cursor.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 

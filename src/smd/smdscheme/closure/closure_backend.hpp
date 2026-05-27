@@ -8,6 +8,7 @@
 #include <smd/smdscheme/elaborator/elaborator.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/reader/reader.hpp>
+#include <smd/smdscheme/parser/cursor.hpp>
 
 #include <string_view>
 
