@@ -13,7 +13,8 @@ struct fix {
     F<foundation::fix<F>> inner;
 
     constexpr fix() = default;
-    constexpr explicit fix(F<foundation::fix<F>> layer) : inner(std::move(layer)) {}
+    constexpr explicit fix(F<foundation::fix<F>> layer)
+        : inner(std::move(layer)) {}
 };
 
 // fold_fix recursively folds a foundation::fix<F> tree using a carrier-algebra.

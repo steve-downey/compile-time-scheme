@@ -1,4 +1,4 @@
-// src/smd/smdscheme/sender/sender_cps_program.test.cpp                   -*-C++-*-
+// src/smd/smdscheme/sender/sender_cps_program.test.cpp -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/sender/sender_cps_program.hpp>
@@ -16,8 +16,8 @@ using namespace smd::smdscheme;
 using namespace std::string_view_literals;
 
 using Core = elaborator::core_type<32, 16>;
-using Val  = closure::value<Core>;
-using Res  = foundation::result<Val>;
+using Val = closure::value<Core>;
+using Res = foundation::result<Val>;
 
 auto eval(std::string_view src) -> Res {
     auto program_r = sender_cps::compile_sender_cps<32, 16>(src);

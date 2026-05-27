@@ -7,8 +7,8 @@
 #include <string_view>
 
 #include <smd/smdscheme/reflection/reified_environment.hpp>
-#include <smd/smdscheme/sender/sender_v.hpp>
 #include <smd/smdscheme/sender/sender_program.hpp>
+#include <smd/smdscheme/sender/sender_v.hpp>
 #include <smd/smdscheme/smdscheme.hpp>
 
 namespace scm = smd::smdscheme;

@@ -1,7 +1,7 @@
 # Step 4: Extend reflection bridge for `then` and `when_all`
 
-**Phase:** 2 — Reflection Bridge  
-**Prereqs:** Step 3 (build_scheme_tree handles `just`)  
+**Phase:** 2 — Reflection Bridge
+**Prereqs:** Step 3 (build_scheme_tree handles `just`)
 **Next step:** step-05.md
 
 ## What To Do

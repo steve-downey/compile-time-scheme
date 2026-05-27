@@ -1,5 +1,5 @@
-// src/smd/smdscheme/sender/sender_v.hpp                                  -*-C++-*-
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// src/smd/smdscheme/sender/sender_v.hpp -*-C++-*- SPDX-License-Identifier:
+// Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_SENDER_SENDER_V_HPP
 #define SRC_SMD_SMDSCHEME_SENDER_SENDER_V_HPP
 

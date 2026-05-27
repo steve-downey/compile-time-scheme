@@ -1,11 +1,11 @@
-// src/smd/smdscheme/parser/alt.hpp                                       -*-C++-*-
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// src/smd/smdscheme/parser/alt.hpp -*-C++-*- SPDX-License-Identifier:
+// Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_PARSER_ALT_HPP
 #define SRC_SMD_SMDSCHEME_PARSER_ALT_HPP
 
 #include <smd/smdscheme/foundation/static_vector.hpp>
-#include <smd/smdscheme/parser/parser.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
+#include <smd/smdscheme/parser/parser.hpp>
 
 #include <optional>
 

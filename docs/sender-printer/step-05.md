@@ -1,7 +1,7 @@
 # Step 5: Create string_writer applicative
 
-**Phase:** 3 — Applicative Traverser  
-**Prereqs:** None (independent of Phase 2, but should run after Steps 1–2 exist)  
+**Phase:** 3 — Applicative Traverser
+**Prereqs:** None (independent of Phase 2, but should run after Steps 1–2 exist)
 **Next step:** step-06.md
 
 ## What To Do

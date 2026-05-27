@@ -3,10 +3,10 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <smd/smdscheme/closure/closure_program.hpp>
-#include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/closure/eval_direct.hpp>
-#include <smd/smdscheme/reader/read_datum.hpp>
+#include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
+#include <smd/smdscheme/reader/read_datum.hpp>
 #include <smd/smdscheme/smdscheme.hpp>
 #include <span>
 #include <string_view>

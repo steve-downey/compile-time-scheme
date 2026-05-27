@@ -1,7 +1,7 @@
 # Step 6: Create format_scheme_node DOT formatter
 
-**Phase:** 3 — Applicative Traverser  
-**Prereqs:** Steps 1, 5 (scheme_node_data and string_writer exist)  
+**Phase:** 3 — Applicative Traverser
+**Prereqs:** Steps 1, 5 (scheme_node_data and string_writer exist)
 **Next step:** step-07.md
 
 ## What To Do
