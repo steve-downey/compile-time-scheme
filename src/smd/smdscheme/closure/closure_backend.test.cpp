@@ -15,7 +15,7 @@ using namespace std::string_view_literals;
 
 // "(+ 1 (* 2 3))" -> smd::smdscheme::closure::value<elaborator::core_type<32, 16>>{7}
 static_assert([] {
-    auto r = compile_to_closure("(+ 1 (* 2 3))"sv);
+    auto r = closure::compile_to_closure("(+ 1 (* 2 3))"sv);
     if (!r.has_value())
         return false;
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
@@ -26,7 +26,7 @@ static_assert([] {
 
 // "42" -> smd::smdscheme::closure::value<elaborator::core_type<32, 16>>{42}
 static_assert([] {
-    auto r = compile_to_closure("42"sv);
+    auto r = closure::compile_to_closure("42"sv);
     if (!r.has_value())
         return false;
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
@@ -37,7 +37,7 @@ static_assert([] {
 
 // "(if #t (+ 1 2) 0)" -> smd::smdscheme::closure::value<elaborator::core_type<32, 16>>{3}
 static_assert([] {
-    auto r = compile_to_closure("(if #t (+ 1 2) 0)"sv);
+    auto r = closure::compile_to_closure("(if #t (+ 1 2) 0)"sv);
     if (!r.has_value())
         return false;
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
@@ -48,7 +48,7 @@ static_assert([] {
 
 // "#t" -> smd::smdscheme::closure::value<elaborator::core_type<32, 16>>{true}
 static_assert([] {
-    auto r = compile_to_closure("#t"sv);
+    auto r = closure::compile_to_closure("#t"sv);
     if (!r.has_value())
         return false;
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
@@ -59,7 +59,7 @@ static_assert([] {
 
 // foundation::bad source -> compile_to_closure returns error
 static_assert([] {
-    auto r = compile_to_closure("(+ x 1)"sv);
+    auto r = closure::compile_to_closure("(+ x 1)"sv);
     if (!r.has_value())
         return true; // elaboration or eval error
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
@@ -72,7 +72,7 @@ static_assert([] {
 TEST_CASE("ClosureBackendTest - HeaderIsIdempotent") { REQUIRE(true); }
 
 TEST_CASE("ClosureBackendTest - AddMultiply") {
-    auto r = compile_to_closure("(+ 1 (* 2 3))"sv);
+    auto r = closure::compile_to_closure("(+ 1 (* 2 3))"sv);
     REQUIRE(r.has_value());
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
     auto vr = r.value()(env0);
@@ -82,7 +82,7 @@ TEST_CASE("ClosureBackendTest - AddMultiply") {
 }
 
 TEST_CASE("ClosureBackendTest - Integer") {
-    auto r = compile_to_closure("42"sv);
+    auto r = closure::compile_to_closure("42"sv);
     REQUIRE(r.has_value());
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
     auto vr = r.value()(env0);
@@ -92,7 +92,7 @@ TEST_CASE("ClosureBackendTest - Integer") {
 }
 
 TEST_CASE("ClosureBackendTest - IfExpression") {
-    auto r = compile_to_closure("(if #t (+ 1 2) 0)"sv);
+    auto r = closure::compile_to_closure("(if #t (+ 1 2) 0)"sv);
     REQUIRE(r.has_value());
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
     auto vr = r.value()(env0);
@@ -102,7 +102,7 @@ TEST_CASE("ClosureBackendTest - IfExpression") {
 }
 
 TEST_CASE("ClosureBackendTest - Boolean") {
-    auto r = compile_to_closure("#t"sv);
+    auto r = closure::compile_to_closure("#t"sv);
     REQUIRE(r.has_value());
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
     auto vr = r.value()(env0);
@@ -112,12 +112,10 @@ TEST_CASE("ClosureBackendTest - Boolean") {
 }
 
 TEST_CASE("ClosureBackendTest - UnboundVariableError") {
-    auto r = compile_to_closure("(+ x 1)"sv);
+    auto r = closure::compile_to_closure("(+ x 1)"sv);
     if (!r.has_value())
         return; // error at elaboration
     auto env0 = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>, 16>();
     auto vr = r.value()(env0);
     REQUIRE_FALSE(vr.has_value());
 }
-
-#endif

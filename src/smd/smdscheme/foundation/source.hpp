@@ -3,7 +3,6 @@
 #ifndef SRC_SMD_SMDSCHEME_FOUNDATION_SOURCE_HPP
 #define SRC_SMD_SMDSCHEME_FOUNDATION_SOURCE_HPP
 
-// src/smd/smdscheme/foundation/source.hpp                      -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_SOURCE_HPP#define SRC_SMD_SMDSCHEME_FOUNDATION_SOURCE_HPP
 namespace smd::smdscheme::foundation {
 
 struct source_pos {

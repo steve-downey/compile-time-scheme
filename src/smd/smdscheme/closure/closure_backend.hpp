@@ -3,7 +3,6 @@
 #ifndef SRC_SMD_SMDSCHEME_CLOSURE_CLOSURE_BACKEND_HPP
 #define SRC_SMD_SMDSCHEME_CLOSURE_CLOSURE_BACKEND_HPP
 
-// src/smd/smdscheme/closure/closure_backend.hpp                -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_CLOSURE_CLOSURE_BACKEND_HPP#define SRC_SMD_SMDSCHEME_CLOSURE_CLOSURE_BACKEND_HPP
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/closure/cps.hpp>
 #include <smd/smdscheme/elaborator/elaborator.hpp>
@@ -54,7 +53,7 @@ template <int MaxNodes = 32, int MaxList = 16>
         return foundation::result<ProgramT>{er.error()};
     auto const &ct_root = er.value();
     return foundation::result<ProgramT>{
-        ProgramT{compile_cps<MaxNodes, MaxList>(ct_root, core_arena)}};
+        ProgramT{cps::compile_cps<MaxNodes, MaxList>(ct_root, core_arena)}};
 }
 
 } // namespace smd::smdscheme::closure
