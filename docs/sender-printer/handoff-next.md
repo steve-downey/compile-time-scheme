@@ -6,7 +6,7 @@ This file is rewritten by each step's agent with notes for the next step.
 
 Step 1 is complete. All 132 tests pass (up from 129 — 3 new SchemeNodeData tests). Linters pass.
 
-The branch `worktree-sender-printer-step-01` contains all Step 1 work.
+Step 1 has been merged into the **`sender-printer`** feature branch. That is the branch all subsequent steps build on.
 
 ## What Was Done in Step 1
 
@@ -19,8 +19,14 @@ The branch `worktree-sender-printer-step-01` contains all Step 1 work.
 
 Begin with `step-02.md`. Step 2 creates `scheme_tree.hpp` — a tree type that holds a collection of `scheme_node_data` nodes.
 
+**Start your worktree from `sender-printer`**, not `main`. Example:
+```bash
+git worktree add -b worktree-sender-printer-step-02 \
+    .claude/worktrees/sender-printer-step-02 sender-printer
+```
+
 Key facts for Step 2:
 - `scheme_node_data` is in `src/smd/smdscheme/sender/scheme_node_data.hpp`, namespace `smd::smdscheme::sender`.
 - `foundation::static_vector<T, Capacity>` now has `operator==` (added in Step 1) — it is constexpr-friendly.
 - The `sender/CMakeLists.txt` FILE_SET now lists files one-per-line (gersemi style). New headers added to the FILE_SET must follow the same format.
-- Linter situation: the HEAD commit on `main` had trailing whitespace and include-order issues across many files. Running `make lint` fixed them all; they were included in the Step 1 commit. Step 2 should not re-encounter those specific issues.
+- Linter situation: trailing whitespace and include-order issues across many files were fixed in Step 1. Step 2 should not re-encounter those specific issues.

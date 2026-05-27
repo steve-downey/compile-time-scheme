@@ -68,4 +68,12 @@ All steps MUST keep `make compile && make test` green.
 
 ## Branch Policy
 
-Each step works in a git worktree on its own branch. At the end of the step, commit all changes to that branch and stop. **Do not merge to `main`.** The human will `--no-ff` merge the step branch to `main` after review. All steps accumulate on their own branches until all steps are complete.
+All steps accumulate on the **`sender-printer`** feature branch (not `main`).
+
+Each step works in a git worktree on its own named branch (e.g., `worktree-sender-printer-step-02`). At the end of the step:
+
+1. Commit all changes to the step branch.
+2. **Do not merge to `main`.**
+3. The human will `--no-ff` merge the step branch into `sender-printer`.
+
+Your worktree and step branch must be based on **`sender-printer`**, not `main`. When creating a worktree for a new step, branch from `sender-printer` so your work builds on all previous steps.
