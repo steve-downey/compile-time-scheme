@@ -8,7 +8,6 @@ target_sources(
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
             FILES
-                functor.hpp
                 parser.hpp
                 parser_alternative.hpp
                 parser_ops.hpp

@@ -3,8 +3,7 @@
 #ifndef SRC_SMD_SMDSCHEME_FOUNDATION_FIX_HPP
 #define SRC_SMD_SMDSCHEME_FOUNDATION_FIX_HPP
 
-// src/smd/smdscheme/foundation/fix.hpp                         -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_FIX_HPP#define SRC_SMD_SMDSCHEME_FOUNDATION_FIX_HPP
-#include <smd/smdscheme/parser/functor.hpp>
+#include <smd/smdscheme/foundation/functor.hpp>
 #include <utility>
 
 namespace smd::smdscheme::foundation {
