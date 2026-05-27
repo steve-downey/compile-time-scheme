@@ -4,7 +4,7 @@
 #define SRC_SMD_SMDSCHEME_PARSER_PARSER_HPP
 
 #include <smd/smdscheme/foundation/result.hpp>
-#include <smd/smdscheme/parser/reader_cursor.hpp>
+#include <smd/smdscheme/parser/cursor.hpp>
 
 namespace smd::smdscheme::parser {
 
