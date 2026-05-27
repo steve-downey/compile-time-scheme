@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/sender/scheme_tree.hpp>
-#include <smd/smdscheme/sender/scheme_tree.hpp>  // test 2nd include OK
+#include <smd/smdscheme/sender/scheme_tree.hpp> // test 2nd include OK
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -12,13 +12,12 @@ using smd::smdscheme::sender::scheme_tree;
 static_assert([] {
     scheme_tree<16> tree{};
     auto root_id = tree.allocate(scheme_node_data{.sender_algo = "when_all"});
-    auto child1  = tree.allocate(scheme_node_data{.sender_algo = "just"});
-    auto child2  = tree.allocate(scheme_node_data{.sender_algo = "just"});
+    auto child1 = tree.allocate(scheme_node_data{.sender_algo = "just"});
+    auto child2 = tree.allocate(scheme_node_data{.sender_algo = "just"});
     tree.get(root_id).child_ids.push_back(child1);
     tree.get(root_id).child_ids.push_back(child2);
     tree.root_id = root_id;
-    return tree.nodes.size() == 3 &&
-           tree.get(root_id).child_ids.size() == 2 &&
+    return tree.nodes.size() == 3 && tree.get(root_id).child_ids.size() == 2 &&
            tree.get(child1).sender_algo == "just";
 }());
 
@@ -34,7 +33,7 @@ TEST_CASE("SchemeTreeTest - AllocateAndGet") {
 
 TEST_CASE("SchemeTreeTest - BuildSimpleTree") {
     scheme_tree<16> tree{};
-    auto root  = tree.allocate(scheme_node_data{.sender_algo = "then"});
+    auto root = tree.allocate(scheme_node_data{.sender_algo = "then"});
     auto child = tree.allocate(
         scheme_node_data{.sender_algo = "just", .scheme_context = "Atom: 1"});
     tree.get(root).child_ids.push_back(child);
