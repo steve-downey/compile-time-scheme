@@ -3,7 +3,7 @@
 #ifndef SRC_SMD_SMDSCHEME_FOUNDATION_RESULT_HPP
 #define SRC_SMD_SMDSCHEME_FOUNDATION_RESULT_HPP
 
-#include <smd/smdscheme/foundation/source.hpp>
+#include <smd/smdscheme/foundation/parse_error.hpp>
 
 #include <variant>
 

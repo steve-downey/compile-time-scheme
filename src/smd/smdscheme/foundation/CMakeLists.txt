@@ -12,7 +12,9 @@ target_sources(
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
             FILES
                 version.hpp
-                source.hpp
+                source_pos.hpp
+                source_span.hpp
+                parse_error.hpp
                 result.hpp
                 static_vector.hpp
                 arena_box.hpp
