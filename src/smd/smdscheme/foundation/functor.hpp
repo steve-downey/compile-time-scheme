@@ -1,13 +1,12 @@
-// src/smd/smdscheme/parser/functor.hpp                         -*-C++-*-
+// src/smd/smdscheme/foundation/functor.hpp                      -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP
-#define SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP
+#ifndef SRC_SMD_SMDSCHEME_FOUNDATION_FUNCTOR_HPP
+#define SRC_SMD_SMDSCHEME_FOUNDATION_FUNCTOR_HPP
 
-// src/smd/smdscheme/parser/functor.hpp                         -*-C++-*-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception#ifndef SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP#define SRC_SMD_SMDSCHEME_PARSER_FUNCTOR_HPP
 #include <type_traits>
 #include <utility>
 
-namespace smd::smdscheme::parser {
+namespace smd::smdscheme::foundation {
 
 template <class Impl>
 struct Functor : protected Impl {
@@ -35,6 +34,6 @@ struct fmap_fn {
 
 inline constexpr fmap_fn fmap{};
 
-} // namespace smd::smdscheme::parser
+} // namespace smd::smdscheme::foundation
 
 #endif
