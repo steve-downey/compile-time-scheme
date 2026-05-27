@@ -7,7 +7,7 @@ target_sources(
         FILE_SET smdscheme_sender_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES sender_backend.hpp sender_adapter.hpp
+            FILES sender_backend.hpp sender_adapter.hpp sender_cps.hpp
 )
 target_link_libraries(
     smdscheme.sender
