@@ -1,7 +1,7 @@
-// src/smd/smdscheme/reader/datum_tree.hpp                      -*-C++-*-
+// src/smd/smdscheme/reader/datum_type.hpp                                -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#ifndef SRC_SMD_SMDSCHEME_READER_DATUM_TREE_HPP
-#define SRC_SMD_SMDSCHEME_READER_DATUM_TREE_HPP
+#ifndef SRC_SMD_SMDSCHEME_READER_DATUM_TYPE_HPP
+#define SRC_SMD_SMDSCHEME_READER_DATUM_TYPE_HPP
 
 #include <smd/smdscheme/foundation/fix.hpp>
 #include <smd/smdscheme/foundation/arena_box.hpp>

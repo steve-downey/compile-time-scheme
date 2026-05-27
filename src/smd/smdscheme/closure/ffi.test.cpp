@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <catch2/catch_test_macros.hpp>
-#include <smd/smdscheme/closure/closure_backend.hpp>
-#include <smd/smdscheme/elaborator/elaborator.hpp>
+#include <smd/smdscheme/closure/closure_program.hpp>
+#include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/closure/eval_direct.hpp>
-#include <smd/smdscheme/reader/reader.hpp>
+#include <smd/smdscheme/reader/read_datum.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
 #include <smd/smdscheme/smdscheme.hpp>
 #include <span>
@@ -79,7 +79,7 @@ static_assert([] {
     return vr.has_value() && std::get<int>(vr.value()) == 142;
 }());
 
-#include <smd/smdscheme/closure/cps.hpp>
+#include <smd/smdscheme/closure/cps_code.hpp>
 
 TEST_CASE("FFITest - CPS") {
     auto e = smd::smdscheme::closure::default_env<elaborator::core_type<32, 16>,
