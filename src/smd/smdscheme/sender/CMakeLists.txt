@@ -13,6 +13,7 @@ target_sources(
                 sender_cps_program.hpp
                 scheme_node_data.hpp
                 scheme_tree.hpp
+                build_scheme_tree.hpp
 )
 target_link_libraries(
     smdscheme.sender
