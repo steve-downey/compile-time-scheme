@@ -17,7 +17,7 @@
 - [x] **Step 4:** Extend `build_scheme_tree` for `then` and `when_all` + tests
 - [x] **Step 5:** Create `string_writer.hpp` + test — Writer applicative for string accumulation
 - [x] **Step 6:** Create `format_scheme_node.hpp` + test — DOT formatter
-- [ ] **Step 7:** Create `dump_scheme_plan.hpp` + test — top-level API wiring
+- [x] **Step 7:** Create `dump_scheme_plan.hpp` + test — top-level API wiring
 - [ ] **Step 8:** Create example program + update docs
 
 ## Marking Complete
