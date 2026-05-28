@@ -11,13 +11,11 @@
 
 namespace smd::smdscheme::sender {
 
-inline auto format_scheme_node(scheme_node_data const& node)
+inline auto format_scheme_node(scheme_node_data const &node)
     -> string_writer<std::monostate> {
-    std::string dot = std::format(
-        "  n{} [label=\"{}\\n[{}]\"];\n",
-        node.node_id,
-        node.sender_algo,
-        node.scheme_context);
+    std::string dot =
+        std::format("  n{} [label=\"{}\\n[{}]\"];\n", node.node_id,
+                    node.sender_algo, node.scheme_context);
 
     for (int child_id : node.child_ids) {
         dot += std::format("  n{} -> n{};\n", node.node_id, child_id);
