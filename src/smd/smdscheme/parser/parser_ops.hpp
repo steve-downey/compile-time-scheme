@@ -3,8 +3,8 @@
 #ifndef SRC_SMD_SMDSCHEME_PARSER_PARSER_OPS_HPP
 #define SRC_SMD_SMDSCHEME_PARSER_PARSER_OPS_HPP
 
-#include <smd/smdscheme/parser/parser.hpp>
 #include <smd/smdscheme/parser/alt.hpp>
+#include <smd/smdscheme/parser/parser.hpp>
 
 #include <type_traits>
 
@@ -42,9 +42,9 @@ struct parser_alternative_impl {
 
 template <class Impl>
 struct ParserApplicative : protected Impl {
-    using Impl::pure;
-    using Impl::map;
     using Impl::lift2;
+    using Impl::map;
+    using Impl::pure;
 
     template <class PF, class PA>
     [[nodiscard]] constexpr auto apply(this auto &&self, PF pf, PA pa) {

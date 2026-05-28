@@ -1,7 +1,7 @@
 # Step 8: Example program and documentation update
 
-**Phase:** 4 — Integration  
-**Prereqs:** Steps 1–7 (full pipeline works)  
+**Phase:** 4 — Integration
+**Prereqs:** Steps 1–7 (full pipeline works)
 **Next step:** None — this is the final step.
 
 ## What To Do

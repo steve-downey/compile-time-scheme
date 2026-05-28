@@ -1,4 +1,4 @@
-// src/smd/smdscheme/sender/sender_program.test.cpp                       -*-C++-*-
+// src/smd/smdscheme/sender/sender_program.test.cpp -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/sender/sender_program.hpp>

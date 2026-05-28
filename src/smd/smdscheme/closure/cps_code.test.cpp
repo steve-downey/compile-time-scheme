@@ -4,8 +4,8 @@
 #include <smd/smdscheme/closure/cps_code.hpp>
 #include <smd/smdscheme/closure/cps_code.hpp> // test 2nd include OK
 
-#include <smd/smdscheme/reader/read_datum.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
+#include <smd/smdscheme/reader/read_datum.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 

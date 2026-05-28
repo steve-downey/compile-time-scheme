@@ -1,5 +1,5 @@
-// src/smd/smdscheme/elaborator/elaborate.hpp                             -*-C++-*-
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// src/smd/smdscheme/elaborator/elaborate.hpp -*-C++-*- SPDX-License-Identifier:
+// Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATE_HPP
 #define SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATE_HPP
 

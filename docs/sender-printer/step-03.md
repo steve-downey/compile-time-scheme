@@ -1,7 +1,7 @@
 # Step 3: Reflection bridge — build_scheme_tree for `just`
 
-**Phase:** 2 — Reflection Bridge  
-**Prereqs:** Steps 1–2 (scheme_node_data and scheme_tree exist)  
+**Phase:** 2 — Reflection Bridge
+**Prereqs:** Steps 1–2 (scheme_node_data and scheme_tree exist)
 **Next step:** step-04.md
 
 ## What To Do
