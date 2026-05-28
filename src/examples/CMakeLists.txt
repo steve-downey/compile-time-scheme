@@ -128,3 +128,21 @@ set_tests_properties(
     examples_sender_graph_demo
     PROPERTIES PASS_REGULAR_EXPRESSION "digraph SchemeExecutionPlan"
 )
+
+add_executable(fibonacci_graph)
+target_sources(fibonacci_graph PRIVATE fibonacci_graph.cpp)
+target_link_libraries(fibonacci_graph PRIVATE smdscheme.sender)
+target_compile_options(fibonacci_graph PRIVATE -freflection)
+
+install(
+    TARGETS fibonacci_graph
+    COMPONENT smdscheme.smdscheme.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
+
+add_test(NAME examples_fibonacci_graph COMMAND fibonacci_graph)
+set_tests_properties(
+    examples_fibonacci_graph
+    PROPERTIES PASS_REGULAR_EXPRESSION "digraph SchemeExecutionPlan"
+)

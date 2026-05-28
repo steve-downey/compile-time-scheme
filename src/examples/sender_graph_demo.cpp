@@ -10,9 +10,8 @@ int main() {
     // Demonstrate DOT output for a composed sender expression.
     // This shows the execution plan for: then(when_all(just(1), just(2)), add)
     using Sender = decltype(smd::smdscheme::sender_v::then(
-        smd::smdscheme::sender_v::when_all(
-            smd::smdscheme::sender_v::just(1),
-            smd::smdscheme::sender_v::just(2)),
+        smd::smdscheme::sender_v::when_all(smd::smdscheme::sender_v::just(1),
+                                           smd::smdscheme::sender_v::just(2)),
         [](int a, int b) { return a + b; }));
 
     std::cout << "// Sender execution plan for: (+ 1 2)\n";
