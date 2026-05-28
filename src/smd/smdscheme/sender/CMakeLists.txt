@@ -16,6 +16,7 @@ target_sources(
                 build_scheme_tree.hpp
                 string_writer.hpp
                 format_scheme_node.hpp
+                dump_scheme_plan.hpp
 )
 target_link_libraries(
     smdscheme.sender
