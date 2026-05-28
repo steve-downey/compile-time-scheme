@@ -43,7 +43,7 @@ TEST_CASE("StringWriterTest - LiftA2") {
 }
 
 TEST_CASE("StringWriterTest - Fmap") {
-    auto w  = string_writer<int>{"some_log", 5};
+    auto w = string_writer<int>{"some_log", 5};
     auto w2 = fmap([](int x) { return x * 2; }, w);
     CHECK(w2.log == "some_log");
     CHECK(w2.value == 10);

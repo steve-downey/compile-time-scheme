@@ -12,7 +12,7 @@ namespace smd::smdscheme::sender {
 template <typename T>
 struct string_writer {
     std::string log;
-    T           value;
+    T value;
 
     static auto pure(T val) -> string_writer {
         return string_writer{"", std::move(val)};
@@ -20,19 +20,19 @@ struct string_writer {
 };
 
 template <typename F, typename A, typename B>
-auto lift_a2(F func, string_writer<A> const& a, string_writer<B> const& b)
+auto lift_a2(F func, string_writer<A> const &a, string_writer<B> const &b)
     -> string_writer<decltype(func(a.value, b.value))> {
     return {a.log + b.log, func(a.value, b.value)};
 }
 
 template <typename T>
-auto combine(string_writer<T> const& a, string_writer<T> const& b)
+auto combine(string_writer<T> const &a, string_writer<T> const &b)
     -> string_writer<T> {
     return {a.log + b.log, b.value};
 }
 
 template <typename F, typename A>
-auto fmap(F func, string_writer<A> const& w)
+auto fmap(F func, string_writer<A> const &w)
     -> string_writer<decltype(func(w.value))> {
     return {w.log, func(w.value)};
 }
