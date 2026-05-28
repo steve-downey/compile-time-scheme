@@ -20,11 +20,11 @@ struct scheme_tree {
         return id;
     }
 
-    constexpr auto get(int id) const -> scheme_node_data const& {
+    constexpr auto get(int id) const -> scheme_node_data const & {
         return nodes[id];
     }
 
-    constexpr auto get(int id) -> scheme_node_data& { return nodes[id]; }
+    constexpr auto get(int id) -> scheme_node_data & { return nodes[id]; }
 };
 
 } // namespace smd::smdscheme::sender
