@@ -4,47 +4,35 @@ This file is rewritten by each step's agent with notes for the next step.
 
 ## Current State
 
-Step 7 is complete. All 155 tests pass (up from 151 — 4 new DumpSchemePlanTest tests:
-HeaderIsIdempotent, JustSender, ThenSender, WhenAllThenSender). Linters pass.
+**All 8 steps are complete.** The sender graph printer implementation is done.
 
-The branch `worktree-sender-printer-step-07` contains Step 7 work built on top of Step 6.
+156 tests pass (up from 155 — 1 new `examples_sender_graph_demo` CTest). Linters pass.
 
-## What Was Done in Step 7
+The branch `worktree-sender-printer-step-08` contains Step 8 work built on top of Step 7.
 
-- Created `src/smd/smdscheme/sender/dump_scheme_plan.hpp` — `format_tree` (runtime DOT
-  assembly from a constexpr `scheme_tree`) and `dump_scheme_plan<Sender, MaxNodes>` (top-
-  level template that reflects at compile time via `^^Sender` then streams DOT at runtime).
-- Created `src/smd/smdscheme/sender/dump_scheme_plan.test.cpp` — 4 Catch2 tests covering
-  `just`, `then`, and nested `then(when_all(just, just), fn)` senders.
-- Updated `src/smd/smdscheme/sender/CMakeLists.txt` to add `dump_scheme_plan.hpp` to
-  FILE_SET.
-- clang-format also fixed minor style issues in `format_scheme_node.hpp` (const&→const &,
-  std::format call reformatting) and `format_scheme_node.test.cpp` (alignment removal,
-  comment spacing).
+## What Was Done in Step 8
 
-## Confirmed: constexpr + runtime pipeline works end-to-end
+- Created `src/examples/sender_graph_demo.cpp` — standalone example demonstrating DOT
+  output for `then(when_all(just(1), just(2)), add)`. Prints `// Sender execution plan
+  for: (+ 1 2)` header then the digraph to stdout.
+- Updated `src/examples/CMakeLists.txt` — added `sender_graph_demo` executable target
+  linking `smdscheme.sender` with `-freflection`, install block, and CTest entry with
+  `PASS_REGULAR_EXPRESSION "digraph SchemeExecutionPlan"`.
+- Created `docs/sender_graphing.md` — added Status section at the top listing all four
+  implemented phases and example usage. The file was previously untracked (not in git);
+  this commit adds it to the repo.
+- clang-format also auto-fixed style in `dump_scheme_plan.hpp` (`const&` → `const &`,
+  comment reformatting) and `dump_scheme_plan.test.cpp` (lambda call alignment) from
+  step 7.
 
-`^^Sender` splice WORKS on template type parameters (not consteval function parameters —
-that GCC16 restriction stays). The pattern:
+## Confirmed: Example Output
 
-```cpp
-template <typename Sender, int MaxNodes = 64>
-void dump_scheme_plan(std::ostream& out = std::cout) {
-    constexpr auto tree = [] {
-        scheme_tree<MaxNodes> t{};
-        auto root = build_scheme_tree<MaxNodes>(^^Sender, t);
-        t.root_id = root;
-        return t;
-    }();
-    out << format_tree(tree);
-}
+Running `sender_graph_demo` produces:
+
 ```
+// Sender execution plan for: (+ 1 2)
+// Pipe to: dot -Tpng -o plan.png
 
-compiles and runs correctly for `just`, `then`, and `when_all` sender compositions.
-
-## Sample DOT Output for then(when_all(just(1), just(2)), fn)
-
-```dot
 digraph SchemeExecutionPlan {
   node [shape=Mrecord, style=filled, fillcolor=lightcyan];
   n0 [label="then\n[]"];
@@ -57,49 +45,16 @@ digraph SchemeExecutionPlan {
 }
 ```
 
-Note: `scheme_context` is empty string because `build_scheme_tree` does not populate it.
-Labels show `"algo\n[]"` until a future step or the user populates `scheme_context`.
+## Key linking note
 
-## Notes for Step 8
+`smdscheme.sender` already propagates `-freflection` via `target_compile_options(smdscheme.sender INTERFACE -freflection)`. Adding explicit `-freflection` to the example target is redundant but harmless and follows the convention of the other reflection examples.
 
-Begin with `step-08.md`. Step 8 creates an example program and updates documentation.
+The example links `smdscheme.sender` directly (not `smdscheme.smdscheme`) since only
+sender headers are needed.
 
-### Key facts for Step 8
+## No Further Steps
 
-- `dump_scheme_plan<SenderType>(std::cout)` is the complete public API — no setup needed.
-- The sender type must be named (passed as template argument). Example usage:
-  ```cpp
-  #include <smd/smdscheme/sender/dump_scheme_plan.hpp>
-  #include <smd/smdscheme/sender/sender_v.hpp>
-
-  int main() {
-      using S = decltype(smd::smdscheme::sender_v::then(
-          smd::smdscheme::sender_v::just(42),
-          [](int x){ return x * 2; }));
-      smd::smdscheme::sender::dump_scheme_plan<S>(std::cout);
-  }
-  ```
-- The example should go in `src/examples/` following the existing pattern (see
-  `src/examples/godbolt_arithmetic.cpp` and similar for conventions).
-- CMakeLists.txt for examples is at `src/examples/CMakeLists.txt` — add an executable
-  target and a CTest test entry following existing patterns.
-- Check if the examples CMakeLists already links `smdscheme.sender` (the sender examples
-  do — `advanced_sender_ffi.cpp` links it). Follow the same pattern.
-- Lambdas in unevaluated operands (e.g. inside `decltype(...)`) work in C++26/GCC16.
-- docs update: `docs/sender_graphing.md` should be updated to reflect that the API is
-  now implemented and describe usage.
-
-### CMakeLists.txt current FILE_SET (after step 7)
-
-```cmake
-FILES
-    sender_program.hpp
-    sender_v.hpp
-    sender_cps_program.hpp
-    scheme_node_data.hpp
-    scheme_tree.hpp
-    build_scheme_tree.hpp
-    string_writer.hpp
-    format_scheme_node.hpp
-    dump_scheme_plan.hpp
-```
+This is the final step. The human should now:
+1. Review branches `worktree-sender-printer-step-01` through `worktree-sender-printer-step-08`
+2. `--no-ff` merge each step branch to main in order (01 → 08)
+3. Optionally run `dot` on the example output to produce a PNG visualization

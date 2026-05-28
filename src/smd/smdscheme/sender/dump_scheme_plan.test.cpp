@@ -27,8 +27,8 @@ TEST_CASE("DumpSchemePlanTest - JustSender") {
 }
 
 TEST_CASE("DumpSchemePlanTest - ThenSender") {
-    using ThenType = decltype(sender_v::then(
-        sender_v::just(1), [](int x) { return x + 1; }));
+    using ThenType = decltype(sender_v::then(sender_v::just(1),
+                                             [](int x) { return x + 1; }));
     std::ostringstream out;
     sender::dump_scheme_plan<ThenType>(out);
     std::string dot = out.str();

@@ -110,3 +110,21 @@ set_tests_properties(
     examples_advanced_sender_ffi
     PROPERTIES PASS_REGULAR_EXPRESSION "Final Scheme Result Output: 5"
 )
+
+add_executable(sender_graph_demo)
+target_sources(sender_graph_demo PRIVATE sender_graph_demo.cpp)
+target_link_libraries(sender_graph_demo PRIVATE smdscheme.sender)
+target_compile_options(sender_graph_demo PRIVATE -freflection)
+
+install(
+    TARGETS sender_graph_demo
+    COMPONENT smdscheme.smdscheme.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
+
+add_test(NAME examples_sender_graph_demo COMMAND sender_graph_demo)
+set_tests_properties(
+    examples_sender_graph_demo
+    PROPERTIES PASS_REGULAR_EXPRESSION "digraph SchemeExecutionPlan"
+)
