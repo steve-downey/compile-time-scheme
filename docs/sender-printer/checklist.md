@@ -4,7 +4,7 @@
 
 | Phase | Description | Steps | Status |
 |-------|-------------|-------|--------|
-| 1 | Runtime Topology | Step 1–2 | ⬜ |
+| 1 | Runtime Topology | Step 1–2 | ✅ |
 | 2 | Reflection Bridge | Step 3–4 | ✅ |
 | 3 | Applicative Traverser | Step 5–6 | ⬜ |
 | 4 | Integration | Step 7–8 | ⬜ |
@@ -15,7 +15,7 @@
 - [x] **Step 2:** Create `scheme_tree.hpp` + test — tree type for holding the topology
 - [x] **Step 3:** Create `build_scheme_tree.hpp` + test — reflection bridge for `just` senders
 - [x] **Step 4:** Extend `build_scheme_tree` for `then` and `when_all` + tests
-- [ ] **Step 5:** Create `string_writer.hpp` + test — Writer applicative for string accumulation
+- [x] **Step 5:** Create `string_writer.hpp` + test — Writer applicative for string accumulation
 - [ ] **Step 6:** Create `format_scheme_node.hpp` + test — DOT formatter
 - [ ] **Step 7:** Create `dump_scheme_plan.hpp` + test — top-level API wiring
 - [ ] **Step 8:** Create example program + update docs
