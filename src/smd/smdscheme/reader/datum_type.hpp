@@ -1,10 +1,10 @@
-// src/smd/smdscheme/reader/datum_type.hpp                                -*-C++-*-
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// src/smd/smdscheme/reader/datum_type.hpp -*-C++-*- SPDX-License-Identifier:
+// Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_READER_DATUM_TYPE_HPP
 #define SRC_SMD_SMDSCHEME_READER_DATUM_TYPE_HPP
 
-#include <smd/smdscheme/foundation/fix.hpp>
 #include <smd/smdscheme/foundation/arena_box.hpp>
+#include <smd/smdscheme/foundation/fix.hpp>
 #include <smd/smdscheme/foundation/static_vector.hpp>
 
 #include <string_view>
@@ -44,7 +44,8 @@ struct datum_f_factory {
 };
 
 template <int MaxNodes, int MaxList>
-using datum_type = foundation::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
+using datum_type =
+    foundation::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
 
 } // namespace smd::smdscheme::reader
 

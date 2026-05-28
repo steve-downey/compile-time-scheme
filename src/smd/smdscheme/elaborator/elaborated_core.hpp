@@ -1,4 +1,4 @@
-// src/smd/smdscheme/elaborator/elaborated_core.hpp                       -*-C++-*-
+// src/smd/smdscheme/elaborator/elaborated_core.hpp -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATED_CORE_HPP
 #define SRC_SMD_SMDSCHEME_ELABORATOR_ELABORATED_CORE_HPP
@@ -59,7 +59,8 @@ struct core_f_factory {
 };
 
 template <int MaxNodes, int MaxList>
-using core_type = foundation::fix<core_f_factory<MaxNodes, MaxList>::template type>;
+using core_type =
+    foundation::fix<core_f_factory<MaxNodes, MaxList>::template type>;
 
 template <int MaxNodes, int MaxList>
 struct elaborated_core {

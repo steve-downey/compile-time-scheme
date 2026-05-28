@@ -1,5 +1,5 @@
-// src/smd/smdscheme/parser/alt.test.cpp                                  -*-C++-*-
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// src/smd/smdscheme/parser/alt.test.cpp -*-C++-*- SPDX-License-Identifier:
+// Apache-2.0 WITH LLVM-exception
 
 #include <smd/smdscheme/parser/alt.hpp>
 #include <smd/smdscheme/parser/alt.hpp> // test 2nd include OK

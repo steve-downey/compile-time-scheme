@@ -1,4 +1,4 @@
-// src/smd/smdscheme/reflection/reified_environment.hpp                   -*-C++-*-
+// src/smd/smdscheme/reflection/reified_environment.hpp -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_REFLECTION_REIFIED_ENVIRONMENT_HPP
 #define SRC_SMD_SMDSCHEME_REFLECTION_REIFIED_ENVIRONMENT_HPP

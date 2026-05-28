@@ -1,4 +1,4 @@
-// src/smd/smdscheme/sender/sender_cps_program.hpp                        -*-C++-*-
+// src/smd/smdscheme/sender/sender_cps_program.hpp -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #ifndef SRC_SMD_SMDSCHEME_SENDER_SENDER_CPS_PROGRAM_HPP
 #define SRC_SMD_SMDSCHEME_SENDER_SENDER_CPS_PROGRAM_HPP
@@ -7,8 +7,8 @@
 #include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/elaborator/elaborated_core.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
-#include <smd/smdscheme/reader/read_datum.hpp>
 #include <smd/smdscheme/parser/cursor.hpp>
+#include <smd/smdscheme/reader/read_datum.hpp>
 #include <smd/smdscheme/sender/sender_v.hpp>
 
 #include <span>
@@ -37,38 +37,34 @@ template <int MaxNodes, int MaxList, int MaxBindings>
 auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                foundation::tree_arena<elaborator::core_type<MaxNodes, MaxList>,
                                       MaxNodes> const &arena,
-               closure::env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings>
-                   const &environment)
+               closure::env<elaborator::core_type<MaxNodes, MaxList>,
+                            MaxBindings> const &environment)
     -> foundation::result<
         closure::value<elaborator::core_type<MaxNodes, MaxList>>> {
 
     using Core = elaborator::core_type<MaxNodes, MaxList>;
-    using Val  = closure::value<Core>;
-    using Res  = foundation::result<Val>;
+    using Val = closure::value<Core>;
+    using Res = foundation::result<Val>;
 
     // Integer literal: just produces the value
     if (std::holds_alternative<core_integer>(node.inner)) {
         return detail::unwrap_sender<Res>(
-            sender_v::just(Res{Val{
-                std::get<core_integer>(node.inner).value}}));
+            sender_v::just(Res{Val{std::get<core_integer>(node.inner).value}}));
     }
 
     // Boolean literal: just produces the value
     if (std::holds_alternative<core_boolean>(node.inner)) {
         return detail::unwrap_sender<Res>(
-            sender_v::just(Res{Val{
-                std::get<core_boolean>(node.inner).value}}));
+            sender_v::just(Res{Val{std::get<core_boolean>(node.inner).value}}));
     }
 
     // Symbol: just the environment, then lookup
     if (std::holds_alternative<core_symbol>(node.inner)) {
         auto name = std::get<core_symbol>(node.inner).name;
-        return detail::unwrap_sender<Res>(
-            sender_v::then(
-                sender_v::just(name),
-                [&environment](std::string_view n) -> Res {
-                    return environment.lookup(n);
-                }));
+        return detail::unwrap_sender<Res>(sender_v::then(
+            sender_v::just(name), [&environment](std::string_view n) -> Res {
+                return environment.lookup(n);
+            }));
     }
 
     // Quote: just produces the quoted atom
@@ -90,19 +86,16 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
         auto cond_r = eval_node<MaxNodes, MaxList, MaxBindings>(
             arena.get(cif.condition), arena, environment);
 
-        return detail::unwrap_sender<Res>(
-            sender_v::then(
-                sender_v::just(std::move(cond_r)),
-                [&](Res cv) -> Res {
-                    if (!cv.has_value())
-                        return cv;
-                    bool taken = !std::holds_alternative<bool>(cv.value()) ||
-                                 std::get<bool>(cv.value());
-                    auto const &branch =
-                        taken ? cif.consequent : cif.alternative;
-                    return eval_node<MaxNodes, MaxList, MaxBindings>(
-                        arena.get(branch), arena, environment);
-                }));
+        return detail::unwrap_sender<Res>(sender_v::then(
+            sender_v::just(std::move(cond_r)), [&](Res cv) -> Res {
+                if (!cv.has_value())
+                    return cv;
+                bool taken = !std::holds_alternative<bool>(cv.value()) ||
+                             std::get<bool>(cv.value());
+                auto const &branch = taken ? cif.consequent : cif.alternative;
+                return eval_node<MaxNodes, MaxList, MaxBindings>(
+                    arena.get(branch), arena, environment);
+            }));
     }
 
     // Lambda: just wraps the closure value
@@ -136,32 +129,28 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
             auto arg1_r = eval_node<MaxNodes, MaxList, MaxBindings>(
                 arena.get(app.args[1]), arena, environment);
 
-            return detail::unwrap_sender<Res>(
-                sender_v::then(
-                    sender_v::when_all(
-                        sender_v::just(std::move(arg0_r)),
-                        sender_v::just(std::move(arg1_r))),
-                    [bi](Res a0r, Res a1r) -> Res {
-                        if (!a0r.has_value())
-                            return a0r;
-                        if (!a1r.has_value())
-                            return a1r;
-                        if (!std::holds_alternative<int>(a0r.value()) ||
-                            !std::holds_alternative<int>(a1r.value()))
-                            return Res{
-                                foundation::parse_error{{}, "type error"}};
-                        int a = std::get<int>(a0r.value());
-                        int b = std::get<int>(a1r.value());
-                        if (bi.op == closure::builtin_op::add)
-                            return Res{Val{a + b}};
-                        return Res{Val{a * b}};
-                    }));
+            return detail::unwrap_sender<Res>(sender_v::then(
+                sender_v::when_all(sender_v::just(std::move(arg0_r)),
+                                   sender_v::just(std::move(arg1_r))),
+                [bi](Res a0r, Res a1r) -> Res {
+                    if (!a0r.has_value())
+                        return a0r;
+                    if (!a1r.has_value())
+                        return a1r;
+                    if (!std::holds_alternative<int>(a0r.value()) ||
+                        !std::holds_alternative<int>(a1r.value()))
+                        return Res{foundation::parse_error{{}, "type error"}};
+                    int a = std::get<int>(a0r.value());
+                    int b = std::get<int>(a1r.value());
+                    if (bi.op == closure::builtin_op::add)
+                        return Res{Val{a + b}};
+                    return Res{Val{a * b}};
+                }));
         }
 
         // Closure application: evaluate args, bind params, evaluate body
         if (std::holds_alternative<closure::closure<Core>>(func_r.value())) {
-            auto const &clo =
-                std::get<closure::closure<Core>>(func_r.value());
+            auto const &clo = std::get<closure::closure<Core>>(func_r.value());
             auto const &lam_node = *clo.node;
 
             if (!std::holds_alternative<core_lambda<Core, MaxNodes, MaxList>>(
@@ -169,8 +158,7 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                 return Res{foundation::parse_error{{}, "type error"}};
 
             auto const &lam =
-                std::get<core_lambda<Core, MaxNodes, MaxList>>(
-                    lam_node.inner);
+                std::get<core_lambda<Core, MaxNodes, MaxList>>(lam_node.inner);
 
             if (app.args.size() != lam.params.size())
                 return Res{foundation::parse_error{{}, "arity mismatch"}};
@@ -203,22 +191,19 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                 evaluated_args.push_back(arg_r.value());
             }
 
-            return detail::unwrap_sender<Res>(
-                sender_v::then(
-                    sender_v::just(
-                        std::span<Val const>(
-                            evaluated_args.begin(), evaluated_args.end())),
-                    [&ff](std::span<Val const> args) -> Res {
-                        return ff.fn(args);
-                    }));
+            return detail::unwrap_sender<Res>(sender_v::then(
+                sender_v::just(std::span<Val const>(evaluated_args.begin(),
+                                                    evaluated_args.end())),
+                [&ff](std::span<Val const> args) -> Res {
+                    return ff.fn(args);
+                }));
         }
 
-        return Res{foundation::parse_error{
-            {}, "attempted to call non-function"}};
+        return Res{
+            foundation::parse_error{{}, "attempted to call non-function"}};
     }
 
-    return Res{foundation::parse_error{
-        {}, "sender_cps: unsupported form"}};
+    return Res{foundation::parse_error{{}, "sender_cps: unsupported form"}};
 }
 
 template <int MaxNodes, int MaxList>
@@ -230,14 +215,14 @@ struct sender_cps_program {
     template <int MaxBindings>
     auto operator()(closure::env<Core, MaxBindings> const &environment) const
         -> foundation::result<closure::value<Core>> {
-        return eval_node<MaxNodes, MaxList, MaxBindings>(
-            root, arena, environment);
+        return eval_node<MaxNodes, MaxList, MaxBindings>(root, arena,
+                                                         environment);
     }
 };
 
 template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] auto compile_sender_cps(std::string_view src) {
-    using Core     = elaborator::core_type<MaxNodes, MaxList>;
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
     using ProgramT = sender_cps_program<MaxNodes, MaxList>;
 
     foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>, MaxNodes>
@@ -247,8 +232,8 @@ template <int MaxNodes = 32, int MaxList = 16>
     if (!dr.has_value())
         return foundation::result<ProgramT>{dr.error()};
     foundation::tree_arena<Core, MaxNodes> core_arena;
-    auto er = elaborator::elaborate<MaxNodes, MaxList>(
-        dr.value().value, arena_dr, core_arena);
+    auto er = elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                       arena_dr, core_arena);
     if (!er.has_value())
         return foundation::result<ProgramT>{er.error()};
     auto const &ct_root = er.value();
