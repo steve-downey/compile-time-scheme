@@ -12,7 +12,7 @@
 ## Step Checklist
 
 - [x] **Step 1:** Create `scheme_node_data.hpp` + test — topology node struct
-- [ ] **Step 2:** Create `scheme_tree.hpp` + test — tree type for holding the topology
+- [x] **Step 2:** Create `scheme_tree.hpp` + test — tree type for holding the topology
 - [ ] **Step 3:** Create `build_scheme_tree.hpp` + test — reflection bridge for `just` senders
 - [ ] **Step 4:** Extend `build_scheme_tree` for `then` and `when_all` + tests
 - [ ] **Step 5:** Create `string_writer.hpp` + test — Writer applicative for string accumulation
