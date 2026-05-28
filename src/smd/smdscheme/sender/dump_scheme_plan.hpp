@@ -14,7 +14,7 @@ namespace smd::smdscheme::sender {
 
 // Build the DOT string for a scheme_tree by formatting each node.
 template <int MaxNodes>
-auto format_tree(scheme_tree<MaxNodes> const& tree) -> std::string {
+auto format_tree(scheme_tree<MaxNodes> const &tree) -> std::string {
     std::string dot = "digraph SchemeExecutionPlan {\n";
     dot += "  node [shape=Mrecord, style=filled, fillcolor=lightcyan];\n";
 
@@ -30,10 +30,10 @@ auto format_tree(scheme_tree<MaxNodes> const& tree) -> std::string {
 // and emit Graphviz DOT to an output stream at runtime.
 //
 // Usage:
-//   using S = decltype(sender_v::then(sender_v::just(1), [](int x){ return x+1; }));
-//   sender::dump_scheme_plan<S>(std::cout);
+//   using S = decltype(sender_v::then(sender_v::just(1), [](int x){ return x+1;
+//   })); sender::dump_scheme_plan<S>(std::cout);
 template <typename Sender, int MaxNodes = 64>
-void dump_scheme_plan(std::ostream& out = std::cout) {
+void dump_scheme_plan(std::ostream &out = std::cout) {
     constexpr auto tree = [] {
         scheme_tree<MaxNodes> t{};
         auto root = build_scheme_tree<MaxNodes>(^^Sender, t);
