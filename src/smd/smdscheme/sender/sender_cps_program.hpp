@@ -221,7 +221,7 @@ struct sender_cps_program {
 };
 
 template <int MaxNodes = 32, int MaxList = 16>
-[[nodiscard]] auto compile_sender_cps(std::string_view src) {
+[[nodiscard]] constexpr auto compile_sender_cps(std::string_view src) {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
     using ProgramT = sender_cps_program<MaxNodes, MaxList>;
 

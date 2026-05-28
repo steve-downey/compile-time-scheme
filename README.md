@@ -19,7 +19,7 @@ The project is structured as a staged pipeline to cleanly separate parsing from 
 
 ## Example: Y Combinator Fibonacci as a Sender Graph
 
-The sender backend compiles a Scheme Y combinator fibonacci entirely at compile time. The `dump_scheme_plan` utility uses C++26 reflection to visualize the sender execution plan as a Graphviz DOT graph.
+The Scheme source is compiled to a core tree at compile time via `compile_sender_cps`. At runtime, `eval_node` drives execution through `just`/`then`/`when_all` senders — no `beman::task` type erasure needed. The `dump_scheme_plan` utility uses C++26 reflection to visualize that sender pattern as a Graphviz DOT graph.
 
 ### Scheme Source
 
@@ -35,7 +35,11 @@ The sender backend compiles a Scheme Y combinator fibonacci entirely at compile 
               (self self (+ n -2)))))))
 ```
 
-This computes `fib(5) = 5` using the self-application (Y combinator) pattern for recursion without a `letrec`. See `src/examples/advanced_sender_ffi.cpp` for the full executable version with FFI bindings.
+Compiled at compile time; evaluated at runtime via `sender_cps`:
+
+```
+fib(5) = 5
+```
 
 ### Sender Execution Plan for fib(3)
 
