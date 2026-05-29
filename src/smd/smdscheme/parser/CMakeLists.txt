@@ -10,8 +10,3 @@ target_sources(
             FILES parser.hpp alt.hpp parser_ops.hpp cursor.hpp
 )
 target_link_libraries(smdscheme.parser PUBLIC smdscheme.foundation)
-
-include(infra/cmake/beman-install-library.cmake OPTIONAL)
-if(COMMAND beman_install_library)
-    beman_install_library(smdscheme.parser TARGETS smdscheme.parser NAMESPACE smd::)
-endif()

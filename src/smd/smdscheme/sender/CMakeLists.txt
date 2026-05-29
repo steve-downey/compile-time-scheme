@@ -20,10 +20,12 @@ target_sources(
 )
 target_link_libraries(
     smdscheme.sender
-    PUBLIC smdscheme.closure beman::execution_headers beman.task_headers
+    PUBLIC
+        smdscheme.closure
+        $<BUILD_INTERFACE:beman::execution_headers>
+        $<BUILD_INTERFACE:beman.task_headers>
 )
-
-include(infra/cmake/beman-install-library.cmake OPTIONAL)
-if(COMMAND beman_install_library)
-    beman_install_library(smdscheme.sender TARGETS smdscheme.sender NAMESPACE smd::)
-endif()
+target_include_directories(
+    smdscheme.sender
+    PUBLIC $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+)

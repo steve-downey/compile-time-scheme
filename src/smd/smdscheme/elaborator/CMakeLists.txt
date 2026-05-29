@@ -10,8 +10,3 @@ target_sources(
             FILES elaborated_core.hpp elaborate.hpp
 )
 target_link_libraries(smdscheme.elaborator PUBLIC smdscheme.reader)
-
-include(infra/cmake/beman-install-library.cmake OPTIONAL)
-if(COMMAND beman_install_library)
-    beman_install_library(smdscheme.elaborator TARGETS smdscheme.elaborator NAMESPACE smd::)
-endif()

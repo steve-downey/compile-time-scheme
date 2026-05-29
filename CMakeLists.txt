@@ -43,7 +43,34 @@ add_subdirectory(vendor/task EXCLUDE_FROM_ALL)
 add_subdirectory(src)
 
 include(infra/cmake/beman-install-library.cmake)
-beman_install_library(smdscheme.smdscheme TARGETS smdscheme.smdscheme NAMESPACE smd::)
+include(GNUInstallDirs)
+
+# Install vendored beman execution and task headers so sender targets are usable
+# from the installed package without requiring a separate beman installation.
+install(
+    DIRECTORY "${CMAKE_SOURCE_DIR}/vendor/execution/include/beman"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    COMPONENT schemepoc.schemepoc_Development
+)
+install(
+    DIRECTORY "${CMAKE_SOURCE_DIR}/vendor/task/include/beman"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    COMPONENT schemepoc.schemepoc_Development
+)
+
+beman_install_library(
+    schemepoc.schemepoc
+    TARGETS
+        smdscheme.smdscheme
+        smdscheme.sender
+        smdscheme.reflection
+        smdscheme.closure
+        smdscheme.elaborator
+        smdscheme.reader
+        smdscheme.parser
+        smdscheme.foundation
+    NAMESPACE smd::
+)
 
 # Coverage
 configure_file("cmake/gcovr.cfg.in" gcovr.cfg @ONLY)

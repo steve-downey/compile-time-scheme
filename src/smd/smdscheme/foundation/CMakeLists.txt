@@ -22,8 +22,3 @@ target_sources(
                 fix.hpp
     PRIVATE version.cpp
 )
-
-include(infra/cmake/beman-install-library.cmake OPTIONAL)
-if(COMMAND beman_install_library)
-    beman_install_library(smdscheme.foundation TARGETS smdscheme.foundation NAMESPACE smd::)
-endif()
