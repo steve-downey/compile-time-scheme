@@ -115,7 +115,7 @@ compile-headers: $(_build_path)/CMakeCache.txt ## Compile the headers
 
 .PHONY: install
 install: $(_build_path)/CMakeCache.txt compile ## Install the project
-	$(CMAKE) --install $(_build_path) --config $(CONFIG) --component schemepoc.schempoc_Development --verbose
+	$(CMAKE) --install $(_build_path) --config $(CONFIG) --component schemepoc.schemepoc_Development --verbose
 
 .PHONY: clean-install
 clean-install:
@@ -230,7 +230,10 @@ testinstall: install
 testinstall: CONFIG=RelWithDebInfo
 testinstall: ## Test the installed package
 	-$(RM) -rf installtest/.build
-	$(CMAKE) -S installtest -B installtest/.build 	-G "Ninja Multi-Config"
+	$(CMAKE) -S installtest -B installtest/.build \
+		-G "Ninja Multi-Config" \
+		-DCMAKE_TOOLCHAIN_FILE=$(abspath etc/gcc-16-toolchain.cmake) \
+		-DCMAKE_PREFIX_PATH=$(abspath $(INSTALL_PREFIX))
 	$(CMAKE) --build  installtest/.build --target test --config="RelWithDebInfo"
 
 .PHONY: clean-testinstall

@@ -10,8 +10,3 @@ target_sources(
             FILES reified_environment.hpp
 )
 target_link_libraries(smdscheme.reflection PUBLIC smdscheme.foundation)
-
-include(infra/cmake/beman-install-library.cmake OPTIONAL)
-if(COMMAND beman_install_library)
-    beman_install_library(smdscheme.reflection TARGETS smdscheme.reflection NAMESPACE smd::)
-endif()

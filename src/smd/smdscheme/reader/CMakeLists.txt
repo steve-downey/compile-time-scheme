@@ -10,8 +10,3 @@ target_sources(
             FILES atom.hpp datum_type.hpp read_datum.hpp
 )
 target_link_libraries(smdscheme.reader PUBLIC smdscheme.parser)
-
-include(infra/cmake/beman-install-library.cmake OPTIONAL)
-if(COMMAND beman_install_library)
-    beman_install_library(smdscheme.reader TARGETS smdscheme.reader NAMESPACE smd::)
-endif()

@@ -10,8 +10,3 @@ target_sources(
             FILES value.hpp cps_code.hpp closure_program.hpp eval_direct.hpp
 )
 target_link_libraries(smdscheme.closure PUBLIC smdscheme.elaborator)
-
-include(infra/cmake/beman-install-library.cmake OPTIONAL)
-if(COMMAND beman_install_library)
-    beman_install_library(smdscheme.closure TARGETS smdscheme.closure NAMESPACE smd::)
-endif()
