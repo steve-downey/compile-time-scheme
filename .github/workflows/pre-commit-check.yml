@@ -18,4 +18,4 @@ jobs:
       checks: write
       issues: write
       pull-requests: write
-    uses: bemanproject/infra-workflows/.github/workflows/reusable-beman-pre-commit.yml@4d946e210ce2ee68ccd8607c8acccacf171830c5 # ratchet:bemanproject/infra-workflows/.github/workflows/reusable-beman-pre-commit.yml@1.7.1
+    uses: bemanproject/infra-workflows/.github/workflows/reusable-beman-pre-commit.yml@ab547291c55be8aedbb183577f571ca75b962f5b # ratchet:bemanproject/infra-workflows/.github/workflows/reusable-beman-pre-commit.yml@1.7.3
