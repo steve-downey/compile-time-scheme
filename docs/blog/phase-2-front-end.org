@@ -1,0 +1,70 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 2 - The Front-End & Parser Combinators
+#+AUTHOR: Steve Downey
+#+DATE: 2026-05-29
+
+#+begin_abstract
+Parsing text into meaningful structure is the first visible step of any compiler. Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, we lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators.
+#+end_abstract
+
+{{{TEASER_END}}}
+
+* Why Not Recursive Descent or LL(1)?
+
+Recursive descent is the industry standard for production compilers (like GCC or Clang) because it offers unparalleled control over error recovery and diagnostics. However, for a purposely simple language like Scheme (with its highly uniform S-expression syntax), a recursive descent parser often involves writing verbose, repetitive loops and state-tracking mechanisms.
+
+We also avoid parser generators (like Bison/Yacc). While mathematically rigorous, they introduce massive build-system complexity and generate code that is historically difficult to make strictly ~constexpr~ compliant in modern C++. Trying to force a tool from 1975 to emit C++26 constant expressions is an exercise in misery.
+
+* Enter Parser Combinators
+
+Parser combinators popularized in the functional programming world (most notably by Haskell's *Parsec* library) treat parsers as first-class values. A parser is simply a function that takes some Input (a cursor) and returns a Result (a parsed value and the remaining unparsed input, or an error).
+
+#+begin_src c++
+// Conceptual model
+using ParserResult = result<std::pair<Value, Cursor>, Error>;
+using Parser = std::function<ParserResult(Cursor)>; 
+#+end_src
+
+By treating parsers as callable objects, we can build small, trivial parsers and "combine" them algebraically to form complex language definitions. 
+
+* Category Theory in C++
+
+To compose parsers elegantly, we map concepts from Category Theory into our C++ design. It sounds intimidating, but the C++ translation is relatively straightforward when you squint at it right.
+
+** Functors
+A Functor allows us to apply a function to a value wrapped in a context. If we have a parser that returns a string of digits, and we want a parser that returns an integer, we ~fmap~ ~std::stoi~ over the parser.
+
+#+begin_src c++
+// fmap(f, parser_A) -> parser_B
+#+end_src
+
+** Applicatives
+Applicative functors allow us to sequence operations and apply functions that take multiple arguments to values securely wrapped in parser contexts. For example, creating a ~Parser<Tuple<A, B>>~ out of ~Parser<A>~ and ~Parser<B>~. 
+
+** Alternative
+The ~Alternative~ typeclass provides the concept of choice (~<|>~). If ~parser_A~ fails, try ~parser_B~.
+
+#+begin_src c++
+auto parse_number_or_string = parse_number <|> parse_string;
+#+end_src
+
+** Monads
+While Monads (like ~bind~ or ~>>=~) allow context-sensitive parsing (where the result of the first parser determines the structure of the next parser), many Scheme constructs can be parsed with purely Applicative structures. The less we have to rely on Monads here, the easier the C++ type system is to deal with.
+
+* Constructing the Scheme Lexer
+
+With these tools, we easily construct a Scheme lexer:
+1. Define ~parse_digit~.
+2. Form ~parse_many(parse_digit)~.
+3. Use a Functor to convert that result to an integer token.
+4. Define ~parse_char('(')~ and ~parse_char(')')~.
+
+This algebraic approach produces a declarative parser written purely in zero-allocation C++ ~constexpr~ syntax, avoiding external build tools and remaining wonderfully composable.
+
+* References
+- Leijen, D., & Meijer, E. (2001). "Parsec: Direct Style Monadic Parser Combinators for the Real World." Department of Computer Science, Universiteit Utrecht.
+- Hutton, G., & Meijer, E. (1992). "Monadic Parser Combinators." Technical Report NOTTCS-TR-92-4.

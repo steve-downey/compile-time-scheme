@@ -1,0 +1,66 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 5 - The Middle-End: Continuation-Passing Style
+#+AUTHOR: Steve Downey
+#+DATE: 2026-05-29
+
+#+begin_abstract
+By Phase 4, our compile-time compiler could parse and elaborate code, but recursive execution directly blew up the C++ compiler's internal call stack. Phase 5 fixes this by introducing Continuation-Passing Style (CPS), fundamentally shifting how we view function execution.
+#+end_abstract
+
+{{{TEASER_END}}}
+
+* What is Continuation-Passing Style?
+
+In typical direct-style programming, a function computes a value and ~return~s it to its caller, utilizing the hardware (or compiler) stack to track where to return.
+
+#+begin_src c++
+// Direct Style
+int add(int a, int b) {
+    return a + b;
+}
+int result = add(2, add(3, 4));
+#+end_src
+
+In Continuation-Passing Style, no function ever returns. Every function explicitly accepts an extra argument—a callback—representing "what to do next." This callback is known as the *Continuation*.
+
+#+begin_src c++
+// Continuation-Passing Style (conceptual)
+void add_cps(int a, int b, auto continuation) {
+    continuation(a + b);
+}
+
+add_cps(3, 4, [](int partial_sum) {
+    add_cps(2, partial_sum, [](int final_result) {
+        // ... done
+    });
+});
+#+end_src
+
+* Defunctionalization and Stack Control
+
+In a ~constexpr~ environment, we cannot dynamically allocate these callback lambdas on the heap. We must *defunctionalize* them. Defunctionalization transforms high-level functions (like our lambdas) into concrete data structures (structs/variants) combined with an ~apply~ loop.
+
+Instead of calling a function on the C++ stack, an evaluation step yields a specific continuation object: "Here is the next step to execute, and here is its data." A top-level trampolining loop processes these continuations.
+
+#+begin_src c++
+while (!is_finished(current_continuation)) {
+    current_continuation = step(current_continuation);
+}
+#+end_src
+
+* Tail-Call Optimization (TCO)
+
+Because Scheme mandates Tail-Call Optimization (meaning infinite recursion without stack overflow is valid loop behavior), CPS provides the perfect mechanical underpinning. Tail calls in CPS are physically just jumps. We merely pass the current continuation without extending it. The trampolining loop handles the iteration perfectly in constant memory space.
+
+* Conclusion
+
+Through CPS and defunctionalization, our Scheme AST is transformed from nested operations fighting for C++ call-stack dominance into an explicit state machine perfectly suited for our fixed-capacity ~constexpr~ arenas. We are now capable of executing complex Scheme algorithms reliably during C++ compilation without exploding standard parsing limits.
+
+* References
+- Danvy, O. (2006). "Defunctionalization at Work." Proceedings of the 3rd ACM SIGPLAN conference on Principles and practice of declarative programming.
+- Steele, G. L. (1978). "Rabbit: A Compiler for Scheme." MIT AI Lab.
+- Reynolds, J. C. (1972). "Definitional interpreters for higher-order programming languages." Proceedings of the ACM annual conference.

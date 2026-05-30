@@ -1,0 +1,59 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 6 - The Back-End & Closure Materialization
+#+AUTHOR: Steve Downey
+#+DATE: 2026-05-29
+
+#+begin_abstract
+Phase 6 marks the transition from an interpreter to an actual compiler. The crucial functional mechanism that bridges runtime behavior into the C++ type system is the materialization of the Closure.
+#+end_abstract
+
+{{{TEASER_END}}}
+
+* What is a Closure?
+
+In functional programming, when a lambda is parsed inside a function, it doesn't just enclose variables functionally; it fundamentally captures the environment state surrounding it at definition time. A *Closure* is therefore a coupling of code (the function pointer/behavior) and data (the captured lexical scope variables).
+
+#+begin_src scheme
+(define (make-adder x)
+  (lambda (y) (+ x y)))
+#+end_src
+
+Here, the ~lambda~ must capture ~x~ to form a closure before it can be returned and invoked later.
+
+* Materializing Closures in Native C++
+
+Many dynamic language environments construct heavy, opaque callable types with runtime type-erasure (e.g., ~std::move_only_function~ or polymorphic classes) to represent closures. Those create abstraction penalties, block optimizations like inlining, and are often strictly forbidden or painfully annoying to utilize effectively in ~constexpr~.
+
+Because we operate structurally at compile time, we leverage the C++ template system to emit standard, statically-defined native C++ wrapper classes that represent these closures precisely.
+
+#+begin_src c++
+// A mechanical visualization of the generated closure struct
+template <typename Environment>
+struct GeneratedAdderClosure {
+    Environment env;
+
+    constexpr auto operator()(auto arg_y, auto continuation) const {
+        return apply_continuation(continuation, env.get_x() + arg_y);
+    }
+};
+#+end_src
+
+This effectively converts dynamic Functional AST bindings into exact, blazing-fast primitive C++ aggregate data types. The Scheme behavior collapses entirely into the C++ type system.
+
+* Negative Compile Tests
+
+Because closures enforce rigorous static paths, we enhance the C++ compiler's reporting. If our Elaborator catches an unbound variable error, or if closure materialization fails, it yields C++ compilation failures.
+
+We write negative compile-time tests using assertions mapping to ~requires~ clauses, enabling the C++ compiler to act natively as a lint and error-reporting tool for our Scheme source text. A typo in your Scheme means your C++ build explicitly breaks.
+
+* Conclusion
+
+By emitting statically defined closure types representing our CPS states, our project ceases to be merely a toy compile-time interpreter. It functions directly as a compiler, bootstrapping Scheme representations into equivalent, fully optimized native C++ behavior. 
+
+* References
+- Sussman, G. J., & Steele, G. L. (1975). "Scheme: An interpreter for extended lambda calculus." MIT AI Memo No. 349.
+- Appel, A. W. (1992). "Compiling with Continuations." Cambridge University Press.
