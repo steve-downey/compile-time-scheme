@@ -11,21 +11,40 @@
 
 namespace smd::smdscheme::cps {
 
+/// A callable CPS representation of a compiled Scheme expression.
+///
+/// @c cps_code<F> wraps a callable @p F with signature
+/// @code
+///   (Env const&, K) -> result<value<Core>>
+/// @endcode
+/// where @p K is the outermost continuation.  Callers pass an environment
+/// and a continuation; the code evaluates the expression and invokes the
+/// continuation with the resulting value.
+///
+/// @tparam F The underlying callable type (deduced via the deduction guide).
 template <class F>
 struct cps_code {
     F f;
 
+    /// Evaluates the CPS expression in @p env, invoking continuation @p k.
     template <class Env, class K>
     constexpr auto operator()(Env const &env, K k) const {
         return f(env, k);
     }
 };
 
+/// Deduction guide: @c cps_code(f) deduces @c cps_code<F>.
 template <class F>
 cps_code(F) -> cps_code<F>;
 
 namespace detail {
 
+/// The identity continuation: returns its argument unchanged.
+///
+/// Used as the terminal continuation in @ref cps_of and @ref compile_cps
+/// to extract the final value.
+///
+/// @tparam Core Core AST type.
 template <class Core>
 struct identity_k {
     constexpr auto operator()(closure::value<Core> v) const
@@ -34,6 +53,27 @@ struct identity_k {
     }
 };
 
+/// Internal CPS dispatch over a core AST node.
+///
+/// Evaluates @p node with outer continuation @p cont and inner continuation
+/// @p k.  On success the value is passed to @p cont; if @p cont succeeds
+/// its result is passed to @p k.  This two-continuation style allows the
+/// caller to intercept intermediate values without restructuring the
+/// recursion.
+///
+/// Handles: integer, boolean, symbol, @c if, quote, lambda, application
+/// (builtin, closure, and foreign-function dispatch).
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum argument/list length.
+/// @tparam Cont     Intermediate continuation type.
+/// @tparam Env      Environment type.
+/// @tparam K        Outer continuation type.
+/// @param  node  Node to evaluate.
+/// @param  arena Core arena.
+/// @param  cont  Intermediate continuation applied to the node's value.
+/// @param  env   Current variable bindings.
+/// @param  k     Outer continuation applied to @c cont's result.
 template <int MaxNodes, int MaxList, class Cont, class Env, class K>
 constexpr auto cps_dispatch(
     elaborator::core_type<MaxNodes, MaxList> const &node,
@@ -230,6 +270,16 @@ constexpr auto cps_dispatch(
 
 } // namespace detail
 
+/// Wraps a core node and its arena in a @ref cps_code with an explicit outer
+/// continuation @p cont.
+///
+/// The returned code, when called with an environment and a final continuation
+/// @p k, evaluates @p node, passes the result to @p cont, then passes @p cont's
+/// result to @p k.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum argument/list length.
+/// @tparam Cont     Intermediate continuation type.
 template <int MaxNodes, int MaxList, class Cont>
 [[nodiscard]] constexpr auto cps_of(
     elaborator::core_type<MaxNodes, MaxList> const &node,
@@ -242,6 +292,14 @@ template <int MaxNodes, int MaxList, class Cont>
     }};
 }
 
+/// Compiles a core node to a @ref cps_code using the identity as the outermost
+/// intermediate continuation.
+///
+/// The resulting code evaluates the expression and returns the value directly
+/// to the final continuation.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum argument/list length.
 template <int MaxNodes, int MaxList>
 [[nodiscard]] constexpr auto compile_cps(
     elaborator::core_type<MaxNodes, MaxList> const &node,

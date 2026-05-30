@@ -13,16 +13,24 @@
 
 namespace smd::smdscheme::reader {
 
+/// A Scheme integer literal, e.g. @c 42 or @c -7.
 struct atom_integer {
-    int value;
+    int value; ///< The parsed integer value.
 };
 
+/// A Scheme symbol (identifier), e.g. @c foo or @c +.
 struct atom_symbol {
-    std::string_view name;
+    std::string_view name; ///< The symbol text as a view into the source.
 };
 
+/// A Scheme atom: either an integer or a symbol.
 using atom = std::variant<atom_integer, atom_symbol>;
 
+/// Returns a parser for a Scheme integer literal.
+///
+/// Handles an optional leading @c - sign followed by one or more decimal
+/// digits (up to 20 digits). The value is computed without allocating
+/// intermediate strings.
 [[nodiscard]] constexpr auto integer_p() {
     return parser::parser{[](parser::cursor cur)
                               -> parser::parse_result<atom_integer> {
@@ -47,6 +55,13 @@ using atom = std::variant<atom_integer, atom_symbol>;
     }};
 }
 
+/// Returns a parser for a Scheme symbol.
+///
+/// A symbol starts with a letter or operator character (per
+/// @ref parser::is_initial_symbol_char) and continues with zero or more
+/// symbol characters (per @ref parser::is_symbol_char). Up to 64 tail
+/// characters are accepted. The returned @c atom_symbol::name is a view
+/// into the original source.
 [[nodiscard]] constexpr auto symbol_p() {
     return parser::parser{
         [](parser::cursor cur) -> parser::parse_result<atom_symbol> {

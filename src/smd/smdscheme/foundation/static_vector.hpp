@@ -8,16 +8,36 @@
 
 namespace smd::smdscheme::foundation {
 
+/// A fixed-capacity vector with inline storage, usable in constexpr contexts.
+///
+/// Unlike @c std::vector, @c static_vector never allocates heap memory.
+/// The capacity is a compile-time constant, so the type is trivially
+/// constexpr-friendly. Pushing beyond capacity is a precondition violation
+/// (asserted in debug mode).
+///
+/// @tparam T        Element type.
+/// @tparam Capacity Maximum number of elements.
 template <class T, int Capacity>
 class static_vector {
   public:
     constexpr static_vector() = default;
 
+    /// Appends @p value to the end.
+    /// @pre size() < Capacity
     constexpr auto push_back(T value) -> void;
 
+    /// Returns the current number of elements.
     [[nodiscard]] constexpr auto size() const -> int;
+
+    /// Returns true if the vector contains no elements.
     [[nodiscard]] constexpr auto empty() const -> bool;
+
+    /// Returns a reference to the element at @p index.
+    /// @pre 0 <= index < size()
     [[nodiscard]] constexpr auto operator[](int index) -> T &;
+
+    /// Returns a const reference to the element at @p index.
+    /// @pre 0 <= index < size()
     [[nodiscard]] constexpr auto operator[](int index) const -> T const &;
 
     constexpr auto begin() -> T * { return storage_.data(); }

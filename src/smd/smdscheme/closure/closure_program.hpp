@@ -14,14 +14,27 @@
 
 namespace smd::smdscheme::closure {
 
-// closure_program: a callable compiled object.
-// Wraps a cps_code so it can be invoked with just an environment,
-// using the identity as the outermost continuation.
+/// A compiled Scheme program that can be called with an environment.
+///
+/// Wraps a @ref cps::cps_code so it can be invoked with just an environment,
+/// using the identity continuation as the outermost @p k.  The type
+/// @c CpsCode is deduced from the output of @ref cps::compile_cps.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum argument/list length.
+/// @tparam CpsCode  The concrete CPS code type produced by @ref
+/// cps::compile_cps.
 template <int MaxNodes, int MaxList, class CpsCode>
 struct closure_program {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
-    CpsCode code;
 
+    CpsCode code; ///< The compiled CPS representation.
+
+    /// Evaluates the program in @p environment.
+    ///
+    /// @tparam MaxBindings Environment capacity.
+    /// @param  environment The variable bindings to evaluate under.
+    /// @return The final value or a @ref foundation::parse_error.
     template <int MaxBindings>
     constexpr auto operator()(env<Core, MaxBindings> const &environment) const
         -> foundation::result<value<Core>> {
@@ -29,10 +42,19 @@ struct closure_program {
     }
 };
 
-// compile_to_closure: full pipeline from source string to callable closure.
-// Chains read -> elaborator::elaborate -> compile_cps<MaxNodes, MaxList>.
-// Returns foundation::result<closure_program<...>>; error propagates from any
-// stage.
+/// Compiles a Scheme source string to a callable @ref closure_program.
+///
+/// Chains the full pipeline: read → elaborate → compile CPS. Any stage
+/// failure propagates as a @ref foundation::parse_error wrapped in the
+/// returned @ref foundation::result.
+///
+/// The returned program is purely functional — it holds the compiled CPS
+/// tree by value and can be called multiple times with different environments.
+///
+/// @tparam MaxNodes Arena capacity (default 32).
+/// @tparam MaxList  Maximum argument/list length (default 16).
+/// @param  src      The Scheme source to compile.
+/// @return A @c result<closure_program<...>> holding the callable on success.
 template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] constexpr auto compile_to_closure(std::string_view src) {
     using Core = elaborator::core_type<MaxNodes, MaxList>;

@@ -12,7 +12,14 @@
 
 namespace smd::smdscheme::sender {
 
-// Build the DOT string for a scheme_tree by formatting each node.
+/// Renders a @ref scheme_tree as a complete Graphviz DOT graph string.
+///
+/// Formats each node in index order using @ref format_scheme_node and
+/// wraps the result in a @c digraph block.
+///
+/// @tparam MaxNodes Tree capacity.
+/// @param  tree The pre-built scheme tree to render.
+/// @return A @c std::string containing the full DOT source.
 template <int MaxNodes>
 auto format_tree(scheme_tree<MaxNodes> const &tree) -> std::string {
     std::string dot = "digraph SchemeExecutionPlan {\n";
@@ -26,12 +33,22 @@ auto format_tree(scheme_tree<MaxNodes> const &tree) -> std::string {
     return dot;
 }
 
-// Reflect on a Sender type, build the execution-plan tree at compile time,
-// and emit Graphviz DOT to an output stream at runtime.
-//
-// Usage:
-//   using S = decltype(sender_v::then(sender_v::just(1), [](int x){ return x+1;
-//   })); sender::dump_scheme_plan<S>(std::cout);
+/// Reflects on @p Sender at compile time, builds a @ref scheme_tree, then
+/// emits Graphviz DOT to @p out at runtime.
+///
+/// The tree is built in a @c constexpr lambda so the reflection happens once
+/// per @p Sender specialization.  At runtime only the string rendering runs.
+///
+/// Usage:
+/// @code
+///   using S = decltype(sender_v::then(sender_v::just(1),
+///                                     [](int x){ return x + 1; }));
+///   sender::dump_scheme_plan<S>(std::cout);
+/// @endcode
+///
+/// @tparam Sender   The sender type whose execution plan is to be shown.
+/// @tparam MaxNodes Maximum tree capacity (default 64).
+/// @param  out      Output stream; defaults to @c std::cout.
 template <typename Sender, int MaxNodes = 64>
 void dump_scheme_plan(std::ostream &out = std::cout) {
     constexpr auto tree = [] {

@@ -15,40 +15,67 @@
 
 namespace smd::smdscheme::sender {
 
+/// A writer monad for accumulating a string log alongside a value.
+///
+/// Operations preserve the log: @ref fmap transforms the value but keeps the
+/// log intact; @ref lift_a2 and @ref combine concatenate logs; @ref tell
+/// appends a message with a @c std::monostate value.  This is the primary
+/// accumulation type for building Graphviz DOT output from reflected sender
+/// graphs.
+///
+/// @tparam T The value type carried alongside the log.
 template <typename T>
 struct string_writer {
-    std::string log;
-    T value;
+    std::string log; ///< Accumulated string output.
+    T value;         ///< The carried value.
 
+    /// Constructs a writer with an empty log holding @p val.
     static auto pure(T val) -> string_writer {
         return string_writer{"", std::move(val)};
     }
 };
 
+/// Applies a binary function to two writers' values, concatenating their logs.
+///
+/// @tparam F  Binary callable type.
+/// @tparam A  First value type.
+/// @tparam B  Second value type.
 template <typename F, typename A, typename B>
 auto lift_a2(F func, string_writer<A> const &a, string_writer<B> const &b)
     -> string_writer<decltype(func(a.value, b.value))> {
     return {a.log + b.log, func(a.value, b.value)};
 }
 
+/// Concatenates the logs of @p a and @p b, returning @p b's value.
+///
+/// Equivalent to the applicative @c discard_first / @c *> operation.
 template <typename T>
 auto combine(string_writer<T> const &a, string_writer<T> const &b)
     -> string_writer<T> {
     return {a.log + b.log, b.value};
 }
 
+/// Applies @p func to @p w's value, preserving its log.
 template <typename F, typename A>
 auto fmap(F func, string_writer<A> const &w)
     -> string_writer<decltype(func(w.value))> {
     return {w.log, func(w.value)};
 }
 
+/// Returns a writer that appends @p msg to the log and carries @c
+/// std::monostate.
+///
+/// The primary way to emit DOT output: callers build a fragment string and
+/// pass it to @c tell, then sequence multiple @c tell results with @ref
+/// combine.
 inline auto tell(std::string msg) -> string_writer<std::monostate> {
     return {std::move(msg), std::monostate{}};
 }
 
 // -- Typeclass instances for string_writer --
 
+/// Functor @c Impl for @c string_writer<T>: maps a function over the value,
+/// preserving the log.
 template <class T>
 struct string_writer_functor_impl {
     template <class F>
@@ -58,12 +85,18 @@ struct string_writer_functor_impl {
     }
 };
 
+/// Functor map for @c string_writer<T>; combines impl with the CRTP base.
 template <class T>
 struct string_writer_functor_map
     : foundation::functor<string_writer_functor_impl<T>> {
     using string_writer_functor_impl<T>::fmap;
 };
 
+/// Applicative @c Impl for @c string_writer<T>.
+///
+/// - @c pure embeds a value with an empty log.
+/// - @c apply applies a function-carrying writer to a value-carrying writer,
+///   concatenating their logs.
 template <class T>
 struct string_writer_applicative_impl {
     template <class V>
@@ -82,6 +115,7 @@ struct string_writer_applicative_impl {
     }
 };
 
+/// Applicative map for @c string_writer<T>; combines impl with the CRTP base.
 template <class T>
 struct string_writer_applicative_map
     : foundation::applicative<string_writer_applicative_impl<T>> {
@@ -89,6 +123,14 @@ struct string_writer_applicative_map
     using string_writer_applicative_impl<T>::apply;
 };
 
+/// Alternative @c Impl for @c string_writer<T>.
+///
+/// - @c empty returns a writer with an empty log and a default-constructed
+/// value.
+/// - @c alt concatenates logs and takes @p b's value (equivalent to @c *>).
+///
+/// This gives @c string_writer<T> a monoid structure for sequencing output
+/// fragments.
 template <class T>
 struct string_writer_alternative_impl {
     constexpr auto empty(this auto &&) -> string_writer<T> {
@@ -101,6 +143,7 @@ struct string_writer_alternative_impl {
     }
 };
 
+/// Alternative map for @c string_writer<T>; combines impl with the CRTP base.
 template <class T>
 struct string_writer_alternative_map
     : foundation::alternative<string_writer_alternative_impl<T>> {
@@ -112,14 +155,17 @@ struct string_writer_alternative_map
 
 namespace smd::smdscheme::foundation {
 
+/// Registers @c string_writer<T> with the Functor typeclass.
 template <class T>
 inline constexpr auto functor_typeclass<sender::string_writer<T>> =
     sender::string_writer_functor_map<T>{};
 
+/// Registers @c string_writer<T> with the Applicative typeclass.
 template <class T>
 inline constexpr auto applicative_typeclass<sender::string_writer<T>> =
     sender::string_writer_applicative_map<T>{};
 
+/// Registers @c string_writer<T> with the Alternative typeclass.
 template <class T>
 inline constexpr auto alternative_typeclass<sender::string_writer<T>> =
     sender::string_writer_alternative_map<T>{};

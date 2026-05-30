@@ -6,12 +6,21 @@
 #include <beman/execution26/execution.hpp>
 #include <beman/task/task.hpp>
 
+/// Thin vocabulary aliases for Beman Execution26 senders and the task coroutine
+/// type.
+///
+/// Importing via @c using rather than @c using @c namespace keeps the
+/// declarations explicit and avoids accidentally pulling in the full
+/// Execution26 ADL surface into downstream code.
 namespace smd::smdscheme::sender_v {
 using beman::execution26::just;
 using beman::execution26::let_value;
 using beman::execution26::sync_wait;
 using beman::execution26::then;
 using beman::execution26::when_all;
+
+/// Type alias for the Beman async task coroutine type.
+/// @tparam T The value type produced by the coroutine.
 template <typename T>
 using task = beman::execution::task<T>;
 } // namespace smd::smdscheme::sender_v

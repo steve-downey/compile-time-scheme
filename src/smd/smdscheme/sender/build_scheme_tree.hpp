@@ -12,11 +12,16 @@
 
 namespace smd::smdscheme::sender {
 
-// Classify a sender type by finding the first tag name in its display string.
-// The outermost tag always appears first because it is basic_sender's first
-// template argument.  Position-based min-find avoids false matches from
-// nested child tag names that also appear in the full type display string.
-// Confirmed working approach in GCC16 consteval contexts (step 3).
+/// Classifies a sender type by the first tag name found in its display string.
+///
+/// Beman Execution26 senders have the form
+/// @c basic_sender<Tag,Data,Child...>; the outermost tag always appears
+/// first in the display string because it is @c basic_sender's first template
+/// argument.  A position-based min-find is used instead of a simple string
+/// search to avoid false matches from nested child tag names.
+///
+/// @param type A P2996 reflection of the sender type.
+/// @return One of @c "just", @c "then", @c "when_all", or @c "unknown".
 consteval auto classify_sender(std::meta::info type) -> std::string_view {
     std::string_view name = std::meta::display_string_of(type);
     auto jp = name.find("just_t");
@@ -32,17 +37,20 @@ consteval auto classify_sender(std::meta::info type) -> std::string_view {
     return "just";
 }
 
-// Build a scheme_tree by reflecting on a Sender type.
-//
-// Beman Execution senders have type basic_sender<Tag, Data, Child...> which
-// inherits from product_type<Tag, Data, Child...>.  Child senders appear
-// as template arguments starting at index 2 (Tag=0, Data=1).
-//
-// Traversal strategy (no splice — GCC16 cannot use [:r:] on function params):
-//   1. Classify the sender via classify_sender (display_string_of approach).
-//   2. Use bases_of(sender_type) to get the product_type base class.
-//   3. Use type_of(base) + template_arguments_of to get [Tag, Data, Child...].
-//   4. Recurse for each Child (args[2+]).
+/// Recursively builds a @ref scheme_tree by reflecting on a sender type.
+///
+/// Traversal strategy (no splice — GCC16 cannot use @c [:r:] on function
+/// parameters at consteval time):
+/// 1. Classify the outermost sender via @ref classify_sender.
+/// 2. Use @c bases_of(sender_type) to get the @c product_type base class.
+/// 3. Use @c type_of(base) + @c template_arguments_of to get
+///    @c [Tag, Data, Child...].
+/// 4. Recurse for each @c Child (args[2+]).
+///
+/// @tparam MaxNodes Maximum tree capacity (default 64).
+/// @param  sender_type P2996 reflection of the sender type to traverse.
+/// @param  tree        Output tree; nodes are appended in pre-order.
+/// @return The integer id of the root node allocated for @p sender_type.
 template <int MaxNodes = 64>
 consteval auto build_scheme_tree(std::meta::info sender_type,
                                  scheme_tree<MaxNodes> &tree) -> int {

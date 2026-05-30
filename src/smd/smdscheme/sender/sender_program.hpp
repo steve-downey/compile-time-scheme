@@ -29,6 +29,20 @@ using elaborator::core_symbol;
 // We use `beman::task::task` as an asynchronous sender factory which
 // type-erases the graph structures into a common coroutine state machine type.
 
+/// Evaluates a core AST node asynchronously, returning a @c task coroutine.
+///
+/// This is the coroutine-based interpreter: each recursive call returns a
+/// @c task that @c co_await-s child evaluations.  @c beman::task::task
+/// provides the type erasure needed to handle @c when_all / @c then senders
+/// whose types differ structurally — without it, the return type of each
+/// branch would be distinct and unify-able only via type erasure.
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum argument/list length.
+/// @tparam MaxBindings Environment capacity.
+/// @param  node        Core node to evaluate.
+/// @param  arena       Core arena; must outlive all co_await points.
+/// @param  environment Current variable bindings.
 template <int MaxNodes, int MaxList, int MaxBindings>
 sender_v::task<foundation::result<
     closure::value<elaborator::core_type<MaxNodes, MaxList>>>>
@@ -185,12 +199,26 @@ compile_node(elaborator::core_type<MaxNodes, MaxList> const &node,
 
 } // namespace sender_backend
 
+/// A compiled Scheme program whose evaluation is expressed as a @c task
+/// coroutine.
+///
+/// Holds the elaborated core root and arena by value. Calling @c operator()
+/// launches a @ref sender_backend::compile_node coroutine and returns the
+/// resulting @c task for the caller to @c co_await or drive with
+/// @c sender_v::sync_wait.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum argument/list length.
 template <int MaxNodes, int MaxList>
 struct sender_program {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
-    Core root;
-    foundation::tree_arena<Core, MaxNodes> arena;
+    Core root; ///< The elaborated root expression.
+    foundation::tree_arena<Core, MaxNodes>
+        arena; ///< Arena owning all sub-nodes.
 
+    /// Evaluates the program in @p environment, returning a coroutine task.
+    ///
+    /// @tparam MaxBindings Environment capacity.
     template <int MaxBindings>
     auto operator()(closure::env<Core, MaxBindings> environment) const
         -> sender_v::task<foundation::result<closure::value<Core>>> {
@@ -199,6 +227,17 @@ struct sender_program {
     }
 };
 
+/// Compiles a Scheme source string to a @ref sender_program via the full
+/// pipeline.
+///
+/// Chains read → elaborate; the CPS step is omitted — evaluation happens
+/// lazily via the @c task coroutine when the caller drives the program.
+///
+/// @tparam MaxNodes Arena capacity (default 32).
+/// @tparam MaxList  Maximum argument/list length (default 16).
+/// @param  src      Scheme source to compile.
+/// @return A @c result<sender_program<...>> holding the compiled program on
+/// success.
 template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] constexpr auto compile_to_sender(std::string_view src) {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
