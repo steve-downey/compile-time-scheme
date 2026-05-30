@@ -12,6 +12,22 @@ namespace smd::smdscheme::reader {
 
 namespace detail {
 
+/// Recursively reads a single datum node from @p cur, allocating sub-nodes
+/// into @p arena.
+///
+/// Dispatches on the first non-space character:
+/// - @c # — boolean literal (@c #t or @c #f)
+/// - @c ' — quote shorthand
+/// - @c ( — list
+/// - decimal digit or @c - — integer atom
+/// - letter or operator character — symbol atom
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list elements per node.
+/// @param  cur    Current read position.
+/// @param  arena  Arena in which new datum nodes are allocated.
+/// @return A @ref parser::parse_result containing the datum and the remaining
+///         cursor, or a @ref foundation::parse_error.
 template <int MaxNodes, int MaxList>
 constexpr auto read_datum_node(
     parser::cursor cur,
@@ -95,6 +111,21 @@ constexpr auto read_datum_node(
 
 } // namespace detail
 
+/// Reads a single Scheme datum from @p cur, allocating into @p arena.
+///
+/// This is the public entry point for the reader phase of the pipeline.
+/// Strips leading whitespace, then delegates to the recursive
+/// @c detail::read_datum_node. The datum tree is built inside @p arena;
+/// all @ref foundation::arena_box handles in the returned datum refer to
+/// nodes in the same arena.
+///
+/// @tparam MaxNodes Arena capacity; also bounds tree depth.
+/// @tparam MaxList  Maximum list elements per node.
+/// @param  cur    Start of the source text to read.
+/// @param  arena  Arena that receives all allocated nodes.
+/// @return A @ref foundation::result wrapping a @ref parser::parse_state
+///         (datum + remaining cursor) on success, or a
+///         @ref foundation::parse_error on failure.
 template <int MaxNodes, int MaxList>
 [[nodiscard]] constexpr auto read_datum(
     parser::cursor cur,

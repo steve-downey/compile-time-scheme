@@ -11,11 +11,24 @@
 
 namespace smd::smdscheme::parser {
 
+/// Ordered-choice combinator; thin alias for the @c | operator.
+///
+/// Tries @p pa; if it fails without consuming input, tries @p pb.
+///
+/// @tparam PA First alternative parser.
+/// @tparam PB Second alternative parser.
 template <parser_like PA, parser_like PB>
 [[nodiscard]] constexpr auto alt(PA pa, PB pb) {
     return pa | pb;
 }
 
+/// Returns a parser that applies @p p zero or more times, collecting at most
+/// @c Capacity results into a @ref foundation::static_vector.
+///
+/// Always succeeds (zero repetitions is valid).
+///
+/// @tparam Capacity Maximum number of repetitions.
+/// @tparam P        Parser to repeat.
 template <int Capacity, parser_like P>
 [[nodiscard]] constexpr auto many(P p) {
     return parser{[p](cursor cur) {
@@ -33,6 +46,13 @@ template <int Capacity, parser_like P>
     }};
 }
 
+/// Returns a parser that applies @p p one or more times, collecting at most
+/// @c Capacity results.
+///
+/// Fails if @p p does not match at least once.
+///
+/// @tparam Capacity Maximum number of repetitions.
+/// @tparam P        Parser to repeat.
 template <int Capacity, parser_like P>
 [[nodiscard]] constexpr auto some(P p) {
     return parser{[p](cursor cur) {
@@ -57,6 +77,12 @@ template <int Capacity, parser_like P>
     }};
 }
 
+/// Returns a parser that tries @p p and wraps the result in @c std::optional.
+///
+/// Always succeeds: yields @c std::nullopt if @p p fails without consuming
+/// input, otherwise yields the value.
+///
+/// @tparam P Parser to attempt.
 template <parser_like P>
 [[nodiscard]] constexpr auto optional(P p) {
     return parser{[p](cursor cur) {
@@ -71,6 +97,13 @@ template <parser_like P>
     }};
 }
 
+/// Returns a parser that strips leading and trailing inter-token whitespace
+/// around @p p.
+///
+/// This is the standard way to make a token parser whitespace-insensitive
+/// in a recursive-descent setting.
+///
+/// @tparam P Parser to wrap.
 template <parser_like P>
 [[nodiscard]] constexpr auto lexeme(P p) {
     return parser{[p](cursor cur) {

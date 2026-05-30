@@ -10,21 +10,34 @@
 namespace smd::smdscheme::reflection {
 // d0092f7c-b9de-440d-ac67-02e4e48c5aa4
 
-// A compile-time description of a captured environment variable
+/// Describes one captured variable in a compile-time environment: its type
+/// (as a reflection) and its name.
 struct capture_desc {
-    std::meta::info type;
-    std::string_view name;
+    std::meta::info type;  ///< P2996 reflection of the variable's type.
+    std::string_view name; ///< The variable name to use as a struct field name.
 };
 
-// Target template for generating environment aggregate shapes.
-// `Tag` allows creating uniquely named aggregate structures per invocation
-// context.
+/// Target template into which @ref compile_environment injects data members.
+///
+/// Specialize this template (implicitly, via @ref compile_environment) to
+/// produce an ordinary aggregate type whose fields correspond to captured
+/// variables.  A unique @p Tag per call site prevents different injections
+/// from aliasing each other.
+///
+/// @tparam Tag A unique tag type identifying this particular environment shape.
 template <typename Tag>
 struct reified_environment;
 
-// Inject fields into `reified_environment<Tag>` based on descriptor
-// This generates an ordinary aggregate type that doesn't cross into evaluation
-// runtime limits.
+/// Injects fields into @c reified_environment<Tag> based on the supplied
+/// capture descriptors.
+///
+/// Generates an ordinary aggregate type by calling
+/// @c std::meta::define_aggregate.  The result is a plain struct with one
+/// data member per entry in @p captures.  This keeps environment shapes out
+/// of the evaluation runtime and avoids limitations of consteval allocation.
+///
+/// @tparam Tag      Unique tag type for this environment shape.
+/// @param  captures Ordered list of (type, name) pairs for the injected fields.
 template <typename Tag>
 consteval void compile_environment(std::vector<capture_desc> captures) {
     std::vector<std::meta::info> members;

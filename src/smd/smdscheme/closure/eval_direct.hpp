@@ -13,6 +13,25 @@
 
 namespace smd::smdscheme {
 
+/// Directly evaluates a core AST node in the given environment.
+///
+/// This is a straightforward tree-walking interpreter over the core AST,
+/// without CPS transformation.  It is simpler than @ref cps::cps_dispatch
+/// but does not support first-class continuations.
+///
+/// Recursion is bounded by the tree depth (which is bounded by @p MaxNodes).
+/// Only one environment size is supported at runtime; the static_assert
+/// enforces this.
+///
+/// @tparam MaxNodes    Arena capacity; bounds tree depth.
+/// @tparam MaxList     Maximum argument/list length.
+/// @tparam MaxBindings Environment capacity; must be 16.
+/// @param  node        The core node to evaluate.
+/// @param  arena       Core arena; must outlive the evaluation.
+/// @param  environment Current variable bindings.
+/// @return The evaluated @ref closure::value on success, or a
+///         @ref foundation::parse_error on type error, arity mismatch, or
+///         unbound variable.
 template <int MaxNodes, int MaxList, int MaxBindings>
 [[nodiscard]] constexpr auto eval_direct(
     elaborator::core_type<MaxNodes, MaxList> const &node,

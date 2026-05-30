@@ -10,6 +10,15 @@
 namespace smd::smdscheme::elaborator {
 namespace detail {
 
+/// Converts a quoted datum into its atom representation.
+///
+/// Only integer, boolean, and symbol atoms are supported; nested lists in
+/// quote position return an error.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+/// @param  d      The datum to quote.
+/// @param  arena  The datum arena (used only for type information here).
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_quote(
     reader::datum_type<MaxNodes, MaxList> const &d,
@@ -32,6 +41,7 @@ constexpr auto elaborate_quote(
         {}, "quote: lists/nested quotes not yet supported"};
 }
 
+/// Forward declaration (mutual recursion with @c elaborate_list).
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_node(
     reader::datum_type<MaxNodes, MaxList> const &d,
@@ -40,6 +50,17 @@ constexpr auto elaborate_node(
     foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
     -> foundation::result<core_type<MaxNodes, MaxList>>;
 
+/// Elaborates a datum list into a core form.
+///
+/// Recognizes the special forms @c if, @c quote, @c define, and @c lambda
+/// by inspecting the leading symbol.  Any other head is treated as a
+/// general application.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+/// @param  lst         The list datum to elaborate.
+/// @param  datum_arena Read-only datum arena.
+/// @param  core_arena  Core arena receiving elaborated nodes.
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_list(
     reader::datum_list<reader::datum_type<MaxNodes, MaxList>, MaxNodes,
@@ -178,6 +199,16 @@ constexpr auto elaborate_list(
     return core{core_f{std::move(app)}};
 }
 
+/// Elaborates a single datum node into a core node.
+///
+/// Atomic datums (integer, boolean, symbol, quote) map directly.
+/// List datums are dispatched to @ref elaborate_list.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+/// @param  d           The datum to elaborate.
+/// @param  datum_arena Read-only datum arena.
+/// @param  core_arena  Core arena receiving elaborated nodes.
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_node(
     reader::datum_type<MaxNodes, MaxList> const &d,
@@ -226,6 +257,20 @@ constexpr auto elaborate_node(
 
 } // namespace detail
 
+/// Elaborates a parsed datum into the core AST.
+///
+/// This is the public entry point for the elaboration phase.  Converts the
+/// raw Scheme datum from the reader into a typed core expression, classifying
+/// special forms (@c if, @c lambda, @c define, @c quote) and emitting errors
+/// for malformed input.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list/argument length.
+/// @param  pd          Root datum to elaborate.
+/// @param  datum_arena Read-only datum arena produced by the reader.
+/// @param  core_arena  Core arena that receives elaborated nodes.
+/// @return A @ref foundation::result holding the root core node, or a
+///         @ref foundation::parse_error describing the first failure.
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate(
     reader::datum_type<MaxNodes, MaxList> const &pd,

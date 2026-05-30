@@ -7,9 +7,14 @@
 
 namespace smd::smdscheme::foundation {
 
+/// A parse failure with the position in the input where it occurred
+/// and a static string describing the expected token or form.
+///
+/// The @p message pointer must be a string literal or have static lifetime;
+/// the struct does not own or copy the pointed-to string.
 struct parse_error {
-    foundation::source_pos where{};
-    char const *message{};
+    foundation::source_pos where{}; ///< Position of the failure in the input.
+    char const *message{}; ///< Static description of what was expected.
 
     friend constexpr auto operator==(foundation::parse_error const &lhs,
                                      foundation::parse_error const &rhs)

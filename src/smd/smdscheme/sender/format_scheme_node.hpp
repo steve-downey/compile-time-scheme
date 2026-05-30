@@ -11,6 +11,15 @@
 
 namespace smd::smdscheme::sender {
 
+/// Formats a single @ref scheme_node_data as Graphviz DOT node and edge
+/// declarations, returning them as a @ref string_writer log.
+///
+/// The returned writer carries @c std::monostate as its value; callers
+/// extract the accumulated DOT text via the @c .log member.
+///
+/// @param node The sender graph node to render.
+/// @return A @c string_writer<std::monostate> whose log contains the DOT
+///         declarations for this node and its outgoing edges.
 inline auto format_scheme_node(scheme_node_data const &node)
     -> string_writer<std::monostate> {
     std::string dot =

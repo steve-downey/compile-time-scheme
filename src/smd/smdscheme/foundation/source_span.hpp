@@ -7,9 +7,10 @@
 
 namespace smd::smdscheme::foundation {
 
+/// A half-open range in source text, defined by its first and last positions.
 struct source_span {
-    foundation::source_pos first{};
-    foundation::source_pos last{};
+    foundation::source_pos first{}; ///< Inclusive start of the span.
+    foundation::source_pos last{};  ///< Exclusive end of the span.
 
     friend constexpr auto operator==(source_span, source_span)
         -> bool = default;

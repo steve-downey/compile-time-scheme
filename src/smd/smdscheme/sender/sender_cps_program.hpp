@@ -26,6 +26,11 @@ using elaborator::core_symbol;
 
 namespace detail {
 
+/// Synchronously drives a sender to completion via @c sync_wait and extracts
+/// the first tuple element.
+///
+/// @tparam T   The value type to extract.
+/// @param  sender  A Beman Execution26 sender producing @c std::tuple<T>.
 template <typename T>
 T unwrap_sender(auto sender) {
     return std::get<0>(sender_v::sync_wait(std::move(sender)).value());
@@ -33,6 +38,23 @@ T unwrap_sender(auto sender) {
 
 } // namespace detail
 
+/// Evaluates a core AST node using Beman Execution26 senders as the
+/// computation primitives.
+///
+/// This backend expresses the interpreter in terms of @c just, @c then,
+/// and @c when_all rather than coroutines or direct recursion.  The sender
+/// graph is constructed eagerly for each sub-expression, then driven to
+/// completion via @ref detail::unwrap_sender.  This makes the evaluation
+/// strategy visible as a first-class sender graph, which is the purpose of
+/// this backend.
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum argument/list length.
+/// @tparam MaxBindings Environment capacity.
+/// @param  node        Core node to evaluate.
+/// @param  arena       Core arena; must outlive the call.
+/// @param  environment Current variable bindings.
+/// @return The evaluated value or a @ref foundation::parse_error.
 template <int MaxNodes, int MaxList, int MaxBindings>
 auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                foundation::tree_arena<elaborator::core_type<MaxNodes, MaxList>,
@@ -206,12 +228,24 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
     return Res{foundation::parse_error{{}, "sender_cps: unsupported form"}};
 }
 
+/// A compiled Scheme program that evaluates via Execution26 sender primitives.
+///
+/// Holds the elaborated root and arena by value.  @c operator() calls
+/// @ref eval_node directly; the evaluation is synchronous from the caller's
+/// perspective even though sender graphs are constructed internally.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum argument/list length.
 template <int MaxNodes, int MaxList>
 struct sender_cps_program {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
-    Core root;
-    foundation::tree_arena<Core, MaxNodes> arena;
+    Core root; ///< Elaborated root expression.
+    foundation::tree_arena<Core, MaxNodes>
+        arena; ///< Arena owning all sub-nodes.
 
+    /// Evaluates the program in @p environment.
+    ///
+    /// @tparam MaxBindings Environment capacity.
     template <int MaxBindings>
     auto operator()(closure::env<Core, MaxBindings> const &environment) const
         -> foundation::result<closure::value<Core>> {
@@ -220,6 +254,15 @@ struct sender_cps_program {
     }
 };
 
+/// Compiles a Scheme source string to a @ref sender_cps_program.
+///
+/// Chains read → elaborate; evaluation happens at call time via @ref eval_node
+/// using Execution26 sender primitives.
+///
+/// @tparam MaxNodes Arena capacity (default 32).
+/// @tparam MaxList  Maximum argument/list length (default 16).
+/// @param  src      Scheme source to compile.
+/// @return A @c result<sender_cps_program<...>> on success.
 template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] constexpr auto compile_sender_cps(std::string_view src) {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
