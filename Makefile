@@ -215,15 +215,85 @@ coverage: venv $(_build_path)/CMakeCache.txt
 view-coverage: ## View the coverage report
 	sensible-browser $(_build_path)/coverage/coverage.html
 
+# ---------------------------------------------------------------------------
+# Documentation — Antora + MrDocs pipeline
+# ---------------------------------------------------------------------------
+
+MRDOCS_VERSION ?= latest
+MRDOCS_INSTALL_DIR ?= .tools/mrdocs
+MRDOCS ?= $(MRDOCS_INSTALL_DIR)/bin/mrdocs
+
+# Detect OS for MrDocs asset name (Linux / Darwin)
+_mrdocs_os := $(shell uname -s)
+
+# Use clang-18 for the cmake configure step (mrdocs is clang-based internally)
+_docs_cxx := clang++-18
+
+DOCS_OUT ?= .build/site
+_docs_conf := antora-playbook.yml antora/antora-worktree-fix.js docs/antora.yml docs/mrdocs.yml
+_docs_deps := $(DOCS_OUT)/.docs.deps
+DOCS_STAMP := $(DOCS_OUT)/.docs.stamp
+
+$(MRDOCS):
+	etc/install-mrdocs.sh \
+		--version $(MRDOCS_VERSION) \
+		--install-dir $(MRDOCS_INSTALL_DIR) \
+		--os $(_mrdocs_os)
+
+.PHONY: install-mrdocs
+install-mrdocs: $(MRDOCS) ## Install MrDocs locally (.tools/mrdocs)
+
+.PHONY: update-mrdocs
+update-mrdocs: ## Update MrDocs to the latest release (or MRDOCS_VERSION=vX.Y.Z)
+	etc/install-mrdocs.sh \
+		--version $(MRDOCS_VERSION) \
+		--install-dir $(MRDOCS_INSTALL_DIR) \
+		--os $(_mrdocs_os)
+
+node_modules/.package-lock.json: package.json
+	npm ci
+
+.PHONY: install-antora
+install-antora: node_modules/.package-lock.json ## Install Antora and extensions via npm
+
+.PHONY: update-antora
+update-antora: ## Update Antora npm dependencies
+	npm update
+
+.PHONY: install-tools
+install-tools: install-mrdocs install-antora ## Install all documentation tools
+
+$(DOCS_STAMP): $(_docs_conf) node_modules/.package-lock.json $(MRDOCS)
+	CXX=$(_docs_cxx) MRDOCS_ROOT=$(abspath $(MRDOCS_INSTALL_DIR)) \
+		npx antora --to-dir $(abspath $(DOCS_OUT)) antora-playbook.yml
+	@{ find src -name '*.hpp'; find docs/modules -name '*.adoc'; } \
+		| awk -v s="$@" '{ print s ": " $$0; print $$0 ":" }' > $(_docs_deps)
+	@touch $(DOCS_STAMP)
+
+-include $(_docs_deps)
+
 .PHONY: docs
-docs: ## Build the docs with Doxygen
-	doxygen docs/Doxyfile
+docs: install-antora install-mrdocs $(DOCS_STAMP) ## Build the Antora + MrDocs documentation site
 
 .PHONY: mrdocs
-mrdocs: ## Build the docs with MrDocs
-	-rm -rf docs/adoc
-	cd docs && NO_COLOR=1 mrdocs mrdocs.yml 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
-	find docs/adoc -name '*.adoc' | xargs asciidoctor
+mrdocs: $(_docs_conf) node_modules/.package-lock.json $(MRDOCS) ## Run MrDocs only (generate API reference pages)
+	cd docs && CXX=$(_docs_cxx) NO_COLOR=1 $(abspath $(MRDOCS)) mrdocs.yml 2>&1 | sed 's/\x1b\[[0-9;]*m//g'
+
+.PHONY: print-docs-out
+print-docs-out: ## Print the docs output directory (used by CI)
+	@echo $(abspath $(DOCS_OUT))
+
+.PHONY: view-docs
+view-docs: $(DOCS_STAMP) ## Open the built documentation site in a browser
+	sensible-browser $(DOCS_OUT)/index.html
+
+.PHONY: clean-mrdocs
+clean-mrdocs: ## Remove MrDocs-generated reference pages
+	-rm -rf docs/modules/ROOT/pages/reference
+
+.PHONY: clean-docs
+clean-docs: clean-mrdocs ## Remove the built Antora site and MrDocs output
+	-rm -rf $(DOCS_OUT)
 
 .PHONY: testinstall
 testinstall: install

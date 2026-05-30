@@ -1,0 +1,70 @@
+= Architecture
+:description: Pipeline stages and design rationale for smd.schemepoc.
+:sectanchors:
+:navtitle: Architecture
+
+== Pipeline Stages
+
+=== Reader
+
+The reader (`smd::smdscheme::reader`) parses Scheme source text into a
+datum tree using a combinator parser.  It does not classify special forms —
+all lists are initially treated as data.
+
+Source: `src/smd/smdscheme/reader/`
+
+=== Elaborator
+
+The elaborator (`smd::smdscheme::elaborator`) walks the datum tree and
+classifies special forms (`if`, `lambda`, `define`, `quote`) into a typed
+core AST.  Applications of unknown head symbols become `core_application`.
+
+Source: `src/smd/smdscheme/elaborator/`
+
+=== Closure Backend
+
+The closure backend (`smd::smdscheme::closure`) provides two evaluators:
+
+* `eval_direct` — a direct tree-walking interpreter.
+* `cps_code` / `compile_cps` — a CPS-transformed evaluator.
+
+Both share the `value`, `env`, and `closure` types.  The `closure_program`
+type wraps a compiled CPS expression into a callable object.
+
+Source: `src/smd/smdscheme/closure/`
+
+=== Sender Backend
+
+The sender backend (`smd::smdscheme::sender`) evaluates expressions via
+Beman Execution26 senders (`just`, `then`, `when_all`).  This makes the
+execution plan a first-class sender graph that can be reflected and rendered.
+
+Source: `src/smd/smdscheme/sender/`
+
+=== Reflection Spike
+
+The reflection module (`smd::smdscheme::reflection`) uses P2996 compile-time
+reflection (GCC16, `<meta>`) to reify closure environments as concrete
+aggregate types.
+
+Source: `src/smd/smdscheme/reflection/`
+
+== Foundation
+
+All stages share the `smd::smdscheme::foundation` utilities:
+
+* `static_vector<T, N>` — fixed-capacity vector for constexpr contexts.
+* `arena_box<T>` / `tree_arena<T>` — arena allocator for tree nodes.
+* `fix<F>` — fixed-point type for recursive data.
+* `result<T>` — error-propagation type (value or `parse_error`).
+* `functor`, `applicative`, `alternative` — typeclass CRTP bases and CPOs.
+
+Source: `src/smd/smdscheme/foundation/`
+
+== Parser
+
+The parser layer (`smd::smdscheme::parser`) provides monadic combinators:
+`satisfy`, `char_p`, `map`, `lift2`, `sequence_left/right`, `alt`, `many`,
+`some`, `optional`, `lexeme`.  All parsers are `constexpr`.
+
+Source: `src/smd/smdscheme/parser/`

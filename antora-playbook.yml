@@ -1,0 +1,41 @@
+# Antora playbook for standalone documentation builds.
+# Usage: npx antora antora-playbook.yml
+#
+# The Antora + MrDocs documentation pipeline is modelled on the approach used
+# by Boost libraries (e.g. boostorg/url), which pioneered this toolchain for
+# C++ API reference generation. See https://github.com/boostorg/url for the
+# upstream reference.
+
+site:
+  title: smd.schemepoc
+  url: https://steve-downey.github.io/compile-time-scheme
+  start_page: smd.schemepoc::index.adoc
+
+antora:
+  extensions:
+    # Fixes Antora 3.1's inability to open a local content source whose .git
+    # entry is a gitdir file (linked git worktree).  Must come first so the
+    # url is corrected before the cpp-reference extension runs.
+    - require: 'antora/antora-worktree-fix.js'
+    - require: '@cppalliance/antora-cpp-reference-extension'
+
+content:
+  sources:
+    - url: .
+      # branches: [HEAD] reads *committed* content from the current branch.
+      # The antora-worktree-fix.js extension makes this work transparently
+      # whether Antora is invoked from a normal checkout or a linked worktree.
+      #
+      # To add versioned releases to the version dropdown, append extra entries:
+      #   branches: [HEAD, v1.0, v1.1]
+      # Each ref must have a docs/antora.yml with the matching version: field.
+      branches: [HEAD]
+      start_path: docs
+
+ui:
+  bundle:
+    url: https://gitlab.com/antora/antora-ui-default/-/jobs/artifacts/HEAD/raw/build/ui-bundle.zip?job=bundle-stable
+    snapshot: true
+
+output:
+  dir: .build/site

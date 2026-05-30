@@ -1,10 +1,9 @@
 name: Doxygen GitHub Pages Deploy Action
+# Superseded by docs.yml (Antora + MrDocs pipeline).
+# Disabled — workflow_dispatch only so it can still be run manually if needed.
 
 on:
-  push:
-    branches:
-      - main
-      - doxify
+  workflow_dispatch:
 
 permissions:
   contents: read
