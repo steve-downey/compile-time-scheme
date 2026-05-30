@@ -40,15 +40,15 @@ jobs:
         shell: bash
         run: |
           sudo apt update
-          sudo apt -y install build-essential gcc-14 g++-14 ccache jq
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-14 100 \
-            --slave /usr/bin/g++ g++ /usr/bin/g++-14 \
-            --slave /usr/bin/gcov gcov /usr/bin/gcov-14
-          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-14  100
-          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-14 100
-          sudo update-alternatives --set gcc  /usr/bin/gcc-14
-          sudo update-alternatives --set cc  /usr/bin/gcc-14
-          sudo update-alternatives --set c++  /usr/bin/g++-14
+          sudo apt -y install build-essential gcc-16 g++-16 ccache jq
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 \
+            --slave /usr/bin/g++ g++ /usr/bin/g++-16 \
+            --slave /usr/bin/gcov gcov /usr/bin/gcov-16
+          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-16  100
+          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-16 100
+          sudo update-alternatives --set gcc  /usr/bin/gcc-16
+          sudo update-alternatives --set cc  /usr/bin/gcc-16
+          sudo update-alternatives --set c++  /usr/bin/g++-16
 
       - name: Configure Environment
         shell: bash

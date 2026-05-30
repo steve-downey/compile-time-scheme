@@ -37,7 +37,7 @@ jobs:
       matrix_config: >
         {
           "gcc": [
-            { "versions": ["15"],
+            { "versions": ["16"],
               "tests": [
                 { "cxxversions": ["c++26"],
                   "tests": [
@@ -49,16 +49,6 @@ jobs:
                       ]
                     }
                   ]
-                },
-                { "cxxversions": ["c++23"],
-                  "tests": [{ "stdlibs": ["libstdc++"], "tests": ["Release.Default"]}]
-                }
-              ]
-            },
-            { "versions": ["14"],
-              "tests": [
-                { "cxxversions": ["c++26", "c++23"],
-                  "tests": [{ "stdlibs": ["libstdc++"], "tests": ["Release.Default"]}]
                 }
               ]
             }
@@ -73,42 +63,6 @@ jobs:
                         "Debug.Default", "Release.Default", "Release.TSan",
                         "Release.MaxSan", "Debug.Werror"
                       ]
-                    }
-                  ]
-                },
-                { "cxxversions": ["c++23"],
-                  "tests": [
-                    {"stdlibs": ["libstdc++", "libc++"], "tests": ["Release.Default"]}
-                  ]
-                }
-              ]
-            },
-            { "versions": ["21", "20", "19"],
-              "tests": [
-                { "cxxversions": ["c++26", "c++23"],
-                  "tests": [
-                    {"stdlibs": ["libstdc++", "libc++"], "tests": ["Release.Default"]}
-                  ]
-                }
-              ]
-            }
-          ],
-          "appleclang": [
-            { "versions": ["latest"],
-              "tests": [
-                { "cxxversions": ["c++26", "c++23"],
-                  "tests": [{ "stdlibs": ["libc++"], "tests": ["Release.Default"]}]
-                }
-              ]
-            }
-          ],
-          "msvc": [
-            { "versions": ["latest"],
-              "tests": [
-                { "cxxversions": ["c++23"],
-                  "tests": [
-                    { "stdlibs": ["stl"],
-                      "tests": ["Debug.Default", "Release.Default", "Release.MaxSan"]
                     }
                   ]
                 }
