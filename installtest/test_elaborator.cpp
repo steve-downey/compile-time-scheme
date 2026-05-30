@@ -23,8 +23,8 @@ static_assert([] {
     if (!dr.has_value())
         return false;
 
-    auto er =
-        elaborator::elaborate<32, 16>(dr.value().value, datum_arena, core_arena);
+    auto er = elaborator::elaborate<32, 16>(dr.value().value, datum_arena,
+                                            core_arena);
     return er.has_value();
 }());
 

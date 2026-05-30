@@ -21,6 +21,7 @@ target_sources(
 target_link_libraries(
     smdscheme.sender
     PUBLIC
+        smdscheme.foundation
         smdscheme.closure
         $<BUILD_INTERFACE:beman::execution_headers>
         $<BUILD_INTERFACE:beman.task_headers>
