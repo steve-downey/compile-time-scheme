@@ -1,0 +1,3 @@
+* xref:index.adoc[Home]
+* xref:architecture.adoc[Architecture]
+* xref:reference:index.adoc[API Reference]

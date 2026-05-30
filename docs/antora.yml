@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+name: smd.schemepoc
+title: smd.schemepoc
+version: ~
+
+nav:
+  - modules/ROOT/nav.adoc
+
+ext:
+  cpp-reference:
+    config: docs/mrdocs.yml
+    using-namespaces:
+      - smd::smdscheme
+      - smd::smdscheme::foundation
+      - smd::smdscheme::parser
+      - smd::smdscheme::reader
+      - smd::smdscheme::elaborator
+      - smd::smdscheme::closure
+      - smd::smdscheme::cps

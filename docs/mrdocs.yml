@@ -3,22 +3,30 @@
 
 ---
 source-root: ..
+# Scope: document the non-reflection layers only.  The sender/reflection
+# modules require GCC16 -freflection which mrdocs (clang-based) cannot parse.
 input:
-  - ../include
-exclude:
-  - ../include/beman/optional/detail
+  - ../src/smd/smdscheme/foundation
+  - ../src/smd/smdscheme/parser
+  - ../src/smd/smdscheme/reader
+  - ../src/smd/smdscheme/elaborator
+  - ../src/smd/smdscheme/closure
 exclude-patterns:
-  - ../include/beman/optional/detail/**
-  - ../tests/**
-  - ../examples/**
+  - '**/*.test.cpp'
+  - '**/detail/**'
 includes:
-  - ../include
+  - ../src
 file-patterns:
   - '*.hpp'
 include-symbols:
-  - 'beman::optional::**'
-implementation-defined:
-  - 'beman::optional::detail'
+  - 'smd::**'
 multipage: true
 generator: adoc
-output: adoc
+output: modules/ROOT/pages/reference
+extract-private: false
+cmake: >-
+  -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+  -DSCHEMEPOC_ENABLE_TESTING=OFF
+  -DCMAKE_TOOLCHAIN_FILE=etc/clang-18-toolchain.cmake
+  -DCMAKE_PROJECT_TOP_LEVEL_INCLUDES=infra/cmake/use-fetch-content.cmake
+base-url: https://github.com/steve-downey/compile-time-scheme/blob/main/
