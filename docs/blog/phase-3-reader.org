@@ -5,7 +5,7 @@
 #+options: html5-fancy:t
 #+TITLE: Building a Compile-Time Scheme in C++26: Phase 3 - The Reader and the Datum Tree
 #+AUTHOR: Steve Downey
-#+DATE: 2026-05-29
+#+DATE: 2026-05-31
 
 #+begin_abstract
 Scheme is homoiconic.
@@ -18,62 +18,65 @@ In Phase 3, we build the "Reader", whose sole job is to convert raw strings into
 
 * The Separation of Syntax and Semantics
 
-A common pitfall is attempting to parse textual tokens directly into semantic AST nodes (e.g., turning ="if"= immediately into an ~IfNode~).
-We explicitly resist this.
+A common pitfall in compiler design is attempting to parse textual tokens directly into semantic AST nodes.
+For instance, turning the string ="if"= immediately into an ~IfNode~ during the first pass.
+We explicitly resist this temptation.
 
-When the Reader sees:
+When the Reader encounters:
 #+begin_src scheme
 (if #t 1 2)
 #+end_src
 It does not parse a conditional branch.
 It simply parses a list containing four items: the symbol ~'if~, the boolean true, the integer ~1~, and the integer ~2~.
 
-This isolation simplifies our parsing logic immensely.
-The combinators from Phase 2 are used solely to build structural ~Datum~ types: ~Integer~, ~Boolean~, ~Symbol~, and ~List~ (Cons cells).
-The Reader doesn't ask questions; it just builds the list.
+This strict isolation simplifies our parsing logic immensely.
+The parser combinators from Phase 2 are used solely to build structural ~Datum~ types: ~Integer~, ~Boolean~, ~Symbol~, and ~List~ (cons cells).
+The Reader doesn't ask semantic questions; it merely shape-matches text into an S-expression.
 
 * Surviving ~constexpr~: The Flat Arena
 
-In a standard C++ implementation, a recursive tree like a List relies on heap allocations (pointers via ~new~ or ~std::unique_ptr~).
+In a standard C++ implementation, a recursive tree like a List fundamentally relies on heap allocations.
+Recursive types require pointers—such as ~std::unique_ptr<Datum>~ or raw ~Datum*~—because a C++ `struct` cannot contain itself by value.
+As we discussed in Phase 1, dynamic allocations that outlive a single ~constexpr~ evaluation context are forbidden by the C++ standard.
 
-#+begin_src c++
-struct Cons {
-    Datum* car;
-    Datum* cdr;
-};
-#+end_src
-
-As discussed in Phase 1, dynamic allocations that outlive the ~constexpr~ evaluation context are forbidden.
 To overcome this, we represent our recursive tree via a *Flat Arena*.
+An Arena is a statically sized array—specifically a ~static_vector~—of nodes.
+Instead of raw memory pointers, nodes refer to their children using integer indexes, often called a /handle/ or a /box/ identifier.
 
-An Arena is a statically sized array (`static_vector`) of nodes.
-Instead of raw memory pointers, nodes refer to their children using integer indexes, often called a ~node_id~.
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/foundation/arena_box.hpp::20fac680-d2cc-4139-875d-50b3953e12a4]] :lines 2- :src cpp :end "20fac680-d2cc-4139-875d-50b3953e12a4 end"
 
-#+begin_src c++
-using static_node_id = std::uint32_t;
+By abstracting the index into an ~arena_box~, our nodes behave semantically like pointers, complete with a null-state equivalent (~id_ == -1~).
+The backing memory layout is simple and predictable:
 
-struct ConsData {
-    static_node_id car_id;
-    static_node_id cdr_id;
-};
-
-// The Arena holds our tree memory:
-static_vector<DatumVariant, 1024> datum_arena;
-#+end_src
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/foundation/arena_box.hpp::90752db7-62a8-493a-bf54-aa4ee7b30933]] :lines 2- :src cpp :end "90752db7-62a8-493a-bf54-aa4ee7b30933 end"
 
 ** Benefits of the Flat Arena
-1. **~constexpr~ Compliance**: The arena uses fixed internal arrays, making it perfectly valid for returning from ~constexpr~ functions. 2. **Cache Locality**: Trees allocated node-by-node on the heap suffer from fragmentation.
-An arena stores sibling data sequentially in memory, meaning operations bounding across the tree enjoy massive CPU cache-hit benefits.
-Memory pre-fetchers love arenas. 3. **Immutability and Easy Copying**: Copying the entire AST means passing a single array value.
-We don't have to trace deep pointer trees to perform deep copies.
-It's just copying a block of memory.
+
+1. **~constexpr~ Compliance**: The arena uses fixed internal arrays, making it perfectly valid for returning from ~constexpr~ contexts intact.
+2. **Cache Locality**: Trees allocated node-by-node on the heap suffer from memory fragmentation. An arena stores sibling data sequentially in memory, meaning bulk operations across the tree enjoy massive CPU cache-hit benefits. Memory pre-fetchers love arenatized data patterns.
+3. **Immutability and Trivial Copying**: Copying the entire AST simply means performing a bulk trivial copy of a single array buffer. We completely bypass the cost of tracing deep pointer trees to execute deep copies.
+
+* Open Recursion and ~Datum~ Formats
+
+In our design, list elements point into the arena via the ~arena_box~ handle, side-stepping the incomplete type problem in C++.
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/reader/datum_type.hpp::e30e1970-1410-46bc-bc98-47f3e5854497]] :lines 2- :src cpp :end "e30e1970-1410-46bc-bc98-47f3e5854497 end"
+
+However, expressing a recursive variant manually requires forward declarations and complex workarounds.
+A cleaner approach utilized heavily in modern compiler engineering is /Open Recursion/ paired with a /Fixed-Point combinator/.
+By defining a generic factory that takes a recursive self-reference ~R~ as a type template parameter, our ~datum_type~ variant only declares exactly one flat layer.
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/reader/datum_type.hpp::4c343e79-7835-4862-afee-9e74d3b6098c]] :lines 2- :src cpp :end "4c343e79-7835-4862-afee-9e74d3b6098c end"
+
+The ~foundation::fix~ helper applies the recursive structural knot for us, tying ~datum_type~ directly into a closed AST structure without needing explicit cyclic data definitions!
 
 * Conclusion
 
 The Reader cleanly translates human text into the mechanical ~Datum~ arena.
-At this stage, our compiler possesses a perfectly parsed, memory-safe structural representation of the input string.
-It does not yet know what the code does, but it knows exactly how it is shaped.
+At this stage, our compiler possesses a perfectly parsed, memory-safe, and cache-friendly structural representation of the input string.
+It does not yet know what the code computes—it only knows precisely how it is shaped.
 
 * References
-- McCarthy, J. (1960). "Recursive Functions of Symbolic Expressions and Their Computation by Machine, Part I." Communications of the ACM.
-- "Arena Allocation", Wikipedia, https://en.wikipedia.org/wiki/Region-based_memory_management
+- McCarthy, J. (1960). [[https://dl.acm.org/doi/10.1145/367177.367199]["Recursive Functions of Symbolic Expressions and Their Computation by Machine, Part I"]]. /Communications of the ACM, 3/(4), 184–195. The foundational paper outlining the S-expression layout and eval mechanics.
+- Bendersky, M. (2014). [[https://eli.thegreenplace.net/2014/06/04/using-the-c-zipper-to-compute-factorial]["Using the Y-combinator in C++"]]. Eli Bendersky's Website. Contextual reading into fixed-point combinators in modern C++.
+- "Region-based memory management" (Arena Allocation). [[https://en.wikipedia.org/wiki/Region-based_memory_management][Wikipedia]].

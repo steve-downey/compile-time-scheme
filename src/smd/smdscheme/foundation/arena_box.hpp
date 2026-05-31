@@ -8,6 +8,7 @@
 
 namespace smd::smdscheme::foundation {
 
+// 20fac680-d2cc-4139-875d-50b3953e12a4
 /// A typed integer handle into a @ref tree_arena.
 ///
 /// Stores the index of a node rather than a pointer, keeping the tree
@@ -28,7 +29,9 @@ struct arena_box {
     /// Returns false when this is the null handle.
     constexpr explicit operator bool() const { return id_ != -1; }
 };
+// 20fac680-d2cc-4139-875d-50b3953e12a4 end
 
+// 90752db7-62a8-493a-bf54-aa4ee7b30933
 /// A bump-allocator arena of @p T with fixed capacity, usable in constexpr.
 ///
 /// Nodes are appended in order; allocation never moves existing nodes.
@@ -63,6 +66,7 @@ struct tree_arena {
         return data[b.id_];
     }
 };
+// 90752db7-62a8-493a-bf54-aa4ee7b30933 end
 
 /// Constructs a @p T in-place in @p arena and returns a handle to it.
 ///

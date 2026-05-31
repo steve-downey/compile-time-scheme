@@ -27,6 +27,7 @@ struct datum_boolean {
     bool value{};
 };
 
+// e30e1970-1410-46bc-bc98-47f3e5854497
 /// A Scheme list datum, e.g. @c (a b c).
 ///
 /// Elements are stored as @ref foundation::arena_box handles into the reader
@@ -40,6 +41,7 @@ struct datum_list {
     foundation::static_vector<foundation::arena_box<R, MaxNodes>, MaxList>
         elements{};
 };
+// e30e1970-1410-46bc-bc98-47f3e5854497 end
 
 /// A Scheme quote form, e.g. @c 'x stored as a handle to the quoted datum.
 ///
@@ -51,6 +53,7 @@ struct datum_quote {
         quoted{}; ///< Handle to the quoted datum.
 };
 
+// 4c343e79-7835-4862-afee-9e74d3b6098c
 /// Factory template that produces the open-recursive functor used by
 /// @ref datum_type.
 ///
@@ -76,6 +79,7 @@ struct datum_f_factory {
 template <int MaxNodes, int MaxList>
 using datum_type =
     foundation::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
+// 4c343e79-7835-4862-afee-9e74d3b6098c end
 
 } // namespace smd::smdscheme::reader
 

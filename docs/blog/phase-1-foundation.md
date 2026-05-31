@@ -1,4 +1,4 @@
-<div class="abstract" id="org452dd11">
+<div class="abstract" id="orgeec7d9d">
 <p>
 Welcome to the first post in our series on building SchemePoC, a compile-time Scheme compiler built entirely in C++26.
 Before we can parse a single S-expression or evaluate a lambda, we must lay a solid foundation.
