@@ -168,6 +168,9 @@
   )
 
 
+(use-package ox-gfm
+  :after org)
+
 (use-package with-editor)
 
 (use-package citeproc :ensure t :after org)

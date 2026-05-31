@@ -11,6 +11,7 @@
 Phase 6 marks the transition from an interpreter to an actual compiler. The crucial functional mechanism that bridges runtime behavior into the C++ type system is the materialization of the Closure.
 #+end_abstract
 
+#+MACRO: TEASER_END
 {{{TEASER_END}}}
 
 * What is a Closure?

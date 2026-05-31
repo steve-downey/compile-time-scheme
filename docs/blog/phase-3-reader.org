@@ -11,6 +11,7 @@
 Scheme is homoiconic. Code is Data, and Data is Code. In Phase 3, we build the "Reader", whose sole job is to convert raw strings into the native structural format of Lisp: the nested List, represented as the ~Datum~ tree, entirely within C++26 ~constexpr~ boundaries.
 #+end_abstract
 
+#+MACRO: TEASER_END
 {{{TEASER_END}}}
 
 * The Separation of Syntax and Semantics

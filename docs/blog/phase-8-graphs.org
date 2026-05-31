@@ -11,6 +11,7 @@
 By lowering our Scheme AST into heavily typed ~std::execution~ Senders, we gained immense performance. But we also created an introspective nightmare. The resulting Sender AST is a massive blob of deeply nested template permutations. How do we prove what the C++ compiler is actually building without deciphering thousands of lines of compiler error backtraces?
 #+end_abstract
 
+#+MACRO: TEASER_END
 {{{TEASER_END}}}
 
 * The Reflection Bridge
