@@ -21,7 +21,7 @@ Because our Scheme compiler parses and generates code at compile-time, we cannot
 
 * Zero-Allocation Utilities
 
-To survive and thrive within these boundaries, we establish zero-allocation, fixed-capacity tools early on. 
+To survive and thrive within these boundaries, we establish zero-allocation, fixed-capacity tools early on.
 
 ** The ~static_vector~ Pattern
 
