@@ -22,6 +22,7 @@ template <parser_like PA, parser_like PB>
     return pa | pb;
 }
 
+// e7d2b575-1f00-46bd-8365-1abbe0de1b63
 /// Returns a parser that applies @p p zero or more times, collecting at most
 /// @c Capacity results into a @ref foundation::static_vector.
 ///
@@ -45,6 +46,7 @@ template <int Capacity, parser_like P>
             parse_state<foundation::static_vector<V, Capacity>>{result, cur}};
     }};
 }
+// e7d2b575-1f00-46bd-8365-1abbe0de1b63 end
 
 /// Returns a parser that applies @p p one or more times, collecting at most
 /// @c Capacity results.
@@ -97,6 +99,7 @@ template <parser_like P>
     }};
 }
 
+// 07cc42ff-6ee4-4b1a-90b0-b81c99574723
 /// Returns a parser that strips leading and trailing inter-token whitespace
 /// around @p p.
 ///
@@ -116,6 +119,7 @@ template <parser_like P>
         return parse_result<V>{parse_state<V>{r.value().value, rest}};
     }};
 }
+// 07cc42ff-6ee4-4b1a-90b0-b81c99574723 end
 
 } // namespace smd::smdscheme::parser
 

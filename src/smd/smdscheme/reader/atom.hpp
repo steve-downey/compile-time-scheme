@@ -26,6 +26,7 @@ struct atom_symbol {
 /// A Scheme atom: either an integer or a symbol.
 using atom = std::variant<atom_integer, atom_symbol>;
 
+// 8b0f791f-6e09-40a4-94bb-fc995a3b434a
 /// Returns a parser for a Scheme integer literal.
 ///
 /// Handles an optional leading @c - sign followed by one or more decimal
@@ -54,7 +55,9 @@ using atom = std::variant<atom_integer, atom_symbol>;
             parser::parse_state<atom_integer>{atom_integer{sign * n}, rest}};
     }};
 }
+// 8b0f791f-6e09-40a4-94bb-fc995a3b434a end
 
+// 0794bb9e-c834-40a6-851f-16541936e85a
 /// Returns a parser for a Scheme symbol.
 ///
 /// A symbol starts with a letter or operator character (per
@@ -80,6 +83,7 @@ using atom = std::variant<atom_integer, atom_symbol>;
                 parser::parse_state<atom_symbol>{atom_symbol{name}, end_cur}};
         }};
 }
+// 0794bb9e-c834-40a6-851f-16541936e85a end
 
 } // namespace smd::smdscheme::reader
 

@@ -15,7 +15,7 @@ Scheme is homoiconic. Code is Data, and Data is Code. In Phase 3, we build the "
 
 * The Separation of Syntax and Semantics
 
-A common pitfall is attempting to parse textual tokens directly into semantic AST nodes (e.g., turning ="if"= immediately into an ~IfNode~). We explicitly resist this. 
+A common pitfall is attempting to parse textual tokens directly into semantic AST nodes (e.g., turning ="if"= immediately into an ~IfNode~). We explicitly resist this.
 
 When the Reader sees:
 #+begin_src scheme
@@ -27,7 +27,7 @@ This isolation simplifies our parsing logic immensely. The combinators from Phas
 
 * Surviving ~constexpr~: The Flat Arena
 
-In a standard C++ implementation, a recursive tree like a List relies on heap allocations (pointers via ~new~ or ~std::unique_ptr~). 
+In a standard C++ implementation, a recursive tree like a List relies on heap allocations (pointers via ~new~ or ~std::unique_ptr~).
 
 #+begin_src c++
 struct Cons {
@@ -36,7 +36,7 @@ struct Cons {
 };
 #+end_src
 
-As discussed in Phase 1, dynamic allocations that outlive the ~constexpr~ evaluation context are forbidden. To overcome this, we represent our recursive tree via a *Flat Arena*. 
+As discussed in Phase 1, dynamic allocations that outlive the ~constexpr~ evaluation context are forbidden. To overcome this, we represent our recursive tree via a *Flat Arena*.
 
 An Arena is a statically sized array (`static_vector`) of nodes. Instead of raw memory pointers, nodes refer to their children using integer indexes, often called a ~node_id~.
 
@@ -53,7 +53,7 @@ static_vector<DatumVariant, 1024> datum_arena;
 #+end_src
 
 ** Benefits of the Flat Arena
-1. **~constexpr~ Compliance**: The arena uses fixed internal arrays, making it perfectly valid for returning from ~constexpr~ functions. 
+1. **~constexpr~ Compliance**: The arena uses fixed internal arrays, making it perfectly valid for returning from ~constexpr~ functions.
 2. **Cache Locality**: Trees allocated node-by-node on the heap suffer from fragmentation. An arena stores sibling data sequentially in memory, meaning operations bounding across the tree enjoy massive CPU cache-hit benefits. Memory pre-fetchers love arenas.
 3. **Immutability and Easy Copying**: Copying the entire AST means passing a single array value. We don't have to trace deep pointer trees to perform deep copies. It's just copying a block of memory.
 

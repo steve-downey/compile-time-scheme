@@ -34,7 +34,7 @@ struct core_if {
 
 * Validation
 
-This separation of concerns means that all syntax validation is centralized in the Elaborator. 
+This separation of concerns means that all syntax validation is centralized in the Elaborator.
 - Did the user pass three arguments to ~if~?
 - Are the arguments to a ~(lambda (x y) ...)~ form actually variable symbols?
 - Is a variable symbol referencing an item that exists in the current lexical environment?
@@ -68,5 +68,5 @@ constexpr Value eval_direct(core_node_id id, Environment env) {
 While this proves the elaborated semantics are correct, evaluating deep recursive structures this way directly utilizes the C++ call stack. Deep recursion will trigger a C++ compiler stack overflow, even at compile-time. There is compiling your code, and then there is crashing Clang. We need a way to decouple Scheme's control flow from C++'s native call stack. This leads directly to our middle-end architecture.
 
 * References
-- Queinnec, C. (1996). "Lisp in Small Pieces." Cambridge University Press. 
+- Queinnec, C. (1996). "Lisp in Small Pieces." Cambridge University Press.
 - De Bruijn, N. G. (1972). "Lambda calculus notation with nameless dummies, a tool for automatic formula manipulation, with application to the Church-Rosser theorem." Indagationes Mathematicae.

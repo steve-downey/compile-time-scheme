@@ -15,9 +15,9 @@ By lowering our Scheme AST into heavily typed ~std::execution~ Senders, we gaine
 
 * The Reflection Bridge
 
-In Phase 8, we build an Applicative DOT traverser. Leveraging C++26 Reflection (~std::meta::info~), we introspect the generated execution typings and project them into the Graphviz dot-language for visual rendering. 
+In Phase 8, we build an Applicative DOT traverser. Leveraging C++26 Reflection (~std::meta::info~), we introspect the generated execution typings and project them into the Graphviz dot-language for visual rendering.
 
-C++26 Reflection (P2996) allows C++ programs to imperatively query the structural definitions of types during constant evaluation. 
+C++26 Reflection (P2996) allows C++ programs to imperatively query the structural definitions of types during constant evaluation.
 
 Instead of writing nightmarish recursive template metaprogramming tricks with partial specializations, we write a straightforward loop that interacts via ~<meta>~. Given a Sender's ~std::meta::info~, we extract its identifier (say, ~"just"~, ~"when_all"~, or ~"then"~) and parse its template arguments perfectly.
 
@@ -42,11 +42,11 @@ constexpr TreeType build_scheme_tree(std::meta::info sender_type, int& id_counte
 }
 #+end_src
 
-This recursively unpacks the deeply typed sequence and maps it onto a homogenously typed ~SchemeTree~ topology, annotating both the Sender algorithm and its originating Scheme context.
+This recursively unpacks the deeply typed sequence and maps it onto a homogeneously typed ~SchemeTree~ topology, annotating both the Sender algorithm and its originating Scheme context.
 
 * Graph Translation via Applicatives
 
-Once we possess a homogeneous C++ tree, we turn once again to Category Theory to render the Graphviz dot-language diagram. 
+Once we possess a homogeneous C++ tree, we turn once again to Category Theory to render the Graphviz dot-language diagram.
 
 Using the ~Applicative~ and ~Traversable~ typeclasses, we construct a ~StringWriter~ Applicative. The traversable interface allows us to map functionally over the tree structure, appending string state uniformly without managing a monolithic concatenation process manually.
 
@@ -62,4 +62,4 @@ Using the reflection bridge to populate our runtime topology completely removes 
 * References
 - Brown, D. et al. (2024). "P2996: Reflection for C++26". C++ Standards Committee Papers.
 - Graphviz DOT Language, https://graphviz.org/doc/info/lang.html
-- "Applicative Programming with Effects", McBride & Paterson (2008). 
+- "Applicative Programming with Effects", McBride & Paterson (2008).

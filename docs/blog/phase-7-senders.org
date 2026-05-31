@@ -24,7 +24,7 @@ Because our Scheme compiler relies on Continuation-Passing Style—where every o
 
 * Generating Typed Senders
 
-When the Elaborator has finished building the structural AST, the backend systematically translates it into native C++ sender algorithms. 
+When the Elaborator has finished building the structural AST, the backend systematically translates it into native C++ sender algorithms.
 
 For instance, consider the fundamental operations:
 - A Scheme atom or literal ~(quote 5)~ translates directly into ~std::execution::just(5)~, representing a sender that instantly completes with the value 5.
@@ -33,7 +33,7 @@ For instance, consider the fundamental operations:
 
 #+begin_src c++
 // An idealized view of the generated sender type
-auto scheme_execution_pipeline = 
+auto scheme_execution_pipeline =
     std::execution::then(
         std::execution::when_all(
             std::execution::just(1),
@@ -45,7 +45,7 @@ auto scheme_execution_pipeline =
 
 * Zero Abstraction Overhead
 
-What is genuinely remarkable about this stage is the compilation efficiency. These typed senders are completely resolved at compile-time. We are passing deeply nested templates into the C++ compiler. 
+What is genuinely remarkable about this stage is the compilation efficiency. These typed senders are completely resolved at compile-time. We are passing deeply nested templates into the C++ compiler.
 
 Where typical dynamic language interpreters rely on heavy switch statements and virtual dispatch (creating cache misses and blocking optimization), our Scheme program compiles into a single, fully-known type topology. The standard C++ optimizer natively unrolls and inlines the ~just~, ~when_all~, and ~then~ structures. A computationally complex Scheme algorithm collapses down into tight, bare-metal C++ instructions running securely across thread pools.
 
