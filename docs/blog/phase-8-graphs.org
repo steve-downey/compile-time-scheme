@@ -8,10 +8,10 @@
 #+DATE: 2026-05-29
 
 #+begin_abstract
-By lowering our Scheme AST into heavily typed ~std::execution~ Senders, we gained immense performance.
-But we also created an introspective nightmare.
+By lowering my Scheme AST into heavily typed ~std::execution~ Senders, I gained immense performance.
+But I also created an introspective nightmare.
 The resulting Sender AST is a massive blob of deeply nested template permutations.
-How do we prove what the C++ compiler is actually building without deciphering thousands of lines of compiler error backtraces?
+How do I prove what the C++ compiler is actually building without deciphering thousands of lines of compiler error backtraces?
 #+end_abstract
 
 #+MACRO: TEASER_END
@@ -19,13 +19,13 @@ How do we prove what the C++ compiler is actually building without deciphering t
 
 * The Reflection Bridge
 
-In Phase 8, we build an Applicative DOT traverser.
-Leveraging C++26 Reflection (~std::meta::info~), we introspect the generated execution typings and project them into the Graphviz dot-language for visual rendering.
+In Phase 8, I build an Applicative DOT traverser.
+Leveraging C++26 Reflection (~std::meta::info~), I introspect the generated execution typings and project them into the Graphviz dot-language for visual rendering.
 
 C++26 Reflection (P2996) allows C++ programs to imperatively query the structural definitions of types during constant evaluation.
 
-Instead of writing nightmarish recursive template metaprogramming tricks with partial specializations, we write a straightforward loop that interacts via ~<meta>~.
-Given a Sender's ~std::meta::info~, we extract its identifier (say, ~"just"~, ~"when_all"~, or ~"then"~) and parse its template arguments perfectly.
+Instead of writing nightmarish recursive template metaprogramming tricks with partial specializations, I write a straightforward loop that interacts via ~<meta>~.
+Given a Sender's ~std::meta::info~, I extract its identifier (say, ~"just"~, ~"when_all"~, or ~"then"~) and parse its template arguments perfectly.
 
 #+begin_src c++
 template <typename TreeType>
@@ -52,10 +52,10 @@ This recursively unpacks the deeply typed sequence and maps it onto a homogeneou
 
 * Graph Translation via Applicatives
 
-Once we possess a homogeneous C++ tree, we turn once again to Category Theory to render the Graphviz dot-language diagram.
+Once I possess a homogeneous C++ tree, I turn once again to Category Theory to render the Graphviz dot-language diagram.
 
-Using the ~Applicative~ and ~Traversable~ typeclasses, we construct a ~StringWriter~ Applicative.
-The traversable interface allows us to map functionally over the tree structure, appending string state uniformly without managing a monolithic concatenation process manually.
+Using the ~Applicative~ and ~Traversable~ typeclasses, I construct a ~StringWriter~ Applicative.
+The traversable interface allows me to map functionally over the tree structure, appending string state uniformly without managing a monolithic concatenation process manually.
 
 #+begin_src c++
 // The traversable sweeps the string writer across all SchemeNodeData points,
@@ -64,8 +64,8 @@ The traversable interface allows us to map functionally over the tree structure,
 
 * Conclusion
 
-Using the reflection bridge to populate our runtime topology completely removes the black-box nature of compile-time meta-programming.
-The C++26 reflection framework allows us to natively render the exact asynchronous execution pipeline (~std::execution~) constructed for any Scheme program.
+Using the reflection bridge to populate my runtime topology completely removes the black-box nature of compile-time meta-programming.
+The C++26 reflection framework allows me to natively render the exact asynchronous execution pipeline (~std::execution~) constructed for any Scheme program.
 Running the output directly through ~dot -Tpng -o plan.png~ grants immediate, visual feedback of how functional continuations map to low-level native scheduling operations.
 
 * References

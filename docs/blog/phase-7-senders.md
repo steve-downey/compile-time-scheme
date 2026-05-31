@@ -1,8 +1,8 @@
-<div class="abstract" id="org15a5df0">
+<div class="abstract" id="org63350cb">
 <p>
-To truly compile our Scheme dialect into blazing-fast native code, we need an execution model.
+To truly compile my Scheme dialect into blazing-fast native code, I need an execution model.
 Phase 7 bridges the gap between functional Scheme evaluation and modern C++ asynchronous workloads.
-We achieve this by lowering our CPS Abstract Syntax Tree into deeply nested <b>Typed Senders</b>.
+I achieve this by lowering my CPS Abstract Syntax Tree into deeply nested <b>Typed Senders</b>.
 </p>
 
 </div>
@@ -16,7 +16,7 @@ C++26 brings standard asynchronous execution models (`std::execution`). The fund
 -   **Receivers**: Callbacks that consume those values.
 -   **Schedulers**: Contexts dictating *where* the work happens (e.g., thread pools).
 
-Because our Scheme compiler relies on Continuation-Passing Style—where every operation simply says "do work, then pass the result to this callback"—it matches perfectly with the Sender/Receiver architecture. A Scheme continuation is functionally isomorphic to a C++ Receiver.
+Because my Scheme compiler relies on Continuation-Passing Style—where every operation simply says "do work, then pass the result to this callback"—it matches perfectly with the Sender/Receiver architecture. A Scheme continuation is functionally isomorphic to a C++ Receiver.
 
 
 # Generating Typed Senders
@@ -44,14 +44,14 @@ auto scheme_execution_pipeline =
 
 # Zero Abstraction Overhead
 
-What is genuinely remarkable about this stage is the compilation efficiency. These typed senders are completely resolved at compile-time. We are passing deeply nested templates into the C++ compiler.
+What is genuinely remarkable about this stage is the compilation efficiency. These typed senders are completely resolved at compile-time. I am passing deeply nested templates into the C++ compiler.
 
-Where typical dynamic language interpreters rely on heavy switch statements and virtual dispatch (creating cache misses and blocking optimization), our Scheme program compiles into a single, fully-known type topology. The standard C++ optimizer natively unrolls and inlines the `just`, `when_all`, and `then` structures. A computationally complex Scheme algorithm collapses down into tight, bare-metal C++ instructions running securely across thread pools.
+Where typical dynamic language interpreters rely on heavy switch statements and virtual dispatch (creating cache misses and blocking optimization), my Scheme program compiles into a single, fully-known type topology. The standard C++ optimizer natively unrolls and inlines the `just`, `when_all`, and `then` structures. A computationally complex Scheme algorithm collapses down into tight, bare-metal C++ instructions running securely across thread pools.
 
 
 # Conclusion
 
-By lowering Scheme code into strongly-typed `std::execution` Senders, our compiler achieves what few others can: seamless integration with C++ asynchronous networking and task-parallel thread pool designs, executing Scheme functionally but with the footprint of hand-written C++ concurrency primitives.
+By lowering Scheme code into strongly-typed `std::execution` Senders, my compiler achieves what few others can: seamless integration with C++ asynchronous networking and task-parallel thread pool designs, executing Scheme functionally but with the footprint of hand-written C++ concurrency primitives.
 
 
 # References

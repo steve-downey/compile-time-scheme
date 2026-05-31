@@ -32,7 +32,7 @@ Here, the ~lambda~ must capture ~x~ to form a closure before it can be returned 
 Many dynamic language environments construct heavy, opaque callable types with runtime type-erasure (e.g., ~std::move_only_function~ or polymorphic classes) to represent closures.
 Those create abstraction penalties, block optimizations like inlining, and are often strictly forbidden or painfully annoying to utilize effectively in ~constexpr~.
 
-Because we operate structurally at compile time, we leverage the C++ template system to emit standard, statically-defined native C++ wrapper classes that represent these closures precisely.
+Because I operate structurally at compile time, I leverage the C++ template system to emit standard, statically-defined native C++ wrapper classes that represent these closures precisely.
 
 #+begin_src c++
 // A mechanical visualization of the generated closure struct
@@ -51,15 +51,15 @@ The Scheme behavior collapses entirely into the C++ type system.
 
 * Negative Compile Tests
 
-Because closures enforce rigorous static paths, we enhance the C++ compiler's reporting.
-If our Elaborator catches an unbound variable error, or if closure materialization fails, it yields C++ compilation failures.
+Because closures enforce rigorous static paths, I enhance the C++ compiler's reporting.
+If my Elaborator catches an unbound variable error, or if closure materialization fails, it yields C++ compilation failures.
 
-We write negative compile-time tests using assertions mapping to ~requires~ clauses, enabling the C++ compiler to act natively as a lint and error-reporting tool for our Scheme source text.
+I write negative compile-time tests using assertions mapping to ~requires~ clauses, enabling the C++ compiler to act natively as a lint and error-reporting tool for my Scheme source text.
 A typo in your Scheme means your C++ build explicitly breaks.
 
 * Conclusion
 
-By emitting statically defined closure types representing our CPS states, our project ceases to be merely a toy compile-time interpreter.
+By emitting statically defined closure types representing my CPS states, my project ceases to be merely a toy compile-time interpreter.
 It functions directly as a compiler, bootstrapping Scheme representations into equivalent, fully optimized native C++ behavior.
 
 * References

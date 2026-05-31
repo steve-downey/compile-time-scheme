@@ -1,7 +1,7 @@
-<div class="abstract" id="org52ba41b">
+<div class="abstract" id="orgfb0d475">
 <p>
-By Phase 4, our compile-time compiler could parse and elaborate code, but recursive execution directly blew up the C++ compiler's internal call stack.
-Phase 5 fixes this by introducing Continuation-Passing Style (CPS), fundamentally shifting how we view function execution.
+By Phase 4, my compile-time compiler could parse and elaborate code, but recursive execution directly blew up the C++ compiler's internal call stack.
+Phase 5 fixes this by introducing Continuation-Passing Style (CPS), fundamentally shifting how I view function execution.
 </p>
 
 </div>
@@ -37,7 +37,7 @@ add_cps(3, 4, [](int partial_sum) {
 
 # Defunctionalization and Stack Control
 
-In a `constexpr` environment, we cannot dynamically allocate these callback lambdas on the heap. We must **defunctionalize** them. Defunctionalization transforms high-level functions (like our lambdas) into concrete data structures (structs/variants) combined with an `apply` loop.
+In a `constexpr` environment, I cannot dynamically allocate these callback lambdas on the heap. I must **defunctionalize** them. Defunctionalization transforms high-level functions (like my lambdas) into concrete data structures (structs/variants) combined with an `apply` loop.
 
 Instead of calling a function on the C++ stack, an evaluation step yields a specific continuation object: "Here is the next step to execute, and here is its data." A top-level trampolining loop processes these continuations.
 
@@ -50,12 +50,12 @@ while (!is_finished(current_continuation)) {
 
 # Tail-Call Optimization (TCO)
 
-Because Scheme mandates Tail-Call Optimization (meaning infinite recursion without stack overflow is valid loop behavior), CPS provides the perfect mechanical underpinning. Tail calls in CPS are physically just jumps. We merely pass the current continuation without extending it. The trampolining loop handles the iteration perfectly in constant memory space.
+Because Scheme mandates Tail-Call Optimization (meaning infinite recursion without stack overflow is valid loop behavior), CPS provides the perfect mechanical underpinning. Tail calls in CPS are physically just jumps. I merely pass the current continuation without extending it. The trampolining loop handles the iteration perfectly in constant memory space.
 
 
 # Conclusion
 
-Through CPS and defunctionalization, our Scheme AST is transformed from nested operations fighting for C++ call-stack dominance into an explicit state machine perfectly suited for our fixed-capacity `constexpr` arenas. We are now capable of executing complex Scheme algorithms reliably during C++ compilation without exploding standard parsing limits.
+Through CPS and defunctionalization, my Scheme AST is transformed from nested operations fighting for C++ call-stack dominance into an explicit state machine perfectly suited for my fixed-capacity `constexpr` arenas. I am now capable of executing complex Scheme algorithms reliably during C++ compilation without exploding standard parsing limits.
 
 
 # References

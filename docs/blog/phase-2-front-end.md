@@ -1,7 +1,7 @@
-<div class="abstract" id="org0b0fd0d">
+<div class="abstract" id="org877e36d">
 <p>
 Parsing text into meaningful structure is the first visible step of any compiler.
-Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, we lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators.
+Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, I lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators.
 This post walks through the exact machinery: from the immutable <code>cursor</code> that carries input state, through the <code>parse_result</code> that models success and failure, to the combinators that snap together into a working Scheme lexer—all in zero-allocation <code>constexpr</code> C++26.
 </p>
 
@@ -12,14 +12,14 @@ This post walks through the exact machinery: from the immutable <code>cursor</co
 
 Recursive descent is the industry standard for production compilers (like GCC or Clang) because it offers unparalleled control over error recovery and diagnostics. However, for a purposely simple language like Scheme—with its highly uniform S-expression syntax—a recursive descent parser involves writing verbose, repetitive loops and state-tracking mechanisms.
 
-We also avoid parser generators (like Bison/Yacc). While mathematically rigorous, they introduce massive build-system complexity and generate code that is historically difficult to make strictly `constexpr` compliant in modern C++. Trying to force a tool from 1975 to emit C++26 constant expressions is an exercise in misery.
+I also avoid parser generators (like Bison/Yacc). While mathematically rigorous, they introduce massive build-system complexity and generate code that is historically difficult to make strictly `constexpr` compliant in modern C++. Trying to force a tool from 1975 to emit C++26 constant expressions is an exercise in misery.
 
 There is a deeper constraint: inside `constexpr` evaluation, you cannot easily juggle lambdas that capture variables and convert them back to function pointers. Every parser must be a concrete callable object whose type the compiler can reason about statically. Parser combinators, expressed as C++ templates, satisfy this requirement naturally.
 
 
 # The Immutable Cursor
 
-Before any parser can run, we need a way to represent "where we are in the input." The simplest possible design is a `std::string_view` plus a position counter—but the critical design decision is that advancing the cursor returns a *new* cursor rather than mutating the existing one.
+Before any parser can run, I need a way to represent "where I am in the input." The simplest possible design is a `std::string_view` plus a position counter—but the critical design decision is that advancing the cursor returns a *new* cursor rather than mutating the existing one.
 
 ```cpp
 /// An immutable view into the remaining input with an associated source
@@ -141,7 +141,7 @@ template <class T>
 using parse_result = foundation::result<parse_state<T>>;
 ```
 
-`parse_state<T>` bundles the successfully parsed value with the cursor positioned just after the consumed input. `parse_result<T>` is an alias for `foundation::result<parse_state<T>>~—our project's ~std::expected`-like type that holds either the state or a `parse_error` (position + message string).
+`parse_state<T>` bundles the successfully parsed value with the cursor positioned just after the consumed input. `parse_result<T>` is an alias for `foundation::result<parse_state<T>>~—my project's ~std::expected`-like type that holds either the state or a `parse_error` (position + message string).
 
 The `T` is a template parameter, so parsers are naturally typed: a parser for a digit character returns `parse_result<char>`, a parser for an integer returns `parse_result<atom_integer>`. The type propagates automatically through every combinator.
 
@@ -176,7 +176,7 @@ template <class F>
 parser(F) -> parser<F>;
 ```
 
-The class is intentionally thin. It stores `F` by value (critical for `constexpr` since we cannot take addresses of lambdas at compile time), exposes `operator()(cursor)`, and satisfies `parser_like`. The CTAD guide `parser(f) -> parser<F>` means you can write `parser{lambda}` without spelling out `F`.
+The class is intentionally thin. It stores `F` by value (critical for `constexpr` since I cannot take addresses of lambdas at compile time), exposes `operator()(cursor)`, and satisfies `parser_like`. The CTAD guide `parser(f) -> parser<F>` means you can write `parser{lambda}` without spelling out `F`.
 
 The `parser_like` concept at the top of the file requires only that a type be callable with a `cursor`. This lets free functions and other callable objects participate in the combinator algebra without being wrapped, while still being checkable at the point of use.
 

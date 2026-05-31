@@ -1,6 +1,6 @@
-<div class="abstract" id="orgee8f3d5">
+<div class="abstract" id="orga5d63cb">
 <p>
-With our program read into a pure nested list of symbols, integers, and booleans, it is time to assign meaning.
+With my program read into a pure nested list of symbols, integers, and booleans, it is time to assign meaning.
 Phase 4 introduces the <b>Elaborator</b>, generating a strict, explicitly-typed Semantic Abstract Syntax Tree known as the <code>Core</code> language.
 </p>
 
@@ -43,12 +43,12 @@ If there are malformed structures, the Elaborator rejects them. Because this occ
 
 One of the more complex tasks in elaboration is mapping variable usage to actual variable definitions in closures. In many naive interpreters, variables are stored as strings in a Hash Map environment at runtime. This is terrible for performance.
 
-A faster, more formal approach (which we map toward here) uses positional indices based on scope depth, similar to De Bruijn indexing. The Elaborator can "resolve" a variable symbol to know exactly which lexical block it belongs to, entirely stripping the need for expensive, string-based lookups during code execution.
+A faster, more formal approach (which I map toward here) uses positional indices based on scope depth, similar to De Bruijn indexing. The Elaborator can "resolve" a variable symbol to know exactly which lexical block it belongs to, entirely stripping the need for expensive, string-based lookups during code execution.
 
 
 # Direct Evaluation vs. Compilation
 
-To verify that our `Core` AST is correctly elaborated, we build an `eval_direct` function. This is a traditional tree-walk interpreter that evaluates nodes recursively.
+To verify that my `Core` AST is correctly elaborated, I build an `eval_direct` function. This is a traditional tree-walk interpreter that evaluates nodes recursively.
 
 ```c++
 constexpr Value eval_direct(core_node_id id, Environment env) {
@@ -64,7 +64,7 @@ constexpr Value eval_direct(core_node_id id, Environment env) {
 }
 ```
 
-While this proves the elaborated semantics are correct, evaluating deep recursive structures this way directly utilizes the C++ call stack. Deep recursion will trigger a C++ compiler stack overflow, even at compile-time. There is compiling your code, and then there is crashing Clang. We need a way to decouple Scheme's control flow from C++'s native call stack. This leads directly to our middle-end architecture.
+While this proves the elaborated semantics are correct, evaluating deep recursive structures this way directly utilizes the C++ call stack. Deep recursion will trigger a C++ compiler stack overflow, even at compile-time. There is compiling your code, and then there is crashing Clang. I need a way to decouple Scheme's control flow from C++'s native call stack. This leads directly to my middle-end architecture.
 
 
 # References

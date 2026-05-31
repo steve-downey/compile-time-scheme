@@ -1,8 +1,8 @@
-<div class="abstract" id="orgd18e87c">
+<div class="abstract" id="org02ce54e">
 <p>
 Scheme is homoiconic.
 Code is Data, and Data is Code.
-In Phase 3, we build the "Reader", whose sole job is to convert raw strings into the native structural format of Lisp: the nested List, represented as the <code>Datum</code> tree, entirely within C++26 <code>constexpr</code> boundaries.
+In Phase 3, I build the "Reader", whose sole job is to convert raw strings into the native structural format of Lisp: the nested List, represented as the <code>Datum</code> tree, entirely within C++26 <code>constexpr</code> boundaries.
 </p>
 
 </div>
@@ -10,7 +10,7 @@ In Phase 3, we build the "Reader", whose sole job is to convert raw strings into
 
 # The Separation of Syntax and Semantics
 
-A common pitfall in compiler design is attempting to parse textual tokens directly into semantic AST nodes. For instance, turning the string `"if"` immediately into an `IfNode` during the first pass. We explicitly resist this temptation.
+A common pitfall in compiler design is attempting to parse textual tokens directly into semantic AST nodes. For instance, turning the string `"if"` immediately into an `IfNode` during the first pass. I explicitly resist this temptation.
 
 When the Reader encounters:
 
@@ -20,14 +20,14 @@ When the Reader encounters:
 
 It does not parse a conditional branch. It simply parses a list containing four items: the symbol `'if`, the boolean true, the integer `1`, and the integer `2`.
 
-This strict isolation simplifies our parsing logic immensely. The parser combinators from Phase 2 are used solely to build structural `Datum` types: `Integer`, `Boolean`, `Symbol`, and `List` (cons cells). The Reader doesn't ask semantic questions; it merely shape-matches text into an S-expression.
+This strict isolation simplifies my parsing logic immensely. The parser combinators from Phase 2 are used solely to build structural `Datum` types: `Integer`, `Boolean`, `Symbol`, and `List` (cons cells). The Reader doesn't ask semantic questions; it merely shape-matches text into an S-expression.
 
 
 # Surviving `constexpr`: The Flat Arena
 
-In a standard C++ implementation, a recursive tree like a List fundamentally relies on heap allocations. Recursive types require pointers—such as `std::unique_ptr<Datum>` or raw ``Datum*~—because a C++ `struct` cannot contain itself by value. As we discussed in Phase 1, dynamic allocations that outlive a single ~constexpr`` evaluation context are forbidden by the C++ standard.
+In a standard C++ implementation, a recursive tree like a List fundamentally relies on heap allocations. Recursive types require pointers—such as `std::unique_ptr<Datum>` or raw ``Datum*~—because a C++ `struct` cannot contain itself by value. As I discussed in Phase 1, dynamic allocations that outlive a single ~constexpr`` evaluation context are forbidden by the C++ standard.
 
-To overcome this, we represent our recursive tree via a **Flat Arena**. An Arena is a statically sized array—specifically a ~static\_vector~—of nodes. Instead of raw memory pointers, nodes refer to their children using integer indexes, often called a *handle* or a *box* identifier.
+To overcome this, I represent my recursive tree via a **Flat Arena**. An Arena is a statically sized array—specifically a ~static\_vector~—of nodes. Instead of raw memory pointers, nodes refer to their children using integer indexes, often called a *handle* or a *box* identifier.
 
 ```cpp
 /// A typed integer handle into a @ref tree_arena.
@@ -52,7 +52,7 @@ struct arena_box {
 };
 ```
 
-By abstracting the index into an `arena_box`, our nodes behave semantically like pointers, complete with a null-state equivalent (`id_ == -1`). The backing memory layout is simple and predictable:
+By abstracting the index into an `arena_box`, my nodes behave semantically like pointers, complete with a null-state equivalent (`id_ == -1`). The backing memory layout is simple and predictable:
 
 ```cpp
 /// A bump-allocator arena of @p T with fixed capacity, usable in constexpr.
@@ -96,12 +96,12 @@ struct tree_arena {
 
 1.  ****`constexpr` Compliance****: The arena uses fixed internal arrays, making it perfectly valid for returning from `constexpr` contexts intact.
 2.  ****Cache Locality****: Trees allocated node-by-node on the heap suffer from memory fragmentation. An arena stores sibling data sequentially in memory, meaning bulk operations across the tree enjoy massive CPU cache-hit benefits. Memory pre-fetchers love arenatized data patterns.
-3.  ****Immutability and Trivial Copying****: Copying the entire AST simply means performing a bulk trivial copy of a single array buffer. We completely bypass the cost of tracing deep pointer trees to execute deep copies.
+3.  ****Immutability and Trivial Copying****: Copying the entire AST simply means performing a bulk trivial copy of a single array buffer. I completely bypass the cost of tracing deep pointer trees to execute deep copies.
 
 
 # Open Recursion and `Datum` Formats
 
-In our design, list elements point into the arena via the `arena_box` handle, side-stepping the incomplete type problem in C++.
+In my design, list elements point into the arena via the `arena_box` handle, side-stepping the incomplete type problem in C++.
 
 ```cpp
 /// A Scheme list datum, e.g. @c (a b c).
@@ -119,7 +119,7 @@ struct datum_list {
 };
 ```
 
-However, expressing a recursive variant manually requires forward declarations and complex workarounds. A cleaner approach utilized heavily in modern compiler engineering is *Open Recursion* paired with a *Fixed-Point combinator*. By defining a generic factory that takes a recursive self-reference `R` as a type template parameter, our `datum_type` variant only declares exactly one flat layer.
+However, expressing a recursive variant manually requires forward declarations and complex workarounds. A cleaner approach utilized heavily in modern compiler engineering is *Open Recursion* paired with a *Fixed-Point combinator*. By defining a generic factory that takes a recursive self-reference `R` as a type template parameter, my `datum_type` variant only declares exactly one flat layer.
 
 ```cpp
 /// Factory template that produces the open-recursive functor used by
@@ -149,12 +149,12 @@ using datum_type =
     foundation::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
 ```
 
-The `foundation::fix` helper applies the recursive structural knot for us, tying `datum_type` directly into a closed AST structure without needing explicit cyclic data definitions!
+The `foundation::fix` helper applies the recursive structural knot for me, tying `datum_type` directly into a closed AST structure without needing explicit cyclic data definitions!
 
 
 # Conclusion
 
-The Reader cleanly translates human text into the mechanical `Datum` arena. At this stage, our compiler possesses a perfectly parsed, memory-safe, and cache-friendly structural representation of the input string. It does not yet know what the code computes—it only knows precisely how it is shaped.
+The Reader cleanly translates human text into the mechanical `Datum` arena. At this stage, my compiler possesses a perfectly parsed, memory-safe, and cache-friendly structural representation of the input string. It does not yet know what the code computes—it only knows precisely how it is shaped.
 
 
 # References
