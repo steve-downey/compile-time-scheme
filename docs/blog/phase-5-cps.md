@@ -1,4 +1,4 @@
-<div class="abstract" id="org1f197c9">
+<div class="abstract" id="org52ba41b">
 <p>
 By Phase 4, our compile-time compiler could parse and elaborate code, but recursive execution directly blew up the C++ compiler's internal call stack.
 Phase 5 fixes this by introducing Continuation-Passing Style (CPS), fundamentally shifting how we view function execution.

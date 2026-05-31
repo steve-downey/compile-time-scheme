@@ -1,4 +1,4 @@
-<div class="abstract" id="orgc5ebf41">
+<div class="abstract" id="orgee8f3d5">
 <p>
 With our program read into a pure nested list of symbols, integers, and booleans, it is time to assign meaning.
 Phase 4 introduces the <b>Elaborator</b>, generating a strict, explicitly-typed Semantic Abstract Syntax Tree known as the <code>Core</code> language.

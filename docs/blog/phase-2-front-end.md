@@ -1,4 +1,4 @@
-<div class="abstract" id="orgd7b68e2">
+<div class="abstract" id="org0b0fd0d">
 <p>
 Parsing text into meaningful structure is the first visible step of any compiler.
 Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, we lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators.
