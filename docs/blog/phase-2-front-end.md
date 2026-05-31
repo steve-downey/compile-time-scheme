@@ -1,6 +1,8 @@
-<div class="abstract" id="orgbd440db">
+<div class="abstract" id="orgd6adabf">
 <p>
-Parsing text into meaningful structure is the first visible step of any compiler. Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, we lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators. This post walks through the exact machinery: from the immutable <code>cursor</code> that carries input state, through the <code>parse_result</code> that models success and failure, to the combinators that snap together into a working Scheme lexer—all in zero-allocation <code>constexpr</code> C++26.
+Parsing text into meaningful structure is the first visible step of any compiler.
+Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, we lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators.
+This post walks through the exact machinery: from the immutable <code>cursor</code> that carries input state, through the <code>parse_result</code> that models success and failure, to the combinators that snap together into a working Scheme lexer—all in zero-allocation <code>constexpr</code> C++26.
 </p>
 
 </div>
@@ -584,11 +586,7 @@ Both parsers are combined with `|` in the reader's full datum dispatcher. The re
 
 The parser combinator library is built from five conceptual layers:
 
-1.  **Input**: ~cursor~—immutable, position-tracking view into source text.
-2.  **Output**: `parse_result<T>~—either ~parse_state<T>{value, remaining}` or `parse_error{position, message}`.
-3.  **Wrapper**: `parser<F>~—any callable with signature ~parse_result<T>(cursor)` is a parser.
-4.  **Primitives**: `pure`, `satisfy`, ~char\_p~—the irreducible building blocks.
-5.  **Combinators**: `map` (Functor), `lift2~/~sequence_left~/~sequence_right` (Applicative), `operator|` (Alternative), `many~/~some~/~optional`, `lexeme`.
+1.  **Input**: `cursor~—immutable, position-tracking view into source text. 2. *Output*: ~parse_result<T>~—either ~parse_state<T>{value, remaining}` or `parse_error{position, message}`. 3. **Wrapper**: `parser<F>~—any callable with signature ~parse_result<T>(cursor)` is a parser. 4. **Primitives**: `pure`, `satisfy`, `char_p~—the irreducible building blocks. 5. *Combinators*: ~map` (Functor), `lift2~/~sequence_left~/~sequence_right` (Applicative), `operator|` (Alternative), `many~/~some~/~optional`, `lexeme`.
 
 Everything in the reader is assembled from these five layers with no heap allocation, and all parsing behavior is verified at compile time through the `static_assert` suite. The type system enforces that parsers are combined correctly—mismatching types fail to compile rather than producing wrong results at runtime.
 

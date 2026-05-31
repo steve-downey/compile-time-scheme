@@ -1,6 +1,8 @@
-<div class="abstract" id="org7c4c15f">
+<div class="abstract" id="org8331983">
 <p>
-Scheme is homoiconic. Code is Data, and Data is Code. In Phase 3, we build the "Reader", whose sole job is to convert raw strings into the native structural format of Lisp: the nested List, represented as the <code>Datum</code> tree, entirely within C++26 <code>constexpr</code> boundaries.
+Scheme is homoiconic.
+Code is Data, and Data is Code.
+In Phase 3, we build the "Reader", whose sole job is to convert raw strings into the native structural format of Lisp: the nested List, represented as the <code>Datum</code> tree, entirely within C++26 <code>constexpr</code> boundaries.
 </p>
 
 </div>
@@ -51,9 +53,9 @@ static_vector<DatumVariant, 1024> datum_arena;
 
 ## Benefits of the Flat Arena
 
-1.  ****`constexpr` Compliance****: The arena uses fixed internal arrays, making it perfectly valid for returning from `constexpr` functions.
-2.  ****Cache Locality****: Trees allocated node-by-node on the heap suffer from fragmentation. An arena stores sibling data sequentially in memory, meaning operations bounding across the tree enjoy massive CPU cache-hit benefits. Memory pre-fetchers love arenas.
-3.  ****Immutability and Easy Copying****: Copying the entire AST means passing a single array value. We don't have to trace deep pointer trees to perform deep copies. It's just copying a block of memory.
+1.  ****`constexpr` Compliance****: The arena uses fixed internal arrays, making it perfectly valid for returning from `constexpr` functions. 2. ****Cache Locality****: Trees allocated node-by-node on the heap suffer from fragmentation.
+
+An arena stores sibling data sequentially in memory, meaning operations bounding across the tree enjoy massive CPU cache-hit benefits. Memory pre-fetchers love arenas. 3. ****Immutability and Easy Copying****: Copying the entire AST means passing a single array value. We don't have to trace deep pointer trees to perform deep copies. It's just copying a block of memory.
 
 
 # Conclusion

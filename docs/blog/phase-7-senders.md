@@ -1,6 +1,8 @@
-<div class="abstract" id="orgc93f5e3">
+<div class="abstract" id="orgad57441">
 <p>
-To truly compile our Scheme dialect into blazing-fast native code, we need an execution model. Phase 7 bridges the gap between functional Scheme evaluation and modern C++ asynchronous workloads. We achieve this by lowering our CPS Abstract Syntax Tree into deeply nested <b>Typed Senders</b>.
+To truly compile our Scheme dialect into blazing-fast native code, we need an execution model.
+Phase 7 bridges the gap between functional Scheme evaluation and modern C++ asynchronous workloads.
+We achieve this by lowering our CPS Abstract Syntax Tree into deeply nested <b>Typed Senders</b>.
 </p>
 
 </div>

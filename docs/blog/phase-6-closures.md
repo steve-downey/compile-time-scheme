@@ -1,6 +1,7 @@
-<div class="abstract" id="org3ee467a">
+<div class="abstract" id="org160593d">
 <p>
-Phase 6 marks the transition from an interpreter to an actual compiler. The crucial functional mechanism that bridges runtime behavior into the C++ type system is the materialization of the Closure.
+Phase 6 marks the transition from an interpreter to an actual compiler.
+The crucial functional mechanism that bridges runtime behavior into the C++ type system is the materialization of the Closure.
 </p>
 
 </div>
