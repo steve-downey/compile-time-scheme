@@ -1,6 +1,0 @@
-[submodule "vendor/execution"]
-	path = vendor/execution
-	url = https://github.com/bemanproject/execution.git
-[submodule "vendor/task"]
-	path = vendor/task
-	url = https://github.com/bemanproject/task.git
