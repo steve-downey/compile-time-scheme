@@ -9,6 +9,7 @@
 
 namespace smd::smdscheme::parser {
 
+// 98d9b991-d8d6-4430-9571-489c17437a3d
 /// An immutable view into the remaining input with an associated source
 /// position.
 ///
@@ -54,7 +55,9 @@ class cursor {
     /// Returns the unconsumed portion of the input as a string_view.
     constexpr auto remaining() const -> std::string_view { return input_; }
 };
+// 98d9b991-d8d6-4430-9571-489c17437a3d end
 
+// 2c5cb3d8-d60d-43f3-aaa9-fde7f983aee3
 /// Returns true if @p c is ASCII whitespace.
 constexpr auto is_space(char c) -> bool {
     return c == ' ' || c == '\t' || c == '\n' || c == '\r';
@@ -91,6 +94,7 @@ constexpr auto skip_intertoken_space(cursor cur) -> cursor {
     }
     return cur;
 }
+// 2c5cb3d8-d60d-43f3-aaa9-fde7f983aee3 end
 
 } // namespace smd::smdscheme::parser
 

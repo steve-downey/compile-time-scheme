@@ -15,6 +15,7 @@ using smd::smdscheme::parser::satisfy;
 using smd::smdscheme::parser::sequence_left;
 using smd::smdscheme::parser::sequence_right;
 
+// 1e013a5f-4125-4e65-a095-3d096df4f20c
 static_assert(char_p('x')(cursor{"xyz"}).has_value());
 static_assert(char_p('x')(cursor{"xyz"}).value().value == 'x');
 static_assert(char_p('x')(cursor{"xyz"}).value().rest.peek() == 'y');
@@ -69,6 +70,7 @@ static_assert(!(char_p('a') | char_p('b'))(cursor{"c"}).has_value());
 
 // operator|: first branch succeeds
 static_assert((char_p('a') | char_p('b'))(cursor{"a"}).value().value == 'a');
+// 1e013a5f-4125-4e65-a095-3d096df4f20c end
 
 TEST_CASE("ParserTest - HeaderIsIdempotent") { REQUIRE(true); }
 
