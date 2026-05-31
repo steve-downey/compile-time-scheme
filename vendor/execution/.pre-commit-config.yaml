@@ -1,0 +1,68 @@
+# See https://pre-commit.com for more information
+# See https://pre-commit.com/hooks.html for more hooks
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-json
+      - id: check-yaml
+        exclude: ^\.clang-(format|tidy)$
+      - id: check-added-large-files
+
+  # Config file: .codespellrc
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.4.2
+    hooks:
+      - id: codespell
+        files: ^.*\.(cmake|cpp|cppm|hpp|txt|md|mds|json|js|in|yaml|yml|py|toml)$
+        args: ["--write", "--ignore-words", ".codespellignore" ]
+
+  # Clang-format for C++
+  # This brings in a portable version of clang-format.
+  # See also: https://github.com/ssciwr/clang-format-wheel
+  # Config file: .clang-format
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: v22.1.4
+    hooks:
+      - id: clang-format
+        types_or: [c++, c, json, javascript]
+        exclude: docs/TODO.json
+
+  # CMake linting and formatting
+  - repo: https://github.com/BlankSpruce/gersemi-pre-commit
+    rev: 0.27.2
+    hooks:
+      - id: gersemi
+        name: CMake linting
+
+  # Markdown linting
+  # Config file: .markdownlint.yaml
+  # Commented out to disable this by default. Uncomment to enable markdown linting.
+  # - repo: https://github.com/igorshubovych/markdownlint-cli
+  #   rev: v0.46.0
+  #   hooks:
+  #     - id: markdownlint
+
+  # Config file: pyproject.toml
+  # first Python sort imports
+  - repo: https://github.com/pycqa/isort
+    rev: 9.0.0a3
+    hooks:
+      - id: isort
+
+  # Config file: pyproject.toml
+  # second Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 26.3.1
+    hooks:
+      - id: black
+
+  # Beman Standard checking via beman-tidy
+  - repo : https://github.com/bemanproject/beman-tidy
+    rev: v0.3.1
+    hooks:
+    - id: beman-tidy
+
+exclude: 'infra/'
