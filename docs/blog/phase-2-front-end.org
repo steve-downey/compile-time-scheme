@@ -26,10 +26,10 @@ Parser combinators popularized in the functional programming world (most notably
 #+begin_src c++
 // Conceptual model
 using ParserResult = result<std::pair<Value, Cursor>, Error>;
-using Parser = std::function<ParserResult(Cursor)>; 
+using Parser = std::function<ParserResult(Cursor)>;
 #+end_src
 
-By treating parsers as callable objects, we can build small, trivial parsers and "combine" them algebraically to form complex language definitions. 
+By treating parsers as callable objects, we can build small, trivial parsers and "combine" them algebraically to form complex language definitions.
 
 * Category Theory in C++
 
@@ -43,7 +43,7 @@ A Functor allows us to apply a function to a value wrapped in a context. If we h
 #+end_src
 
 ** Applicatives
-Applicative functors allow us to sequence operations and apply functions that take multiple arguments to values securely wrapped in parser contexts. For example, creating a ~Parser<Tuple<A, B>>~ out of ~Parser<A>~ and ~Parser<B>~. 
+Applicative functors allow us to sequence operations and apply functions that take multiple arguments to values securely wrapped in parser contexts. For example, creating a ~Parser<Tuple<A, B>>~ out of ~Parser<A>~ and ~Parser<B>~.
 
 ** Alternative
 The ~Alternative~ typeclass provides the concept of choice (~<|>~). If ~parser_A~ fails, try ~parser_B~.

@@ -52,7 +52,7 @@ We write negative compile-time tests using assertions mapping to ~requires~ clau
 
 * Conclusion
 
-By emitting statically defined closure types representing our CPS states, our project ceases to be merely a toy compile-time interpreter. It functions directly as a compiler, bootstrapping Scheme representations into equivalent, fully optimized native C++ behavior. 
+By emitting statically defined closure types representing our CPS states, our project ceases to be merely a toy compile-time interpreter. It functions directly as a compiler, bootstrapping Scheme representations into equivalent, fully optimized native C++ behavior.
 
 * References
 - Sussman, G. J., & Steele, G. L. (1975). "Scheme: An interpreter for extended lambda calculus." MIT AI Memo No. 349.
