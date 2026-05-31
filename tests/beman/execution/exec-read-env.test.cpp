@@ -1,0 +1,107 @@
+// src/beman/execution/tests/exec-read-env.test.cpp                 -*-C++-*-
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include <concepts>
+#include <test/execution.hpp>
+#ifdef BEMAN_HAS_MODULES
+import beman.execution;
+import beman.execution.detail.join_env;
+#else
+#include <beman/execution/detail/read_env.hpp>
+#include <beman/execution/detail/common.hpp>
+#include <beman/execution/detail/get_domain.hpp>
+#include <beman/execution/detail/join_env.hpp>
+#include <beman/execution/detail/sender.hpp>
+#include <beman/execution/detail/sender_in.hpp>
+#include <beman/execution/detail/receiver.hpp>
+#include <beman/execution/detail/connect.hpp>
+#include <beman/execution/detail/start.hpp>
+#include <beman/execution/detail/get_stop_token.hpp>
+#include <beman/execution/detail/sync_wait.hpp>
+#include <beman/execution/detail/when_all.hpp>
+#endif
+
+// ----------------------------------------------------------------------------
+
+namespace {
+struct domain {
+    int  value{};
+    auto operator==(const domain&) const -> bool = default;
+};
+
+struct env {
+    int  value{};
+    auto query(test_std::get_domain_t) const noexcept -> domain { return {this->value}; }
+};
+
+struct receiver {
+    using receiver_concept = test_std::receiver_tag;
+
+    int   value{};
+    bool* called{};
+
+    auto set_value(domain d) && noexcept -> void {
+        ASSERT(d == domain{this->value});
+        *this->called = true;
+    }
+    auto set_error(auto&&) && noexcept -> void {
+        // NOLINTBEGIN(cert-dcl03-c,hicpp-static-assert,misc-static-assert)
+        ASSERT(nullptr == "error function was incorrectly called");
+        // NOLINTEND(cert-dcl03-c,hicpp-static-assert,misc-static-assert)
+    }
+    auto get_env() const noexcept -> env { return {this->value}; }
+};
+
+auto test_read_env() -> void {
+    static_assert(test_std::receiver<receiver>);
+    ASSERT(domain{17} == test_std::get_domain(env{17}));
+    ASSERT(domain{17} == test_std::get_domain(test_std::get_env(receiver{17})));
+    auto sender{test_std::read_env(test_std::get_domain)};
+    test::use(sender);
+    static_assert(test_std::sender<decltype(sender)>);
+    static_assert(test_std::sender_in<decltype(sender), env>);
+    static_assert(
+        std::same_as<test_std::completion_signatures<test_std::set_value_t(domain)
+                                                     //-dk:TODO verify , test_std::set_error_t(std::exception_ptr)
+                                                     >,
+                     decltype(test_std::get_completion_signatures<decltype(sender), env>())>);
+
+    bool called{};
+    auto op{test_std::connect(test_std::read_env(test_std::get_domain), receiver{17, &called})};
+    test::use(op);
+    ASSERT(not called);
+    test_std::start(op);
+    ASSERT(called);
+}
+
+auto test_read_env_completions() -> void {
+    auto r{test_std::read_env(test_std::get_stop_token)};
+    test::check_type<test_std::completion_signatures<test_std::set_value_t(test_std::never_stop_token)>>(
+        test_std::get_completion_signatures<decltype(r), test_std::env<>>());
+    test::check_type<test_std::completion_signatures<test_std::set_value_t(test_std::never_stop_token)>>(
+        test_std::get_completion_signatures<decltype(r), decltype(test_std::env{})>());
+    test::check_type<test_std::completion_signatures<test_std::set_value_t(test_std::inplace_stop_token)>>(
+        test_std::get_completion_signatures<decltype(r),
+                                            decltype(test_std::env{
+                                                test_std::prop{test_std::get_stop_token,
+                                                               std::declval<test_std::inplace_stop_token>()}})>());
+    test::check_type<test_std::completion_signatures<test_std::set_value_t(test_std::inplace_stop_token)>>(
+        test_std::get_completion_signatures<
+            decltype(r),
+            decltype(test_detail::join_env(
+                test_std::env{test_std::prop{test_std::get_stop_token, std::declval<test_std::inplace_stop_token>()}},
+                test_std::env{
+                    test_std::prop{test_std::get_stop_token, std::declval<test_std::never_stop_token>()}}))>());
+    test::use(r);
+
+    test_std::sync_wait(test_std::read_env(test_std::get_stop_token));
+    test_std::sync_wait(test_std::when_all(test_std::read_env(test_std::get_stop_token)));
+    test_std::sync_wait(test_std::when_all(test_std::read_env(test_std::get_scheduler)));
+}
+} // namespace
+
+TEST(exec_read_env) {
+    static_assert(std::same_as<const test_std::read_env_t, decltype(test_std::read_env)>);
+    test_read_env();
+    test_read_env_completions();
+}
