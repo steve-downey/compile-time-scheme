@@ -11,6 +11,7 @@
 With our program read into a pure nested list of symbols, integers, and booleans, it is time to assign meaning. Phase 4 introduces the *Elaborator*, generating a strict, explicitly-typed Semantic Abstract Syntax Tree known as the ~Core~ language.
 #+end_abstract
 
+#+MACRO: TEASER_END
 {{{TEASER_END}}}
 
 * Semantics over Syntax

@@ -11,6 +11,7 @@
 Parsing text into meaningful structure is the first visible step of any compiler. Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, we lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators. This post walks through the exact machinery: from the immutable ~cursor~ that carries input state, through the ~parse_result~ that models success and failure, to the combinators that snap together into a working Scheme lexer—all in zero-allocation ~constexpr~ C++26.
 #+end_abstract
 
+#+MACRO: TEASER_END
 {{{TEASER_END}}}
 
 * Why Not Recursive Descent or LL(1)?

@@ -11,6 +11,7 @@
 Welcome to the first post in our series on building SchemePoC, a compile-time Scheme compiler built entirely in C++26. Before we can parse a single S-expression or evaluate a lambda, we must lay a solid foundation. Here is how we survive the ~constexpr~ straightjacket using zero-allocation data structures and monadic error handling.
 #+end_abstract
 
+#+MACRO: TEASER_END
 {{{TEASER_END}}}
 
 * The ~constexpr~ Challenge
