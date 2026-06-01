@@ -12,6 +12,7 @@
 
 namespace smd::smdscheme::sender {
 
+// e0d42f47-3007-4d03-955a-2e94c9fad8b1
 /// Renders a @ref scheme_tree as a complete Graphviz DOT graph string.
 ///
 /// Formats each node in index order using @ref format_scheme_node and
@@ -60,6 +61,7 @@ void dump_scheme_plan(std::ostream &out = std::cout) {
 
     out << format_tree(tree);
 }
+// e0d42f47-3007-4d03-955a-2e94c9fad8b1 end
 
 } // namespace smd::smdscheme::sender
 

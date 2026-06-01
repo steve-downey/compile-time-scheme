@@ -95,6 +95,7 @@ struct constexpr_box {
 /// owned copy of the lexical environment at the time of closure creation.
 ///
 /// @tparam Core The core AST type.
+// 8335a467-f7e9-4d18-8d5b-54931b1d5c18
 template <typename Core>
 struct closure {
     Core const
@@ -107,6 +108,7 @@ struct closure {
         return lhs.node == rhs.node;
     }
 };
+// 8335a467-f7e9-4d18-8d5b-54931b1d5c18 end
 
 /// An interned Scheme symbol at runtime (not a compile-time identifier).
 struct symbol {
@@ -143,9 +145,11 @@ struct foreign_function {
 ///
 /// @tparam Core The core AST type (used to type @ref closure and
 ///              @ref foreign_function).
+// 7251dd2e-066e-4c1e-8360-c33b15301355
 template <typename Core>
 using value = std::variant<int, bool, builtin, closure<Core>, symbol,
                            foreign_function<Core>>;
+// 7251dd2e-066e-4c1e-8360-c33b15301355 end
 
 /// A variable binding environment with linear search and most-recent-first
 /// shadowing.

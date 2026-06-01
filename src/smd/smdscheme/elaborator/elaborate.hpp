@@ -82,6 +82,7 @@ constexpr auto elaborate_list(
         auto name = std::get<reader::datum_symbol>(first.inner).name;
 
         if (name == "if") {
+            // d33ff3ee-aee2-4dd8-b9af-28f4fb59584e
             if (lst.elements.size() != 4)
                 return foundation::parse_error{{}, "if: expected 3 arguments"};
 
@@ -104,6 +105,7 @@ constexpr auto elaborate_list(
                 make_arena_box(core_arena, std::move(cond_r.value())),
                 make_arena_box(core_arena, std::move(cons_r.value())),
                 make_arena_box(core_arena, std::move(alt_r.value()))}}};
+            // d33ff3ee-aee2-4dd8-b9af-28f4fb59584e end
         }
 
         if (name == "quote") {

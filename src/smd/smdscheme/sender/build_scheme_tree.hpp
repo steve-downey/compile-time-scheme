@@ -12,6 +12,7 @@
 
 namespace smd::smdscheme::sender {
 
+// ad3fee60-a0ea-4464-966c-bae3a964db79
 /// Classifies a sender type by the first tag name found in its display string.
 ///
 /// Beman Execution26 senders have the form
@@ -71,6 +72,7 @@ consteval auto build_scheme_tree(std::meta::info sender_type,
 
     return id;
 }
+// ad3fee60-a0ea-4464-966c-bae3a964db79 end
 
 } // namespace smd::smdscheme::sender
 

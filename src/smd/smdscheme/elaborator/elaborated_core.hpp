@@ -37,6 +37,7 @@ struct core_quote {
 ///
 /// @tparam R        Recursive self-reference (the core fix-point type).
 /// @tparam MaxNodes Arena capacity.
+// bb010057-c0a1-468b-a21c-7ab18af8cd72
 template <typename R, int MaxNodes>
 struct core_if {
     foundation::arena_box<R, MaxNodes> condition; ///< The test expression.
@@ -45,6 +46,7 @@ struct core_if {
     foundation::arena_box<R, MaxNodes>
         alternative; ///< Branch taken when false.
 };
+// bb010057-c0a1-468b-a21c-7ab18af8cd72 end
 
 /// A Scheme @c lambda form with a fixed parameter list and a single-expression
 /// body.

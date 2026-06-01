@@ -1,4 +1,4 @@
-<div class="abstract" id="org02ce54e">
+<div class="abstract" id="org70e6403">
 <p>
 Scheme is homoiconic.
 Code is Data, and Data is Code.
@@ -94,7 +94,7 @@ struct tree_arena {
 
 ## Benefits of the Flat Arena
 
-1.  ****`constexpr` Compliance****: The arena uses fixed internal arrays, making it perfectly valid for returning from `constexpr` contexts intact.
+1.  ****`constexpr` Compliance****: The arena uses fixed internal arrays, making it valid for returning from `constexpr` contexts intact.
 2.  ****Cache Locality****: Trees allocated node-by-node on the heap suffer from memory fragmentation. An arena stores sibling data sequentially in memory, meaning bulk operations across the tree enjoy massive CPU cache-hit benefits. Memory pre-fetchers love arenatized data patterns.
 3.  ****Immutability and Trivial Copying****: Copying the entire AST simply means performing a bulk trivial copy of a single array buffer. I completely bypass the cost of tracing deep pointer trees to execute deep copies.
 
@@ -149,16 +149,12 @@ using datum_type =
     foundation::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
 ```
 
-The `foundation::fix` helper applies the recursive structural knot for me, tying `datum_type` directly into a closed AST structure without needing explicit cyclic data definitions!
+The `foundation::fix` helper applies the recursive structural knot for me, tying `datum_type` directly into a closed AST structure without needing explicit cyclic data definitions.
 
 
 # Conclusion
 
-The Reader cleanly translates human text into the mechanical `Datum` arena. At this stage, my compiler possesses a perfectly parsed, memory-safe, and cache-friendly structural representation of the input string. It does not yet know what the code computes—it only knows precisely how it is shaped.
+The Reader cleanly translates human text into the mechanical `Datum` arena. At this stage, my compiler possesses a parsed, memory-safe, and cache-friendly structural representation of the input string. It does not yet know what the code computes—it only knows precisely how it is shaped.
 
 
 # References
-
--   McCarthy, J. (1960). ["Recursive Functions of Symbolic Expressions and Their Computation by Machine, Part I"](https://dl.acm.org/doi/10.1145/367177.367199). /Communications of the ACM, 3/(4), 184–195. The foundational paper outlining the S-expression layout and eval mechanics.
--   Bendersky, M. (2014). ["Using the Y-combinator in C++"](https://eli.thegreenplace.net/2014/06/04/using-the-c-zipper-to-compute-factorial). Eli Bendersky's Website. Contextual reading into fixed-point combinators in modern C++.
--   "Region-based memory management" (Arena Allocation). [Wikipedia](https://en.wikipedia.org/wiki/Region-based_memory_management).

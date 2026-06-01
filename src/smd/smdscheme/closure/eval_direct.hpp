@@ -74,6 +74,7 @@ template <int MaxNodes, int MaxList, int MaxBindings>
 
     if (std::holds_alternative<elaborator::core_if<Core, MaxNodes>>(
             node.inner)) {
+        // e9bae797-69b6-4682-b77f-2110138bf5ab
         auto const &cif =
             std::get<elaborator::core_if<Core, MaxNodes>>(node.inner);
         auto cond_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
@@ -89,6 +90,7 @@ template <int MaxNodes, int MaxList, int MaxBindings>
         }
         return eval_direct<MaxNodes, MaxList, MaxBindings>(
             arena.get(cif.consequent), arena, environment);
+        // e9bae797-69b6-4682-b77f-2110138bf5ab end
     }
 
     if (std::holds_alternative<

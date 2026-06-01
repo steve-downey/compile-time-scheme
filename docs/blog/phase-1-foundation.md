@@ -1,4 +1,4 @@
-<div class="abstract" id="orgde82042">
+<div class="abstract" id="org307887b">
 <p>
 Welcome to the first post in my series on building SchemePoC, a compile-time Scheme compiler built entirely in C++26.
 Before I can parse a single S-expression or evaluate a lambda, I must lay a solid foundation.
@@ -40,7 +40,7 @@ By using `static_vector`, I eliminate dynamic memory allocation entirely. The st
 
 Compiler engineering inherently means dealing with invalid input. Exceptions are not available in `constexpr` contexts in the way standard runtime C++ handles them, and C-style error codes quickly become an unwieldy mess of `if (err != 0) return err;`.
 
-Instead, I employ Monadic error handling, drawing inspiration from Haskell's `Either` type or Rust's `Result`. I utilize a `result<T, E>` type (similar to `std::expected` in C++23).
+Instead, I employ Monadic error handling, drawing inspiration from Haskell's `Either` type or Rust's `Result`. I utilize a `result<T, E>` type (similar to `std::expected` (??, ????) in C++23).
 
 ```c++
 template <typename T, typename E>
@@ -59,5 +59,4 @@ By establishing a robust toolset based on zero-allocation data structures and mo
 
 # References
 
--   Smith, R. (2022). "Constant evaluation in C++". C++ Standards Committee Papers.
--   "std::expected", cppreference.com, <https://en.cppreference.com/w/cpp/utility/expected>
+(). *std::expected*, cppreference.com.

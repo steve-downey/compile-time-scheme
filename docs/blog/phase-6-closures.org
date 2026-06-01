@@ -3,6 +3,8 @@
 #+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
 #+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
 #+options: html5-fancy:t
+#+bibliography: references.bib
+#+nocite: @appel1992compiling
 #+TITLE: Building a Compile-Time Scheme in C++26: Phase 6 - The Back-End & Closure Materialization
 #+AUTHOR: Steve Downey
 #+DATE: 2026-05-29
@@ -17,8 +19,8 @@ The crucial functional mechanism that bridges runtime behavior into the C++ type
 
 * What is a Closure?
 
-In functional programming, when a lambda is parsed inside a function, it doesn't just enclose variables functionally; it fundamentally captures the environment state surrounding it at definition time.
-A *Closure* is therefore a coupling of code (the function pointer/behavior) and data (the captured lexical scope variables).
+In functional programming, when a lambda is parsed inside a function, it doesn't just enclose variables functionally; it fundamentally captures the environment state surrounding it at definition time [cite:@sussman1975scheme].
+A *Closure* is therefore a coupling of code (the AST node/behavior) and data (the captured lexical scope variables).
 
 #+begin_src scheme
 (define (make-adder x)
@@ -30,32 +32,32 @@ Here, the ~lambda~ must capture ~x~ to form a closure before it can be returned 
 * Materializing Closures in Native C++
 
 Many dynamic language environments construct heavy, opaque callable types with runtime type-erasure (e.g., ~std::move_only_function~ or polymorphic classes) to represent closures.
-Those create abstraction penalties, block optimizations like inlining, and are often strictly forbidden or painfully annoying to utilize effectively in ~constexpr~.
+Those create abstraction penalties, block optimizations like inlining, and are often strictly forbidden or painfully annoying to utilize effectively in a ~constexpr~ context due to dynamic allocation constraints.
 
-Because I operate structurally at compile time, I leverage the C++ template system to emit standard, statically-defined native C++ wrapper classes that represent these closures precisely.
+Because I operate structurally at compile time and already execute in CPS format, I leverage the C++ type system to define exact representations. The `closure` structure models this explicitly:
 
-#+begin_src c++
-// A mechanical visualization of the generated closure struct
-template <typename Environment>
-struct GeneratedAdderClosure {
-    Environment env;
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/closure/value.hpp::8335a467-f7e9-4d18-8d5b-54931b1d5c18]] :lines 2- :src cpp :end "8335a467-f7e9-4d18-8d5b-54931b1d5c18 end"
 
-    constexpr auto operator()(auto arg_y, auto continuation) const {
-        return apply_continuation(continuation, env.get_x() + arg_y);
-    }
-};
-#+end_src
+Notice how `closure` strictly bundles a non-owning pointer to the lambda AST node in the arena, alongside a `constexpr_box` copy of its enclosing environment. This fully isolates its runtime state statically.
+
+We map this natively into the core evaluated `value` type alongside our built-ins, standard symbols, and literals:
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/closure/value.hpp::7251dd2e-066e-4c1e-8360-c33b15301355]] :lines 2- :src cpp :end "7251dd2e-066e-4c1e-8360-c33b15301355 end"
 
 This effectively converts dynamic Functional AST bindings into exact, blazing-fast primitive C++ aggregate data types.
-The Scheme behavior collapses entirely into the C++ type system.
+The Scheme runtime behavior collapses entirely into the C++ type system without relying on dynamically typed heaps.
 
 * Negative Compile Tests
 
 Because closures enforce rigorous static paths, I enhance the C++ compiler's reporting.
-If my Elaborator catches an unbound variable error, or if closure materialization fails, it yields C++ compilation failures.
+If my environment encounters an unbound variable error, or if closure evaluation fails due to arity mismatches, it yields an explicit `false` return at compile time.
 
-I write negative compile-time tests using assertions mapping to ~requires~ clauses, enabling the C++ compiler to act natively as a lint and error-reporting tool for my Scheme source text.
-A typo in your Scheme means your C++ build explicitly breaks.
+I write negative compile-time tests using standard ~static_assert~ lambdas, enabling the C++ compiler to act natively as a lint and error-reporting tool for my Scheme source text.
+An expression containing an unbound variable, for instance, is proven mechanically to fail execution directly at compilation:
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/closure/closure_program.test.cpp::39553e82-874f-4c2a-b6ee-b8ac7ff4ec97]] :lines 2- :src cpp :end "39553e82-874f-4c2a-b6ee-b8ac7ff4ec97 end"
+
+Here, compilation successfully occurs *only if* the evaluation of the badly formed Scheme resolves properly into the internal Unbound Variable error state (causing `!vr.has_value()` to return true, which satisfies the C++ compilation check).
 
 * Conclusion
 
@@ -63,5 +65,5 @@ By emitting statically defined closure types representing my CPS states, my proj
 It functions directly as a compiler, bootstrapping Scheme representations into equivalent, fully optimized native C++ behavior.
 
 * References
-- Sussman, G. J., & Steele, G. L. (1975). "Scheme: An interpreter for extended lambda calculus." MIT AI Memo No. 349.
-- Appel, A. W. (1992). "Compiling with Continuations." Cambridge University Press.
+
+#+print_bibliography:

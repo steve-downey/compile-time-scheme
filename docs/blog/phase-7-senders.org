@@ -3,14 +3,15 @@
 #+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
 #+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
 #+options: html5-fancy:t
+#+bibliography: references.bib
 #+TITLE: Building a Compile-Time Scheme in C++26: Phase 7 - The Sender Backend
 #+AUTHOR: Steve Downey
 #+DATE: 2026-05-29
 
 #+begin_abstract
-To truly compile my Scheme dialect into blazing-fast native code, I need an execution model.
+To truly compile my Scheme dialect into native code, I need an execution model.
 Phase 7 bridges the gap between functional Scheme evaluation and modern C++ asynchronous workloads.
-I achieve this by lowering my CPS Abstract Syntax Tree into deeply nested *Typed Senders*.
+I achieve this by exploring two parallel approaches for mapping my CPS Abstract Syntax Tree into modern async executors using P2300 Senders and C++ Coroutines.
 #+end_abstract
 
 #+MACRO: TEASER_END
@@ -18,50 +19,48 @@ I achieve this by lowering my CPS Abstract Syntax Tree into deeply nested *Typed
 
 * The P2300 Sender/Receiver Model
 
-C++26 brings standard asynchronous execution models (~std::execution~).
+C++26 brings standard asynchronous execution models (~std::execution [cite:@niebler2020p2300]~), commonly implemented in this codebase via the `beman::execution` and `beman::task` frameworks.
 The fundamental elements are:
 - *Senders*: Types describing units of work that will produce values (or errors).
 - *Receivers*: Callbacks that consume those values.
 - *Schedulers*: Contexts dictating /where/ the work happens (e.g., thread pools).
 
-Because my Scheme compiler relies on Continuation-Passing Style—where every operation simply says "do work, then pass the result to this callback"—it matches perfectly with the Sender/Receiver architecture.
+Because my Scheme compiler relies on Continuation-Passing Style—where every operation simply says "do work, then pass the result to this callback"—it matches with the Sender/Receiver architecture.
 A Scheme continuation is functionally isomorphic to a C++ Receiver.
 
-* Generating Typed Senders
+* Two Parallel Asynchronous Backends
 
-When the Elaborator has finished building the structural AST, the backend systematically translates it into native C++ sender algorithms.
+While the core functionality of evaluating Scheme programs stays formally consistent, the mechanism mapping it to modern C++ execution semantics can be approached from two distinct architectural paths. Both can successfully represent the same set of correct Scheme programs.
 
-For instance, consider the fundamental operations:
-- A Scheme atom or literal ~(quote 5)~ translates directly into ~std::execution::just(5)~, representing a sender that instantly completes with the value 5.
-- Complex parallel argument evaluations like evaluating the arguments to a function ~(+ (f 1) (g 2))~ translate into a ~std::execution::when_all(eval_f1, eval_g2)~, spawning an async pipeline that awaits both results.
-- Chaining evaluations, like applying the ~+~ operation after the arguments are evaluated, translate into ~std::execution::then(..., apply_plus)~.
+I have implemented both to evaluate their tradeoffs against C++ structural typing bounds.
 
-#+begin_src c++
-// An idealized view of the generated sender type
-auto scheme_execution_pipeline =
-    std::execution::then(
-        std::execution::when_all(
-            std::execution::just(1),
-            std::execution::just(2)
-        ),
-        [](int a, int b) { return a + b; }
-    );
-#+end_src
+** Approach 1: Eager Graph Construction via Senders (`sender_cps_program`)
 
-* Zero Abstraction Overhead
+My first approach revolves around natively translating the AST into pure, nested `beman::execution` Senders. Here, the interpreter works synchronously wrapping its return types dynamically, building the data-flow chain.
 
-What is genuinely remarkable about this stage is the compilation efficiency.
-These typed senders are completely resolved at compile-time.
-I am passing deeply nested templates into the C++ compiler.
+By mapping over standard forms, the Scheme expression can execute out-of-order asynchronously.
+Complex parallel argument evaluations, like evaluating the arguments to a builtin function `(+ (f 1) (g 2))`, translates natively into a `when_all`, spawning an async pipeline that awaits both results simultaneously before dropping to a `then` application block.
 
-Where typical dynamic language interpreters rely on heavy switch statements and virtual dispatch (creating cache misses and blocking optimization), my Scheme program compiles into a single, fully-known type topology.
-The standard C++ optimizer natively unrolls and inlines the ~just~, ~when_all~, and ~then~ structures.
-A computationally complex Scheme algorithm collapses down into tight, bare-metal C++ instructions running securely across thread pools.
+Here is the exact code snippet from `sender_cps_program.hpp` showing the `when_all` implementation over function arguments natively resolving asynchronous execution structures:
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/sender_cps_program.hpp::e619ae0a-47be-48b4-86f5-1dfac90299e6]] :lines 2- :src cpp :end "e619ae0a-47be-48b4-86f5-1dfac90299e6 end"
+
+The execution builds an explicit sender dependency graph over arguments `arg0_r` and `arg1_r`. It wraps them dynamically via `sender_v::just` before joining them inside `sender_v::when_all`. Once both have correctly emitted their evaluated results via the dependency chain, the `sender_v::then` block captures their success states and explicitly runs the math operators, which are run through synchronous wait evaluation.
+
+The major benefit to this approach is that the data graph structure is explicitly typed out locally. As long as every recursive return path is synchronously waited upon to type-erase its distinct pipeline return into homogeneous results, it builds cleanly.
+
+** Approach 2: Asynchronous State Machines via Coroutines (`sender_program`)
+
+While `sender_cps_program` functions admirably using synchronous `unwrap_sender` evaluations locally against explicit type boundaries, there exists a second model that treats the entire program traversal as a fully asynchronous, unbroken pipeline.
+
+However, executing sender pipelines recursively out natively without synchronous unwrapping hits severe structural limits in pure C++ template typing. If `if` branches evaluate differently into different generic typed sender structures, they cannot naturally resolve to the same recursive template return type syntactically.
+
+To circumvent this, the alternative `sender_program.hpp` backend falls back to *Coroutines*! We evaluate the root AST nodes asynchronously utilizing `beman::task::task` as an asynchronous factory. By utilizing standard `co_await`, the execution dynamically type-erases the disparate internal graph structures down into a common coroutine state machine type natively provided by the compiler. It elegantly merges any mismatched paths over `when_all` smoothly.
 
 * Conclusion
 
-By lowering Scheme code into strongly-typed ~std::execution~ Senders, my compiler achieves what few others can: seamless integration with C++ asynchronous networking and task-parallel thread pool designs, executing Scheme functionally but with the footprint of hand-written C++ concurrency primitives.
+By implementing dual representations of our backend logic utilizing strictly local synchronous Senders and dynamically type-erased async Coroutines, my compiler safely bridges the gap. It demonstrates that regardless of which mechanical representation of execution concurrency you prefer running across C++, our evaluated Scheme topology gracefully matches execution invariants safely.
 
 * References
-- Niebler, E. et al. (2020). "P2300: std::execution". C++ Standards Committee Papers.
-- Beman Project `std::execution` library execution contexts.
+
+#+print_bibliography:

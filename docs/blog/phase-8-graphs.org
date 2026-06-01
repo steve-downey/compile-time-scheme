@@ -3,14 +3,15 @@
 #+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
 #+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
 #+options: html5-fancy:t
+#+bibliography: references.bib
 #+TITLE: Building a Compile-Time Scheme in C++26: Phase 8 - Visualizing Execution
 #+AUTHOR: Steve Downey
 #+DATE: 2026-05-29
 
 #+begin_abstract
-By lowering my Scheme AST into heavily typed ~std::execution~ Senders, I gained immense performance.
+By lowering my Scheme AST into heavily typed ~std::execution~ Senders, I gained improved performance.
 But I also created an introspective nightmare.
-The resulting Sender AST is a massive blob of deeply nested template permutations.
+The resulting Sender AST is a large set of deeply nested template permutations.
 How do I prove what the C++ compiler is actually building without deciphering thousands of lines of compiler error backtraces?
 #+end_abstract
 
@@ -19,56 +20,35 @@ How do I prove what the C++ compiler is actually building without deciphering th
 
 * The Reflection Bridge
 
-In Phase 8, I build an Applicative DOT traverser.
-Leveraging C++26 Reflection (~std::meta::info~), I introspect the generated execution typings and project them into the Graphviz dot-language for visual rendering.
+In Phase 8, I utilize C++26 Reflection (~std::meta::info~) alongside a custom ~string_writer~ Applicative [cite:@mcbride2008applicative] to project the generated execution typings into the Graphviz [cite:@graphviz_doc] dot-language for visual rendering.
 
 C++26 Reflection (P2996) allows C++ programs to imperatively query the structural definitions of types during constant evaluation.
 
-Instead of writing nightmarish recursive template metaprogramming tricks with partial specializations, I write a straightforward loop that interacts via ~<meta>~.
-Given a Sender's ~std::meta::info~, I extract its identifier (say, ~"just"~, ~"when_all"~, or ~"then"~) and parse its template arguments perfectly.
+Instead of writing recursive template metaprogramming tricks with partial specializations, I write a straightforward loop that interacts via ~<meta>~ using the newly implemented ~^^Sender~ reflection syntax.
 
-#+begin_src c++
-template <typename TreeType>
-constexpr TreeType build_scheme_tree(std::meta::info sender_type, int& id_counter) {
-    SchemeNodeData current;
-    current.node_id = id_counter++;
-    current.sender_algo = std::string(std::meta::identifier_of(sender_type));
+Because `beman::execution` wraps its underlying types inside `basic_sender<Tag, ...>`, ~std::meta::identifier_of~ alone isn't sufficient (it just yields "basic_sender"). Instead, I retrieve the full signature via ~std::meta::display_string_of~ and parse out markers for "just_t", "when_all_t", or "then_t", allowing me to correctly classify the nodes.
+I extract its base class, recursively step into its template arguments, and map the sender topology into a strongly typed graph at `consteval` time.
 
-    // If it's a function application trigger
-    if (current.sender_algo == "then") {
-        current.scheme_context = "Function Application";
-        auto args = std::meta::template_arguments_of(sender_type);
-        if (args.size() >= 2) {
-            auto predecessor = build_scheme_tree<TreeType>(args[0], id_counter);
-            // Link edge
-            current.child_ids.push_back(predecessor.data.node_id);
-        }
-    }
-    // ...
-}
-#+end_src
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/build_scheme_tree.hpp::ad3fee60-a0ea-4464-966c-bae3a964db79]] :lines 2- :src cpp :end "ad3fee60-a0ea-4464-966c-bae3a964db79 end"
 
-This recursively unpacks the deeply typed sequence and maps it onto a homogeneously typed ~SchemeTree~ topology, annotating both the Sender algorithm and its originating Scheme context.
+This recursively unpacks the deeply typed sequence and maps it onto a homogeneously typed ~scheme_tree~ topology, annotating the Sender algorithm properly. All of this runs strictly during compile-time.
 
 * Graph Translation via Applicatives
 
 Once I possess a homogeneous C++ tree, I turn once again to Category Theory to render the Graphviz dot-language diagram.
 
-Using the ~Applicative~ and ~Traversable~ typeclasses, I construct a ~StringWriter~ Applicative.
-The traversable interface allows me to map functionally over the tree structure, appending string state uniformly without managing a monolithic concatenation process manually.
+Using the ~Applicative~ and ~Traversable~ typeclasses mapped within the repository (Phase 1), I constructed a ~string_writer~ Applicative. The monadic and alternative interfaces allow me to map functionally over the returned string values. While the Graphviz mapping is currently driven through a straightforward indexing iteration, the types align nicely allowing pure state accumulation.
 
-#+begin_src c++
-// The traversable sweeps the string writer across all SchemeNodeData points,
-// accumulating DOT nodes and edges.
-#+end_src
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/dump_scheme_plan.hpp::e0d42f47-3007-4d03-955a-2e94c9fad8b1]] :lines 2- :src cpp :end "e0d42f47-3007-4d03-955a-2e94c9fad8b1 end"
+
+The ~dump_scheme_plan~ function encapsulates the compile-time reflection traversal into a ~constexpr~ lambda, cleanly executing the heavy `meta` machinery strictly during translation.
 
 * Conclusion
 
-Using the reflection bridge to populate my runtime topology completely removes the black-box nature of compile-time meta-programming.
-The C++26 reflection framework allows me to natively render the exact asynchronous execution pipeline (~std::execution~) constructed for any Scheme program.
+Using the reflection bridge to populate my runtime topology completely removes the black-box nature of compile-time meta-programming. The C++26 reflection framework allows me to natively render the exact asynchronous execution pipeline (~std::execution~) constructed for any Scheme program.
+
 Running the output directly through ~dot -Tpng -o plan.png~ grants immediate, visual feedback of how functional continuations map to low-level native scheduling operations.
 
 * References
-- Brown, D. et al. (2024). "P2996: Reflection for C++26". C++ Standards Committee Papers.
-- Graphviz DOT Language, https://graphviz.org/doc/info/lang.html
-- "Applicative Programming with Effects", McBride & Paterson (2008).
+
+#+print_bibliography:

@@ -42,6 +42,7 @@ ffi_print_and_return(std::span<scm::closure::value<Core> const> args)
     return args[1];
 }
 
+// a66f705b-af80-4e73-9526-c45713b2de95
 // 3. Compile-time generation of the Runtime State Aggregates using Reflection.
 // This creates a physical C++ `struct` natively from the descriptor list.
 struct RuntimeStateTag {};
@@ -50,6 +51,7 @@ consteval {
     scm::reflection::compile_environment<RuntimeStateTag>(
         {{^^int, "eval_result"}, {^^bool, "successful_run"}});
 }
+// a66f705b-af80-4e73-9526-c45713b2de95 end
 
 // 1. Non-trivial Scheme program compiled to heavily optimized CPS form strictly
 // at compile-time.
@@ -67,12 +69,15 @@ constexpr auto scheme_source = R"(
                   (self self (+ n -2))))))))
 )";
 
+// 034f2f75-e8af-4228-bcbb-d2edd3dfd2d2
 constexpr auto program =
     scm::sender::compile_to_sender<512, 16>(scheme_source).value();
+// 034f2f75-e8af-4228-bcbb-d2edd3dfd2d2 end
 
 int main() {
     std::println("==== Compile-Time Scheme -> Sender Runtime Execution ====");
 
+    // 906360cf-7ab2-4c5c-b0f1-b136104cee4b
     auto env = scm::closure::default_env<Core, 16>();
     env.define("eq?", scm::closure::value<Core>{
                           scm::closure::foreign_function<Core>{ffi_eq}});
@@ -85,6 +90,7 @@ int main() {
     auto res_opt = scm::sender_v::sync_wait(std::move(s));
 
     scm::reflection::reified_environment<RuntimeStateTag> state{};
+    // 906360cf-7ab2-4c5c-b0f1-b136104cee4b end
 
     if (res_opt.has_value()) {
         auto result = std::get<0>(res_opt.value());

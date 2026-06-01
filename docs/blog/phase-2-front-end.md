@@ -1,7 +1,7 @@
-<div class="abstract" id="org877e36d">
+<div class="abstract" id="org36a220f">
 <p>
 Parsing text into meaningful structure is the first visible step of any compiler.
-Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, I lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators.
+Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, I lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators (Hutton, Graham and Meijer, Erik, 1992, Leijen, Daan and Meijer, Erik, 2001).
 This post walks through the exact machinery: from the immutable <code>cursor</code> that carries input state, through the <code>parse_result</code> that models success and failure, to the combinators that snap together into a working Scheme lexer—all in zero-allocation <code>constexpr</code> C++26.
 </p>
 
@@ -300,7 +300,7 @@ static_assert((char_p('a') | char_p('b'))(cursor{"a"}).value().value == 'a');
 Reading these top to bottom tells you the contract precisely: `char_p('x')` on `"xyz"` yields value `'x'` and leaves the cursor at `'y'`; `pure(42)` on `"abc"` yields `42` and leaves the cursor entirely unchanged; `char_p('x')` on `"abc"` or `""` fails. These are not documentation—they are the spec, and the compiler verifies them.
 
 
-# Functor: `map`
+# Functor (McBride, Conor and Paterson, Ross, 2008): `map`
 
 Once you can parse a character, you need to transform the value into something more useful. That is what `map` does:
 
@@ -593,6 +593,8 @@ Everything in the reader is assembled from these five layers with no heap alloca
 
 # References
 
--   Leijen, D., & Meijer, E. (2001). "Parsec: Direct Style Monadic Parser Combinators for the Real World." Department of Computer Science, Universiteit Utrecht.
--   Hutton, G., & Meijer, E. (1992). "Monadic Parser Combinators." Technical Report NOTTCS-TR-92-4.
--   McBride, C., & Paterson, R. (2008). "Applicative Programming with Effects." *Journal of Functional Programming*, 18(1).
+Hutton, Graham and Meijer, Erik (1992). *Monadic Parser Combinators*, Technical Report NOTTCS-TR-92-4.
+
+Leijen, Daan and Meijer, Erik (2001). *Parsec: Direct Style Monadic Parser Combinators for the Real World*, Department of Computer Science, Universiteit Utrecht.
+
+McBride, Conor and Paterson, Ross (2008). *Applicative Programming with Effects*, Journal of Functional Programming.

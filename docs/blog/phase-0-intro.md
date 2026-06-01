@@ -1,4 +1,4 @@
-<div class="abstract" id="org8765249">
+<div class="abstract" id="org49aff28">
 <p>
 I am building a Scheme-light compiler that parses, elaborates, and executes Lisp code entirely during C++26 compilation.
 But why go to such extreme lengths to force a dynamic language into a rigid <code>constexpr</code> context?
@@ -92,5 +92,3 @@ This blog series will document each of these phases, detailing the workarounds, 
 
 
 # References
-
--   Hillary, E. [Edmund Hillary Quotes](https://www.goodreads.com/author/quotes/183217.Edmund_Hillary). Goodreads.

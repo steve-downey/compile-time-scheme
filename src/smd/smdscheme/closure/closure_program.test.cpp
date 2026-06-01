@@ -68,6 +68,7 @@ static_assert([] {
 }());
 
 // foundation::bad source -> compile_to_closure returns error
+// 39553e82-874f-4c2a-b6ee-b8ac7ff4ec97
 static_assert([] {
     auto r = closure::compile_to_closure("(+ x 1)"sv);
     if (!r.has_value())
@@ -78,6 +79,7 @@ static_assert([] {
     auto vr = r.value()(env0);
     return !vr.has_value(); // unbound variable error at runtime
 }());
+// 39553e82-874f-4c2a-b6ee-b8ac7ff4ec97 end
 
 } // namespace
 

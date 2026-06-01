@@ -3,6 +3,7 @@
 #+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
 #+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
 #+options: html5-fancy:t
+#+bibliography: references.bib
 #+TITLE: Building a Compile-Time Scheme in C++26: Phase 1 - Foundation and Utilities
 #+AUTHOR: Steve Downey
 #+DATE: 2026-05-29
@@ -53,7 +54,7 @@ Compiler engineering inherently means dealing with invalid input.
 Exceptions are not available in ~constexpr~ contexts in the way standard runtime C++ handles them, and C-style error codes quickly become an unwieldy mess of ~if (err != 0) return err;~.
 
 Instead, I employ Monadic error handling, drawing inspiration from Haskell's ~Either~ type or Rust's ~Result~.
-I utilize a ~result<T, E>~ type (similar to ~std::expected~ in C++23).
+I utilize a ~result<T, E>~ type (similar to ~std::expected~ [cite:@cppref_expected] in C++23).
 
 #+begin_src c++
 template <typename T, typename E>
@@ -71,5 +72,5 @@ By establishing a robust toolset based on zero-allocation data structures and mo
 This foundation ensures that the complex parsing and semantic analysis layers to follow can focus purely on logic, unburdened by the quirks of the C++26 ~constexpr~ memory model.
 
 * References
-- Smith, R. (2022). "Constant evaluation in C++". C++ Standards Committee Papers.
-- "std::expected", cppreference.com, https://en.cppreference.com/w/cpp/utility/expected
+
+#+print_bibliography:

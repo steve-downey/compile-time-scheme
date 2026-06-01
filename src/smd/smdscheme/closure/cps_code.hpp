@@ -22,6 +22,7 @@ namespace smd::smdscheme::cps {
 /// continuation with the resulting value.
 ///
 /// @tparam F The underlying callable type (deduced via the deduction guide).
+// 715f2954-9e34-4da8-a339-c7d810a82f70
 template <class F>
 struct cps_code {
     F f;
@@ -32,6 +33,7 @@ struct cps_code {
         return f(env, k);
     }
 };
+// 715f2954-9e34-4da8-a339-c7d810a82f70 end
 
 /// Deduction guide: @c cps_code(f) deduces @c cps_code<F>.
 template <class F>
@@ -145,6 +147,7 @@ constexpr auto cps_dispatch(
 
     if (std::holds_alternative<
             elaborator::core_lambda<Core, MaxNodes, MaxList>>(node.inner)) {
+        // 9a78bc9b-37eb-4b80-bd27-6146c24f6244
         closure::value<Core> v{closure::closure<Core>{
             &node, closure::constexpr_box<closure::env<Core, 16>>{
                        new closure::env<Core, 16>{env}}}};
@@ -152,6 +155,7 @@ constexpr auto cps_dispatch(
         if (!r.has_value())
             return r;
         return k(r.value());
+        // 9a78bc9b-37eb-4b80-bd27-6146c24f6244 end
     }
 
     if (std::holds_alternative<
@@ -230,8 +234,10 @@ constexpr auto cps_dispatch(
                     return arg_r;
                 new_env.define(lam.params[i], arg_r.value());
             }
+            // 7d7514b6-5dcb-41d9-8938-5f539e66688f
             return cps_dispatch<MaxNodes, MaxList>(arena.get(lam.body), arena,
                                                    cont, new_env, k);
+            // 7d7514b6-5dcb-41d9-8938-5f539e66688f end
         }
 
         if (std::holds_alternative<closure::foreign_function<Core>>(

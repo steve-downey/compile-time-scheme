@@ -3,6 +3,7 @@
 #+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
 #+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
 #+options: html5-fancy:t
+#+bibliography: references.bib
 #+TITLE: Building a Compile-Time Scheme in C++26: Phase 0 - Why Climb the Mountain?
 #+AUTHOR: Steve Downey
 #+DATE: 2026-05-31
@@ -113,4 +114,4 @@ I am climbing this mountain simply because it is there.
 
 * References
 
-- Hillary, E. [[https://www.goodreads.com/author/quotes/183217.Edmund_Hillary][Edmund Hillary Quotes]]. Goodreads.
+#+print_bibliography:

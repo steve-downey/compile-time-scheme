@@ -140,6 +140,7 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
         if (!func_r.has_value())
             return func_r;
 
+        // e619ae0a-47be-48b4-86f5-1dfac90299e6
         // Builtin application: when_all args, then apply operator
         if (std::holds_alternative<closure::builtin>(func_r.value())) {
             auto const &bi = std::get<closure::builtin>(func_r.value());
@@ -169,6 +170,7 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                     return Res{Val{a * b}};
                 }));
         }
+        // e619ae0a-47be-48b4-86f5-1dfac90299e6 end
 
         // Closure application: evaluate args, bind params, evaluate body
         if (std::holds_alternative<closure::closure<Core>>(func_r.value())) {

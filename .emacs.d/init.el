@@ -211,11 +211,11 @@
            (search-uuid (if (> (length parts) 2) (caddr parts) nil))
            (actual-file (expand-file-name inner-file repo-dir))
            (raw-link (concat "file:" actual-file)))
-      
+
       (when search-uuid
         (setq raw-link (concat raw-link "::" search-uuid)))
-        
-      ;; CRITICAL: Mutate the original link in-place so downstream plugins 
+
+      ;; CRITICAL: Mutate the original link in-place so downstream plugins
       ;; (like org-transclusion-src-lines) see the correct file path!
       (org-element-put-property link :type "file")
       (org-element-put-property link :path actual-file)
