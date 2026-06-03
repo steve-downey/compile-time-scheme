@@ -9,8 +9,9 @@
 #+DATE: 2026-05-29
 
 #+begin_abstract
-By Phase 4, my compile-time compiler could parse and elaborate code, but recursive execution deeply stacked the C++ compiler's internal call limits.
+By Phase 4, my compile-time compiler could parse and elaborate code into a typed ~core_type~ AST, but recursive execution deeply stacked the C++ compiler's internal call limits.
 Phase 5 fixes this by introducing Continuation-Passing Style (CPS [cite:@reynolds1972definitional]) at the C++ template layer, enabling native Tail-Call Optimization (TCO) inside the C++ compiler itself.
+Phase 6 then materializes what CPS sets up, turning the lambda nodes in the ~core_type~ arena into concrete closure values.
 #+end_abstract
 
 #+MACRO: TEASER_END
@@ -54,7 +55,9 @@ Each CPS form takes an environment (`env`) containing variables and a continuati
 
 * Dispatching Core Nodes in CPS
 
-Instead of rewriting an entire interpreter loop within C++ structures natively (which would require a manual trampoline or defunctionalization [cite:@danvy2006defunctionalization] to avoid deep stack frames), I leverage the C++ compiler's own native optimizer. Over our ~core_type~ AST, I built ~cps_dispatch~.
+Instead of rewriting an entire interpreter loop within C++ structures natively (which would require a manual trampoline or defunctionalization [cite:@danvy2006defunctionalization] to avoid deep stack frames), I leverage the C++ compiler's own native optimizer.
+Over the ~core_type~ AST from Phase 4—with its ~arena_box~ handles, ~core_if~, ~core_lambda~, and ~core_application~ nodes—I built ~cps_dispatch~.
+The result type of every dispatch is ~foundation::result<closure::value<Core>>~: the ~result<T>~ error-handling type from Phase 1, parameterized on the closure value type defined in Phase 6.
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/closure/cps_code.hpp::ceecf448-bff3-4b76-99cc-8c11ac4140f3]] :lines 2- :src cpp :end "ceecf448-bff3-4b76-99cc-8c11ac4140f3 end"
 
@@ -78,6 +81,8 @@ By forwarding `cont` and `k` into the recursive instantiation of `cps_dispatch(a
 * Conclusion
 
 By combining Continuation-Passing Style templates with native C++ Tail Call-Optimized return forms, my Scheme AST maintains state securely through execution paths without resorting to complex heap-allocated C++ data structures or manual interpreter loops.
+
+Phase 6 takes this structure and materializes it: it defines the ~closure~ value type that ~cps_dispatch~ produces, and shows how lambda nodes captured in the arena become concrete, executable closure objects.
 
 * References
 

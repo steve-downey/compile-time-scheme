@@ -48,6 +48,8 @@ The storage is completely inline, satisfying the ~constexpr~ constraints.
 All structures representing my parsed Scheme program will be backed by such fixed-allocation memory arenas.
 It turns out that pre-allocating a chunk of memory and carefully managing indices is not just for 1980s game developers; it's required for 2020s compile-time computing.
 
+~static_vector~ appears throughout the pipeline: Phase 2's ~many~ combinator uses it to accumulate repeated parser matches, Phase 3's ~datum_list~ stores list elements in one, and the flat tree arenas that hold every AST node in Phases 3 and 4 are built on top of it.
+
 ** Monadic Error Handling
 
 Compiler engineering inherently means dealing with invalid input.
@@ -66,6 +68,19 @@ class result {
 
 This pattern allows me to cleanly thread success and failure states through my parser pipeline without relying on exceptions or out-parameters.
 It remains purely functional and, most importantly, ~constexpr~ friendly.
+
+~result<T>~ is the return type of nearly every function in the pipeline.
+Phase 2 wraps it in ~parse_result<T>~, which pairs it with a remaining cursor position.
+Phases 4 and 5 use ~result<T>~ directly to propagate elaboration and evaluation errors without exceptions.
+
+* Other Foundation Pieces
+
+Two more types from the ~foundation~ layer appear in Phase 3, where the problems they solve first arise.
+~arena_box<T, N>~ is an integer handle that replaces raw pointers into a flat arena—because ~constexpr~ forbids pointer arithmetic across allocation boundaries, all cross-node references use these integer indices instead.
+~fix<F>~ is a six-line struct that constructs recursive types without self-referential definitions—it is what makes a ~std::variant~ that contains itself possible at compile time.
+Both are explained in depth in Phase 3.
+
+The ~functor.hpp~ and ~applicative.hpp~ headers establish Functor and Applicative typeclasses; they underpin the parser combinator library in Phase 2 and reappear in the graph-rendering ~string_writer~ in Phase 8.
 
 * Conclusion
 

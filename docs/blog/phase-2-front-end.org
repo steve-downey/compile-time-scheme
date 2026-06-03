@@ -60,7 +60,7 @@ This is modelled with two types:
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/parser.hpp::59712a9e-e890-4931-9196-61ceaa880b6d]] :lines 2- :src cpp :end "59712a9e-e890-4931-9196-61ceaa880b6d end"
 
 ~parse_state<T>~ bundles the successfully parsed value with the cursor positioned just after the consumed input.
-~parse_result<T>~ is an alias for ~foundation::result<parse_state<T>>~—my project's ~std::expected~-like type that holds either the state or a ~parse_error~ (position + message string).
+~parse_result<T>~ is an alias for ~foundation::result<parse_state<T>>~—building on the ~result<T>~ error-handling type from Phase 1—that holds either the state or a ~parse_error~ (position + message string).
 
 The ~T~ is a template parameter, so parsers are naturally typed: a parser for a digit character returns ~parse_result<char>~, a parser for an integer returns ~parse_result<atom_integer>~.
 The type propagates automatically through every combinator.
@@ -192,7 +192,7 @@ static_assert(!(char_p('a') | char_p('b'))(cursor{"c"}).has_value());
 * Repetition: ~many~ and ~some~
 
 Repeating a parser zero or more times requires a fixed-capacity container because dynamic allocation is unavailable in ~constexpr~.
-~many~ uses ~foundation::static_vector<V, Capacity>~:
+~many~ uses ~foundation::static_vector<V, Capacity>~—the zero-allocation array from Phase 1:
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/alt.hpp::e7d2b575-1f00-46bd-8365-1abbe0de1b63]] :lines 2- :src cpp :end "e7d2b575-1f00-46bd-8365-1abbe0de1b63 end"
 
@@ -237,6 +237,9 @@ Both parsers are combined with ~|~ in the reader's full datum dispatcher.
 The reader tries ~integer_p()~ first; if that fails without consuming, it tries ~symbol_p()~; if that fails, it tries boolean, quote, and list—all via the same ~|~ operator.
 
 * The Design in Sum
+
+Phase 3 assembles these combinators into the complete S-expression reader that produces the ~datum_type~ tree.
+Everything in the reader—booleans, integers, symbols, quote forms, and nested lists—is expressed as a composition of the primitives and combinators described here.
 
 The parser combinator library is built from five conceptual layers:
 

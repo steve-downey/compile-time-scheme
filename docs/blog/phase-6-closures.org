@@ -11,6 +11,7 @@
 
 #+begin_abstract
 Phase 6 marks the transition from an interpreter to an actual compiler.
+Building on the CPS dispatcher from Phase 5 and the ~core_type~ arena established in Phase 4, this phase defines the ~closure~ and ~value<Core>~ types that give the evaluator its concrete return type.
 The crucial functional mechanism that bridges runtime behavior into the C++ type system is the materialization of the Closure.
 #+end_abstract
 
@@ -38,7 +39,7 @@ Because I operate structurally at compile time and already execute in CPS format
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/closure/value.hpp::8335a467-f7e9-4d18-8d5b-54931b1d5c18]] :lines 2- :src cpp :end "8335a467-f7e9-4d18-8d5b-54931b1d5c18 end"
 
-Notice how `closure` strictly bundles a non-owning pointer to the lambda AST node in the arena, alongside a `constexpr_box` copy of its enclosing environment. This fully isolates its runtime state statically.
+Notice how `closure` strictly bundles a non-owning pointer to the lambda AST node in the arena—the same flat arena whose layout was established in Phases 3 and 4—alongside a `constexpr_box` copy of its enclosing environment. This fully isolates its runtime state statically.
 
 We map this natively into the core evaluated `value` type alongside our built-ins, standard symbols, and literals:
 
@@ -63,6 +64,8 @@ Here, compilation successfully occurs *only if* the evaluation of the badly form
 
 By emitting statically defined closure types representing my CPS states, my project ceases to be merely a toy compile-time interpreter.
 It functions directly as a compiler, bootstrapping Scheme representations into equivalent, fully optimized native C++ behavior.
+
+Phase 7 explores an alternative execution model for the same CPS structure: rather than a direct closure evaluator, it maps the AST into Beman Execution senders, opening the door to async pipelines and compile-time execution graph visualization.
 
 * References
 

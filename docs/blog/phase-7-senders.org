@@ -10,8 +10,9 @@
 
 #+begin_abstract
 To truly compile my Scheme dialect into native code, I need an execution model.
-Phase 7 bridges the gap between functional Scheme evaluation and modern C++ asynchronous workloads.
+Phase 7 bridges the gap between the CPS structure from Phase 5, the ~closure~ and ~value<Core>~ types from Phase 6, and modern C++ asynchronous workloads.
 I achieve this by exploring two parallel approaches for mapping my CPS Abstract Syntax Tree into modern async executors using P2300 Senders and C++ Coroutines.
+Phase 8 then uses C++26 Reflection to inspect the generated sender topology and render it as a Graphviz execution graph.
 #+end_abstract
 
 #+MACRO: TEASER_END
