@@ -21,7 +21,7 @@ This post walks through the structural differences between raw syntax and semant
 * Semantics over Syntax
 
 While the Reader handles syntax, the Elaborator handles semantics.
-The reader produces a generic tree of lists, atoms, and symbols. It does not know if ~(if #t 1 2)~ is a function call, a variable definition, or a control flow construct—it just sees a list of four items.
+The reader (Phase 3) produces a generic ~datum_type~ tree of lists, atoms, and symbols. It does not know if ~(if #t 1 2)~ is a function call, a variable definition, or a control flow construct—it just sees a list of four items.
 The Elaborator traverses this ~datum~ tree, inspects the layout of lists, binds variables to lexical scopes, and verifies that special forms are used correctly to construct the ~core~ AST.
 
 For example, when the Elaborator encounters a list whose first element is the symbol ~if~, it maps it to a ~core_if~ node. In C++, this is defined as follows:
@@ -29,7 +29,7 @@ For example, when the Elaborator encounters a list whose first element is the sy
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/elaborator/elaborated_core.hpp::bb010057-c0a1-468b-a21c-7ab18af8cd72]] :lines 2- :src cpp :end "bb010057-c0a1-468b-a21c-7ab18af8cd72 end"
 
 Note how explicit the types are. Instead of arbitrary nested lists, the ~core_if~ node strictly mandates a condition, a consequent, and an alternative.
-These branches are handles (~arena_box~) to other nodes allocated in the AST arena, preventing deep recursion overhead.
+These branches are ~arena_box~ handles into the AST arena—the same index-based indirection introduced in Phase 3 for the datum tree—preventing deep recursion overhead.
 
 * The Core Types
 
@@ -96,8 +96,10 @@ Here, the ~eval_direct~ function takes the tree arena and evaluates the ~if~ log
 
 While this proves the elaborated semantics are valid, evaluating deep recursive structures this way directly utilizes the C++ call stack.
 Deep recursion will trigger a C++ compiler stack overflow, even at compile-time.
- There is compiling your code, and then there is crashing Clang.
-I need a way to decouple Scheme's control flow from C++'s native call stack. This limitation naturally pushes us toward Continuation-Passing Style (CPS) architecture, which will be the next step in our series.
+There is compiling your code, and then there is crashing Clang.
+I need a way to decouple Scheme's control flow from C++'s native call stack.
+Phase 5 addresses this by transforming evaluation into Continuation-Passing Style, which passes control explicitly through ~Cont~ and ~K~ template parameters rather than through the C++ call stack.
+The ~core_type~ tree built here is what Phase 5's ~cps_dispatch~ traverses, and what Phase 6's closure backend stores non-owning pointers into.
 
 * References
 [cite:@steele1978art; @queinnec1996lisp]

@@ -38,6 +38,7 @@ The Reader doesn't ask semantic questions; it merely shape-matches text into an 
 * Surviving ~constexpr~: The Flat Arena
 
 In a standard C++ implementation, a recursive tree like a List fundamentally relies on heap allocations.
+The two foundation pieces that solve this—~arena_box~ and ~fix<F>~—live in the same ~foundation~ layer as the ~static_vector~ and ~result<T>~ from Phase 1; they are introduced here because the datum tree is where they are first needed.
 Recursive types require pointers—such as ~std::unique_ptr<Datum>~ or raw ~Datum*~—because a C++ `struct` cannot contain itself by value.
 As I discussed in Phase 1, dynamic allocations that outlive a single ~constexpr~ evaluation context are forbidden by the C++ standard.
 
@@ -178,6 +179,9 @@ The elaborator uses the same ~fix~ structure for ~core_type~ and relies on the s
 The Reader cleanly translates human text into the mechanical ~Datum~ arena.
 At this stage, my compiler possesses a parsed, memory-safe, and cache-friendly structural representation of the input string.
 It does not yet know what the code computes—it only knows precisely how it is shaped.
+
+Phase 4 takes this ~datum_type~ tree and assigns semantic meaning: it recognizes ~if~ as a branch, ~lambda~ as a function, ~define~ as a binding, and rejects malformed forms at compile time.
+The elaborator builds its own ~core_type~ AST using the same ~fix<F>~ and arena patterns introduced here.
 
 * References
 

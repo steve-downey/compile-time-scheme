@@ -23,7 +23,7 @@ Because the compiler validates, elaborates, and lowers the abstract syntax tree 
 
 ** Standard Closure Evaluation
 
-The standard methodology for embedding the Scheme compiler into a runtime process involves pre-compiling a script via ~scm::compiled_closure~.
+The standard methodology for embedding the Scheme compiler into a runtime process involves pre-compiling a script via ~scm::compiled_closure~—the closure backend from Phase 6 wrapped in a convenient variable template.
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/examples/godbolt_ffi.cpp::2f7b4590-ca62-426d-a66f-2e9ace961764]] :lines 2- :src cpp :end "2f7b4590-ca62-426d-a66f-2e9ace961764 end"
 
@@ -37,7 +37,7 @@ The execution requires registering variables natively. A ~current-year~ variable
 
 * FFI Abstractions
 
-To bridge the C++ type system with the generic value wrappers utilized internally, the architecture utilizes a `std::span` structure over dynamically generated `scm::closure::value<Core>` abstractions.
+To bridge the C++ type system with the generic value wrappers utilized internally, the architecture utilizes a `std::span` structure over dynamically generated `scm::closure::value<Core>` abstractions—the same ~value<Core>~ variant type that ~cps_dispatch~ (Phase 5) produces and the closure backend (Phase 6) defines.
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/examples/godbolt_ffi.cpp::2a057d0f-ec4f-4c3f-9c0f-7147a3675b6a]] :lines 2- :src cpp :end "2a057d0f-ec4f-4c3f-9c0f-7147a3675b6a end"
 
@@ -48,7 +48,7 @@ Values are subsequently unpacked utilizing standard native C++ variants (~std::h
 
 While the standard closure backend relies on standard C++ stack evaluation by wrapping tail-calls, the ~beman::execution~ Sender backend introduces a more sophisticated integration state. By observing how the sender graph evaluates Fibonacci equations, we can look at the requisite changes.
 
-First, standard instantiation requires ~compile_to_sender~ rather than the simplified ~compiled_closure~ variant.
+First, standard instantiation requires ~compile_to_sender~ rather than the simplified ~compiled_closure~ variant—switching from the closure backend (Phase 6) to the sender backend (Phase 7).
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/examples/advanced_sender_ffi.cpp::034f2f75-e8af-4228-bcbb-d2edd3dfd2d2]] :lines 2- :src cpp :end "034f2f75-e8af-4228-bcbb-d2edd3dfd2d2 end"
 

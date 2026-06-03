@@ -37,7 +37,9 @@ This recursively unpacks the deeply typed sequence and maps it onto a homogeneou
 
 Once I possess a homogeneous C++ tree, I turn once again to Category Theory to render the Graphviz dot-language diagram.
 
-Using the ~Applicative~ typeclass from the foundation (Phase 1), I constructed a ~string_writer~ Applicative. The applicative and alternative interfaces allow me to map functionally over the returned string values. While the Graphviz mapping is currently driven through a straightforward indexing iteration, the types align nicely allowing pure state accumulation.
+Using the ~Applicative~ typeclass from the foundation—the same typeclass that drives the ~lift2~ and sequencing combinators in Phase 2's parser library—I constructed a ~string_writer~ Applicative.
+The applicative and alternative interfaces allow me to map functionally over the returned string values.
+While the Graphviz mapping is currently driven through a straightforward indexing iteration, the types align nicely allowing pure state accumulation.
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/dump_scheme_plan.hpp::e0d42f47-3007-4d03-955a-2e94c9fad8b1]] :lines 2- :src cpp :end "e0d42f47-3007-4d03-955a-2e94c9fad8b1 end"
 
