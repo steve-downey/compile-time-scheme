@@ -17,6 +17,7 @@ namespace smd::smdscheme::foundation {
 ///
 /// @tparam F A unary type template (e.g., @c std::variant) that forms one
 ///           recursion layer.
+// 7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d
 template <template <class> class F>
 struct fix {
     F<foundation::fix<F>> inner; ///< The outermost functor layer.
@@ -27,6 +28,7 @@ struct fix {
     constexpr explicit fix(F<foundation::fix<F>> layer)
         : inner(std::move(layer)) {}
 };
+// 7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d end
 
 /// Recursively folds a @c fix<F> tree using a carrier algebra.
 ///
@@ -42,6 +44,7 @@ struct fix {
 /// @param  tree    Root of the tree to fold.
 /// @param  algebra The carrier algebra applied at each node.
 /// @return The fold result of type @p R.
+// 8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e
 template <class R, template <class> class F, class Algebra>
 constexpr auto fold_fix(foundation::fix<F> const &tree, Algebra algebra) -> R {
     auto mapped = fmap(tree.inner, [&](auto const &child) -> R {
@@ -49,6 +52,7 @@ constexpr auto fold_fix(foundation::fix<F> const &tree, Algebra algebra) -> R {
     });
     return algebra(mapped);
 }
+// 8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e end
 
 } // namespace smd::smdscheme::foundation
 

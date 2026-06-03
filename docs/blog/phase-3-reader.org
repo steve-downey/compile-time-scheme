@@ -58,19 +58,120 @@ The backing memory layout is simple and predictable:
 2. **Cache Locality**: Trees allocated node-by-node on the heap suffer from memory fragmentation. An arena stores sibling data sequentially in memory, meaning bulk operations across the tree enjoy massive CPU cache-hit benefits. Memory pre-fetchers love arenatized data patterns.
 3. **Immutability and Trivial Copying**: Copying the entire AST simply means performing a bulk trivial copy of a single array buffer. I completely bypass the cost of tracing deep pointer trees to execute deep copies.
 
-* Open Recursion and ~Datum~ Formats
+* Open Recursion and the Fixed-Point Combinator
 
-In my design, list elements point into the arena via the ~arena_box~ handle, side-stepping the incomplete type problem in C++.
+** The Problem: C++ Cannot Name an Incomplete Type as Its Own Member
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/reader/datum_type.hpp::e30e1970-1410-46bc-bc98-47f3e5854497]] :lines 2- :src cpp :end "e30e1970-1410-46bc-bc98-47f3e5854497 end"
+A ~datum_list~ node holds its children, which are themselves ~datum~ nodes.
+Writing that directly in C++:
 
-However, expressing a recursive variant manually requires forward declarations and complex workarounds.
-A cleaner approach utilized heavily in modern compiler engineering is /Open Recursion/ paired with a /Fixed-Point combinator/.
-By defining a generic factory that takes a recursive self-reference ~R~ as a type template parameter, my ~datum_type~ variant only declares exactly one flat layer.
+#+begin_src cpp
+// Does not compile — datum_type is incomplete when datum_list is being defined
+struct datum_list {
+    std::vector<datum_type> elements;  // datum_type not yet defined
+};
+using datum_type = std::variant<datum_integer, datum_symbol, datum_boolean,
+                                datum_list>;  // too late: datum_list already frozen
+#+end_src
+
+The C++ type system forbids this: a type cannot appear as a non-pointer member of itself before its definition is complete.
+The usual escape hatch is a heap pointer—~std::vector<std::unique_ptr<datum_type>>~—which breaks the cycle because a pointer to an incomplete type is valid.
+But ~std::unique_ptr~ allocations that escape ~constexpr~ evaluation are rejected by the C++ standard: memory acquired during constant evaluation must be freed before the evaluation completes.
+
+This leaves an apparent dead end: recursive structure needs indirection; ~constexpr~ forbids persisting heap pointers.
+
+** Open Recursion: Leaving the Knot Untied
+
+The solution is to write the type as if it has no self-reference at all.
+Instead of naming ~datum_type~ inside ~datum_list~, the element type is left as a template parameter:
+
+#+begin_src cpp
+template <typename R>   // R = "whatever the recursive type turns out to be"
+struct datum_list {
+    foundation::static_vector<foundation::arena_box<R, MaxNodes>, MaxList> elements{};
+};
+#+end_src
+
+~datum_list<R>~ is fully defined for any ~R~, even before ~R~ is known.
+The self-reference is gone; the recursive position is an open hole labeled ~R~.
+This is called *open recursion*: the type describes one flat layer of structure and defers the question of what goes in the recursive slots.
+
+The same idea extends to the whole variant:
+
+#+begin_src cpp
+// One flat layer of the datum tree; R is a stand-in for recursive children
+template <typename R>
+using datum_f = std::variant<datum_integer, datum_symbol, datum_boolean,
+                             datum_list<R, MaxNodes, MaxList>,
+                             datum_quote<R, MaxNodes>>;
+#+end_src
+
+Given any concrete ~R~, ~datum_f<R>~ is a perfectly ordinary, non-recursive variant.
+~R~ is a placeholder — the recursive knot has not yet been tied.
+
+** Closing the Recursion: ~fix<F>~
+
+Given ~datum_f<R>~, the type we actually want satisfies the equation ~T = datum_f<T>~: a type whose recursive slots contain itself.
+That is the *fixed point* of ~datum_f~, and ~foundation::fix<F>~ computes it:
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/foundation/fix.hpp::7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d]] :lines 2- :src cpp :end "7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d end"
+
+~fix<F>~ is a struct whose single data member ~inner~ has type ~F<fix<F>>~—one layer of ~F~ with the recursive position filled by ~fix<F>~ itself.
+The trick is that this is valid C++: by the time the compiler instantiates ~F<fix<F>>~ to determine the member type, ~fix<F>~ is already a declared (though not yet fully defined) struct, and a struct may hold members whose type references itself through a template.
+There is no cycle in the sense the compiler cares about; each instantiation terminates.
+
+Unrolling what this means for the datum tree:
+
+| Type | Expands to |
+|------+------------|
+| ~fix<datum_f>~         | ~struct { datum_f<fix<datum_f>> inner; }~ |
+| ~datum_f<fix<datum_f>>~ | ~variant<datum_integer, …, datum_list<fix<datum_f>, …>, datum_quote<fix<datum_f>, …>>~ |
+
+~fix<datum_f>~ is a struct whose ~inner~ variant can hold ~datum_list~ nodes that contain ~arena_box~ handles to more ~fix<datum_f>~ values—a recursive tree, assembled from a six-line struct and a non-recursive template.
+No heap allocation, no forward-declaration gymnastics.
+
+** The Datum Tree in Full
+
+The actual aliases in the codebase combine the pieces:
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/reader/datum_type.hpp::4c343e79-7835-4862-afee-9e74d3b6098c]] :lines 2- :src cpp :end "4c343e79-7835-4862-afee-9e74d3b6098c end"
 
-The ~foundation::fix~ helper applies the recursive structural knot for me, tying ~datum_type~ directly into a closed AST structure without needing explicit cyclic data definitions.
+~datum_f_factory~ is the open-recursive functor with the arena sizes baked in.
+~datum_type~ is its fixed point.
+
+Construction in the reader is straightforward: build one variant layer, wrap it in ~fix~:
+
+#+begin_src cpp
+using datum = datum_type<MaxNodes, MaxList>;
+using datum_f = typename datum_f_factory<MaxNodes, MaxList>::template type<datum>;
+
+datum d{datum_f{datum_integer{42}}};    // integer node
+datum d{datum_f{datum_boolean{true}}};  // boolean node
+#+end_src
+
+Reading a node back peels the outer ~fix~ layer via ~.inner~, then dispatches on the variant:
+
+#+begin_src cpp
+std::visit(overloaded{
+    [](datum_integer i) { /* i.value */ },
+    [](datum_symbol  s) { /* s.name  */ },
+    [](datum_list<datum, MaxNodes, MaxList> const &lst) { /* lst.elements */ },
+    // ...
+}, d.inner);
+#+end_src
+
+List elements are ~arena_box~ handles; resolving them via the arena yields more ~datum~ nodes, each with their own ~.inner~.
+
+** Traversal: ~fold_fix~ and Catamorphisms
+
+Because every ~fix<F>~ tree has the same structure—one ~F~ layer containing recursive ~fix<F>~ children—there is a universal bottom-up traversal:
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/foundation/fix.hpp::8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e]] :lines 2- :src cpp :end "8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e end"
+
+~fold_fix<R>(tree, algebra)~ folds the entire tree into a single value of type ~R~: it first folds every child recursively, then calls ~algebra~ on the resulting ~F<R>~ node—one layer with all children already replaced by their fold results.
+You supply the single-layer logic in ~algebra~; ~fold_fix~ handles the recursion.
+This pattern is called a /catamorphism/ in category theory and is the natural companion to the fixed-point representation.
+The elaborator uses the same ~fix~ structure for ~core_type~ and relies on the same traversal idiom when transforming the AST.
 
 * Conclusion
 
