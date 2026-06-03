@@ -16,7 +16,7 @@ This phase focuses on invoking a Scheme script from C++, passing parameters, and
 #+MACRO: TEASER_END
 {{{TEASER_END}}}
 
-* Execution Frontends 
+* Execution Frontends
 
 Throughout this project, the implementation has enforced a strict boundary between compile-time evaluation and runtime environment mapping.
 Because the compiler validates, elaborates, and lowers the abstract syntax tree entirely during ~constexpr~ calculation, the runtime executor takes the statically generated C++ execution pipeline and drives data through it sequentially.
@@ -44,7 +44,7 @@ To bridge the C++ type system with the generic value wrappers utilized internall
 The execution mechanism ensures that native C++ callbacks receive an accurate memory window (~std::span~) into the evaluated variable pool.
 Values are subsequently unpacked utilizing standard native C++ variants (~std::holds_alternative<int>~) before native invocation proceeds.
 
-* Integrating the Sender Backend 
+* Integrating the Sender Backend
 
 While the standard closure backend relies on standard C++ stack evaluation by wrapping tail-calls, the ~beman::execution~ Sender backend introduces a more sophisticated integration state. By observing how the sender graph evaluates Fibonacci equations, we can look at the requisite changes.
 

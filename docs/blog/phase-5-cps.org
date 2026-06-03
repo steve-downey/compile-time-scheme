@@ -54,7 +54,7 @@ Each CPS form takes an environment (`env`) containing variables and a continuati
 
 * Dispatching Core Nodes in CPS
 
-Instead of rewriting an entire interpreter loop within C++ structures natively (which often resorts to heavy trampoline mechanics like Reynolds Defunctionalization [cite:@danvy2006defunctionalization] applied manually), I leverage the C++ compiler's own native optimizer. Over our ~core_type~ AST, I built ~cps_dispatch~.
+Instead of rewriting an entire interpreter loop within C++ structures natively (which would require a manual trampoline or defunctionalization [cite:@danvy2006defunctionalization] to avoid deep stack frames), I leverage the C++ compiler's own native optimizer. Over our ~core_type~ AST, I built ~cps_dispatch~.
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/closure/cps_code.hpp::ceecf448-bff3-4b76-99cc-8c11ac4140f3]] :lines 2- :src cpp :end "ceecf448-bff3-4b76-99cc-8c11ac4140f3 end"
 
@@ -66,14 +66,14 @@ However, for capturing a lambda scope, the `cps_dispatch` returns control direct
 
 * Relying on the C++ Compiler for TCO
 
-Because Scheme mandates Tail-Call Optimization (meaning infinite recursion without stack overflow is valid loop behavior), CPS architectures like the Rabbit compiler [cite:@steele1978rabbit] historically built mechanical jump tables.
+Because Scheme mandates Tail-Call Optimization (meaning infinite recursion without stack overflow is valid loop behavior), CPS architectures like the Rabbit compiler [cite:@steele1978rabbit] historically represented continuations as heap-allocated closures (a function pointer paired with a captured environment) to avoid consuming the C stack.
 
 However, since our ~constexpr~ paths are strictly evaluated at compile-time by C++ parsers like GCC, I delegate the job of transforming tail-recursive calls back to the native C++ optimizer.
 Instead of manually building a trampolining loop to evaluate defunctionalized continuations, my `cps_dispatch` aligns its final AST execution steps (like executing the body of the lambda) natively in the C++ return position.
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/closure/cps_code.hpp::7d7514b6-5dcb-41d9-8938-5f539e66688f]] :lines 2- :src cpp :end "7d7514b6-5dcb-41d9-8938-5f539e66688f end"
 
-By forwarding `cont` and `k` into the recursive instantiation of `cps_dispatch(arena.get(lam.body)...)` inside the `return` statement, Clang and GCC correctly collapse the compile-time execution frame. A recursive Scheme call executing this branch does not consume extra memory depth, compiling infinite Scheme tail recursion securely in C++.
+By forwarding `cont` and `k` into the recursive instantiation of `cps_dispatch(arena.get(lam.body)...)` inside the `return` statement, GCC's constexpr evaluator can collapse the compile-time execution frame. A recursive Scheme call executing this branch avoids consuming extra evaluation stack depth, enabling deep Scheme tail recursion within the C++ constant evaluator.
 
 * Conclusion
 

@@ -35,10 +35,10 @@ The cornerstone of this foundation is the ~static_vector~.
 It's essentially an array with a dynamically tracked size but a statically determined maximum capacity.
 
 #+begin_src c++
-template <typename T, std::size_t Capacity>
+template <class T, int Capacity>
 class static_vector {
     std::array<T, Capacity> data_;
-    std::size_t size_ = 0;
+    int size_{};
     // ... push_back, pop_back, end(), begin() operations ...
 };
 #+end_src
@@ -54,11 +54,12 @@ Compiler engineering inherently means dealing with invalid input.
 Exceptions are not available in ~constexpr~ contexts in the way standard runtime C++ handles them, and C-style error codes quickly become an unwieldy mess of ~if (err != 0) return err;~.
 
 Instead, I employ Monadic error handling, drawing inspiration from Haskell's ~Either~ type or Rust's ~Result~.
-I utilize a ~result<T, E>~ type (similar to ~std::expected~ [cite:@cppref_expected] in C++23).
+I utilize a ~result<T>~ type (similar to ~std::expected~ [cite:@cppref_expected] in C++23), with the error type fixed as ~parse_error~.
 
 #+begin_src c++
-template <typename T, typename E>
+template <class T>
 class result {
+    std::variant<T, parse_error> data_;
     // ...
 };
 #+end_src
