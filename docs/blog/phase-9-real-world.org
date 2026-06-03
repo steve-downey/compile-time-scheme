@@ -58,6 +58,57 @@ Second, the returned functional interface cannot be executed natively as an imme
 
 Extraction happens by invoking ~scm::sender_v::sync_wait(std::move(s))~, which initializes propagation across the pipeline, asynchronously awaiting resolution safely before unwrapping local evaluation values locally into ~res_opt~.
 
+* Reflection-Reified Environments
+
+The two FFI examples above require hand-writing a C++ struct to hold the Scheme program's output values.
+The names and types of those fields are determined by the programmer at the point they write the example.
+C++26 Reflection offers a more ambitious alternative: let the compiler *generate* that struct's shape from a descriptor list at ~consteval~ time.
+
+** The Mechanism: ~compile_environment~ and ~define_aggregate~
+
+~reified_environment.hpp~ provides two pieces:
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/reflection/reified_environment.hpp::d0092f7c-b9de-440d-ac67-02e4e48c5aa4]] :lines 2- :src cpp :end "d0092f7c-b9de-440d-ac67-02e4e48c5aa4 end"
+
+~reified_environment<Tag>~ starts as a declared-but-undefined struct template.
+~compile_environment<Tag>~ calls ~std::meta::define_aggregate~ at ~consteval~ time, which *injects data members* into that template specialization.
+After ~compile_environment<Tag>~ runs, ~reified_environment<Tag>~ becomes a complete aggregate type whose fields correspond exactly to the supplied ~(type, name)~ pairs — ordinary members, accessible by name, fully typed.
+
+This is distinct from the read-only introspection in Phase 8.
+There, reflection *read* information from existing types.
+Here, reflection *writes* a new type into existence.
+
+** A ~consteval {}~ Block
+
+The mechanism is invoked via a C++26 standalone ~consteval~ block — a block-level statement that executes unconditionally at compile time, with no enclosing function:
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/examples/advanced_reflection_ffi.cpp::e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6071]] :lines 2- :src cpp :end "e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6071 end"
+
+After this block executes, ~reified_environment<RuntimeStateTag>~ is a complete struct equivalent to:
+
+#+begin_src cpp
+struct reified_environment<RuntimeStateTag> {
+    int eval_result;
+    bool successful_run;
+};
+#+end_src
+
+** Using the Reified Struct
+
+At runtime, the struct is used exactly like any other aggregate — by field name, with native C++ types:
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/examples/advanced_reflection_ffi.cpp::f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f607182]] :lines 2- :src cpp :end "f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f607182 end"
+
+~state.eval_result~ and ~state.successful_run~ are accessed as ordinary struct members.
+There is no ~std::any~, no type-erased variant, no runtime map lookup.
+The struct is a plain aggregate and can be passed by value, stored in arrays, or used in ~if constexpr~ branches like any other C++ type.
+
+** What This Enables
+
+The practical motivation is decoupling the shape of the runtime environment from the point in the code where the struct is written.
+In a more complete system, ~compile_environment~ could be driven by the Scheme program itself — the elaborator could extract the free variables of a Scheme expression and produce the corresponding ~capture_desc~ list at ~consteval~ time, generating a precisely-shaped C++ aggregate to hold exactly the variables that Scheme program needs.
+That would close the loop between compile-time Scheme evaluation and statically typed C++ data, without any runtime type erasure.
+
 * Conclusion
 
 The isolated compile-time Scheme compiler can merge back into conventional C++ software logic smoothly when mapped cleanly.
