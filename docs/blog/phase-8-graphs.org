@@ -23,15 +23,36 @@ How do I prove what the C++ compiler is actually building without deciphering th
 In Phase 8, I utilize C++26 Reflection (~std::meta::info~) alongside a custom ~string_writer~ Applicative [cite:@mcbride2008applicative] to project the generated execution typings into the Graphviz [cite:@graphviz_doc] dot-language for visual rendering.
 
 C++26 Reflection (P2996) allows C++ programs to imperatively query the structural definitions of types during constant evaluation.
+Instead of writing recursive template metaprogramming tricks with partial specializations, I write a straightforward loop that interacts via ~<meta>~ using the ~^^Sender~ reflection syntax.
 
-Instead of writing recursive template metaprogramming tricks with partial specializations, I write a straightforward loop that interacts via ~<meta>~ using the newly implemented ~^^Sender~ reflection syntax.
+* The Intermediate Representation: ~scheme_tree~
 
-Because `beman::execution` wraps its underlying types inside `basic_sender<Tag, ...>`, ~std::meta::identifier_of~ alone isn't sufficient (it just yields "basic_sender"). Instead, I retrieve the full signature via ~std::meta::display_string_of~ and parse out markers for "just_t", "when_all_t", or "then_t", allowing me to correctly classify the nodes.
-I extract its base class, recursively step into its template arguments, and map the sender topology into a strongly typed graph at `consteval` time.
+Before generating Graphviz output, the reflected sender topology is materialized into a homogeneous, ~consteval~-friendly tree.
+Two types form this intermediate representation:
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/scheme_node_data.hpp::c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f]] :lines 2- :src cpp :end "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f end"
+
+#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/scheme_tree.hpp::d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f60]] :lines 2- :src cpp :end "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f60 end"
+
+This is the same flat arena pattern as the datum and core trees from Phases 3 and 4: a ~static_vector~ of nodes addressed by integer index, trivially copyable, and safe to produce in a ~consteval~ context.
+The difference is that the recursion depth is bounded by the sender composition depth rather than the Scheme source nesting depth.
+
+* Building the Tree: Reflection Over Sender Types
+
+~build_scheme_tree~ populates a ~scheme_tree~ by walking the sender type at ~consteval~ time:
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/build_scheme_tree.hpp::ad3fee60-a0ea-4464-966c-bae3a964db79]] :lines 2- :src cpp :end "ad3fee60-a0ea-4464-966c-bae3a964db79 end"
 
-This recursively unpacks the deeply typed sequence and maps it onto a homogeneously typed ~scheme_tree~ topology, annotating the Sender algorithm properly. All of this runs strictly during compile-time.
+The child traversal is clean: ~bases_of(sender_type)~ reaches the ~product_type~ base that Beman Execution uses internally, and ~template_arguments_of~ on that base yields the child sender types at positions ~[2+]~, which are recursed into directly.
+
+The node /classification/ is less clean.
+The ideal code would be ~identifier_of(template_arguments_of(type)[0])~: get the first template argument of the sender (its tag type, e.g. ~just_t~) and read its identifier string.
+This does not work in GCC16 because the consteval evaluator cannot splice (~[:r:]~) on ~std::meta::info~ values passed as function parameters — the splice syntax requires a compile-time constant template argument, not a runtime-typed reflection value.
+
+The workaround is to call ~std::meta::display_string_of(type)~, which returns the type's human-readable printed name as a ~string_view~, and then string-search for ~"just_t"~, ~"then_t"~, and ~"when_all_t"~.
+This relies on implementation-defined output from ~display_string_of~ and would break if Beman Execution renamed its tag types or if a different compiler rendered names differently.
+A minimum-position search rather than a plain ~find~ is used as a further guard against false matches from nested child tag names appearing earlier in the string.
+It works correctly with GCC16 and the current beman::execution library; it is explicitly a workaround for a toolchain limitation, not the intended long-term approach.
 
 * Graph Translation via Applicatives
 

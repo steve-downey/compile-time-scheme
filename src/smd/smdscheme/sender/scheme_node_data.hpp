@@ -9,6 +9,7 @@
 
 namespace smd::smdscheme::sender {
 
+// c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f
 /// Data describing a single node in a reflected sender execution graph.
 ///
 /// Populated at compile time by @ref build_scheme_tree via P2996 reflection.
@@ -27,6 +28,7 @@ struct scheme_node_data {
                                      scheme_node_data const &)
         -> bool = default;
 };
+// c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f end
 
 } // namespace smd::smdscheme::sender
 

@@ -8,6 +8,7 @@
 
 namespace smd::smdscheme::sender {
 
+// d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f60
 /// A flat, index-addressed tree of @ref scheme_node_data nodes.
 ///
 /// Nodes are allocated by @ref allocate in pre-order; child links use integer
@@ -41,6 +42,7 @@ struct scheme_tree {
     /// Returns a mutable reference to the node at @p id.
     constexpr auto get(int id) -> scheme_node_data & { return nodes[id]; }
 };
+// d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f60 end
 
 } // namespace smd::smdscheme::sender
 
