@@ -76,6 +76,7 @@ struct identity_k {
 /// @param  cont  Intermediate continuation applied to the node's value.
 /// @param  env   Current variable bindings.
 /// @param  k     Outer continuation applied to @c cont's result.
+// ceecf448-bff3-4b76-99cc-8c11ac4140f3
 template <int MaxNodes, int MaxList, class Cont, class Env, class K>
 constexpr auto cps_dispatch(
     elaborator::core_type<MaxNodes, MaxList> const &node,
@@ -93,6 +94,7 @@ constexpr auto cps_dispatch(
             return r;
         return k(r.value());
     }
+// ceecf448-bff3-4b76-99cc-8c11ac4140f3 end
 
     if (std::holds_alternative<elaborator::core_boolean>(node.inner)) {
         auto r = cont(closure::value<Core>{

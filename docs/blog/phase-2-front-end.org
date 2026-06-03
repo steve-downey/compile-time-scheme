@@ -89,7 +89,7 @@ Two functions build every other parser in the library.
 
 ~pure(v)~ always succeeds, consumes nothing, and returns ~v~.
 It is the identity element of the Applicative structure: it lifts a known value into the parser context without touching the input.
-In practice it is used to provide default values—for example, after ~optional(char_p('-'))~ produces ~std::nullopt~, ~pure(+1)~ seeds the sign for a positive integer.
+In practice it seeds a fixed result into a combinator pipeline—for example, to supply a default when an optional step is skipped.
 
 ** ~satisfy~ and ~char_p~: Consume One Character
 
@@ -110,7 +110,7 @@ They compile with the rest of the project:
 Reading these top to bottom tells you the contract precisely: ~char_p('x')~ on ~"xyz"~ yields value ~'x'~ and leaves the cursor at ~'y'~; ~pure(42)~ on ~"abc"~ yields ~42~ and leaves the cursor entirely unchanged; ~char_p('x')~ on ~"abc"~ or ~""~ fails.
 These are not documentation—they are the spec, and the compiler verifies them.
 
-* Functor [cite:@mcbride2008applicative]: ~map~
+* Functor: ~map~
 
 Once you can parse a character, you need to transform the value into something more useful.
 That is what ~map~ does:
@@ -136,7 +136,7 @@ auto digit_int = map(
 The transformation happens entirely inside the parse result.
 The cursor positions are managed by the combinator, not by ~f~.
 
-* Applicative: ~lift2~ and Sequencing
+* Applicative [cite:@mcbride2008applicative]: ~lift2~ and Sequencing
 
 Two parsers in sequence, whose results are combined, is the Applicative ~lift2~:
 

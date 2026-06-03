@@ -31,7 +31,8 @@ It does not parse a conditional branch.
 It simply parses a list containing four items: the symbol ~'if~, the boolean true, the integer ~1~, and the integer ~2~.
 
 This strict isolation simplifies my parsing logic immensely.
-The parser combinators from Phase 2 are used solely to build structural ~Datum~ types: ~Integer~, ~Boolean~, ~Symbol~, and ~List~ (cons cells).
+The parser combinators from Phase 2 are used solely to build structural ~Datum~ types: ~datum_integer~, ~datum_boolean~, ~datum_symbol~, ~datum_list~, and ~datum_quote~.
+~datum_list~ is not a linked list of cons cells; it is a flat ~static_vector~ of arena handles into the same node array.
 The Reader doesn't ask semantic questions; it merely shape-matches text into an S-expression.
 
 * Surviving ~constexpr~: The Flat Arena

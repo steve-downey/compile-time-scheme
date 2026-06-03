@@ -39,13 +39,14 @@ I have implemented both to evaluate their tradeoffs against C++ structural typin
 My first approach revolves around natively translating the AST into pure, nested `beman::execution` Senders. Here, the interpreter works synchronously wrapping its return types dynamically, building the data-flow chain.
 
 By mapping over standard forms, the Scheme expression can execute out-of-order asynchronously.
-Complex parallel argument evaluations, like evaluating the arguments to a builtin function `(+ (f 1) (g 2))`, translates natively into a `when_all`, spawning an async pipeline that awaits both results simultaneously before dropping to a `then` application block.
+Argument evaluation for a builtin function `(+ (f 1) (g 2))` uses `when_all` to join the two results before the `then` application block.
+Each argument is evaluated eagerly and wrapped in `sender_v::just`; the `when_all` then joins those two already-completed senders into a single pipeline step.
 
 Here is the exact code snippet from `sender_cps_program.hpp` showing the `when_all` implementation over function arguments natively resolving asynchronous execution structures:
 
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/sender_cps_program.hpp::e619ae0a-47be-48b4-86f5-1dfac90299e6]] :lines 2- :src cpp :end "e619ae0a-47be-48b4-86f5-1dfac90299e6 end"
 
-The execution builds an explicit sender dependency graph over arguments `arg0_r` and `arg1_r`. It wraps them dynamically via `sender_v::just` before joining them inside `sender_v::when_all`. Once both have correctly emitted their evaluated results via the dependency chain, the `sender_v::then` block captures their success states and explicitly runs the math operators, which are run through synchronous wait evaluation.
+The execution evaluates `arg0_r` then `arg1_r` sequentially, wraps each in `sender_v::just`, and joins them inside `sender_v::when_all`. The `sender_v::then` block captures their success states and applies the arithmetic operator, with the result surfaced through a synchronous `unwrap_sender` call.
 
 The major benefit to this approach is that the data graph structure is explicitly typed out locally. As long as every recursive return path is synchronously waited upon to type-erase its distinct pipeline return into homogeneous results, it builds cleanly.
 

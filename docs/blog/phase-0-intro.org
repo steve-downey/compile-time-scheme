@@ -83,7 +83,7 @@ With the raw shape of the code established, the Elaborator parses that generic s
 #+end_quote
 
 ** Phase 5: Continuation-Passing Style (CPS)
-The pipeline then drops the AST into a drastically different representation. Standard recursive evaluation overflows the rigid call stack depths permitted by compile-time limits. Defunctionalization and continuations flatten the control flow entirely.
+The pipeline then drops the AST into a drastically different representation. Standard recursive evaluation overflows the rigid call stack depths permitted by compile-time limits. Continuation-Passing Style transforms recursive evaluation into a continuation-chaining form that the C++ compiler's own optimizer handles without consuming deep evaluation stack frames.
 
 #+begin_quote
 - Continuation-Passing Style (CPS) :: A style of programming in which control is passed explicitly. Operations do not return; instead, they call an explicit continuation function with their result.
