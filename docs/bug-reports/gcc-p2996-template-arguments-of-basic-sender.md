@@ -1,9 +1,11 @@
 # GCC Bug: `std::meta::template_arguments_of` throws on certain class template specialisations
 
-**Component:** C++ compiler (g++), P2996 reflection implementation  
-**Affected version:** GCC 16 trunk (confirmed broken; earlier versions with `-freflection` may also be affected)  
-**Standard:** C++26 with P2996 (`-std=c++26`)  
-**Severity:** Incorrect behaviour — standard-conforming code silently throws at `consteval` time
+- **Component:** C++ compiler (g++), P2996 reflection implementation
+- **Affected version:** GCC 16 trunk (confirmed broken; earlier versions
+  with `-freflection` may also be affected)
+- **Standard:** C++26 with P2996 (`-std=c++26`)
+- **Severity:** Incorrect behaviour — standard-conforming code silently
+  throws at `consteval` time
 
 ---
 
@@ -11,9 +13,9 @@
 
 `std::meta::template_arguments_of(r)` throws when `r` reflects a class template
 specialisation whose base class is parameterised on the *same* template arguments.
-The standard requires `template_arguments_of` to return the template arguments of
-any class template specialisation; it should only throw when the operand is not a
-specialisation at all.
+The standard requires `template_arguments_of` to return the template
+arguments of any class template specialisation; it should only throw
+when the operand is not a specialisation at all.
 
 The problem was discovered while reflecting over `beman::execution::detail::basic_sender`,
 whose template signature is:
@@ -150,15 +152,16 @@ Throwing is only permitted when the operand is *not* a specialisation.
 
 To help bisect the root cause, the MRE tests four structural levels:
 
-| Level | Structure | Predicted result |
-|-------|-----------|-----------------|
-| 1 | `flat_pair<T,U>` — plain template | Works |
-| 2 | `outer_simple<T,U> : inner_simple<T,U>` — inherits from template with same args | Needs verification |
-| 3 | `product_like<T...>` — inherits through partial specialisation on `index_sequence` | Needs verification |
-| 4 | `basic_like<Tag,Data> : product_like<Tag,Data>` — outer template inheriting from multi-level structure above | **Reportedly throws** |
+| Level | Structure | Expected |
+| ----- | --------- | -------- |
+| 1 | `flat_pair<T,U>` — flat template | Works |
+| 2 | `outer_simple<T,U> : inner_simple<T,U>` — same-arg base | Verify |
+| 3 | `product_like<T...>` — partial spec on `index_sequence` | Verify |
+| 4 | `basic_like<Tag,Data> : product_like<Tag,Data>` | **Throws** |
 
-Determining which level first causes the failure will identify whether the bug is
-in handling of:
+Determining which level first causes the failure will identify whether
+the bug is in handling of:
+
 - inherited base classes generally,
 - partial specialisations in the base chain, or
 - multi-level pack-expansion inheritance (`product_element<I,T>...`).
@@ -200,6 +203,8 @@ the caller's perspective). This is a separate issue and does not affect the
 ## References
 
 - P2996 "Reflection for C++26": <https://wg21.link/p2996>
-- Discovery commit in SchemePoC: `676d316` ("feat: Add reflection bridge for just senders")
-- Workaround commit: `1c5fc7c` ("feat: Extend reflection bridge for then and when_all senders")
+- Discovery commit in SchemePoC: `676d316`
+  ("feat: Add reflection bridge for just senders")
+- Workaround commit: `1c5fc7c`
+  ("feat: Extend reflection bridge for then and when_all senders")
 - Affected file: `src/smd/smdscheme/sender/build_scheme_tree.hpp`
