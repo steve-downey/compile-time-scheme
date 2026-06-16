@@ -8,7 +8,6 @@
 
 #include <smd/smdscheme/reflection/reified_environment.hpp>
 #include <smd/smdscheme/sender/sender_program.hpp>
-#include <smd/smdscheme/sender/sender_v.hpp>
 #include <smd/smdscheme/smdscheme.hpp>
 
 namespace scm = smd::smdscheme;
@@ -86,26 +85,19 @@ int main() {
                    scm::closure::foreign_function<Core>{ffi_print_and_return}});
 
     std::println("Running pre-compiled Scheme application via Senders...");
-    auto s = program(env);
-    auto res_opt = scm::sender_v::sync_wait(std::move(s));
+    auto result = program(env);
 
     scm::reflection::reified_environment<RuntimeStateTag> state{};
     // 906360cf-7ab2-4c5c-b0f1-b136104cee4b end
 
-    if (res_opt.has_value()) {
-        auto result = std::get<0>(res_opt.value());
-        if (result.has_value()) {
-            state.successful_run = true;
-            state.eval_result = std::get<int>(result.value());
-            std::println("Final Scheme Result Output: {}", state.eval_result);
-        } else {
-            state.successful_run = false;
-            std::println(stderr, "Error evaluating Scheme: {}",
-                         result.error().message);
-            return 1;
-        }
+    if (result.has_value()) {
+        state.successful_run = true;
+        state.eval_result    = std::get<int>(result.value());
+        std::println("Final Scheme Result Output: {}", state.eval_result);
     } else {
-        std::println(stderr, "Sender sync_wait returned empty optional.");
+        state.successful_run = false;
+        std::println(stderr, "Error evaluating Scheme: {}",
+                     result.error().message);
         return 1;
     }
 
