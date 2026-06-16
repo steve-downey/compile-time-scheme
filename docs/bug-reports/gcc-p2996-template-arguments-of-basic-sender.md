@@ -55,13 +55,18 @@ bug in local GCC 16 builds.
 template <std::size_t I, typename T>
 struct product_type_element { T value; };
 
+template <typename IndexSeq, typename... T>
+struct product_type_base;
+
 template <std::size_t... I, typename... T>
-struct product_type_base : product_type_element<I, T>... {
+struct product_type_base<std::index_sequence<I...>, T...>
+    : product_type_element<I, T>... {
     static constexpr std::size_t size() noexcept { return sizeof...(T); }
 };
 
 template <typename... T>
-struct product_type : product_type_base<std::index_sequence_for<T...>{}, T...> {};
+struct product_type
+    : product_type_base<std::index_sequence_for<T...>, T...> {};
 
 // Specializations (like those in std namespace for basic_sender)
 template <typename... T>
