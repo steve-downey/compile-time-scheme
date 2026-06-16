@@ -69,6 +69,7 @@ beman_install_library(
         smdscheme.reader
         smdscheme.parser
         smdscheme.foundation
+        smd.fixpoint
     NAMESPACE smd::
 )
 
