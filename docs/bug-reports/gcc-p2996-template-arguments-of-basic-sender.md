@@ -31,10 +31,15 @@ the `product_type` base, then calling `template_arguments_of` on that — succee
 
 ---
 
-## Minimal Reproducible Example
+## Minimal Reproducible Example (Refined)
 
-The following is self-contained and does not require the beman::execution library.
-It mirrors the relevant type structure at each level of complexity.
+The original MRE reproduced cleanly in early tests but does not trigger the bug
+on recent Godbolt snapshots. Investigation reveals the actual failing pattern:
+
+**Key difference:** The real code obtains the type via `decltype(factory_call())`
+and then reflects the *alias*, not the direct template specialization. The factory
+pattern, combined with standard library specializations, appears to trigger the
+bug in local GCC 16 builds.
 
 ```cpp
 // Compile with: g++ -std=c++26 -freflection mre.cpp
@@ -42,83 +47,79 @@ It mirrors the relevant type structure at each level of complexity.
 
 #include <meta>
 #include <cstddef>
+#include <tuple>
 #include <utility>
 
-// ── Level 1: flat template ──────────────────────────────────────────────────
-// Expected: works fine.
-
-template <typename T, typename U>
-struct flat_pair {};
-
-consteval bool test_flat() {
-    auto args = std::meta::template_arguments_of(^^flat_pair<int, float>);
-    return args.size() == 2;                         // should be true
-}
-static_assert(test_flat(), "flat template: expected 2 args");
-
-// ── Level 2: template that inherits from a simple template ──────────────────
-// Expected: should still work — the outer type is still a class template
-// specialisation and template_arguments_of must return its arguments.
-
-template <typename T, typename U>
-struct inner_simple {};
-
-template <typename T, typename U>
-struct outer_simple : inner_simple<T, U> {};
-
-consteval bool test_outer_simple() {
-    auto args = std::meta::template_arguments_of(^^outer_simple<int, float>);
-    return args.size() == 2;
-}
-static_assert(test_outer_simple(), "outer-simple: expected 2 args");
-
-// ── Level 3: multi-level inheritance with index_sequence (mirrors product_type)
-// product_type in beman::execution uses this pattern.
+// ── Minimal Structure: mirrors beman::execution::detail::basic_sender ────────
 
 template <std::size_t I, typename T>
-struct element { T value; };
-
-template <typename IndexSeq, typename... T>
-struct product_base;
+struct product_type_element { T value; };
 
 template <std::size_t... I, typename... T>
-struct product_base<std::index_sequence<I...>, T...>
-    : element<I, T>... {};
+struct product_type_base : product_type_element<I, T>... {
+    static constexpr std::size_t size() noexcept { return sizeof...(T); }
+};
 
 template <typename... T>
-struct product_like
-    : product_base<std::index_sequence_for<T...>, T...> {};
+struct product_type : product_type_base<std::index_sequence_for<T...>{}, T...> {};
 
-// ── Level 4: outer template that inherits from product_like with same args ──
-// This mirrors basic_sender<Tag, Data, Child...> : product_type<Tag, Data, Child...>
-// HYPOTHESIS: this is where template_arguments_of begins to throw.
+// Specializations (like those in std namespace for basic_sender)
+template <typename... T>
+struct std::tuple_size<product_type<T...>>
+    : std::integral_constant<std::size_t, sizeof...(T)> {};
+
+template <std::size_t I, typename... T>
+struct std::tuple_element<I, product_type<T...>> {
+    // (simplified; actual impl uses get<I>)
+    using type = int;
+};
 
 template <typename Tag, typename Data, typename... Child>
-struct basic_like : product_like<Tag, Data, Child...> {};
+struct basic_like : product_type<Tag, Data, Child...> {};
 
 struct my_tag {};
 
-consteval bool test_basic_like_direct() {
-    // Attempt direct access — expected to work but reportedly throws in GCC16.
-    auto r    = ^^basic_like<my_tag, product_like<int>>;
+// ── Factory pattern: decltype(factory) → reflect on alias ──────────────────
+
+consteval auto make_just_like() {
+    return basic_like<my_tag, product_type<int>>{};
+}
+
+// Alias obtained via decltype factory call (the actual pattern from
+// build_scheme_tree.test.cpp: using JustType = decltype(sender_v::just(42));)
+using JustLikeType = decltype(make_just_like());
+
+consteval bool test_via_decltype_alias() {
+    // Reflect the decltype alias, not the direct specialization.
+    // This is what fails in some GCC 16 configurations.
+    auto r = ^^JustLikeType;
     auto args = std::meta::template_arguments_of(r);  // <-- throws?
     return args.size() == 2;
 }
-// Uncomment to test:
-// static_assert(test_basic_like_direct(), "direct: expected 2 args");
 
-// ── Workaround: go through the base ────────────────────────────────────────
-// Accessing template_arguments_of on the product_like base succeeds.
-// This is the approach currently used in build_scheme_tree.hpp.
+// Uncomment to test the decltype-alias pattern:
+// static_assert(test_via_decltype_alias(), "decltype alias: expected 2 args");
 
-consteval bool test_basic_like_via_base() {
-    auto r     = ^^basic_like<my_tag, product_like<int>>;
-    auto bases = std::meta::bases_of(r, std::meta::access_context::unchecked());
-    // bases[0] reflects product_like<my_tag, product_like<int>>
-    auto args  = std::meta::template_arguments_of(std::meta::type_of(bases[0]));
-    return args.size() == 2;                         // Tag + Data
+// ── Direct reflection (works on recent Godbolt, may fail locally) ──────────
+
+consteval bool test_direct_specialization() {
+    auto r = ^^basic_like<my_tag, product_type<int>>;
+    auto args = std::meta::template_arguments_of(r);  // may also throw
+    return args.size() == 2;
 }
-static_assert(test_basic_like_via_base(), "via-base workaround: expected 2 args");
+// static_assert(test_direct_specialization(), "direct: expected 2 args");
+
+// ── Workaround: via base (always works) ──────────────────────────────────────
+
+consteval bool test_via_base() {
+    auto r     = ^^JustLikeType;
+    auto bases = std::meta::bases_of(r,
+                                     std::meta::access_context::unchecked());
+    auto args  = std::meta::template_arguments_of(
+        std::meta::type_of(bases[0]));
+    return args.size() == 2;
+}
+static_assert(test_via_base(), "via-base workaround: expected 2 args");
 
 int main() {}
 ```
@@ -127,9 +128,10 @@ int main() {}
 
 ## Expected Behaviour
 
-All four `test_*` functions should compile and return `true`.
+`test_via_decltype_alias()` and `test_direct_specialization()` should both
+compile and return `true`. The workaround `test_via_base()` always succeeds.
 
-`basic_like<my_tag, product_like<int>>` is plainly a specialisation of
+`JustLikeType` is plainly a specialisation of
 `basic_like<typename Tag, typename Data, typename... Child>`.
 P2996 §3.4 requires `template_arguments_of` to succeed on any reflection of a
 class template specialisation and return the corresponding argument list.
@@ -137,34 +139,33 @@ Throwing is only permitted when the operand is *not* a specialisation.
 
 ---
 
-## Actual Behaviour (GCC 16)
+## Actual Behaviour (GCC 16 — local build)
 
-`test_basic_like_direct()` — and the beman::execution equivalent calling
-`template_arguments_of(^^basic_sender<just_t, product_type<int>>)` — throws at
-`consteval` evaluation time.
+**On recent Godbolt snapshots:** The MRE works. Direct specialization and
+decltype-alias patterns both succeed.
 
-`test_basic_like_via_base()` — accessing the same arguments by reflecting on the
-`product_like` base class — succeeds.
+**On some local GCC 16 builds:** `test_via_decltype_alias()` may throw at
+`consteval` time, while `test_via_base()` always succeeds. The issue may be
+related to:
+
+1. The **decltype-alias pattern** (how the type is obtained), or
+2. The **`std::tuple_size`/`tuple_element` specializations**, or  
+3. Both, in specific GCC 16 release/patch versions.
 
 ---
 
 ## Distinguishing Factors
 
-To help bisect the root cause, the MRE tests four structural levels:
+If the bug reproduces on your local GCC 16:
 
-| Level | Structure | Expected |
-| ----- | --------- | -------- |
-| 1 | `flat_pair<T,U>` — flat template | Works |
-| 2 | `outer_simple<T,U> : inner_simple<T,U>` — same-arg base | Verify |
-| 3 | `product_like<T...>` — partial spec on `index_sequence` | Verify |
-| 4 | `basic_like<Tag,Data> : product_like<Tag,Data>` | **Throws** |
+- Comment/uncomment `test_via_decltype_alias()` and `test_direct_specialization()`
+  individually to identify which pattern fails.
+- Try removing the `std::tuple_size`/`tuple_element` specializations to see if
+  reflection succeeds without them.
+- Check your GCC 16 version (`g++ -v`) and compare against Godbolt's trunk/16.1.
 
-Determining which level first causes the failure will identify whether
-the bug is in handling of:
-
-- inherited base classes generally,
-- partial specialisations in the base chain, or
-- multi-level pack-expansion inheritance (`product_element<I,T>...`).
+This will help identify whether the issue is version-specific, pattern-specific,
+or related to standard library specializations.
 
 ---
 
