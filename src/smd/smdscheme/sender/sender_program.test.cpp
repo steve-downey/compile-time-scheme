@@ -8,7 +8,7 @@
 
 TEST_CASE("SenderBackendTest - HeaderIsIdempotent") { REQUIRE(true); }
 
-TEST_CASE("SenderBackendTest - CompileIntegerNode") {
+TEST_CASE("SenderBackendTest - EvalIntegerNode") {
     using Core = smd::smdscheme::elaborator::core_type<32, 16>;
 
     Core node;
@@ -17,14 +17,11 @@ TEST_CASE("SenderBackendTest - CompileIntegerNode") {
     smd::smdscheme::foundation::tree_arena<Core, 32> arena;
     auto e = smd::smdscheme::closure::default_env<Core, 16>();
 
-    auto s = smd::smdscheme::sender::sender_backend::compile_node<32, 16, 16>(
-        node, arena, e);
-    auto res = smd::smdscheme::sender_v::sync_wait(std::move(s));
+    auto res = smd::smdscheme::sender::eval_node<32, 16, 16>(node, arena, e);
 
     REQUIRE(res.has_value());
-    REQUIRE(std::get<0>(res.value()).has_value());
-    REQUIRE(std::holds_alternative<int>(std::get<0>(res.value()).value()));
-    REQUIRE(std::get<int>(std::get<0>(res.value()).value()) == 42);
+    REQUIRE(std::holds_alternative<int>(res.value()));
+    REQUIRE(std::get<int>(res.value()) == 42);
 }
 
 TEST_CASE("SenderBackendTest - CompileToSender") {
@@ -33,14 +30,12 @@ TEST_CASE("SenderBackendTest - CompileToSender") {
     REQUIRE(program_res.has_value());
 
     auto program = program_res.value();
-    auto e = smd::smdscheme::closure::default_env<
+    auto e       = smd::smdscheme::closure::default_env<
         smd::smdscheme::elaborator::core_type<32, 16>, 16>();
 
-    auto s = program(e);
-    auto res = smd::smdscheme::sender_v::sync_wait(std::move(s));
+    auto res = program(e);
 
     REQUIRE(res.has_value());
-    REQUIRE(std::get<0>(res.value()).has_value());
-    REQUIRE(std::holds_alternative<int>(std::get<0>(res.value()).value()));
-    REQUIRE(std::get<int>(std::get<0>(res.value()).value()) == 7);
+    REQUIRE(std::holds_alternative<int>(res.value()));
+    REQUIRE(std::get<int>(res.value()) == 7);
 }
