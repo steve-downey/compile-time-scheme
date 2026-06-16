@@ -7,6 +7,8 @@
 #include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
 
+#include <smd/fixpoint/overloaded.hpp>
+
 #include <variant>
 
 namespace smd::smdscheme::cps {
@@ -87,193 +89,199 @@ constexpr auto cps_dispatch(
         closure::value<elaborator::core_type<MaxNodes, MaxList>>> {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
 
-    if (std::holds_alternative<elaborator::core_integer>(node.inner)) {
-        auto r = cont(closure::value<Core>{
-            std::get<elaborator::core_integer>(node.inner).value});
-        if (!r.has_value())
-            return r;
-        return k(r.value());
-    }
-// ceecf448-bff3-4b76-99cc-8c11ac4140f3 end
+    using Val = closure::value<Core>;
+    using Res = foundation::result<Val>;
 
-    if (std::holds_alternative<elaborator::core_boolean>(node.inner)) {
-        auto r = cont(closure::value<Core>{
-            std::get<elaborator::core_boolean>(node.inner).value});
-        if (!r.has_value())
-            return r;
-        return k(r.value());
-    }
-
-    if (std::holds_alternative<elaborator::core_symbol>(node.inner)) {
-        auto lr =
-            env.lookup(std::get<elaborator::core_symbol>(node.inner).name);
-        if (!lr.has_value())
-            return foundation::result<closure::value<Core>>{lr.error()};
-        auto r = cont(lr.value());
-        if (!r.has_value())
-            return r;
-        return k(r.value());
-    }
-
-    if (std::holds_alternative<elaborator::core_if<Core, MaxNodes>>(
-            node.inner)) {
-        auto const &cif =
-            std::get<elaborator::core_if<Core, MaxNodes>>(node.inner);
-        auto cond_r = cps_dispatch<MaxNodes, MaxList>(arena.get(cif.condition),
-                                                      arena, identity_k<Core>{},
-                                                      env, identity_k<Core>{});
-        if (!cond_r.has_value())
-            return cond_r;
-        bool taken = !std::holds_alternative<bool>(cond_r.value()) ||
-                     std::get<bool>(cond_r.value());
-        auto const &branch = taken ? cif.consequent : cif.alternative;
-        return cps_dispatch<MaxNodes, MaxList>(arena.get(branch), arena, cont,
-                                               env, k);
-    }
-
-    if (std::holds_alternative<elaborator::core_quote>(node.inner)) {
-        auto const &cq = std::get<elaborator::core_quote>(node.inner);
-        closure::value<Core> v;
-        if (std::holds_alternative<int>(cq.atom))
-            v = closure::value<Core>{std::get<int>(cq.atom)};
-        else if (std::holds_alternative<bool>(cq.atom))
-            v = closure::value<Core>{std::get<bool>(cq.atom)};
-        else
-            v = closure::value<Core>{
-                closure::symbol{std::get<std::string_view>(cq.atom)}};
-        auto r = cont(v);
-        if (!r.has_value())
-            return r;
-        return k(r.value());
-    }
-
-    if (std::holds_alternative<
-            elaborator::core_lambda<Core, MaxNodes, MaxList>>(node.inner)) {
-        // 9a78bc9b-37eb-4b80-bd27-6146c24f6244
-        closure::value<Core> v{closure::closure<Core>{
-            &node, closure::constexpr_box<closure::env<Core, 16>>{
-                       new closure::env<Core, 16>{env}}}};
-        auto r = cont(v);
-        if (!r.has_value())
-            return r;
-        return k(r.value());
-        // 9a78bc9b-37eb-4b80-bd27-6146c24f6244 end
-    }
-
-    if (std::holds_alternative<
-            elaborator::core_application<Core, MaxNodes, MaxList>>(
-            node.inner)) {
-        auto const &app =
-            std::get<elaborator::core_application<Core, MaxNodes, MaxList>>(
-                node.inner);
-
-        auto func_r = cps_dispatch<MaxNodes, MaxList>(arena.get(app.func),
-                                                      arena, identity_k<Core>{},
-                                                      env, identity_k<Core>{});
-        if (!func_r.has_value())
-            return func_r;
-
-        if (std::holds_alternative<closure::builtin>(func_r.value())) {
-            auto const &bi = std::get<closure::builtin>(func_r.value());
-            if (app.args.size() != 2)
-                return foundation::result<closure::value<Core>>{
-                    foundation::parse_error{{}, "arity mismatch"}};
-
-            auto arg0_r = cps_dispatch<MaxNodes, MaxList>(
-                arena.get(app.args[0]), arena, identity_k<Core>{}, env,
-                identity_k<Core>{});
-            if (!arg0_r.has_value())
-                return arg0_r;
-            if (!std::holds_alternative<int>(arg0_r.value()))
-                return foundation::result<closure::value<Core>>{
-                    foundation::parse_error{{}, "type error"}};
-            int a = std::get<int>(arg0_r.value());
-
-            auto arg1_r = cps_dispatch<MaxNodes, MaxList>(
-                arena.get(app.args[1]), arena, identity_k<Core>{}, env,
-                identity_k<Core>{});
-            if (!arg1_r.has_value())
-                return arg1_r;
-            if (!std::holds_alternative<int>(arg1_r.value()))
-                return foundation::result<closure::value<Core>>{
-                    foundation::parse_error{{}, "type error"}};
-            int b = std::get<int>(arg1_r.value());
-
-            closure::value<Core> app_val;
-            if (bi.op == closure::builtin_op::add)
-                app_val = closure::value<Core>{a + b};
-            else
-                app_val = closure::value<Core>{a * b};
-
-            auto r = cont(app_val);
-            if (!r.has_value())
-                return r;
-            return k(r.value());
-        }
-
-        if (std::holds_alternative<closure::closure<Core>>(func_r.value())) {
-            auto const &clo = std::get<closure::closure<Core>>(func_r.value());
-            auto const &lam_node = *clo.node;
-
-            if (!std::holds_alternative<
-                    elaborator::core_lambda<Core, MaxNodes, MaxList>>(
-                    lam_node.inner))
-                return foundation::result<closure::value<Core>>{
-                    foundation::parse_error{{}, "type error"}};
-            auto const &lam =
-                std::get<elaborator::core_lambda<Core, MaxNodes, MaxList>>(
-                    lam_node.inner);
-            if (app.args.size() != lam.params.size())
-                return foundation::result<closure::value<Core>>{
-                    foundation::parse_error{{}, "arity mismatch"}};
-
-            auto new_env = clo.captured ? *clo.captured : env;
-            for (int i = 0; i < app.args.size(); ++i) {
-                auto arg_r = cps_dispatch<MaxNodes, MaxList>(
-                    arena.get(app.args[i]), arena, identity_k<Core>{}, env,
+    return std::visit(
+        smd::fixpoint::overloaded{
+            [&](elaborator::core_integer const &ci) -> Res {
+                // ceecf448-bff3-4b76-99cc-8c11ac4140f3
+                auto r = cont(Val{ci.value});
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
+                // ceecf448-bff3-4b76-99cc-8c11ac4140f3 end
+            },
+            [&](elaborator::core_boolean const &cb) -> Res {
+                auto r = cont(Val{cb.value});
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
+            },
+            [&](elaborator::core_symbol const &cs) -> Res {
+                auto lr = env.lookup(cs.name);
+                if (!lr.has_value())
+                    return Res{lr.error()};
+                auto r = cont(lr.value());
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
+            },
+            [&](elaborator::core_if<Core, MaxNodes> const &cif) -> Res {
+                auto cond_r = cps_dispatch<MaxNodes, MaxList>(
+                    arena.get(cif.condition), arena, identity_k<Core>{}, env,
                     identity_k<Core>{});
-                if (!arg_r.has_value())
-                    return arg_r;
-                new_env.define(lam.params[i], arg_r.value());
-            }
-            // 7d7514b6-5dcb-41d9-8938-5f539e66688f
-            return cps_dispatch<MaxNodes, MaxList>(arena.get(lam.body), arena,
-                                                   cont, new_env, k);
-            // 7d7514b6-5dcb-41d9-8938-5f539e66688f end
-        }
-
-        if (std::holds_alternative<closure::foreign_function<Core>>(
-                func_r.value())) {
-            auto const &ff =
-                std::get<closure::foreign_function<Core>>(func_r.value());
-
-            foundation::static_vector<closure::value<Core>, MaxNodes>
-                evaluated_args;
-            for (auto const &arg_id : app.args) {
-                auto arg_r = cps_dispatch<MaxNodes, MaxList>(
-                    arena.get(arg_id), arena, identity_k<Core>{}, env,
+                if (!cond_r.has_value())
+                    return cond_r;
+                bool taken =
+                    !std::holds_alternative<bool>(cond_r.value()) ||
+                    std::get<bool>(cond_r.value());
+                auto const &branch =
+                    taken ? cif.consequent : cif.alternative;
+                return cps_dispatch<MaxNodes, MaxList>(arena.get(branch), arena,
+                                                       cont, env, k);
+            },
+            [&](elaborator::core_quote const &cq) -> Res {
+                Val v = std::visit(
+                    smd::fixpoint::overloaded{
+                        [](int i) -> Val { return Val{i}; },
+                        [](bool b) -> Val { return Val{b}; },
+                        [](std::string_view sv) -> Val {
+                            return Val{closure::symbol{sv}};
+                        }},
+                    cq.atom);
+                auto r = cont(v);
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
+            },
+            [&](elaborator::core_lambda<Core, MaxNodes, MaxList> const &)
+                -> Res {
+                // 9a78bc9b-37eb-4b80-bd27-6146c24f6244
+                Val v{closure::closure<Core>{
+                    &node, closure::constexpr_box<closure::env<Core, 16>>{
+                               new closure::env<Core, 16>{env}}}};
+                auto r = cont(v);
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
+                // 9a78bc9b-37eb-4b80-bd27-6146c24f6244 end
+            },
+            [&](elaborator::core_application<Core, MaxNodes, MaxList> const
+                    &app) -> Res {
+                auto func_r = cps_dispatch<MaxNodes, MaxList>(
+                    arena.get(app.func), arena, identity_k<Core>{}, env,
                     identity_k<Core>{});
-                if (!arg_r.has_value())
-                    return arg_r;
-                evaluated_args.push_back(arg_r.value());
-            }
+                if (!func_r.has_value())
+                    return func_r;
 
-            auto ff_r = ff.fn(std::span<closure::value<Core> const>(
-                evaluated_args.begin(), evaluated_args.end()));
-            if (!ff_r.has_value())
-                return foundation::result<closure::value<Core>>{ff_r.error()};
+                return std::visit(
+                    smd::fixpoint::overloaded{
+                        [&](closure::builtin const &bi) -> Res {
+                            if (app.args.size() != 2)
+                                return Res{foundation::parse_error{
+                                    {}, "arity mismatch"}};
 
-            auto r = cont(ff_r.value());
-            if (!r.has_value())
-                return r;
-            return k(r.value());
-        }
+                            auto arg0_r = cps_dispatch<MaxNodes, MaxList>(
+                                arena.get(app.args[0]), arena,
+                                identity_k<Core>{}, env, identity_k<Core>{});
+                            if (!arg0_r.has_value())
+                                return arg0_r;
+                            if (!std::holds_alternative<int>(arg0_r.value()))
+                                return Res{foundation::parse_error{
+                                    {}, "type error"}};
+                            int a = std::get<int>(arg0_r.value());
 
-        return foundation::result<closure::value<Core>>{
-            foundation::parse_error{{}, "attempted to call non-function"}};
-    }
-    return foundation::result<closure::value<Core>>{
-        foundation::parse_error{{}, "cps_dispatch: unsupported form"}};
+                            auto arg1_r = cps_dispatch<MaxNodes, MaxList>(
+                                arena.get(app.args[1]), arena,
+                                identity_k<Core>{}, env, identity_k<Core>{});
+                            if (!arg1_r.has_value())
+                                return arg1_r;
+                            if (!std::holds_alternative<int>(arg1_r.value()))
+                                return Res{foundation::parse_error{
+                                    {}, "type error"}};
+                            int b = std::get<int>(arg1_r.value());
+
+                            Val app_val;
+                            if (bi.op == closure::builtin_op::add)
+                                app_val = Val{a + b};
+                            else
+                                app_val = Val{a * b};
+
+                            auto r = cont(app_val);
+                            if (!r.has_value())
+                                return r;
+                            return k(r.value());
+                        },
+                        [&](closure::closure<Core> const &clo) -> Res {
+                            auto const &lam_node = *clo.node;
+
+                            if (!std::holds_alternative<
+                                    elaborator::core_lambda<Core, MaxNodes,
+                                                            MaxList>>(
+                                    lam_node.inner))
+                                return Res{foundation::parse_error{
+                                    {}, "type error"}};
+                            auto const &lam = std::get<
+                                elaborator::core_lambda<Core, MaxNodes,
+                                                        MaxList>>(
+                                lam_node.inner);
+                            if (app.args.size() != lam.params.size())
+                                return Res{foundation::parse_error{
+                                    {}, "arity mismatch"}};
+
+                            auto new_env =
+                                clo.captured ? *clo.captured : env;
+                            for (int i = 0; i < app.args.size(); ++i) {
+                                auto arg_r =
+                                    cps_dispatch<MaxNodes, MaxList>(
+                                        arena.get(app.args[i]), arena,
+                                        identity_k<Core>{}, env,
+                                        identity_k<Core>{});
+                                if (!arg_r.has_value())
+                                    return arg_r;
+                                new_env.define(lam.params[i], arg_r.value());
+                            }
+                            // 7d7514b6-5dcb-41d9-8938-5f539e66688f
+                            return cps_dispatch<MaxNodes, MaxList>(
+                                arena.get(lam.body), arena, cont, new_env, k);
+                            // 7d7514b6-5dcb-41d9-8938-5f539e66688f end
+                        },
+                        [&](closure::foreign_function<Core> const &ff) -> Res {
+                            foundation::static_vector<Val, MaxNodes>
+                                evaluated_args;
+                            for (auto const &arg_id : app.args) {
+                                auto arg_r =
+                                    cps_dispatch<MaxNodes, MaxList>(
+                                        arena.get(arg_id), arena,
+                                        identity_k<Core>{}, env,
+                                        identity_k<Core>{});
+                                if (!arg_r.has_value())
+                                    return arg_r;
+                                evaluated_args.push_back(arg_r.value());
+                            }
+
+                            auto ff_r = ff.fn(std::span<Val const>(
+                                evaluated_args.begin(),
+                                evaluated_args.end()));
+                            if (!ff_r.has_value())
+                                return Res{ff_r.error()};
+
+                            auto r = cont(ff_r.value());
+                            if (!r.has_value())
+                                return r;
+                            return k(r.value());
+                        },
+                        [](int const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
+                        },
+                        [](bool const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
+                        },
+                        [](closure::symbol const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
+                        }},
+                    func_r.value());
+            },
+            [&](elaborator::core_define<Core, MaxNodes> const &) -> Res {
+                return Res{foundation::parse_error{
+                    {}, "cps_dispatch: define not supported in expression "
+                        "context"}};
+            }},
+        node.inner);
 }
 
 } // namespace detail
