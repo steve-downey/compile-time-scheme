@@ -62,14 +62,13 @@ template <int MaxNodes, int MaxList, int MaxBindings>
                 return environment.lookup(cs.name);
             },
             [&](elaborator::core_quote const &cq) -> Res {
-                return std::visit(
-                    smd::fixpoint::overloaded{
-                        [](int i) -> Val { return Val{i}; },
-                        [](bool b) -> Val { return Val{b}; },
-                        [](std::string_view sv) -> Val {
-                            return Val{closure::symbol{sv}};
-                        }},
-                    cq.atom);
+                return std::visit(smd::fixpoint::overloaded{
+                                      [](int i) -> Val { return Val{i}; },
+                                      [](bool b) -> Val { return Val{b}; },
+                                      [](std::string_view sv) -> Val {
+                                          return Val{closure::symbol{sv}};
+                                      }},
+                                  cq.atom);
             },
             [&](elaborator::core_if<Core, MaxNodes> const &cif) -> Res {
                 // e9bae797-69b6-4682-b77f-2110138bf5ab
@@ -117,8 +116,8 @@ template <int MaxNodes, int MaxList, int MaxBindings>
                                 return arg0_r.error();
                             }
                             if (!std::holds_alternative<int>(arg0_r.value())) {
-                                return foundation::parse_error{
-                                    {}, "type error"};
+                                return foundation::parse_error{{},
+                                                               "type error"};
                             }
 
                             auto arg1_r =
@@ -128,8 +127,8 @@ template <int MaxNodes, int MaxList, int MaxBindings>
                                 return arg1_r.error();
                             }
                             if (!std::holds_alternative<int>(arg1_r.value())) {
-                                return foundation::parse_error{
-                                    {}, "type error"};
+                                return foundation::parse_error{{},
+                                                               "type error"};
                             }
 
                             int a = std::get<int>(arg0_r.value());
@@ -141,18 +140,14 @@ template <int MaxNodes, int MaxList, int MaxBindings>
                         },
                         [&](closure::closure<Core> const &clo) -> Res {
                             auto const &lam_node = *clo.node;
-                            if (!std::holds_alternative<
-                                    elaborator::core_lambda<Core, MaxNodes,
-                                                            MaxList>>(
-                                    lam_node.inner)) {
-                                return foundation::parse_error{
-                                    {}, "type error"};
+                            if (!std::holds_alternative<elaborator::core_lambda<
+                                    Core, MaxNodes, MaxList>>(lam_node.inner)) {
+                                return foundation::parse_error{{},
+                                                               "type error"};
                             }
 
-                            auto const &lam = std::get<
-                                elaborator::core_lambda<Core, MaxNodes,
-                                                        MaxList>>(
-                                lam_node.inner);
+                            auto const &lam = std::get<elaborator::core_lambda<
+                                Core, MaxNodes, MaxList>>(lam_node.inner);
                             if (app.args.size() != lam.params.size()) {
                                 return foundation::parse_error{
                                     {}, "arity mismatch"};
@@ -189,8 +184,7 @@ template <int MaxNodes, int MaxList, int MaxBindings>
                                 evaluated_args.push_back(arg_r.value());
                             }
                             return ff.fn(std::span<Val const>(
-                                evaluated_args.begin(),
-                                evaluated_args.end()));
+                                evaluated_args.begin(), evaluated_args.end()));
                         },
                         [](int const &) -> Res {
                             return foundation::parse_error{
@@ -208,8 +202,9 @@ template <int MaxNodes, int MaxList, int MaxBindings>
             },
             [&](elaborator::core_define<Core, MaxNodes> const &) -> Res {
                 return foundation::parse_error{
-                    {}, "eval_direct: define not supported in expression "
-                        "context"};
+                    {},
+                    "eval_direct: define not supported in expression "
+                    "context"};
             }},
         node.inner);
 }

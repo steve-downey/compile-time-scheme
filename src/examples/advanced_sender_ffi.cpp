@@ -92,7 +92,7 @@ int main() {
 
     if (result.has_value()) {
         state.successful_run = true;
-        state.eval_result    = std::get<int>(result.value());
+        state.eval_result = std::get<int>(result.value());
         std::println("Final Scheme Result Output: {}", state.eval_result);
     } else {
         state.successful_run = false;

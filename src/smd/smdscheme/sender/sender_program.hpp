@@ -44,8 +44,9 @@ T unwrap_sender(auto sender) {
 ///
 /// This backend expresses the interpreter in terms of @c just, @c then, and
 /// @c when_all rather than coroutines.  Each sub-expression builds a sender
-/// graph that is driven to completion immediately via @ref detail::unwrap_sender,
-/// keeping the return type uniform without a type-erasing wrapper.
+/// graph that is driven to completion immediately via @ref
+/// detail::unwrap_sender, keeping the return type uniform without a
+/// type-erasing wrapper.
 ///
 /// @tparam MaxNodes    Arena capacity.
 /// @tparam MaxList     Maximum argument/list length.
@@ -64,8 +65,8 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
         closure::value<elaborator::core_type<MaxNodes, MaxList>>> {
 
     using Core = elaborator::core_type<MaxNodes, MaxList>;
-    using Val  = closure::value<Core>;
-    using Res  = foundation::result<Val>;
+    using Val = closure::value<Core>;
+    using Res = foundation::result<Val>;
 
     return std::visit(
         overloaded{
@@ -78,21 +79,20 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                     sender_v::just(Res{Val{cb.value}}));
             },
             [&](core_symbol const &cs) -> Res {
-                return detail::unwrap_sender<Res>(sender_v::then(
-                    sender_v::just(cs.name),
-                    [&environment](std::string_view n) -> Res {
-                        return environment.lookup(n);
-                    }));
+                return detail::unwrap_sender<Res>(
+                    sender_v::then(sender_v::just(cs.name),
+                                   [&environment](std::string_view n) -> Res {
+                                       return environment.lookup(n);
+                                   }));
             },
             [&](core_quote const &cq) -> Res {
-                Val v = std::visit(
-                    overloaded{
-                        [](int i) -> Val { return Val{i}; },
-                        [](bool b) -> Val { return Val{b}; },
-                        [](std::string_view sv) -> Val {
-                            return Val{closure::symbol{sv}};
-                        }},
-                    cq.atom);
+                Val v =
+                    std::visit(overloaded{[](int i) -> Val { return Val{i}; },
+                                          [](bool b) -> Val { return Val{b}; },
+                                          [](std::string_view sv) -> Val {
+                                              return Val{closure::symbol{sv}};
+                                          }},
+                               cq.atom);
                 return detail::unwrap_sender<Res>(sender_v::just(Res{v}));
             },
             [&](core_if<Core, MaxNodes> const &cif) -> Res {
@@ -171,9 +171,9 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                                 return Res{
                                     foundation::parse_error{{}, "type error"}};
 
-                            auto const &lam = std::get<
-                                core_lambda<Core, MaxNodes, MaxList>>(
-                                lam_node.inner);
+                            auto const &lam =
+                                std::get<core_lambda<Core, MaxNodes, MaxList>>(
+                                    lam_node.inner);
 
                             if (app.args.size() != lam.params.size())
                                 return Res{foundation::parse_error{
@@ -207,9 +207,9 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                             }
 
                             return detail::unwrap_sender<Res>(sender_v::then(
-                                sender_v::just(std::span<Val const>(
-                                    evaluated_args.begin(),
-                                    evaluated_args.end())),
+                                sender_v::just(
+                                    std::span<Val const>(evaluated_args.begin(),
+                                                         evaluated_args.end())),
                                 [&ff](std::span<Val const> args) -> Res {
                                     return ff.fn(args);
                                 }));
@@ -231,8 +231,9 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
             },
             [&](core_define<Core, MaxNodes> const &) -> Res {
                 return Res{foundation::parse_error{
-                    {}, "eval_node: define not supported in expression "
-                        "context"}};
+                    {},
+                    "eval_node: define not supported in expression "
+                    "context"}};
             }},
         node.inner);
 }
@@ -278,7 +279,7 @@ struct sender_program {
 /// success.
 template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] constexpr auto compile_to_sender(std::string_view src) {
-    using Core     = elaborator::core_type<MaxNodes, MaxList>;
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
     using ProgramT = sender_program<MaxNodes, MaxList>;
 
     foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>, MaxNodes>

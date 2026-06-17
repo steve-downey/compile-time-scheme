@@ -94,7 +94,9 @@ using Comp = smd::fixpoint::Fix<comp_f_factory<MaxList>::template type>;
 /// @param  layer    The CompF layer to map over.
 /// @return The mapped layer, with children type transformed from A to B.
 template <int MaxList, typename F, typename A>
-constexpr auto fmap_comp(F &&f, typename comp_f_factory<MaxList>::template type<A> const &layer) {
+constexpr auto
+fmap_comp(F &&f,
+          typename comp_f_factory<MaxList>::template type<A> const &layer) {
     using B = std::invoke_result_t<F, A const &>;
     using ResultF = typename comp_f_factory<MaxList>::template type<B>;
 
@@ -108,16 +110,17 @@ constexpr auto fmap_comp(F &&f, typename comp_f_factory<MaxList>::template type<
                                   smd::fixpoint::make_box<B>(f(*ci.alt))};
             },
             [&f](comp_lambda<A, MaxList> const &lam) -> ResultF {
-                return comp_lambda<B, MaxList>{lam.params,
-                                               smd::fixpoint::make_box<B>(f(*lam.body))};
+                return comp_lambda<B, MaxList>{
+                    lam.params, smd::fixpoint::make_box<B>(f(*lam.body))};
             },
             [&f](comp_apply<A, MaxList> const &app) -> ResultF {
                 std::vector<B> args_result;
                 for (auto const &arg : app.args) {
                     args_result.push_back(std::invoke(f, *arg));
                 }
-                return comp_apply<B, MaxList>{smd::fixpoint::make_box<B>(std::invoke(f, *app.func)),
-                                               std::move(args_result)};
+                return comp_apply<B, MaxList>{
+                    smd::fixpoint::make_box<B>(std::invoke(f, *app.func)),
+                    std::move(args_result)};
             }},
         layer);
 }
@@ -135,9 +138,10 @@ constexpr auto fmap_comp(F &&f, typename comp_f_factory<MaxList>::template type<
 /// @param  arena    The arena containing all core sub-nodes.
 /// @return A Comp tree on success, or a parse_error on invalid input.
 template <int MaxNodes, int MaxList>
-[[nodiscard]] constexpr auto core_to_comp(
-    elaborator::core_type<MaxNodes, MaxList> const &node,
-    foundation::tree_arena<elaborator::core_type<MaxNodes, MaxList>, MaxNodes> const &arena)
+[[nodiscard]] constexpr auto
+core_to_comp(elaborator::core_type<MaxNodes, MaxList> const &node,
+             foundation::tree_arena<elaborator::core_type<MaxNodes, MaxList>,
+                                    MaxNodes> const &arena)
     -> foundation::result<Comp<MaxList>> {
 
     using Core = elaborator::core_type<MaxNodes, MaxList>;
@@ -148,68 +152,89 @@ template <int MaxNodes, int MaxList>
     return std::visit(
         smd::fixpoint::overloaded{
             [](elaborator::core_integer const &ci) -> Res {
-                return smd::fixpoint::wrap_fix<comp_f_factory<MaxList>::template type>(
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(
                     CompLayer{comp_pure{{ci.value}}});
             },
             [](elaborator::core_boolean const &cb) -> Res {
-                return smd::fixpoint::wrap_fix<comp_f_factory<MaxList>::template type>(
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(
                     CompLayer{comp_pure{{cb.value}}});
             },
             [](elaborator::core_symbol const &cs) -> Res {
-                return smd::fixpoint::wrap_fix<comp_f_factory<MaxList>::template type>(
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(
                     CompLayer{comp_lookup{cs.name}});
             },
             [](elaborator::core_quote const &cq) -> Res {
-                return smd::fixpoint::wrap_fix<comp_f_factory<MaxList>::template type>(
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(
                     CompLayer{comp_pure{cq.atom}});
             },
             [&arena](elaborator::core_if<Core, MaxNodes> const &cif) -> Res {
-                auto cond_r = core_to_comp<MaxNodes, MaxList>(arena.get(cif.condition), arena);
+                auto cond_r = core_to_comp<MaxNodes, MaxList>(
+                    arena.get(cif.condition), arena);
                 if (!cond_r.has_value())
                     return cond_r.error();
 
-                auto cons_r = core_to_comp<MaxNodes, MaxList>(arena.get(cif.consequent), arena);
+                auto cons_r = core_to_comp<MaxNodes, MaxList>(
+                    arena.get(cif.consequent), arena);
                 if (!cons_r.has_value())
                     return cons_r.error();
 
-                auto alt_r = core_to_comp<MaxNodes, MaxList>(arena.get(cif.alternative), arena);
+                auto alt_r = core_to_comp<MaxNodes, MaxList>(
+                    arena.get(cif.alternative), arena);
                 if (!alt_r.has_value())
                     return alt_r.error();
 
-                return smd::fixpoint::wrap_fix<comp_f_factory<MaxList>::template type>(
-                    CompLayer{comp_if<CompT>{smd::fixpoint::make_box<CompT>(cond_r.value()),
-                                             smd::fixpoint::make_box<CompT>(cons_r.value()),
-                                             smd::fixpoint::make_box<CompT>(alt_r.value())}});
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(
+                    CompLayer{comp_if<CompT>{
+                        smd::fixpoint::make_box<CompT>(cond_r.value()),
+                        smd::fixpoint::make_box<CompT>(cons_r.value()),
+                        smd::fixpoint::make_box<CompT>(alt_r.value())}});
             },
-            [&arena](elaborator::core_lambda<Core, MaxNodes, MaxList> const &lam) -> Res {
-                auto body_r = core_to_comp<MaxNodes, MaxList>(arena.get(lam.body), arena);
+            [&arena](
+                elaborator::core_lambda<Core, MaxNodes, MaxList> const &lam)
+                -> Res {
+                auto body_r =
+                    core_to_comp<MaxNodes, MaxList>(arena.get(lam.body), arena);
                 if (!body_r.has_value())
                     return body_r.error();
 
-                return smd::fixpoint::wrap_fix<comp_f_factory<MaxList>::template type>(
-                    CompLayer{comp_lambda<CompT, MaxList>{lam.params,
-                                                          smd::fixpoint::make_box<CompT>(body_r.value())}});
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(
+                    CompLayer{comp_lambda<CompT, MaxList>{
+                        lam.params,
+                        smd::fixpoint::make_box<CompT>(body_r.value())}});
             },
-            [&arena](elaborator::core_application<Core, MaxNodes, MaxList> const &app) -> Res {
-                auto func_r = core_to_comp<MaxNodes, MaxList>(arena.get(app.func), arena);
+            [&arena](elaborator::core_application<Core, MaxNodes, MaxList> const
+                         &app) -> Res {
+                auto func_r =
+                    core_to_comp<MaxNodes, MaxList>(arena.get(app.func), arena);
                 if (!func_r.has_value())
                     return func_r.error();
 
                 std::vector<smd::fixpoint::Box<CompT>> arg_boxes;
                 for (auto const &arg_box : app.args) {
-                    auto arg_r = core_to_comp<MaxNodes, MaxList>(arena.get(arg_box), arena);
+                    auto arg_r = core_to_comp<MaxNodes, MaxList>(
+                        arena.get(arg_box), arena);
                     if (!arg_r.has_value())
                         return arg_r.error();
-                    arg_boxes.push_back(smd::fixpoint::make_box<CompT>(arg_r.value()));
+                    arg_boxes.push_back(
+                        smd::fixpoint::make_box<CompT>(arg_r.value()));
                 }
 
-                return smd::fixpoint::wrap_fix<comp_f_factory<MaxList>::template type>(
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(
                     CompLayer{comp_apply<CompT, MaxList>{
                         smd::fixpoint::make_box<CompT>(func_r.value()),
                         std::move(arg_boxes)}});
             },
             [](elaborator::core_define<Core, MaxNodes> const &) -> Res {
-                return foundation::parse_error{{}, "comp_tree: define not supported in expression context"};
+                return foundation::parse_error{
+                    {},
+                    "comp_tree: define not supported in expression context"};
             }},
         node.inner);
 }

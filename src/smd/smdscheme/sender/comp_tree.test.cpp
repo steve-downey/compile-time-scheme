@@ -25,19 +25,23 @@ using ResComp = foundation::result<CompT>;
 
 auto to_comp(std::string_view src) -> ResComp {
     // Read phase
-    foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>, MaxNodes> arena_dr;
-    auto dr = reader::read_datum<MaxNodes, MaxList>(parser::cursor{src}, arena_dr);
+    foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>, MaxNodes>
+        arena_dr;
+    auto dr =
+        reader::read_datum<MaxNodes, MaxList>(parser::cursor{src}, arena_dr);
     if (!dr.has_value())
         return ResComp{dr.error()};
 
     // Elaborate phase
     foundation::tree_arena<Core, MaxNodes> core_arena;
-    auto er = elaborator::elaborate<MaxNodes, MaxList>(dr.value().value, arena_dr, core_arena);
+    auto er = elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                       arena_dr, core_arena);
     if (!er.has_value())
         return ResComp{er.error()};
 
     // Conversion phase
-    return fixpoint_eval::core_to_comp<MaxNodes, MaxList>(er.value(), core_arena);
+    return fixpoint_eval::core_to_comp<MaxNodes, MaxList>(er.value(),
+                                                          core_arena);
 }
 
 } // namespace
@@ -130,9 +134,11 @@ TEST_CASE("CompTreeTest - LambdaNodeStructure") {
     REQUIRE(comp_r.has_value());
 
     auto const &layer = smd::fixpoint::unwrap_fix(comp_r.value());
-    REQUIRE(std::holds_alternative<fixpoint_eval::comp_lambda<CompT, MaxList>>(layer));
+    REQUIRE(std::holds_alternative<fixpoint_eval::comp_lambda<CompT, MaxList>>(
+        layer));
 
-    auto const &lam = std::get<fixpoint_eval::comp_lambda<CompT, MaxList>>(layer);
+    auto const &lam =
+        std::get<fixpoint_eval::comp_lambda<CompT, MaxList>>(layer);
     REQUIRE(lam.params.size() == 1);
     REQUIRE(lam.params[0] == "x");
 
@@ -147,9 +153,11 @@ TEST_CASE("CompTreeTest - ApplicationNodeStructure") {
     REQUIRE(comp_r.has_value());
 
     auto const &layer = smd::fixpoint::unwrap_fix(comp_r.value());
-    REQUIRE(std::holds_alternative<fixpoint_eval::comp_apply<CompT, MaxList>>(layer));
+    REQUIRE(std::holds_alternative<fixpoint_eval::comp_apply<CompT, MaxList>>(
+        layer));
 
-    auto const &app = std::get<fixpoint_eval::comp_apply<CompT, MaxList>>(layer);
+    auto const &app =
+        std::get<fixpoint_eval::comp_apply<CompT, MaxList>>(layer);
     REQUIRE(app.args.size() == 2);
 
     // func should be a symbol lookup for "+"
@@ -170,9 +178,11 @@ TEST_CASE("CompTreeTest - NestedApplicationStructure") {
     REQUIRE(comp_r.has_value());
 
     auto const &layer = smd::fixpoint::unwrap_fix(comp_r.value());
-    REQUIRE(std::holds_alternative<fixpoint_eval::comp_apply<CompT, MaxList>>(layer));
+    REQUIRE(std::holds_alternative<fixpoint_eval::comp_apply<CompT, MaxList>>(
+        layer));
 
-    auto const &app = std::get<fixpoint_eval::comp_apply<CompT, MaxList>>(layer);
+    auto const &app =
+        std::get<fixpoint_eval::comp_apply<CompT, MaxList>>(layer);
     REQUIRE(app.args.size() == 2);
 
     // First arg is integer literal
@@ -181,8 +191,10 @@ TEST_CASE("CompTreeTest - NestedApplicationStructure") {
 
     // Second arg is an application
     auto const &arg1_layer = smd::fixpoint::unwrap_fix(*app.args[1]);
-    REQUIRE(std::holds_alternative<fixpoint_eval::comp_apply<CompT, MaxList>>(arg1_layer));
+    REQUIRE(std::holds_alternative<fixpoint_eval::comp_apply<CompT, MaxList>>(
+        arg1_layer));
 
-    auto const &inner_app = std::get<fixpoint_eval::comp_apply<CompT, MaxList>>(arg1_layer);
+    auto const &inner_app =
+        std::get<fixpoint_eval::comp_apply<CompT, MaxList>>(arg1_layer);
     REQUIRE(inner_app.args.size() == 2);
 }

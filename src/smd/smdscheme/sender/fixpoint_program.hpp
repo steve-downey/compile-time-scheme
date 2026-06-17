@@ -40,7 +40,8 @@ struct fixpoint_program {
     /// @param  environment The variable bindings to evaluate under.
     /// @return The final value or a @ref foundation::parse_error.
     template <int MaxBindings>
-    constexpr auto operator()(closure::env<CompT, MaxBindings> const &environment) const
+    constexpr auto
+    operator()(closure::env<CompT, MaxBindings> const &environment) const
         -> foundation::result<closure::value<CompT>> {
         return mendler_run<MaxList, MaxBindings>(root, environment);
     }
@@ -58,7 +59,8 @@ struct fixpoint_program {
 /// @tparam MaxNodes Arena capacity (default 32).
 /// @tparam MaxList  Maximum argument/list length (default 16).
 /// @param  src      The Scheme source to compile.
-/// @return A @c result<fixpoint_program<MaxList>> holding the callable on success.
+/// @return A @c result<fixpoint_program<MaxList>> holding the callable on
+/// success.
 template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] constexpr auto compile_fixpoint(std::string_view src)
     -> foundation::result<fixpoint_program<MaxList>> {
@@ -67,14 +69,17 @@ template <int MaxNodes = 32, int MaxList = 16>
     using ProgramT = fixpoint_program<MaxList>;
 
     // Read datum from source
-    foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>, MaxNodes> arena_dr;
-    auto dr = reader::read_datum<MaxNodes, MaxList>(parser::cursor{src}, arena_dr);
+    foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>, MaxNodes>
+        arena_dr;
+    auto dr =
+        reader::read_datum<MaxNodes, MaxList>(parser::cursor{src}, arena_dr);
     if (!dr.has_value())
         return foundation::result<ProgramT>{dr.error()};
 
     // Elaborate datum to core AST
     foundation::tree_arena<Core, MaxNodes> core_arena;
-    auto er = elaborator::elaborate<MaxNodes, MaxList>(dr.value().value, arena_dr, core_arena);
+    auto er = elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                       arena_dr, core_arena);
     if (!er.has_value())
         return foundation::result<ProgramT>{er.error()};
 

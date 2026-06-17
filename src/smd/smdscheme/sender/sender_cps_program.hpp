@@ -83,21 +83,20 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                     sender_v::just(Res{Val{cb.value}}));
             },
             [&](core_symbol const &cs) -> Res {
-                return detail::unwrap_sender<Res>(sender_v::then(
-                    sender_v::just(cs.name),
-                    [&environment](std::string_view n) -> Res {
-                        return environment.lookup(n);
-                    }));
+                return detail::unwrap_sender<Res>(
+                    sender_v::then(sender_v::just(cs.name),
+                                   [&environment](std::string_view n) -> Res {
+                                       return environment.lookup(n);
+                                   }));
             },
             [&](core_quote const &cq) -> Res {
-                Val v = std::visit(
-                    overloaded{
-                        [](int i) -> Val { return Val{i}; },
-                        [](bool b) -> Val { return Val{b}; },
-                        [](std::string_view sv) -> Val {
-                            return Val{closure::symbol{sv}};
-                        }},
-                    cq.atom);
+                Val v =
+                    std::visit(overloaded{[](int i) -> Val { return Val{i}; },
+                                          [](bool b) -> Val { return Val{b}; },
+                                          [](std::string_view sv) -> Val {
+                                              return Val{closure::symbol{sv}};
+                                          }},
+                               cq.atom);
                 return detail::unwrap_sender<Res>(sender_v::just(Res{v}));
             },
             [&](core_if<Core, MaxNodes> const &cif) -> Res {
@@ -176,9 +175,9 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                                 return Res{
                                     foundation::parse_error{{}, "type error"}};
 
-                            auto const &lam = std::get<
-                                core_lambda<Core, MaxNodes, MaxList>>(
-                                lam_node.inner);
+                            auto const &lam =
+                                std::get<core_lambda<Core, MaxNodes, MaxList>>(
+                                    lam_node.inner);
 
                             if (app.args.size() != lam.params.size())
                                 return Res{foundation::parse_error{
@@ -212,9 +211,9 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                             }
 
                             return detail::unwrap_sender<Res>(sender_v::then(
-                                sender_v::just(std::span<Val const>(
-                                    evaluated_args.begin(),
-                                    evaluated_args.end())),
+                                sender_v::just(
+                                    std::span<Val const>(evaluated_args.begin(),
+                                                         evaluated_args.end())),
                                 [&ff](std::span<Val const> args) -> Res {
                                     return ff.fn(args);
                                 }));
@@ -236,8 +235,9 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
             },
             [&](core_define<Core, MaxNodes> const &) -> Res {
                 return Res{foundation::parse_error{
-                    {}, "sender_cps: define not supported in expression "
-                        "context"}};
+                    {},
+                    "sender_cps: define not supported in expression "
+                    "context"}};
             }},
         node.inner);
 }
