@@ -17,12 +17,16 @@ target_sources(
                 string_writer.hpp
                 format_scheme_node.hpp
                 dump_scheme_plan.hpp
+                comp_tree.hpp
+                fixpoint_eval.hpp
+                fixpoint_program.hpp
 )
 target_link_libraries(
     smdscheme.sender
     PUBLIC
         smdscheme.foundation
         smdscheme.closure
+        smd.fixpoint
         $<BUILD_INTERFACE:beman::execution_headers>
         $<BUILD_INTERFACE:beman.task_headers>
 )
