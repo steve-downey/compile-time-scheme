@@ -120,6 +120,7 @@ template <int MaxList, int MaxBindings>
 
                 return std::visit(
                     smd::fixpoint::overloaded{
+                        // 25cb48b9-23f3-4099-9469-17935b733c09
                         // Builtin: when_all for parallel arg evaluation
                         [&env, &app](closure::builtin const &bi) -> Res {
                             if (app.args.size() != 2)
@@ -162,6 +163,7 @@ template <int MaxList, int MaxBindings>
                                     return Res{Val{a * b}};
                                 }));
                         },
+                        // 25cb48b9-23f3-4099-9469-17935b733c09 end
 
                         // Closure: sequential arg eval, extend env, eval body
                         [&env,

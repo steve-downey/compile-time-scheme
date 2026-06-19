@@ -18,6 +18,7 @@
 
 namespace smd::smdscheme::fixpoint_eval {
 
+// 31435b33-ce4b-4e8e-ae10-abc64aa13501
 /// A computation node holding a literal atom (integer, boolean, or symbol).
 /// Stores atoms only — no full values or closures — to avoid circular type
 /// dependencies with closure::value<Comp>.
@@ -60,7 +61,9 @@ struct comp_apply {
     smd::fixpoint::Box<A> func;
     foundation::static_vector<smd::fixpoint::Box<A>, MaxList> args;
 };
+// 31435b33-ce4b-4e8e-ae10-abc64aa13501 end
 
+// 950ee4f0-367a-47bb-9335-30191f783119
 /// Factory template producing the open-recursive variant layer for CompF.
 /// Each structural node (comp_if, comp_lambda, comp_apply) is parameterized
 /// by A, the type of recursive children. Leaf nodes (comp_pure, comp_lookup)
@@ -83,6 +86,7 @@ struct comp_f_factory {
 /// @tparam MaxList  Maximum list/argument length.
 template <int MaxList>
 using Comp = smd::fixpoint::Fix<comp_f_factory<MaxList>::template type>;
+// 950ee4f0-367a-47bb-9335-30191f783119 end
 
 /// Maps a function over the children of a CompF layer.
 /// This is the functor fmap operation for CompF, enabling fold_fix and
@@ -93,6 +97,7 @@ using Comp = smd::fixpoint::Fix<comp_f_factory<MaxList>::template type>;
 /// @param  f        The function to apply to each recursive child.
 /// @param  layer    The CompF layer to map over.
 /// @return The mapped layer, with children type transformed from A to B.
+// 731f3ab0-d9ea-4254-aab4-8b38a30bb28e
 template <int MaxList, typename F, typename A>
 constexpr auto
 fmap_comp(F &&f,
@@ -126,6 +131,7 @@ fmap_comp(F &&f,
             }},
         layer);
 }
+// 731f3ab0-d9ea-4254-aab4-8b38a30bb28e end
 
 /// Converts an elaborated core AST (arena-based, using arena_box handles)
 /// into a computation tree (heap-pointer-based, using Box indirection).

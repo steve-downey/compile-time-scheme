@@ -18,6 +18,7 @@ namespace smd::fixpoint {
  *
  * @tparam A the wrapped type (typically a recursive Fix instantiation)
  */
+// a1f81cb9-ebb3-4872-9549-03ca140c61b2
 template <typename A>
 struct Box {
     A *ptr = nullptr;
@@ -61,12 +62,15 @@ struct Box {
         return *lhs.ptr == *rhs.ptr;
     }
 };
+// a1f81cb9-ebb3-4872-9549-03ca140c61b2 end
 
+// 45a64b08-8217-4baf-b19b-146434de1e44
 /** Construct a Box<A>, forwarding @p args to A's constructor. */
 template <typename A, typename... Args>
 constexpr auto make_box(Args &&...args) -> Box<A> {
     return Box<A>(new A(std::forward<Args>(args)...));
 }
+// 45a64b08-8217-4baf-b19b-146434de1e44 end
 
 } // namespace smd::fixpoint
 

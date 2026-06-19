@@ -25,6 +25,7 @@ auto eval(std::string_view src) -> Res {
     return program_r.value()(env);
 }
 
+// a817bd64-c6de-4e00-a16b-4df6c46e183d
 constexpr auto constexpr_eval(std::string_view src) -> Res {
     auto program_r = fixpoint_eval::compile_fixpoint<32, 16>(src);
     if (!program_r.has_value())
@@ -32,7 +33,9 @@ constexpr auto constexpr_eval(std::string_view src) -> Res {
     auto env = closure::default_env<CompT, 16>();
     return program_r.value()(env);
 }
+// a817bd64-c6de-4e00-a16b-4df6c46e183d end
 
+// c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5
 static_assert(std::get<int>(constexpr_eval("42").value()) == 42);
 static_assert(std::get<bool>(constexpr_eval("#t").value()) == true);
 static_assert(std::get<int>(constexpr_eval("(+ 1 2)").value()) == 3);
@@ -46,6 +49,7 @@ static_assert(
     std::get<int>(constexpr_eval("(let ((x 1) (y 2)) (+ x y))").value()) == 3);
 static_assert(std::get<int>(constexpr_eval("(let* ((x 1) (y (+ x 1))) (+ x y))")
                                 .value()) == 3);
+// c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5 end
 
 } // namespace
 

@@ -13,11 +13,13 @@
 /// declarations explicit and avoids accidentally pulling in the full
 /// Execution26 ADL surface into downstream code.
 namespace smd::smdscheme::sender_v {
+// 7a257e82-8d19-480a-974c-a088b7681250
 using beman::execution26::just;
 using beman::execution26::let_value;
 using beman::execution26::sync_wait;
 using beman::execution26::then;
 using beman::execution26::when_all;
+// 7a257e82-8d19-480a-974c-a088b7681250 end
 
 /// Type alias for the Beman async task coroutine type.
 /// @tparam T The value type produced by the coroutine.
