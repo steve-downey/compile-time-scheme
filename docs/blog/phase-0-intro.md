@@ -102,5 +102,4 @@ limits, fixpoint types, and the Mendler recursion scheme.
 # References
 
 Steele, Guy L. (1977). *Lambda: The Ultimate GOTO*, MIT AI Memo 443.
-
-Appel, Andrew W. (1992). *Compiling with Continuations*, Cambridge University Press.
+[cite:@steele1977lambda]

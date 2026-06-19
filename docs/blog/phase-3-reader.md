@@ -32,7 +32,7 @@ struct datum_boolean { bool value{}; };
 ```
 
 The recursive cases — list and quote — need to refer to child datums. This is
-where the fixpoint pattern from Phase 1 earns its keep.
+where the open-recursive fixpoint pattern earns its keep.
 
 A `datum_list` holds a `static_vector` of `arena_box` handles:
 
@@ -83,7 +83,7 @@ using datum_type =
     foundation::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
 ```
 
-`foundation::fix<F>` (from Phase 1) wraps `F<fix<F>>` so `datum_type` is the
+`foundation::fix<F>` wraps `F<fix<F>>` so `datum_type` is the
 recursive type. The template parameters `MaxNodes` and `MaxList` are compile-time
 capacities: the arena can hold at most `MaxNodes` nodes, and each list can
 hold at most `MaxList` children. Both are statically checked — no allocation,
@@ -255,5 +255,3 @@ No heap allocation, no runtime cost.
 
 McCarthy, John (1960). *Recursive Functions of Symbolic Expressions and Their
 Computation by Machine, Part I*, Communications of the ACM. [cite:@mccarthy1960recursive]
-
-Steele, Guy L. (1978). *RABBIT: A Compiler for SCHEME*, MIT AI-TR-474. [cite:@steele1978rabbit]

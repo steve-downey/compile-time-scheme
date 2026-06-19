@@ -116,9 +116,11 @@ struct closure {
 };
 ```
 
-`node` is a non-owning pointer into the core arena. The program tree lives
-for the entire evaluation; closures hold raw pointers into it. There is no
-ownership question: the arena outlives all closures.
+`node` is a non-owning pointer into the computation tree
+(`Comp<MaxList>` — the `Fix<CompF>` tree from the previous phase). The
+program object owns that tree for the entire evaluation; closures hold raw
+pointers into it. There is no ownership question: the program outlives all
+closures.
 
 `captured` is an owned deep copy of the environment at the moment the lambda
 was evaluated. When the evaluator encounters a `lambda` form, it freezes the
@@ -225,8 +227,9 @@ struct constexpr_box {
 is deleted. `constexpr_box` provides the necessary deep-copy semantics while
 still destroying via `delete`. It appears here for the same reason `Box`
 appears in `comp_f_factory`: breaking a recursive type relationship that the
-C++ type system cannot yet express with a standard vocabulary type. The
-`std::indirect` proposal would replace both, but until that lands, the raw
+C++ type system cannot yet express with a standard vocabulary type. `std::indirect` [cite:@p3019indirect] would replace both, but its explicit
+default constructor blocks aggregate initialization inside `static_vector`,
+and full `constexpr` support is not yet available in GCC 16 — so the raw
 pointer workaround is the mountain path I walk.
 
 # What Comes Next
@@ -239,4 +242,7 @@ produces a `closure::value`.
 # References
 
 Abelson, Harold and Sussman, Gerald Jay (1996). *Structure and Interpretation
-of Computer Programs*, 2nd ed., MIT Press.
+of Computer Programs*, 2nd ed., MIT Press. [cite:@abelson1996sicp]
+
+P3019R13 (2024). *std::indirect and std::polymorphic*, ISO C++ Committee.
+[cite:@p3019indirect]

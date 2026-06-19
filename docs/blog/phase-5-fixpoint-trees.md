@@ -82,8 +82,10 @@ constexpr auto make_box(Args &&...args) -> Box<A> {
 ```
 
 `Box` uses `new`/`delete`, which are `constexpr` in C++20 for transient
-allocations. This is a workaround until `std::indirect` has the right
-constexpr semantics [cite:@meijer1991functional].
+allocations. The natural C++26 type for this role is `std::indirect`
+[cite:@p3019indirect], but its explicit default constructor blocks
+aggregate initialization inside `static_vector`, and full `constexpr`
+support is not yet available in GCC 16. `Box` avoids both constraints.
 
 # The CompF Functor
 
@@ -289,3 +291,6 @@ Prentice Hall.
 
 Meijer, Erik, Fokkinga, Maarten, and Paterson, Ross (1991). *Functional
 Programming with Bananas, Lenses, Envelopes and Barbed Wire*, FPCA.
+
+P3019R13 (2024). *std::indirect and std::polymorphic*, ISO C++ Committee.
+[cite:@p3019indirect]

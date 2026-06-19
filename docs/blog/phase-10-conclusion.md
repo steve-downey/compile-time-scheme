@@ -81,11 +81,12 @@ open-recursive fixpoint combinator [cite:@meijer1991bananas].
 
 ```cpp
 // src/smd/smdscheme/sender/comp_tree.hpp
-template <typename A, int MaxList>
-struct comp_tree {
+template <int MaxList>
+struct comp_f_factory {
+    template <typename A>
     using type = std::variant<
-        comp_literal,
-        comp_var,
+        comp_pure,
+        comp_lookup,
         comp_if<A>,
         comp_lambda<A, MaxList>,
         comp_apply<A, MaxList>>;
@@ -114,20 +115,20 @@ recursion by threading the recursive call as an argument:
 
 ```cpp
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
-auto mendler_run(Fix<CompF> const& tree, Env env) -> Res {
+auto mendler_run(Comp<MaxList> const& comp, Env env) -> Res {
     return std::visit(overloaded{
-        [&](comp_literal const& lit) -> Res { ... },
-        [&](comp_var const& var) -> Res { ... },
-        [&](comp_if<Comp> const& if_) -> Res {
+        [&](comp_pure const& p) -> Res { ... },
+        [&](comp_lookup const& l) -> Res { ... },
+        [&](comp_if<CompT> const& if_) -> Res {
             auto cond = mendler_run(*if_.cond, env);
             ...
         },
-        [&](comp_apply<Comp, MaxList> const& app) -> Res {
+        [&](comp_apply<CompT, MaxList> const& app) -> Res {
             auto func = mendler_run(*app.func, env);
             ...
         },
         ...
-    }, tree.unfix());
+    }, smd::fixpoint::unwrap_fix(comp));
 }
 ```
 
@@ -145,13 +146,13 @@ argument senders are combined with `when_all`:
 
 ```cpp
 // src/smd/smdscheme/sender/sender_mendler_eval.hpp
-auto eval_arg0 = ex::then(ex::just(0), [&](int) {
+auto eval_arg0 = sender_v::then(sender_v::just(0), [&](int) {
     return sender_mendler_run(*args[0], env);
 });
-auto eval_arg1 = ex::then(ex::just(0), [&](int) {
+auto eval_arg1 = sender_v::then(sender_v::just(0), [&](int) {
     return sender_mendler_run(*args[1], env);
 });
-return ex::then(ex::when_all(eval_arg0, eval_arg1), apply_ff);
+return sender_v::then(sender_v::when_all(eval_arg0, eval_arg1), apply_builtin);
 ```
 
 With `sync_wait` as the scheduler, execution is inline-sequential. A
@@ -228,7 +229,8 @@ simplifies.
 
 **call/cc**: First-class continuations. In a Mendler interpreter, this means
 reifying the "recurse" function as a value. The CPS structure is already
-implicit in the recursive call pattern [cite:@appel1992compiling].
+implicit in the recursive call pattern [cite:@steele1977lambda]
+[cite:@appel1992compiling].
 
 **set!**: Mutable bindings require a store — an indirection from environment
 names to mutable locations. A boxing transformation pass can introduce this

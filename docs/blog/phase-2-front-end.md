@@ -185,7 +185,7 @@ Every delimiter is parsed with two lines: `char_p('(')`, `char_p(')')`,
 
 With the primitives in place, I can lift Applicative composition into the
 parser library [cite:@mcbride2008applicative]. The idea: build complex parsers
-by combining simple ones without monadic bind. Sequential composition and
+by combining simple ones without monadic bind [cite:@hutton1992monadic]. Sequential composition and
 transformation are enough for a Scheme lexer.
 
 `map` applies a function to a successfully parsed value:
@@ -328,7 +328,7 @@ template <parser_like P>
 }
 ```
 
-This is the standard Parsec approach: make each token parser responsible for
+This is the standard Parsec approach [cite:@leijen2001parsec]: make each token parser responsible for
 the whitespace that follows it. `(if #t 1 2)` and `( if #t 1 2 )` parse
 identically.
 
