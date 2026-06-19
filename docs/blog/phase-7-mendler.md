@@ -273,7 +273,7 @@ argument evaluations as concurrent sender chains and joining them with
 Bird, Richard S. and de Moor, Oege (1997). *The Algebra of Programming*,
 Prentice Hall.
 
-Mendler, Nax Paul (1991). *Recursive Types and Type Constraints*, PhD thesis,
+Mendler, N. Paul (1991). *Recursive Types and Type Constraints*, PhD thesis,
 Cornell University.
 
 Abel, Andreas and Pientka, Brigitte (2012). *Wellfounded Recursion with
