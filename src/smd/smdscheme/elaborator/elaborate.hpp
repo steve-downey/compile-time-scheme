@@ -178,6 +178,146 @@ constexpr auto elaborate_list(
 
             return core{core_f{std::move(lam)}};
         }
+
+        if (name == "let") {
+            // (let ((name expr) ...) body) → ((lambda (name ...) body) expr
+            // ...)
+            if (lst.elements.size() != 3)
+                return foundation::parse_error{
+                    {}, "let: expected bindings and body"};
+
+            auto const &bindings_node = datum_arena.get(lst.elements[1]);
+            using DatumList =
+                reader::datum_list<reader::datum_type<MaxNodes, MaxList>,
+                                   MaxNodes, MaxList>;
+            if (!std::holds_alternative<DatumList>(bindings_node.inner))
+                return foundation::parse_error{{},
+                                               "let: bindings must be a list"};
+
+            auto const &bindings = std::get<DatumList>(bindings_node.inner);
+
+            using DatumT = reader::datum_type<MaxNodes, MaxList>;
+            using DatumHandle = foundation::arena_box<DatumT, MaxNodes>;
+
+            core_lambda<core, MaxNodes, MaxList> lam{};
+            foundation::static_vector<DatumHandle, MaxList> arg_ids;
+
+            for (int i = 0; i < bindings.elements.size(); ++i) {
+                auto const &pair_node = datum_arena.get(bindings.elements[i]);
+                if (!std::holds_alternative<DatumList>(pair_node.inner))
+                    return foundation::parse_error{
+                        {}, "let: each binding must be a list"};
+                auto const &pair = std::get<DatumList>(pair_node.inner);
+                if (pair.elements.size() != 2)
+                    return foundation::parse_error{
+                        {}, "let: each binding must have 2 elements"};
+
+                auto const &name_node = datum_arena.get(pair.elements[0]);
+                if (!std::holds_alternative<reader::datum_symbol>(
+                        name_node.inner))
+                    return foundation::parse_error{
+                        {}, "let: binding name must be a symbol"};
+                auto p_name =
+                    std::get<reader::datum_symbol>(name_node.inner).name;
+
+                for (auto const &existing : lam.params) {
+                    if (existing == p_name)
+                        return foundation::parse_error{
+                            {}, "let: duplicate binding name"};
+                }
+                lam.params.push_back(p_name);
+                arg_ids.push_back(pair.elements[1]);
+            }
+
+            auto body_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[2]), datum_arena, core_arena);
+            if (!body_r.has_value())
+                return body_r;
+            lam.body = make_arena_box(core_arena, std::move(body_r.value()));
+
+            core_application<core, MaxNodes, MaxList> app{};
+            app.func = make_arena_box(core_arena, core{core_f{std::move(lam)}});
+
+            for (int i = 0; i < arg_ids.size(); ++i) {
+                auto arg_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(arg_ids[i]), datum_arena, core_arena);
+                if (!arg_r.has_value())
+                    return arg_r;
+                app.args.push_back(
+                    make_arena_box(core_arena, std::move(arg_r.value())));
+            }
+
+            return core{core_f{std::move(app)}};
+        }
+
+        if (name == "let*") {
+            // (let* ((name expr) ...) body)
+            // → nested lets: (let ((n1 e1)) (let ((n2 e2)) ... body))
+            if (lst.elements.size() != 3)
+                return foundation::parse_error{
+                    {}, "let*: expected bindings and body"};
+
+            auto const &bindings_node = datum_arena.get(lst.elements[1]);
+            using DatumList =
+                reader::datum_list<reader::datum_type<MaxNodes, MaxList>,
+                                   MaxNodes, MaxList>;
+            if (!std::holds_alternative<DatumList>(bindings_node.inner))
+                return foundation::parse_error{{},
+                                               "let*: bindings must be a list"};
+
+            auto const &bindings = std::get<DatumList>(bindings_node.inner);
+
+            if (bindings.elements.empty()) {
+                return elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[2]), datum_arena, core_arena);
+            }
+
+            // Elaborate innermost binding outward: build nested
+            // ((lambda (nK) body) eK) from the last binding, then wrap
+            // each preceding binding around it.
+            auto inner = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[2]), datum_arena, core_arena);
+            if (!inner.has_value())
+                return inner;
+
+            for (int i = bindings.elements.size() - 1; i >= 0; --i) {
+                auto const &pair_node = datum_arena.get(bindings.elements[i]);
+                if (!std::holds_alternative<DatumList>(pair_node.inner))
+                    return foundation::parse_error{
+                        {}, "let*: each binding must be a list"};
+                auto const &pair = std::get<DatumList>(pair_node.inner);
+                if (pair.elements.size() != 2)
+                    return foundation::parse_error{
+                        {}, "let*: each binding must have 2 elements"};
+
+                auto const &bname_node = datum_arena.get(pair.elements[0]);
+                if (!std::holds_alternative<reader::datum_symbol>(
+                        bname_node.inner))
+                    return foundation::parse_error{
+                        {}, "let*: binding name must be a symbol"};
+                auto bname =
+                    std::get<reader::datum_symbol>(bname_node.inner).name;
+
+                auto val_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(pair.elements[1]), datum_arena, core_arena);
+                if (!val_r.has_value())
+                    return val_r;
+
+                core_lambda<core, MaxNodes, MaxList> lam{};
+                lam.params.push_back(bname);
+                lam.body = make_arena_box(core_arena, std::move(inner.value()));
+
+                core_application<core, MaxNodes, MaxList> app{};
+                app.func =
+                    make_arena_box(core_arena, core{core_f{std::move(lam)}});
+                app.args.push_back(
+                    make_arena_box(core_arena, std::move(val_r.value())));
+
+                inner = foundation::result<core>{core{core_f{std::move(app)}}};
+            }
+
+            return inner;
+        }
     }
 
     // Regular application

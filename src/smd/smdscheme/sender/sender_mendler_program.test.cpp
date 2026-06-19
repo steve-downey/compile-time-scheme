@@ -14,8 +14,8 @@ using namespace smd::smdscheme;
 using namespace std::string_view_literals;
 
 using CompT = fixpoint_eval::Comp<16>;
-using Val   = closure::value<CompT>;
-using Res   = foundation::result<Val>;
+using Val = closure::value<CompT>;
+using Res = foundation::result<Val>;
 
 auto eval(std::string_view src) -> Res {
     auto program_r = sender_mendler::compile_sender_mendler<32, 16>(src);
@@ -114,6 +114,46 @@ TEST_CASE("SenderMendlerTest - ClosureCapture") {
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 15);
+}
+
+TEST_CASE("SenderMendlerTest - LetSimple") {
+    auto r = eval("(let ((x 1)) x)");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+}
+
+TEST_CASE("SenderMendlerTest - LetMultipleBindings") {
+    auto r = eval("(let ((x 1) (y 2)) (+ x y))");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("SenderMendlerTest - LetWithBody") {
+    auto r = eval("(let ((x 10)) (+ x 1))");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 11);
+}
+
+TEST_CASE("SenderMendlerTest - LetStarSequential") {
+    auto r = eval("(let* ((x 1) (y (+ x 1))) (+ x y))");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("SenderMendlerTest - LetStarThreeBindings") {
+    auto r = eval("(let* ((x 10) (y (* x 2)) (z (+ y 1))) z)");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 21);
+}
+
+TEST_CASE("SenderMendlerTest - LetBadBindingName") {
+    auto r = eval("(let ((1 2)) 0)");
+    REQUIRE_FALSE(r.has_value());
+}
+
+TEST_CASE("SenderMendlerTest - LetBadBindingArity") {
+    auto r = eval("(let ((x)) 0)");
+    REQUIRE_FALSE(r.has_value());
 }
 
 TEST_CASE("SenderMendlerTest - HeaderIsIdempotent") { REQUIRE(true); }
