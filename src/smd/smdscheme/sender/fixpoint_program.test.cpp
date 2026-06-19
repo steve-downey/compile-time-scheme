@@ -25,6 +25,28 @@ auto eval(std::string_view src) -> Res {
     return program_r.value()(env);
 }
 
+constexpr auto constexpr_eval(std::string_view src) -> Res {
+    auto program_r = fixpoint_eval::compile_fixpoint<32, 16>(src);
+    if (!program_r.has_value())
+        return Res{program_r.error()};
+    auto env = closure::default_env<CompT, 16>();
+    return program_r.value()(env);
+}
+
+static_assert(std::get<int>(constexpr_eval("42").value()) == 42);
+static_assert(std::get<bool>(constexpr_eval("#t").value()) == true);
+static_assert(std::get<int>(constexpr_eval("(+ 1 2)").value()) == 3);
+static_assert(std::get<int>(constexpr_eval("(+ 1 (* 2 3))").value()) == 7);
+static_assert(std::get<int>(constexpr_eval("(if #t 1 2)").value()) == 1);
+static_assert(std::get<int>(constexpr_eval("(if #f 1 2)").value()) == 2);
+static_assert(
+    std::get<int>(constexpr_eval("((lambda (x) (+ x 1)) 41)").value()) == 42);
+static_assert(std::get<int>(constexpr_eval("(let ((x 1)) x)").value()) == 1);
+static_assert(
+    std::get<int>(constexpr_eval("(let ((x 1) (y 2)) (+ x y))").value()) == 3);
+static_assert(std::get<int>(constexpr_eval("(let* ((x 1) (y (+ x 1))) (+ x y))")
+                                .value()) == 3);
+
 } // namespace
 
 TEST_CASE("FixpointEvalTest - IntegerLiteral") {
@@ -114,6 +136,46 @@ TEST_CASE("FixpointEvalTest - ClosureCapture") {
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 15);
+}
+
+TEST_CASE("FixpointEvalTest - LetSimple") {
+    auto r = eval("(let ((x 1)) x)");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+}
+
+TEST_CASE("FixpointEvalTest - LetMultipleBindings") {
+    auto r = eval("(let ((x 1) (y 2)) (+ x y))");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("FixpointEvalTest - LetWithBody") {
+    auto r = eval("(let ((x 10)) (+ x 1))");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 11);
+}
+
+TEST_CASE("FixpointEvalTest - LetStarSequential") {
+    auto r = eval("(let* ((x 1) (y (+ x 1))) (+ x y))");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("FixpointEvalTest - LetStarThreeBindings") {
+    auto r = eval("(let* ((x 10) (y (* x 2)) (z (+ y 1))) z)");
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 21);
+}
+
+TEST_CASE("FixpointEvalTest - LetBadBindingName") {
+    auto r = eval("(let ((1 2)) 0)");
+    REQUIRE_FALSE(r.has_value());
+}
+
+TEST_CASE("FixpointEvalTest - LetBadBindingArity") {
+    auto r = eval("(let ((x)) 0)");
+    REQUIRE_FALSE(r.has_value());
 }
 
 TEST_CASE("FixpointEvalTest - HeaderIsIdempotent") { REQUIRE(true); }

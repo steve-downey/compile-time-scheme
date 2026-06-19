@@ -42,12 +42,13 @@ template <int MaxList, int MaxBindings>
     closure::env<fixpoint_eval::Comp<MaxList>, MaxBindings> const &env)
     -> foundation::result<closure::value<fixpoint_eval::Comp<MaxList>>> {
 
-    static_assert(MaxBindings == 16,
-                  "sender_mendler_run currently requires closure::env<Core, 16>");
+    static_assert(
+        MaxBindings == 16,
+        "sender_mendler_run currently requires closure::env<Core, 16>");
 
-    using CompT  = fixpoint_eval::Comp<MaxList>;
-    using Val    = closure::value<CompT>;
-    using Res    = foundation::result<Val>;
+    using CompT = fixpoint_eval::Comp<MaxList>;
+    using Val = closure::value<CompT>;
+    using Res = foundation::result<Val>;
 
     return std::visit(
         smd::fixpoint::overloaded{
@@ -70,8 +71,7 @@ template <int MaxList, int MaxBindings>
             // comp_lookup: variable lookup via sender
             [&env](fixpoint_eval::comp_lookup const &l) -> Res {
                 return detail::unwrap_sender<Res>(sender_v::then(
-                    sender_v::just(l.name),
-                    [&env](std::string_view n) -> Res {
+                    sender_v::just(l.name), [&env](std::string_view n) -> Res {
                         return env.lookup(n);
                     }));
             },
@@ -79,9 +79,8 @@ template <int MaxList, int MaxBindings>
             // comp_if: lazy branch selection — evaluate condition, then only
             // the chosen branch
             [&env](fixpoint_eval::comp_if<CompT> const &ci) -> Res {
-                auto cond_r = detail::unwrap_sender<Res>(sender_v::then(
-                    sender_v::just(0),
-                    [&](int) -> Res {
+                auto cond_r = detail::unwrap_sender<Res>(
+                    sender_v::then(sender_v::just(0), [&](int) -> Res {
                         return sender_mendler_run<MaxList, MaxBindings>(
                             *ci.cond, env);
                     }));
@@ -92,28 +91,27 @@ template <int MaxList, int MaxBindings>
                 bool taken = !std::holds_alternative<bool>(cond_r.value()) ||
                              std::get<bool>(cond_r.value());
 
-                return detail::unwrap_sender<Res>(sender_v::then(
-                    sender_v::just(0),
-                    [&](int) -> Res {
+                return detail::unwrap_sender<Res>(
+                    sender_v::then(sender_v::just(0), [&](int) -> Res {
                         return sender_mendler_run<MaxList, MaxBindings>(
                             taken ? *ci.cons : *ci.alt, env);
                     }));
             },
 
             // comp_lambda: capture env and node pointer into closure
-            [&env, &comp](fixpoint_eval::comp_lambda<CompT, MaxList> const &) -> Res {
+            [&env,
+             &comp](fixpoint_eval::comp_lambda<CompT, MaxList> const &) -> Res {
                 return detail::unwrap_sender<Res>(
                     sender_v::just(Res{Val{closure::closure<CompT>{
-                        &comp,
-                        closure::constexpr_box<closure::env<CompT, 16>>{
-                            new closure::env<CompT, 16>{env}}}}}));
+                        &comp, closure::constexpr_box<closure::env<CompT, 16>>{
+                                   new closure::env<CompT, 16>{env}}}}}));
             },
 
             // comp_apply: evaluate function, dispatch on its type
-            [&env, &comp](fixpoint_eval::comp_apply<CompT, MaxList> const &app) -> Res {
-                auto func_r = detail::unwrap_sender<Res>(sender_v::then(
-                    sender_v::just(0),
-                    [&](int) -> Res {
+            [&env, &comp](
+                fixpoint_eval::comp_apply<CompT, MaxList> const &app) -> Res {
+                auto func_r = detail::unwrap_sender<Res>(
+                    sender_v::then(sender_v::just(0), [&](int) -> Res {
                         return sender_mendler_run<MaxList, MaxBindings>(
                             *app.func, env);
                     }));
@@ -131,23 +129,21 @@ template <int MaxList, int MaxBindings>
                             // Deferred senders — evaluation happens inside
                             // when_all, not before it
                             auto s0 = sender_v::then(
-                                sender_v::just(0),
-                                [&](int) -> Res {
-                                    return sender_mendler_run<
-                                        MaxList, MaxBindings>(
+                                sender_v::just(0), [&](int) -> Res {
+                                    return sender_mendler_run<MaxList,
+                                                              MaxBindings>(
                                         *app.args[0], env);
                                 });
                             auto s1 = sender_v::then(
-                                sender_v::just(0),
-                                [&](int) -> Res {
-                                    return sender_mendler_run<
-                                        MaxList, MaxBindings>(
+                                sender_v::just(0), [&](int) -> Res {
+                                    return sender_mendler_run<MaxList,
+                                                              MaxBindings>(
                                         *app.args[1], env);
                                 });
 
                             return detail::unwrap_sender<Res>(sender_v::then(
-                                sender_v::when_all(
-                                    std::move(s0), std::move(s1)),
+                                sender_v::when_all(std::move(s0),
+                                                   std::move(s1)),
                                 [bi](Res a0r, Res a1r) -> Res {
                                     if (!a0r.has_value())
                                         return a0r;
@@ -168,34 +164,32 @@ template <int MaxList, int MaxBindings>
                         },
 
                         // Closure: sequential arg eval, extend env, eval body
-                        [&env, &app](closure::closure<CompT> const &clo) -> Res {
+                        [&env,
+                         &app](closure::closure<CompT> const &clo) -> Res {
                             auto const &lam_layer =
                                 smd::fixpoint::unwrap_fix(*clo.node);
                             if (!std::holds_alternative<
                                     fixpoint_eval::comp_lambda<CompT, MaxList>>(
                                     lam_layer))
-                                return Res{foundation::parse_error{
-                                    {}, "type error"}};
+                                return Res{
+                                    foundation::parse_error{{}, "type error"}};
 
                             auto const &lam = std::get<
                                 fixpoint_eval::comp_lambda<CompT, MaxList>>(
                                 lam_layer);
 
-                            if (app.args.size() !=
-                                static_cast<size_t>(lam.params.size()))
+                            if (app.args.size() != lam.params.size())
                                 return Res{foundation::parse_error{
                                     {}, "arity mismatch"}};
 
-                            auto new_env =
-                                clo.captured
-                                    ? *clo.captured
-                                    : closure::env<CompT, 16>{env};
+                            auto new_env = clo.captured
+                                               ? *clo.captured
+                                               : closure::env<CompT, 16>{env};
 
-                            for (size_t i = 0; i < app.args.size(); ++i) {
+                            for (int i = 0; i < app.args.size(); ++i) {
                                 auto arg_r =
                                     detail::unwrap_sender<Res>(sender_v::then(
-                                        sender_v::just(0),
-                                        [&](int) -> Res {
+                                        sender_v::just(0), [&](int) -> Res {
                                             return sender_mendler_run<
                                                 MaxList, MaxBindings>(
                                                 *app.args[i], env);
@@ -214,28 +208,26 @@ template <int MaxList, int MaxBindings>
                         },
 
                         // Foreign function: sequential arg eval, call fn
-                        [&env,
-                         &app](closure::foreign_function<CompT> const &ff)
-                            -> Res {
+                        [&env, &app](
+                            closure::foreign_function<CompT> const &ff) -> Res {
                             foundation::static_vector<Val, MaxList>
                                 evaluated_args;
                             for (auto const &arg : app.args) {
                                 auto arg_r =
                                     detail::unwrap_sender<Res>(sender_v::then(
-                                        sender_v::just(0),
-                                        [&](int) -> Res {
+                                        sender_v::just(0), [&](int) -> Res {
                                             return sender_mendler_run<
-                                                MaxList, MaxBindings>(
-                                                *arg, env);
+                                                MaxList, MaxBindings>(*arg,
+                                                                      env);
                                         }));
                                 if (!arg_r.has_value())
                                     return arg_r;
                                 evaluated_args.push_back(arg_r.value());
                             }
                             return detail::unwrap_sender<Res>(sender_v::then(
-                                sender_v::just(std::span<Val const>(
-                                    evaluated_args.begin(),
-                                    evaluated_args.end())),
+                                sender_v::just(
+                                    std::span<Val const>(evaluated_args.begin(),
+                                                         evaluated_args.end())),
                                 [&ff](std::span<Val const> args) -> Res {
                                     return ff.fn(args);
                                 }));

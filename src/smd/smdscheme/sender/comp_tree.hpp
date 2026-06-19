@@ -15,7 +15,6 @@
 #include <functional>
 #include <string_view>
 #include <variant>
-#include <vector>
 
 namespace smd::smdscheme::fixpoint_eval {
 
@@ -59,7 +58,7 @@ struct comp_lambda {
 template <typename A, int MaxList>
 struct comp_apply {
     smd::fixpoint::Box<A> func;
-    std::vector<smd::fixpoint::Box<A>> args;
+    foundation::static_vector<smd::fixpoint::Box<A>, MaxList> args;
 };
 
 /// Factory template producing the open-recursive variant layer for CompF.
@@ -78,7 +77,8 @@ struct comp_f_factory {
 
 /// The concrete recursive computation tree type.
 /// Fix<F> ties the knot: Comp = F<Comp> where F = comp_f_factory<MaxList>.
-/// Children are stored as Box<Comp> (std::indirect) rather than arena handles.
+/// Children are stored as Box<Comp> (constexpr owning pointer) rather than
+/// arena handles.
 ///
 /// @tparam MaxList  Maximum list/argument length.
 template <int MaxList>
@@ -114,9 +114,11 @@ fmap_comp(F &&f,
                     lam.params, smd::fixpoint::make_box<B>(f(*lam.body))};
             },
             [&f](comp_apply<A, MaxList> const &app) -> ResultF {
-                std::vector<B> args_result;
+                foundation::static_vector<smd::fixpoint::Box<B>, MaxList>
+                    args_result;
                 for (auto const &arg : app.args) {
-                    args_result.push_back(std::invoke(f, *arg));
+                    args_result.push_back(
+                        smd::fixpoint::make_box<B>(std::invoke(f, *arg)));
                 }
                 return comp_apply<B, MaxList>{
                     smd::fixpoint::make_box<B>(std::invoke(f, *app.func)),
@@ -215,7 +217,8 @@ core_to_comp(elaborator::core_type<MaxNodes, MaxList> const &node,
                 if (!func_r.has_value())
                     return func_r.error();
 
-                std::vector<smd::fixpoint::Box<CompT>> arg_boxes;
+                foundation::static_vector<smd::fixpoint::Box<CompT>, MaxList>
+                    arg_boxes;
                 for (auto const &arg_box : app.args) {
                     auto arg_r = core_to_comp<MaxNodes, MaxList>(
                         arena.get(arg_box), arena);

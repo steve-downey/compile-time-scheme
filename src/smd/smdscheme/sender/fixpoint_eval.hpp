@@ -129,8 +129,7 @@ mendler_run(Comp<MaxList> const &comp,
                                 std::get<comp_lambda<CompT, MaxList>>(
                                     lam_layer);
 
-                            if (app.args.size() !=
-                                static_cast<size_t>(lam.params.size()))
+                            if (app.args.size() != lam.params.size())
                                 return Res{foundation::parse_error{
                                     {}, "arity mismatch"}};
 
@@ -141,7 +140,7 @@ mendler_run(Comp<MaxList> const &comp,
                                                : closure::env<CompT, 16>{env};
 
                             // Evaluate args in CURRENT env, bind in NEW env
-                            for (size_t i = 0; i < app.args.size(); ++i) {
+                            for (int i = 0; i < app.args.size(); ++i) {
                                 auto arg_r = mendler_run<MaxList, MaxBindings>(
                                     *app.args[i], env);
                                 if (!arg_r.has_value())

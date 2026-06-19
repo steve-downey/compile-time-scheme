@@ -44,7 +44,7 @@ template <int MaxNodes = 32, int MaxList = 16>
 [[nodiscard]] auto compile_sender_mendler(std::string_view src)
     -> foundation::result<sender_mendler_program<MaxList>> {
 
-    using Core     = elaborator::core_type<MaxNodes, MaxList>;
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
     using ProgramT = sender_mendler_program<MaxList>;
 
     foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>, MaxNodes>
@@ -55,8 +55,8 @@ template <int MaxNodes = 32, int MaxList = 16>
         return foundation::result<ProgramT>{dr.error()};
 
     foundation::tree_arena<Core, MaxNodes> core_arena;
-    auto er = elaborator::elaborate<MaxNodes, MaxList>(
-        dr.value().value, arena_dr, core_arena);
+    auto er = elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                       arena_dr, core_arena);
     if (!er.has_value())
         return foundation::result<ProgramT>{er.error()};
 
