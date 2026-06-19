@@ -20,6 +20,8 @@ target_sources(
                 comp_tree.hpp
                 fixpoint_eval.hpp
                 fixpoint_program.hpp
+                sender_mendler_eval.hpp
+                sender_mendler_program.hpp
 )
 target_link_libraries(
     smdscheme.sender
