@@ -123,23 +123,20 @@ constexpr auto cps_dispatch(
                     identity_k<Core>{});
                 if (!cond_r.has_value())
                     return cond_r;
-                bool taken =
-                    !std::holds_alternative<bool>(cond_r.value()) ||
-                    std::get<bool>(cond_r.value());
-                auto const &branch =
-                    taken ? cif.consequent : cif.alternative;
+                bool taken = !std::holds_alternative<bool>(cond_r.value()) ||
+                             std::get<bool>(cond_r.value());
+                auto const &branch = taken ? cif.consequent : cif.alternative;
                 return cps_dispatch<MaxNodes, MaxList>(arena.get(branch), arena,
                                                        cont, env, k);
             },
             [&](elaborator::core_quote const &cq) -> Res {
-                Val v = std::visit(
-                    smd::fixpoint::overloaded{
-                        [](int i) -> Val { return Val{i}; },
-                        [](bool b) -> Val { return Val{b}; },
-                        [](std::string_view sv) -> Val {
-                            return Val{closure::symbol{sv}};
-                        }},
-                    cq.atom);
+                Val v = std::visit(smd::fixpoint::overloaded{
+                                       [](int i) -> Val { return Val{i}; },
+                                       [](bool b) -> Val { return Val{b}; },
+                                       [](std::string_view sv) -> Val {
+                                           return Val{closure::symbol{sv}};
+                                       }},
+                                   cq.atom);
                 auto r = cont(v);
                 if (!r.has_value())
                     return r;
@@ -178,8 +175,8 @@ constexpr auto cps_dispatch(
                             if (!arg0_r.has_value())
                                 return arg0_r;
                             if (!std::holds_alternative<int>(arg0_r.value()))
-                                return Res{foundation::parse_error{
-                                    {}, "type error"}};
+                                return Res{
+                                    foundation::parse_error{{}, "type error"}};
                             int a = std::get<int>(arg0_r.value());
 
                             auto arg1_r = cps_dispatch<MaxNodes, MaxList>(
@@ -188,8 +185,8 @@ constexpr auto cps_dispatch(
                             if (!arg1_r.has_value())
                                 return arg1_r;
                             if (!std::holds_alternative<int>(arg1_r.value()))
-                                return Res{foundation::parse_error{
-                                    {}, "type error"}};
+                                return Res{
+                                    foundation::parse_error{{}, "type error"}};
                             int b = std::get<int>(arg1_r.value());
 
                             Val app_val;
@@ -206,28 +203,22 @@ constexpr auto cps_dispatch(
                         [&](closure::closure<Core> const &clo) -> Res {
                             auto const &lam_node = *clo.node;
 
-                            if (!std::holds_alternative<
-                                    elaborator::core_lambda<Core, MaxNodes,
-                                                            MaxList>>(
-                                    lam_node.inner))
-                                return Res{foundation::parse_error{
-                                    {}, "type error"}};
-                            auto const &lam = std::get<
-                                elaborator::core_lambda<Core, MaxNodes,
-                                                        MaxList>>(
-                                lam_node.inner);
+                            if (!std::holds_alternative<elaborator::core_lambda<
+                                    Core, MaxNodes, MaxList>>(lam_node.inner))
+                                return Res{
+                                    foundation::parse_error{{}, "type error"}};
+                            auto const &lam = std::get<elaborator::core_lambda<
+                                Core, MaxNodes, MaxList>>(lam_node.inner);
                             if (app.args.size() != lam.params.size())
                                 return Res{foundation::parse_error{
                                     {}, "arity mismatch"}};
 
-                            auto new_env =
-                                clo.captured ? *clo.captured : env;
+                            auto new_env = clo.captured ? *clo.captured : env;
                             for (int i = 0; i < app.args.size(); ++i) {
-                                auto arg_r =
-                                    cps_dispatch<MaxNodes, MaxList>(
-                                        arena.get(app.args[i]), arena,
-                                        identity_k<Core>{}, env,
-                                        identity_k<Core>{});
+                                auto arg_r = cps_dispatch<MaxNodes, MaxList>(
+                                    arena.get(app.args[i]), arena,
+                                    identity_k<Core>{}, env,
+                                    identity_k<Core>{});
                                 if (!arg_r.has_value())
                                     return arg_r;
                                 new_env.define(lam.params[i], arg_r.value());
@@ -241,19 +232,17 @@ constexpr auto cps_dispatch(
                             foundation::static_vector<Val, MaxNodes>
                                 evaluated_args;
                             for (auto const &arg_id : app.args) {
-                                auto arg_r =
-                                    cps_dispatch<MaxNodes, MaxList>(
-                                        arena.get(arg_id), arena,
-                                        identity_k<Core>{}, env,
-                                        identity_k<Core>{});
+                                auto arg_r = cps_dispatch<MaxNodes, MaxList>(
+                                    arena.get(arg_id), arena,
+                                    identity_k<Core>{}, env,
+                                    identity_k<Core>{});
                                 if (!arg_r.has_value())
                                     return arg_r;
                                 evaluated_args.push_back(arg_r.value());
                             }
 
                             auto ff_r = ff.fn(std::span<Val const>(
-                                evaluated_args.begin(),
-                                evaluated_args.end()));
+                                evaluated_args.begin(), evaluated_args.end()));
                             if (!ff_r.has_value())
                                 return Res{ff_r.error()};
 
@@ -278,8 +267,9 @@ constexpr auto cps_dispatch(
             },
             [&](elaborator::core_define<Core, MaxNodes> const &) -> Res {
                 return Res{foundation::parse_error{
-                    {}, "cps_dispatch: define not supported in expression "
-                        "context"}};
+                    {},
+                    "cps_dispatch: define not supported in expression "
+                    "context"}};
             }},
         node.inner);
 }

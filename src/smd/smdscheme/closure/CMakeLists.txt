@@ -9,4 +9,7 @@ target_sources(
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
             FILES value.hpp cps_code.hpp closure_program.hpp eval_direct.hpp
 )
-target_link_libraries(smdscheme.closure PUBLIC smdscheme.elaborator smd.fixpoint)
+target_link_libraries(
+    smdscheme.closure
+    PUBLIC smdscheme.elaborator smd.fixpoint
+)

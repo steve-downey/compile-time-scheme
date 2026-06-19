@@ -6,13 +6,12 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <concepts>
 #include <string>
 
 using smd::fixpoint::Box;
 using smd::fixpoint::make_box;
 
-static_assert(std::same_as<Box<int>, std::indirect<int>>);
+static_assert(std::is_default_constructible_v<Box<int>>);
 
 TEST_CASE("Box - MakeBoxInt") {
     auto b = make_box<int>(42);

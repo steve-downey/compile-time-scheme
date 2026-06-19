@@ -81,7 +81,10 @@ It controls recursion explicitly:
 
 ## The `CompF` Functor
 
-`CompF` mirrors the structure of the core AST but replaces `arena_box` handles with `Box<A>` (heap pointers).
+`CompF` mirrors the structure of the core AST but replaces `arena_box` handles with `Box<A>`, a custom constexpr-capable owning pointer.
+`Box<A>` is not `std::indirect`: `std::indirect`'s explicit default constructor blocks aggregate initialization in `static_vector`,
+and constexpr support for `std::indirect` is not yet available in GCC16.
+`Box<A>` avoids both constraints.
 
 ```cpp
 struct comp_pure { std::variant<int, bool, std::string_view> atom; };
@@ -112,6 +115,10 @@ using Comp = Fix<comp_f_factory<MaxList>::template type>;
 If `comp_pure` stored `closure::value<Comp>`, the variant would have a circular type dependency at instantiation time.
 By limiting `comp_pure` to literal atoms, we break the cycle.
 The interpreter converts atoms to values at evaluation time via a simple `std::visit`.
+
+**Why `comp_apply` uses `static_vector<Box<A>, MaxList>` for args** (not `std::vector`):
+`static_vector` has no heap allocator and is constexpr-capable; `MaxList` is a compile-time bound matching the pipeline's list limit.
+`std::vector` would prevent constexpr evaluation and require a heap allocator at constant-evaluation time.
 
 ## Two-Level Fixpoint: CoreF → CompF
 
@@ -194,6 +201,48 @@ step 4: apply
 The tree structure (and its parallelism) would be lost.
 `Fix<CompF>` preserves it.
 
+## Sender-Based Mendler Interpreter
+
+`sender_mendler_run` has the same signature and semantics as `mendler_run` but wraps each sub-expression evaluation as a deferred sender:
+
+```cpp
+// src/smd/smdscheme/sender/sender_mendler_eval.hpp
+// Each sub-expression is a deferred sender via then(just(0), lambda)
+auto s0 = sender_v::then(sender_v::just(0), [&](int) -> Res {
+    return sender_mendler_run<MaxList, MaxBindings>(*app.args[0], env);
+});
+auto s1 = sender_v::then(sender_v::just(0), [&](int) -> Res {
+    return sender_mendler_run<MaxList, MaxBindings>(*app.args[1], env);
+});
+
+// For builtins (arity 2), the two argument senders are combined with when_all
+return detail::unwrap_sender<Res>(sender_v::then(
+    sender_v::when_all(std::move(s0), std::move(s1)),
+    [bi](Res a0r, Res a1r) -> Res { /* apply builtin */ }));
+```
+
+The key dispatch:
+
+- **Builtin application (arity 2)**: the two argument senders are combined with `when_all`, making their structural independence visible to the sender framework.
+- **Closure application**: args are evaluated sequentially in a loop because the runtime-sized args list prevents variadic `when_all`.
+- **Foreign function application**: also sequential for the same reason.
+
+With `sync_wait`, execution is inline-sequential.
+A thread-pool scheduler would parallelize builtin argument evaluation without any code changes to `sender_mendler_run`.
+
+## Let and Let* Desugaring
+
+`let` and `let*` are not new IR nodes — both desugar in the elaborator before the computation tree is built:
+
+- `(let ((x e1) (y e2)) body)` → `((lambda (x y) body) e1 e2)`
+- `(let* ((x e1) (y e2)) body)` → `((lambda (x) ((lambda (y) body) e2)) e1)`
+
+Both are handled in `elaborate.hpp`, not the interpreter.
+No new `Comp` IR nodes are needed: the interpreter sees only `comp_lambda` and `comp_apply`.
+
+`let*` allows each binding to reference earlier bindings because each binding creates a separate lambda scope.
+The sequential nesting of lambdas encodes the left-to-right dependency chain directly in the tree structure.
+
 ## Closure Ownership and Lifetime
 
 A `closure::closure<CompT>` holds:
@@ -222,5 +271,8 @@ The lifecycle is safe.
 - **Anamorphisms and hylomorphisms**: Meijer, E., Fokkinga, M., & Paterson, R. (1991). "Functional Programming with Bananas, Lenses, Envelopes and Barbed Wire." *FPCA*.
 - **Mendler-style recursion**: Mendler, N. P. (1991). "Recursive Types and Type-checking." *PhD thesis*, Cornell University.
 - **Modern recursive patterns**: Abel, A., & Pientka, B. (2012). "Wellfounded Recursion with Copatterns." *ICFP*.
-- **C++26 Execution (senders)**: P2300R9. "std::execution".
-- **C++26 std::indirect**: P3019R13. "Portable assumptions".
+- **C++26 std::indirect**: P3019R13. The standard type for owned indirection;
+  the project uses a custom constexpr `Box<A>` as a workaround until `std::indirect`
+  gains full constexpr support.
+- **C++26 Execution (senders)**: P2300R9. "std::execution". The sender-based
+  Mendler interpreter uses Beman Execution's implementation.

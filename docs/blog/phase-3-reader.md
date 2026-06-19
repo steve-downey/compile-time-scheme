@@ -1,117 +1,43 @@
-<div class="abstract" id="org70e6403">
+<div class="abstract">
 <p>
-Scheme is homoiconic.
-Code is Data, and Data is Code.
-In Phase 3, I build the "Reader", whose sole job is to convert raw strings into the native structural format of Lisp: the nested List, represented as the <code>Datum</code> tree, entirely within C++26 <code>constexpr</code> boundaries.
+The reader takes a string and produces a tree of datums — integers, booleans,
+symbols, lists, and quoted forms. It sees data, not programs. That separation
+is the key to homoiconicity.
 </p>
-
 </div>
 
+# The Reader: Turning Text into Datum Trees
 
-# The Separation of Syntax and Semantics
+Before the elaborator can classify an `if` or a `lambda`, before evaluation
+can run, something has to take the raw source string and produce structure.
+That is the reader's job. It asks only one question of every character sequence:
+is this a valid Scheme datum? It never asks what the datum means.
 
-A common pitfall in compiler design is attempting to parse textual tokens directly into semantic AST nodes. For instance, turning the string `"if"` immediately into an `IfNode` during the first pass. I explicitly resist this temptation.
+This separation is not accidental. It is homoiconicity: the same tree that
+represents data also represents code. The reader produces the same structure
+for the list `(1 2 3)` and for the expression `(+ 1 2)`. The symbol `+` and
+the integer `1` are just atoms — the reader does not know that `+` is addition.
+That knowledge belongs to the elaborator.
 
-When the Reader encounters:
+## Datum Types
 
-```scheme
-(if #t 1 2)
-```
-
-It does not parse a conditional branch. It simply parses a list containing four items: the symbol `'if`, the boolean true, the integer `1`, and the integer `2`.
-
-This strict isolation simplifies my parsing logic immensely. The parser combinators from Phase 2 are used solely to build structural `Datum` types: `Integer`, `Boolean`, `Symbol`, and `List` (cons cells). The Reader doesn't ask semantic questions; it merely shape-matches text into an S-expression.
-
-
-# Surviving `constexpr`: The Flat Arena
-
-In a standard C++ implementation, a recursive tree like a List fundamentally relies on heap allocations. Recursive types require pointers—such as `std::unique_ptr<Datum>` or raw ``Datum*~—because a C++ `struct` cannot contain itself by value. As I discussed in Phase 1, dynamic allocations that outlive a single ~constexpr`` evaluation context are forbidden by the C++ standard.
-
-To overcome this, I represent my recursive tree via a **Flat Arena**. An Arena is a statically sized array—specifically a ~static\_vector~—of nodes. Instead of raw memory pointers, nodes refer to their children using integer indexes, often called a *handle* or a *box* identifier.
+A Scheme datum is one of five things: an integer, a symbol, a boolean, a list,
+or a quoted form. I model each as a struct:
 
 ```cpp
-/// A typed integer handle into a @ref tree_arena.
-///
-/// Stores the index of a node rather than a pointer, keeping the tree
-/// relocatable and constexpr-friendly. The sentinel value @c -1 means
-/// "null" and converts to @c false.
-///
-/// @tparam T        The element type in the arena.
-/// @tparam MaxNodes Capacity of the backing arena (disambiguates handle types).
-template <typename T, int MaxNodes = 1024>
-struct arena_box {
-    int id_{-1}; ///< Index into the arena, or -1 for the null handle.
-
-    constexpr arena_box() = default;
-
-    /// Constructs a handle for the element at @p id.
-    constexpr explicit arena_box(int id) : id_(id) {}
-
-    /// Returns false when this is the null handle.
-    constexpr explicit operator bool() const { return id_ != -1; }
-};
+// src/smd/smdscheme/reader/datum_type.hpp
+struct datum_integer { int value{}; };
+struct datum_symbol  { std::string_view name{}; };
+struct datum_boolean { bool value{}; };
 ```
 
-By abstracting the index into an `arena_box`, my nodes behave semantically like pointers, complete with a null-state equivalent (`id_ == -1`). The backing memory layout is simple and predictable:
+The recursive cases — list and quote — need to refer to child datums. This is
+where the open-recursive fixpoint pattern earns its keep.
+
+A `datum_list` holds a `static_vector` of `arena_box` handles:
 
 ```cpp
-/// A bump-allocator arena of @p T with fixed capacity, usable in constexpr.
-///
-/// Nodes are appended in order; allocation never moves existing nodes.
-/// Access by raw integer index or by @ref arena_box handle.
-///
-/// @tparam T        Element type stored in the arena.
-/// @tparam MaxNodes Maximum number of elements.
-template <typename T, int MaxNodes>
-struct tree_arena {
-    static_vector<T, MaxNodes> data{};
-
-    constexpr tree_arena() = default;
-
-    /// Appends @p value and returns its integer index.
-    constexpr auto allocate(T value) -> int {
-        int id = data.size();
-        data.push_back(std::move(value));
-        return id;
-    }
-
-    /// Returns a reference to the element at @p id.
-    constexpr auto get(int id) -> T & { return data[id]; }
-
-    /// Returns a const reference to the element at @p id.
-    constexpr auto get(int id) const -> const T & { return data[id]; }
-
-    /// Returns a reference to the element referred to by @p b.
-    constexpr auto get(arena_box<T, MaxNodes> b) -> T & { return data[b.id_]; }
-
-    /// Returns a const reference to the element referred to by @p b.
-    constexpr auto get(arena_box<T, MaxNodes> b) const -> const T & {
-        return data[b.id_];
-    }
-};
-```
-
-
-## Benefits of the Flat Arena
-
-1.  ****`constexpr` Compliance****: The arena uses fixed internal arrays, making it valid for returning from `constexpr` contexts intact.
-2.  ****Cache Locality****: Trees allocated node-by-node on the heap suffer from memory fragmentation. An arena stores sibling data sequentially in memory, meaning bulk operations across the tree enjoy massive CPU cache-hit benefits. Memory pre-fetchers love arenatized data patterns.
-3.  ****Immutability and Trivial Copying****: Copying the entire AST simply means performing a bulk trivial copy of a single array buffer. I completely bypass the cost of tracing deep pointer trees to execute deep copies.
-
-
-# Open Recursion and `Datum` Formats
-
-In my design, list elements point into the arena via the `arena_box` handle, side-stepping the incomplete type problem in C++.
-
-```cpp
-/// A Scheme list datum, e.g. @c (a b c).
-///
-/// Elements are stored as @ref foundation::arena_box handles into the reader
-/// arena, avoiding recursion during the parse phase.
-///
-/// @tparam R        The recursive element type (the datum fix-point).
-/// @tparam MaxNodes Arena capacity.
-/// @tparam MaxList  Maximum number of list elements.
+// src/smd/smdscheme/reader/datum_type.hpp
 template <typename R, int MaxNodes, int MaxList>
 struct datum_list {
     foundation::static_vector<foundation::arena_box<R, MaxNodes>, MaxList>
@@ -119,42 +45,213 @@ struct datum_list {
 };
 ```
 
-However, expressing a recursive variant manually requires forward declarations and complex workarounds. A cleaner approach utilized heavily in modern compiler engineering is *Open Recursion* paired with a *Fixed-Point combinator*. By defining a generic factory that takes a recursive self-reference `R` as a type template parameter, my `datum_type` variant only declares exactly one flat layer.
+`R` is the self-referential element type — the recursive datum. Rather than
+embedding a `datum` directly (which would make the struct infinitely large),
+`datum_list` stores integer handles into an arena. The handles are typed as
+`arena_box<R, MaxNodes>`: they name an index in a `tree_arena` of capacity
+`MaxNodes`. The children live in the arena; the list only holds their
+addresses.
+
+`datum_quote` is similar:
 
 ```cpp
-/// Factory template that produces the open-recursive functor used by
-/// @ref datum_type.
-///
-/// The @c type member template is the @c std::variant layer for one level of
-/// the datum tree; @ref foundation::fix ties the recursion.
-///
-/// @tparam MaxNodes Arena capacity.
-/// @tparam MaxList  Maximum list length.
+// src/smd/smdscheme/reader/datum_type.hpp
+template <typename R, int MaxNodes>
+struct datum_quote {
+    foundation::arena_box<R, MaxNodes> quoted{};
+};
+```
+
+## The Open-Recursive Factory
+
+With the leaf and recursive structs in hand, I need to tie the knot. The
+open-recursive factory `datum_f_factory` expresses the one-layer variant
+without committing to the self-reference:
+
+```cpp
+// src/smd/smdscheme/reader/datum_type.hpp
 template <int MaxNodes, int MaxList>
 struct datum_f_factory {
-    /// The one-layer variant type; @p R is the recursive self-reference.
     template <typename R>
     using type = std::variant<datum_integer, datum_symbol, datum_boolean,
                               datum_list<R, MaxNodes, MaxList>,
                               datum_quote<R, MaxNodes>>;
 };
 
-/// The concrete recursive Scheme datum type, formed as the fixed point of
-/// @ref datum_f_factory.
-///
-/// @tparam MaxNodes Maximum tree nodes (arena size).
-/// @tparam MaxList  Maximum list elements per node.
 template <int MaxNodes, int MaxList>
 using datum_type =
     foundation::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
 ```
 
-The `foundation::fix` helper applies the recursive structural knot for me, tying `datum_type` directly into a closed AST structure without needing explicit cyclic data definitions.
+`foundation::fix<F>` wraps `F<fix<F>>` so `datum_type` is the
+recursive type. The template parameters `MaxNodes` and `MaxList` are compile-time
+capacities: the arena can hold at most `MaxNodes` nodes, and each list can
+hold at most `MaxList` children. Both are statically checked — no allocation,
+no overflow.
 
+## Atom Parsers
 
-# Conclusion
+The leaf parsers are built from the combinator library introduced in Phase 2.
+`integer_p` combines `optional(char_p('-'))` with `some<20>(digit)` and
+accumulates the result without any intermediate string allocation:
 
-The Reader cleanly translates human text into the mechanical `Datum` arena. At this stage, my compiler possesses a parsed, memory-safe, and cache-friendly structural representation of the input string. It does not yet know what the code computes—it only knows precisely how it is shaped.
+```cpp
+// src/smd/smdscheme/reader/atom.hpp
+[[nodiscard]] constexpr auto integer_p() {
+    return parser::parser{[](parser::cursor cur)
+                              -> parser::parse_result<atom_integer> {
+        auto sign_r = parser::optional(parser::char_p('-'))(cur);
+        bool negative = sign_r.value().value.has_value();
+        auto after_sign = sign_r.value().rest;
 
+        auto digits = parser::some<20>(parser::satisfy(
+            [](char c) { return c >= '0' && c <= '9'; }, "digit"))(after_sign);
+        if (!digits.has_value()) {
+            return parser::parse_result<atom_integer>{digits.error()};
+        }
+        int sign = negative ? -1 : 1;
+        int n = 0;
+        for (int i = 0; i < digits.value().value.size(); ++i)
+            n = n * 10 + (digits.value().value[i] - '0');
+        return parser::parse_result<atom_integer>{
+            parser::parse_state<atom_integer>{atom_integer{sign * n},
+                                              digits.value().rest}};
+    }};
+}
+```
+
+`symbol_p` uses `is_initial_symbol_char` for the first character and
+`is_symbol_char` for the tail. The result is a `string_view` into the original
+source, so no copy is made [cite:@mccarthy1960recursive]:
+
+```cpp
+// src/smd/smdscheme/reader/atom.hpp
+[[nodiscard]] constexpr auto symbol_p() {
+    return parser::parser{
+        [](parser::cursor cur) -> parser::parse_result<atom_symbol> {
+            auto start = cur;
+            auto first =
+                parser::satisfy(parser::is_initial_symbol_char, "symbol")(cur);
+            if (!first.has_value())
+                return parser::parse_result<atom_symbol>{first.error()};
+            auto rest_cur = first.value().rest;
+            auto tail = parser::many<64>(parser::satisfy(
+                parser::is_symbol_char, "symbol char"))(rest_cur);
+            auto end_cur = tail.value().rest;
+            int len = end_cur.position().offset - start.position().offset;
+            auto name = start.remaining().substr(0, len);
+            return parser::parse_result<atom_symbol>{
+                parser::parse_state<atom_symbol>{atom_symbol{name}, end_cur}};
+        }};
+}
+```
+
+## The Recursive Descent
+
+`read_datum_node` is the heart of the reader. It dispatches on the first
+non-whitespace character and recursively builds the datum tree into the arena:
+
+```cpp
+// src/smd/smdscheme/reader/read_datum.hpp
+template <int MaxNodes, int MaxList>
+constexpr auto read_datum_node(
+    parser::cursor cur,
+    foundation::tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> &arena)
+    -> parser::parse_result<datum_type<MaxNodes, MaxList>> {
+    using datum = datum_type<MaxNodes, MaxList>;
+    using datum_f =
+        typename datum_f_factory<MaxNodes, MaxList>::template type<datum>;
+
+    cur = skip_intertoken_space(cur);
+    if (cur.empty())
+        return foundation::parse_error{cur.position(), "unexpected end of input"};
+
+    char c = cur.peek();
+
+    if (c == '#') { /* boolean */ }
+    if (c == '\'') { /* quote  */ }
+    if (c == '(')  { /* list   */ }
+    /* integer and symbol as fallthrough */
+}
+```
+
+The list case accumulates arena handles as it goes:
+
+```cpp
+    if (c == '(') {
+        parser::cursor after = cur.bump();
+        datum_list<datum, MaxNodes, MaxList> list{};
+        while (true) {
+            after = skip_intertoken_space(after);
+            if (after.peek() == ')')
+                return parser::parse_state<datum>{datum{datum_f{list}}, after.bump()};
+            auto elem = read_datum_node<MaxNodes, MaxList>(after, arena);
+            if (!elem.has_value()) return elem;
+            list.elements.push_back(make_arena_box(arena, elem.value().value));
+            after = elem.value().rest;
+        }
+    }
+```
+
+Each child datum is allocated into the arena with `make_arena_box`, which
+returns an `arena_box` handle. The list stores handles, not values, so there is
+no copying of child trees — only integer indices accumulate in the
+`static_vector`.
+
+## Quote Preservation
+
+The reader does not lower `'x` to `(quote x)`. It preserves the source
+notation as `datum_quote`:
+
+```cpp
+    if (c == '\'') {
+        parser::cursor after = cur.bump();
+        auto inner = read_datum_node<MaxNodes, MaxList>(after, arena);
+        if (!inner.has_value()) return inner;
+        datum d{datum_f{datum_quote<datum, MaxNodes>{
+            make_arena_box(arena, inner.value().value)}}};
+        return parser::parse_state<datum>{d, inner.value().rest};
+    }
+```
+
+The elaborator will later decide what `quote` means. The reader's job is only
+to record what was written.
+
+## The Public Entry Point
+
+`read_datum` strips the `parse_result` wrapper and converts to
+`foundation::result`, which is the error-handling type used throughout the
+pipeline:
+
+```cpp
+// src/smd/smdscheme/reader/read_datum.hpp
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto read_datum(
+    parser::cursor cur,
+    foundation::tree_arena<datum_type<MaxNodes, MaxList>, MaxNodes> &arena)
+    -> foundation::result<parser::parse_state<datum_type<MaxNodes, MaxList>>> {
+    auto r = detail::read_datum_node<MaxNodes, MaxList>(cur, arena);
+    if (!r.has_value()) return r.error();
+    return r.value();
+}
+```
+
+At the call site, the whole reader is `constexpr`:
+
+```cpp
+constexpr auto run() {
+    using namespace smd::smdscheme;
+    foundation::tree_arena<reader::datum_type<64, 16>, 64> arena{};
+    auto r = reader::read_datum(parser::cursor{"(+ 1 2)"}, arena);
+    return r.has_value();
+}
+static_assert(run());
+```
+
+The arena and the datum tree live entirely in constant-evaluation memory.
+No heap allocation, no runtime cost.
 
 # References
+
+McCarthy, John (1960). *Recursive Functions of Symbolic Expressions and Their
+Computation by Machine, Part I*, Communications of the ACM. [cite:@mccarthy1960recursive]

@@ -30,7 +30,7 @@ TEST_CASE("SenderBackendTest - CompileToSender") {
     REQUIRE(program_res.has_value());
 
     auto program = program_res.value();
-    auto e       = smd::smdscheme::closure::default_env<
+    auto e = smd::smdscheme::closure::default_env<
         smd::smdscheme::elaborator::core_type<32, 16>, 16>();
 
     auto res = program(e);

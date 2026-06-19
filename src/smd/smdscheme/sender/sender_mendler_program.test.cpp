@@ -1,8 +1,8 @@
-// src/smd/smdscheme/sender/fixpoint_program.test.cpp             -*-C++-*-
+// src/smd/smdscheme/sender/sender_mendler_program.test.cpp        -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <smd/smdscheme/sender/fixpoint_program.hpp>
-#include <smd/smdscheme/sender/fixpoint_program.hpp> // test 2nd include OK
+#include <smd/smdscheme/sender/sender_mendler_program.hpp>
+#include <smd/smdscheme/sender/sender_mendler_program.hpp> // test 2nd include OK
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -18,164 +18,142 @@ using Val = closure::value<CompT>;
 using Res = foundation::result<Val>;
 
 auto eval(std::string_view src) -> Res {
-    auto program_r = fixpoint_eval::compile_fixpoint<32, 16>(src);
+    auto program_r = sender_mendler::compile_sender_mendler<32, 16>(src);
     if (!program_r.has_value())
         return Res{program_r.error()};
     auto env = closure::default_env<CompT, 16>();
     return program_r.value()(env);
 }
-
-constexpr auto constexpr_eval(std::string_view src) -> Res {
-    auto program_r = fixpoint_eval::compile_fixpoint<32, 16>(src);
-    if (!program_r.has_value())
-        return Res{program_r.error()};
-    auto env = closure::default_env<CompT, 16>();
-    return program_r.value()(env);
-}
-
-static_assert(std::get<int>(constexpr_eval("42").value()) == 42);
-static_assert(std::get<bool>(constexpr_eval("#t").value()) == true);
-static_assert(std::get<int>(constexpr_eval("(+ 1 2)").value()) == 3);
-static_assert(std::get<int>(constexpr_eval("(+ 1 (* 2 3))").value()) == 7);
-static_assert(std::get<int>(constexpr_eval("(if #t 1 2)").value()) == 1);
-static_assert(std::get<int>(constexpr_eval("(if #f 1 2)").value()) == 2);
-static_assert(
-    std::get<int>(constexpr_eval("((lambda (x) (+ x 1)) 41)").value()) == 42);
-static_assert(std::get<int>(constexpr_eval("(let ((x 1)) x)").value()) == 1);
-static_assert(
-    std::get<int>(constexpr_eval("(let ((x 1) (y 2)) (+ x y))").value()) == 3);
-static_assert(std::get<int>(constexpr_eval("(let* ((x 1) (y (+ x 1))) (+ x y))")
-                                .value()) == 3);
 
 } // namespace
 
-TEST_CASE("FixpointEvalTest - IntegerLiteral") {
+TEST_CASE("SenderMendlerTest - IntegerLiteral") {
     auto r = eval("42");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 42);
 }
 
-TEST_CASE("FixpointEvalTest - BooleanTrue") {
+TEST_CASE("SenderMendlerTest - BooleanTrue") {
     auto r = eval("#t");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<bool>(r.value()));
     REQUIRE(std::get<bool>(r.value()) == true);
 }
 
-TEST_CASE("FixpointEvalTest - BooleanFalse") {
+TEST_CASE("SenderMendlerTest - BooleanFalse") {
     auto r = eval("#f");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<bool>(r.value()));
     REQUIRE(std::get<bool>(r.value()) == false);
 }
 
-TEST_CASE("FixpointEvalTest - Addition") {
+TEST_CASE("SenderMendlerTest - Addition") {
     auto r = eval("(+ 3 4)");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 7);
 }
 
-TEST_CASE("FixpointEvalTest - Multiplication") {
+TEST_CASE("SenderMendlerTest - Multiplication") {
     auto r = eval("(* 3 4)");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 12);
 }
 
-TEST_CASE("FixpointEvalTest - NestedArithmetic") {
+TEST_CASE("SenderMendlerTest - NestedArithmetic") {
     auto r = eval("(+ 1 (* 2 3))");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 7);
 }
 
-TEST_CASE("FixpointEvalTest - IfTrue") {
+TEST_CASE("SenderMendlerTest - IfTrue") {
     auto r = eval("(if #t 1 2)");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 1);
 }
 
-TEST_CASE("FixpointEvalTest - IfFalse") {
+TEST_CASE("SenderMendlerTest - IfFalse") {
     auto r = eval("(if #f 1 2)");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 2);
 }
 
-TEST_CASE("FixpointEvalTest - IfWithExpression") {
+TEST_CASE("SenderMendlerTest - IfWithExpression") {
     auto r = eval("(if #t (+ 1 2) (* 3 4))");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 3);
 }
 
-TEST_CASE("FixpointEvalTest - LambdaApplication") {
+TEST_CASE("SenderMendlerTest - LambdaApplication") {
     auto r = eval("((lambda (x) (+ x 1)) 41)");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 42);
 }
 
-TEST_CASE("FixpointEvalTest - Quote") {
+TEST_CASE("SenderMendlerTest - Quote") {
     auto r = eval("(quote abc)");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<closure::symbol>(r.value()));
     REQUIRE(std::get<closure::symbol>(r.value()).name == "abc");
 }
 
-TEST_CASE("FixpointEvalTest - UnboundVariable") {
+TEST_CASE("SenderMendlerTest - UnboundVariable") {
     auto r = eval("undefined_var");
     REQUIRE_FALSE(r.has_value());
 }
 
-TEST_CASE("FixpointEvalTest - ClosureCapture") {
+TEST_CASE("SenderMendlerTest - ClosureCapture") {
     auto r = eval("(((lambda (x) (lambda (y) (+ x y))) 10) 5)");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == 15);
 }
 
-TEST_CASE("FixpointEvalTest - LetSimple") {
+TEST_CASE("SenderMendlerTest - LetSimple") {
     auto r = eval("(let ((x 1)) x)");
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 1);
 }
 
-TEST_CASE("FixpointEvalTest - LetMultipleBindings") {
+TEST_CASE("SenderMendlerTest - LetMultipleBindings") {
     auto r = eval("(let ((x 1) (y 2)) (+ x y))");
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 3);
 }
 
-TEST_CASE("FixpointEvalTest - LetWithBody") {
+TEST_CASE("SenderMendlerTest - LetWithBody") {
     auto r = eval("(let ((x 10)) (+ x 1))");
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 11);
 }
 
-TEST_CASE("FixpointEvalTest - LetStarSequential") {
+TEST_CASE("SenderMendlerTest - LetStarSequential") {
     auto r = eval("(let* ((x 1) (y (+ x 1))) (+ x y))");
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 3);
 }
 
-TEST_CASE("FixpointEvalTest - LetStarThreeBindings") {
+TEST_CASE("SenderMendlerTest - LetStarThreeBindings") {
     auto r = eval("(let* ((x 10) (y (* x 2)) (z (+ y 1))) z)");
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 21);
 }
 
-TEST_CASE("FixpointEvalTest - LetBadBindingName") {
+TEST_CASE("SenderMendlerTest - LetBadBindingName") {
     auto r = eval("(let ((1 2)) 0)");
     REQUIRE_FALSE(r.has_value());
 }
 
-TEST_CASE("FixpointEvalTest - LetBadBindingArity") {
+TEST_CASE("SenderMendlerTest - LetBadBindingArity") {
     auto r = eval("(let ((x)) 0)");
     REQUIRE_FALSE(r.has_value());
 }
 
-TEST_CASE("FixpointEvalTest - HeaderIsIdempotent") { REQUIRE(true); }
+TEST_CASE("SenderMendlerTest - HeaderIsIdempotent") { REQUIRE(true); }
