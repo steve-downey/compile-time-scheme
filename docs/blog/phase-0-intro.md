@@ -1,94 +1,106 @@
-<div class="abstract" id="org49aff28">
+<div class="abstract">
 <p>
-I am building a Scheme-light compiler that parses, elaborates, and executes Lisp code entirely during C++26 compilation.
-But why go to such extreme lengths to force a dynamic language into a rigid <code>constexpr</code> context?
-Because I want to see if the mountain can be climbed.
+I am building a Scheme-light compiler that parses, elaborates, and evaluates Lisp
+code entirely during C++26 compilation. This series documents each phase of that
+ascent: from zero-allocation parsers through fixpoint trees to Mendler-style
+evaluation — all inside the C++ constant evaluator.
 </p>
-
 </div>
-
 
 # The Motivation
 
-> "Nobody climbs mountains for scientific reasons. Science is used to raise money for the expeditions, but you really climb for the hell of it." — Edmund Hillary
+> "Nobody climbs mountains for scientific reasons. Science is used to raise money for
+> the expeditions, but you really climb for the hell of it." — Edmund Hillary
 
-This project is a proof of concept targeting C++26 on GCC16. It implements a fully staged compiler pipeline entirely inside the C++ compile-time evaluation engine. I am transforming a source text string into a syntax tree, elaborating it into an abstract semantic core, converting it to Continuation-Passing Style (CPS), and executing it using closures and sender/receiver backends. And it does all of this strictly before the compiler ever emits a single byte of executable machine code.
+This project is a proof of concept targeting C++26 on GCC16. It implements a fully
+staged compiler pipeline entirely inside the C++ compile-time evaluation engine. I
+transform a source text string into a syntax tree, elaborate it into an abstract
+semantic core, build a fixpoint computation tree, and evaluate it — all strictly
+before the compiler ever emits a single byte of executable machine code.
 
-Why? I am not building this because the software industry desperately needs a compile-time Scheme embedded in C++. I am building this to expand my own understanding of modern C++ static analysis and template meta-programming.
-
+Why? The connection between functional compilation and machine execution is
+deep [cite:@steele1977lambda]. Scheme's lambda calculus maps cleanly onto the abstract
+machines that execute it. I am not building this because the software industry
+desperately needs a compile-time Scheme embedded in C++. I am building this to expand
+my own understanding of modern C++ metaprogramming and to find out exactly where the
+language's boundaries lie.
 
 # Exploring `constexpr` Boundaries
 
-Modern C++ has steadily expanded what can be accomplished at compile time. What started as simple constant variable expressions in C++11 has grown into a nearly Turing-complete sub-language. By C++26, the `constexpr` environment is capable of remarkably non-trivial computation.
+Modern C++ has steadily expanded what can be accomplished at compile time. What
+started as simple constant variable expressions in C++11 has grown into a nearly
+Turing-complete sub-language. By C++26, the `constexpr` environment is capable of
+remarkably non-trivial computation.
 
-I am testing the absolute limits of this environment. Building a functional Scheme compiler forces me to confront and solve the severe restrictions of compile-time C++. It bars me from utilizing dynamic memory allocations that outlive a single constant evaluation, forcing me to eschew standard heap pointers. It lacks support for traditional virtual polymorphism, demanding alternative strategies for dynamic dispatch. It limits recursion depths and prohibits casting tricks.
+I am testing the absolute limits of this environment. Building a functional Scheme
+compiler forces me to confront and solve the severe restrictions of compile-time C++:
+no persistent heap allocation that outlives a constant evaluation, no virtual dispatch,
+limited recursion depth, and no casting tricks.
 
-To survive this, I must model zero-allocation combinator parsers using immutable cursors. I am forced to represent complex recursive Abstract Syntax Trees using flat memory arenas and handle-based indirection. I have to orchestrate open recursion and fixed-point combinators just to represent heterogeneous lists.
+To survive this, I model zero-allocation combinator parsers using immutable cursors. I
+represent complex recursive abstract syntax trees using flat memory arenas and
+handle-based indirection. I orchestrate open recursion and fixpoint combinators to
+represent heterogeneous computation trees. Each restriction becomes a design problem
+worth solving.
 
+# The Pipeline
 
-# The Ascent: A Phase-by-Phase Guide
+The current architecture flows through six stages:
 
-To tackle this complexity, the architecture is broken down into distinct, heavily isolated phases. Each addresses a specific limitation of C++ compile-time evaluation.
+```
+source string
+  → reader (datum tree, arena-based)
+  → elaborator (core AST: if, lambda, let, let*, quote)
+  → Fix<CompF> computation tree
+  → evaluator:
+      ├─ mendler_run (synchronous, constexpr-capable)
+      └─ sender_mendler_run (sender-structured, Beman Execution)
+```
 
+The reader parses Scheme data into a raw datum tree without asking any semantic
+questions. The elaborator translates that tree into a typed core AST. A conversion
+step builds a `Fix<CompF>` heap-pointer computation tree — a recursively defined
+algebraic type using the fixpoint combinator. Two evaluators then interpret that tree:
+a synchronous Mendler-style interpreter that is fully `constexpr`, and a sender-based
+variant that structures evaluation as composable asynchronous operations using Beman
+Execution.
 
-## Phase 1: Foundation
+# Phase-by-Phase Roadmap
 
-I establish the fundamental vocabulary for memory management. The core problem is that recursive structures mathematically require indirection, and standard C++ handles this via heap pointers which are forbidden across `constexpr` bounds. I solve this using a fixed-size contiguous memory block.
+**Phase 1 — Foundation**: I establish the memory vocabulary: arenas, handle-based
+indirection, the `Box` type, and the fixpoint combinator `Fix`.
 
-> -   **Arena:** A pre-allocated, flat block of memory used to store nodes sequentially. By referencing elements via integer indices instead of raw pointers, dynamic allocation is circumvented.
-> -   **Open Recursion:** A technique for building recursive data types by accepting the recursive type as a parameter, allowing fixed-point combinators to tie the recursive knot.
+**Phase 2 — Front End**: I build zero-allocation combinator parsers using immutable
+cursors that compose without allocating.
 
+**Phase 3 — Reader**: I implement a reader that translates source text into a raw
+`Datum` tree, treating all input as nested shapes with no semantic judgement.
 
-## Phase 2: Front End
+**Phase 4 — Elaboration**: I implement the elaborator that classifies `Datum` nodes
+into a typed core AST covering `if`, `lambda`, `let`, `let*`, `define`, and `quote`.
 
-Next, I build robust, zero-allocation textual combinator parsers. Rather than using complex state machines or generative tools like Bison, smaller functions compose to match source characters dynamically.
+**Phase 5 — Fixpoint Trees**: I define `Fix<CompF>` — a heap-pointer computation tree
+built from open-recursive algebraic types — and the `core_to_comp` translation that
+bridges the arena-based core AST to the heap-based computation tree.
 
-> -   **Combinator Parser:** A higher-order function that accepts simple parsers as input and composes them into more complex parsers, enabling declarative grammar definitions directly in C++.
+**Phase 6 — Closures and Values**: I define the runtime value domain: numbers,
+booleans, closures, and the environments that bind names to values at evaluation time.
 
+**Phase 7 — Mendler Interpretation**: I implement `mendler_run`, a Mendler-style
+interpreter over `Fix<CompF>` that is synchronous and fully `constexpr`-capable.
 
-## Phase 3: Reader
+**Phase 8 — Sender-Based Evaluation**: I implement `sender_mendler_run`, which rewrites
+evaluation as a graph of Beman Execution senders with `when_all` for argument-list
+parallelism.
 
-I implement a Reader that translates human text directly into the raw `Datum` tree. It asks no semantic questions and treats all input merely as nested shapes.
+**Phase 9 — Constexpr Pipeline**: I wire all phases together into a single `constexpr`
+pipeline and demonstrate evaluation results baked into the binary.
 
-> -   **Homoiconic:** A property of languages like Lisp where the primary representation of programs is also a data structure in a primitive type of the language itself ("Code is Data").
-
-
-## Phase 4: Elaboration
-
-With the raw shape of the code established, the Elaborator parses that generic structure. It matches patterns and validates language constraints to yield an Elaborated Core tree.
-
-> -   **Elaborator:** The compiler pass responsible for resolving generic syntax trees (`Datum`) into concrete, semantically verified internal representations (`Core` AST).
-
-
-## Phase 5: Continuation-Passing Style (CPS)
-
-The pipeline then drops the AST into a drastically different representation. Standard recursive evaluation overflows the rigid call stack depths permitted by compile-time limits. Defunctionalization and continuations flatten the control flow entirely.
-
-> -   **Continuation-Passing Style (CPS):** A style of programming in which control is passed explicitly. Operations do not return; instead, they call an explicit continuation function with their result.
-
-
-## Phase 6: Closures
-
-With the AST dropped into a linear flow, I materialize functions and their variable environments to execute the Lisp script correctly through a direct compiler backend.
-
-> -   **Closure:** A function object that has a preserved referencing environment, capturing and carrying the scoped variables active when it was declared.
-
-
-## Phase 7: Senders
-
-Beyond simple synchronous execution, I port the execution engine to rely on the modern C++ asynchronous model, compiling the CPS program flow into parallel, composable sender nodes.
-
-> -   **Senders and Receivers:** An execution model (often associated with `std::execution` or Beman Execution) that defines asynchronous operations as chains of senders passing values or errors to receivers.
-
-
-## Phase 8: Graphs
-
-Finally, using the structured data generated by the backend, I extract visual flow graphs of the compile-time execution pipeline to prove what the compiler has actually accomplished under the hood.
-
-
-# For the Hell of It
-
-This blog series will document each of these phases, detailing the workarounds, the breakthroughs, and the C++26 features that make it possible. I am mapping the frontiers of C++ language constraints. I am climbing this mountain simply because it is there.
-
+**Phase 10 — Conclusion**: I reflect on what the climb taught me about C++26 `constexpr`
+limits, fixpoint types, and the Mendler recursion scheme.
 
 # References
+
+Steele, Guy L. (1977). *Lambda: The Ultimate GOTO*, MIT AI Memo 443.
+
+Appel, Andrew W. (1992). *Compiling with Continuations*, Cambridge University Press.
