@@ -4,250 +4,375 @@
 #+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
 #+options: html5-fancy:t
 #+bibliography: references.bib
-#+TITLE: Building a Compile-Time Scheme in C++26: Phase 2 - The Front-End & Parser Combinators
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 2 - The Front-End and Parser Combinators
 #+AUTHOR: Steve Downey
-#+DATE: 2026-05-29
+#+DATE: 2026-06-19
 
 #+begin_abstract
-Parsing text into meaningful structure is the first visible step of any compiler.
-Instead of traditional lexer/parser generators like Lex/Yacc or hand-rolling a massive recursive descent state machine, I lean heavily into Category Theory and Haskell-inspired functional patterns by using Parser Combinators [cite:@hutton1992monadic;@leijen2001parsec].
-This post walks through the exact machinery: from the immutable ~cursor~ that carries input state, through the ~parse_result~ that models success and failure, to the combinators that snap together into a working Scheme lexer—all in zero-allocation ~constexpr~ C++26.
+Parsing Scheme starts with an immutable cursor and a library of applicative
+combinators. No raw function pointers, no mutation, no heap — just composition.
 #+end_abstract
 
 #+MACRO: TEASER_END
 {{{TEASER_END}}}
 
-* Why Not Recursive Descent or LL(1)?
+* The Front End: Parsing with Applicative Combinators
 
-Recursive descent is the industry standard for production compilers (like GCC or Clang) because it offers unparalleled control over error recovery and diagnostics.
-However, for a purposely simple language like Scheme—with its highly uniform S-expression syntax—a recursive descent parser involves writing verbose, repetitive loops and state-tracking mechanisms.
+Before I can elaborate, evaluate, or compile anything, I need to turn source
+text into a tree. The front end does that work: a cursor that tracks position
+without mutating, a result type that models success and failure, and a library
+of parser combinators that snap together like LEGO.
 
-I also avoid parser generators (like Bison/Yacc).
-While mathematically rigorous, they introduce massive build-system complexity and generate code that is historically difficult to make strictly ~constexpr~ compliant in modern C++.
-Trying to force a tool from 1975 to emit C++26 constant expressions is an exercise in misery.
+The entire parser is ~constexpr~. No allocation escapes. Everything composes
+from the same five primitive forms.
 
-There is a deeper constraint: inside ~constexpr~ evaluation, you cannot easily juggle lambdas that capture variables and convert them back to function pointers.
-Every parser must be a concrete callable object whose type the compiler can reason about statically.
-Parser combinators, expressed as C++ templates, satisfy this requirement naturally.
+** The Immutable Cursor
 
-* The Immutable Cursor
+#+begin_src c++
+// src/smd/smdscheme/parser/cursor.hpp
+class cursor {
+    std::string_view input_{};
+    foundation::source_pos pos_{};
 
-Before any parser can run, I need a way to represent "where I am in the input." The simplest possible design is a ~std::string_view~ plus a position counter—but the critical design decision is that advancing the cursor returns a /new/ cursor rather than mutating the existing one.
+  public:
+    constexpr explicit cursor(std::string_view input) : input_{input} {}
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/cursor.hpp::98d9b991-d8d6-4430-9571-489c17437a3d]] :lines 2- :src cpp :end "98d9b991-d8d6-4430-9571-489c17437a3d end"
+    constexpr auto empty() const -> bool { return input_.empty(); }
+    constexpr auto peek() const -> char { return input_.front(); }
 
-~peek()~ reads the next character without consuming it.
-~bump()~ returns a brand-new ~cursor~ with one character removed from the front and the position updated.
-Neither mutates anything.
-This immutability is what makes backtracking free: to "go back," a parser simply discards the advanced cursor and uses the one it saved earlier—no undo stack, no state restoration.
+    constexpr auto bump() const -> cursor {
+        cursor next{*this};
+        if (!input_.empty()) {
+            char c = input_.front();
+            next.input_.remove_prefix(1);
+            ++next.pos_.offset;
+            if (c == '\n') {
+                ++next.pos_.line;
+                next.pos_.column = 1;
+            } else {
+                ++next.pos_.column;
+            }
+        }
+        return next;
+    }
 
-The position tracks line, column, and absolute byte offset.
-The offset is the key field for the Alternative combinator: it detects whether a parser consumed any input before failing.
+    constexpr auto position() const -> foundation::source_pos { return pos_; }
+    constexpr auto remaining() const -> std::string_view { return input_; }
+};
+#+end_src
 
-The helper functions that classify characters live in the same header:
+~peek()~ reads the next character without consuming it. ~bump()~ returns a
+brand-new cursor with one character removed from the front and the position
+updated. Neither mutates anything. Backtracking is free: to "go back," a
+parser discards the advanced cursor and uses the checkpoint it saved earlier —
+no undo stack, no state restoration.
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/cursor.hpp::2c5cb3d8-d60d-43f3-aaa9-fde7f983aee3]] :lines 2- :src cpp :end "2c5cb3d8-d60d-43f3-aaa9-fde7f983aee3 end"
+The position tracks line, column, and absolute byte offset. The offset is the
+critical field for the alternative combinator: it detects whether a parser
+consumed any input before failing.
 
-~is_initial_symbol_char~ and ~is_symbol_char~ encode the Scheme symbol alphabet directly.
-~is_delimiter~ is used by the boolean parser in the reader to detect token boundaries without consuming them.
-~skip_intertoken_space~ is a plain loop—no parser abstraction needed for something this simple.
+** Lexical Primitives
 
-* Success and Failure: ~parse_result<T>~
+The character classification predicates live in the same header:
 
-Every parser returns the same shape of result: either a value plus the remaining cursor, or an error with a position.
-This is modelled with two types:
+#+begin_src c++
+// src/smd/smdscheme/parser/cursor.hpp
+constexpr auto is_space(char c) -> bool {
+    return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+}
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/parser.hpp::59712a9e-e890-4931-9196-61ceaa880b6d]] :lines 2- :src cpp :end "59712a9e-e890-4931-9196-61ceaa880b6d end"
+constexpr auto is_initial_symbol_char(char c) -> bool {
+    if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')) {
+        return true;
+    }
+    return c == '+' || c == '-' || c == '*' || c == '/' || c == '=' ||
+           c == '<' || c == '>' || c == '!' || c == '?';
+}
 
-~parse_state<T>~ bundles the successfully parsed value with the cursor positioned just after the consumed input.
-~parse_result<T>~ is an alias for ~foundation::result<parse_state<T>>~—building on the ~result<T>~ error-handling type from Phase 1—that holds either the state or a ~parse_error~ (position + message string).
+constexpr auto is_symbol_char(char c) -> bool {
+    return is_initial_symbol_char(c) || (c >= '0' && c <= '9');
+}
 
-The ~T~ is a template parameter, so parsers are naturally typed: a parser for a digit character returns ~parse_result<char>~, a parser for an integer returns ~parse_result<atom_integer>~.
-The type propagates automatically through every combinator.
+constexpr auto is_delimiter(char c) -> bool {
+    return is_space(c) || c == '(' || c == ')' || c == '\'';
+}
 
-* The ~parser<F>~ Wrapper
+constexpr auto skip_intertoken_space(cursor cur) -> cursor {
+    while (!cur.empty() && is_space(cur.peek())) {
+        cur = cur.bump();
+    }
+    return cur;
+}
+#+end_src
 
-Parsers are callable objects.
-The ~parser<F>~ class wraps any callable ~F~ with the right signature and gives it a concrete type that satisfies the ~parser_like~ concept:
+~is_initial_symbol_char~ and ~is_symbol_char~ encode Scheme's two-phase
+symbol alphabet: the initial character must be a letter or operator symbol,
+but subsequent characters can also include digits. ~is_delimiter~ detects
+token boundaries without consuming them. ~skip_intertoken_space~ is a plain
+loop — no parser abstraction needed for something this simple.
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/parser.hpp::5f36b161-a5b2-45a9-82e4-4d4679a8a60e]] :lines 2- :src cpp :end "5f36b161-a5b2-45a9-82e4-4d4679a8a60e end"
+** Parser Objects
 
-The class is intentionally thin.
-It stores ~F~ by value (critical for ~constexpr~ since I cannot take addresses of lambdas at compile time), exposes ~operator()(cursor)~, and satisfies ~parser_like~.
-The CTAD guide ~parser(f) -> parser<F>~ means you can write ~parser{lambda}~ without spelling out ~F~.
+Every parser is a callable that takes a ~cursor~ and returns a
+~parse_result<T>~. The ~parse_result<T>~ is an alias for
+~foundation::result<parse_state<T>>~ — either a value plus the remaining
+cursor, or a ~parse_error~ with position and message:
 
-The ~parser_like~ concept at the top of the file requires only that a type be callable with a ~cursor~.
-This lets free functions and other callable objects participate in the combinator algebra without being wrapped, while still being checkable at the point of use.
+#+begin_src c++
+// src/smd/smdscheme/parser/parser.hpp
+template <class T>
+struct parse_state {
+    T value;
+    cursor rest;
+};
 
-* The Primitives
+template <class T>
+using parse_result = foundation::result<parse_state<T>>;
+#+end_src
+
+Parsers cannot be raw function pointers because they need captures: a
+combinator closes over sub-parsers. Instead, I wrap any callable ~F~ with the
+right signature in a ~parser<F>~ class:
+
+#+begin_src c++
+// src/smd/smdscheme/parser/parser.hpp
+template <class F>
+class parser {
+  public:
+    constexpr explicit parser(F f) : f_{f} {}
+    constexpr auto operator()(cursor cur) const { return f_(cur); }
+  private:
+    F f_;
+};
+
+template <class F>
+parser(F) -> parser<F>;
+#+end_src
+
+The class is intentionally thin. It stores ~F~ by value (critical for
+~constexpr~ — lambda addresses are unavailable at compile time), exposes
+~operator()(cursor)~, and satisfies the ~parser_like~ concept. The CTAD guide
+means ~parser{lambda}~ works without spelling out ~F~.
+
+** Primitive Parsers
 
 Two functions build every other parser in the library.
 
-** ~pure~: Inject a Value
+~pure(v)~ always succeeds, consumes nothing, and returns ~v~:
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/parser.hpp::d6bea45d-0050-4c54-98e7-65e500510b3e]] :lines 2- :src cpp :end "d6bea45d-0050-4c54-98e7-65e500510b3e end"
-
-~pure(v)~ always succeeds, consumes nothing, and returns ~v~.
-It is the identity element of the Applicative structure: it lifts a known value into the parser context without touching the input.
-In practice it seeds a fixed result into a combinator pipeline—for example, to supply a default when an optional step is skipped.
-
-** ~satisfy~ and ~char_p~: Consume One Character
-
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/parser.hpp::f954087d-8a4a-4e71-8f8d-dd63bc9a857a]] :lines 2- :src cpp :end "f954087d-8a4a-4e71-8f8d-dd63bc9a857a end"
-
-~satisfy(pred, desc)~ is the single atomic building block of the entire parser.
-It peeks at the next character, checks ~pred~, and either consumes the character (returning the new cursor from ~cur.bump()~) or fails with a ~parse_error~ at the current position.
-The ~desc~ string names what was expected and ends up in error messages.
-
-~char_p(c)~ is sugar: it builds ~satisfy~ with a lambda that compares against a single character.
-These two lines are how every delimiter is parsed: ~char_p('(')~, ~char_p(')')~, ~char_p('\'')~.
-
-The static_asserts in the test file serve as a machine-checked specification.
-They compile with the rest of the project:
-
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/parser.test.cpp::1e013a5f-4125-4e65-a095-3d096df4f20c]] :lines 2- :src cpp :end "1e013a5f-4125-4e65-a095-3d096df4f20c end"
-
-Reading these top to bottom tells you the contract precisely: ~char_p('x')~ on ~"xyz"~ yields value ~'x'~ and leaves the cursor at ~'y'~; ~pure(42)~ on ~"abc"~ yields ~42~ and leaves the cursor entirely unchanged; ~char_p('x')~ on ~"abc"~ or ~""~ fails.
-These are not documentation—they are the spec, and the compiler verifies them.
-
-* Functor: ~map~
-
-Once you can parse a character, you need to transform the value into something more useful.
-That is what ~map~ does:
-
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/parser.hpp::51e6f31e-12ad-4180-b7ca-9aa3e564fdbc]] :lines 2- :src cpp :end "51e6f31e-12ad-4180-b7ca-9aa3e564fdbc end"
-
-~map(pa, f)~ runs ~pa~.
-If ~pa~ succeeds, ~f~ is applied to the value and the cursor position from ~pa~ is inherited.
-If ~pa~ fails, the error is forwarded unchanged.
-The return type ~R~ is deduced from ~decltype(f(r.value().value))~—the compiler figures out what type ~f~ produces.
-
-This is the Functor operation from category theory (written ~fmap f pa~ in Haskell).
-A typical use:
-
-#+begin_src cpp
-// Parse a digit character, then convert it to an integer offset from '0'
-auto digit_int = map(
-    satisfy([](char c) { return c >= '0' && c <= '9'; }, "digit"),
-    [](char c) { return c - '0'; });
-// digit_int invoked on "5abc" returns parse_result<int>{5, cursor pointing at "abc"}
+#+begin_src c++
+// src/smd/smdscheme/parser/parser.hpp
+template <class T>
+[[nodiscard]] constexpr auto pure(T value) {
+    return parser{[v = value](cursor cur) -> parse_result<T> {
+        return parse_state<T>{v, cur};
+    }};
+}
 #+end_src
 
-The transformation happens entirely inside the parse result.
-The cursor positions are managed by the combinator, not by ~f~.
+~satisfy(pred, desc)~ is the single atomic building block:
 
-* Applicative [cite:@mcbride2008applicative]: ~lift2~ and Sequencing
+#+begin_src c++
+// src/smd/smdscheme/parser/parser.hpp
+[[nodiscard]] constexpr auto satisfy(auto pred, char const *expected) {
+    return parser{[pred, expected](cursor cur) -> parse_result<char> {
+        if (!cur.empty() && pred(cur.peek())) {
+            return parse_state<char>{cur.peek(), cur.bump()};
+        }
+        return foundation::parse_error{cur.position(), expected};
+    }};
+}
 
-Two parsers in sequence, whose results are combined, is the Applicative ~lift2~:
-
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/parser.hpp::f446b18c-6afb-4bc1-9df7-ba1f5ea89046]] :lines 2- :src cpp :end "f446b18c-6afb-4bc1-9df7-ba1f5ea89046 end"
-
-~lift2(pa, pb, f)~ runs ~pa~ first.
-If it succeeds, it runs ~pb~ starting from ~pa~'s remaining cursor ~ra.value().rest~—the two parsers are strictly ordered, and together they consume the concatenation of their individual inputs.
-If either fails, the earliest error is forwarded.
-~f~ combines the two values into a single result.
-
-~sequence_left~ and ~sequence_right~ are the two common degenerate cases: run both parsers in order but keep only one value:
-
-#+begin_src cpp
-// Parse '(' then a symbol; return the symbol (discard the paren)
-auto after_open = sequence_right(char_p('('), symbol_parser);
-
-// Parse a symbol then ')'; return the symbol (discard the paren)
-auto before_close = sequence_left(symbol_parser, char_p(')'));
+[[nodiscard]] constexpr auto char_p(char expected) {
+    return satisfy([expected](char c) { return c == expected; },
+                   "expected char");
+}
 #+end_src
 
-Both are implemented directly on ~lift2~ with a lambda that ignores one argument.
-There is no separate machinery.
+Every delimiter is parsed with two lines: ~char_p('(')~, ~char_p(')')~,
+~char_p('\'')~.
 
-* Alternative: ~operator|~
+** Applicative Combinators
 
-The choice combinator tries the first parser and, if it fails /without consuming any input/, tries the second:
+With the primitives in place, I can lift Applicative composition into the
+parser library [cite:@mcbride2008applicative]. The idea: build complex parsers
+by combining simple ones without monadic bind [cite:@hutton1992monadic]. Sequential composition and
+transformation are enough for a Scheme lexer.
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/parser.hpp::2a77ed5e-0863-4a2a-8ea0-1b03b56ffeb4]] :lines 2- :src cpp :end "2a77ed5e-0863-4a2a-8ea0-1b03b56ffeb4 end"
+~map~ applies a function to a successfully parsed value:
 
-The key line is ~if (ra.error().where.offset != start) return ra~.
-If ~pa~ consumed at least one character before failing, the offset advanced past ~start~, and the error is propagated immediately without trying ~pb~.
-This is ordered choice (the PEG $/$ operator), not full backtracking.
-It prevents a combinatorial explosion of retries and makes the grammar predictable.
+#+begin_src c++
+// src/smd/smdscheme/parser/parser.hpp
+template <parser_like PA, class F>
+[[nodiscard]] constexpr auto map(PA pa, F f) {
+    return parser{[pa, f](cursor cur) {
+        auto r = pa(cur);
+        if (!r.has_value()) {
+            using R = decltype(f(r.value().value));
+            return parse_result<R>{r.error()};
+        }
+        using R = decltype(f(r.value().value));
+        return parse_result<R>{
+            parse_state<R>{f(r.value().value), r.value().rest}};
+    }};
+}
+#+end_src
 
-For Scheme's uniform prefix syntax this is exactly right.
-By the time the reader has consumed ~(if~, it is committed to the if-form branch.
-If something inside the if-form fails, retrying as an application would produce garbage results.
-The "no consume, no retry" rule makes the grammar deterministic.
+~lift2~ sequences two parsers and combines their values:
 
-The static_asserts in the test file demonstrate both sides:
+#+begin_src c++
+// src/smd/smdscheme/parser/parser.hpp
+template <parser_like PA, parser_like PB, class F>
+[[nodiscard]] constexpr auto lift2(PA pa, PB pb, F f) {
+    return parser{[pa, pb, f](cursor cur) {
+        auto ra = pa(cur);
+        if (!ra.has_value()) {
+            using V = decltype(f(ra.value().value, pb(cur).value().value));
+            return parse_result<V>{ra.error()};
+        }
+        auto rb = pb(ra.value().rest);
+        if (!rb.has_value()) {
+            using V = decltype(f(ra.value().value, rb.value().value));
+            return parse_result<V>{rb.error()};
+        }
+        using V = decltype(f(ra.value().value, rb.value().value));
+        return parse_result<V>{parse_state<V>{
+            f(ra.value().value, rb.value().value), rb.value().rest}};
+    }};
+}
+#+end_src
 
-#+begin_src cpp
-// second branch taken when first fails without consuming
+~pb~ runs starting at ~ra.value().rest~ — the two parsers are strictly ordered
+and together consume the concatenation of their individual inputs. The
+degenerate cases ~sequence_left~ and ~sequence_right~ drop one of the two
+values:
+
+#+begin_src c++
+// src/smd/smdscheme/parser/parser.hpp
+template <parser_like PA, parser_like PB>
+[[nodiscard]] constexpr auto sequence_left(PA pa, PB pb) {
+    return lift2(pa, pb, [](auto a, auto) { return a; });
+}
+
+template <parser_like PA, parser_like PB>
+[[nodiscard]] constexpr auto sequence_right(PA pa, PB pb) {
+    return lift2(pa, pb, [](auto, auto b) { return b; });
+}
+#+end_src
+
+Both are one-liners on top of ~lift2~. There is no separate machinery.
+
+** Alternative: ~operator|~
+
+The choice combinator tries the first parser and, if it fails *without
+consuming any input*, tries the second:
+
+#+begin_src c++
+// src/smd/smdscheme/parser/parser.hpp
+template <parser_like PA, parser_like PB>
+[[nodiscard]] constexpr auto operator|(PA pa, PB pb) {
+    return parser{[pa, pb](cursor cur) {
+        auto start = cur.position().offset;
+        auto ra = pa(cur);
+        if (ra.has_value())
+            return ra;
+        if (ra.error().where.offset != start)
+            return ra;
+        return pb(cur);
+    }};
+}
+#+end_src
+
+If ~pa~ consumed at least one character before failing, the offset advanced
+past ~start~ and the error is propagated immediately without trying ~pb~. This
+is ordered choice, not full backtracking. For Scheme's uniform prefix syntax
+this is exactly right: once the reader has consumed ~(if~, it is committed to
+the if-form branch.
+
+** Repetition: ~many~ and ~some~
+
+Repeating a parser zero or more times requires a fixed-capacity container —
+dynamic allocation is unavailable in ~constexpr~. ~many~ collects results into
+the ~foundation::static_vector~ introduced in Phase 1:
+
+#+begin_src c++
+// src/smd/smdscheme/parser/alt.hpp
+template <int Capacity, parser_like P>
+[[nodiscard]] constexpr auto many(P p) {
+    return parser{[p](cursor cur) {
+        using V = decltype(p(cur).value().value);
+        foundation::static_vector<V, Capacity> result{};
+        while (result.size() < Capacity) {
+            auto r = p(cur);
+            if (!r.has_value())
+                break;
+            result.push_back(r.value().value);
+            cur = r.value().rest;
+        }
+        return parse_result<foundation::static_vector<V, Capacity>>{
+            parse_state<foundation::static_vector<V, Capacity>>{result, cur}};
+    }};
+}
+#+end_src
+
+~many<Capacity>(p)~ loops until ~p~ fails or the vector is full, always
+succeeding (zero matches is a valid result). ~some<Capacity>(p)~ requires at
+least one match and propagates the error if ~p~ immediately fails. The
+~Capacity~ is a non-type template parameter — the compiler must know the
+maximum repetitions at compile time.
+
+~lexeme(p)~ strips surrounding inter-token whitespace before and after ~p~:
+
+#+begin_src c++
+// src/smd/smdscheme/parser/alt.hpp
+template <parser_like P>
+[[nodiscard]] constexpr auto lexeme(P p) {
+    return parser{[p](cursor cur) {
+        auto start = skip_intertoken_space(cur);
+        auto r = p(start);
+        if (!r.has_value())
+            return r;
+        auto rest = skip_intertoken_space(r.value().rest);
+        using V = decltype(r.value().value);
+        return parse_result<V>{parse_state<V>{r.value().value, rest}};
+    }};
+}
+#+end_src
+
+This is the standard Parsec approach [cite:@leijen2001parsec]: make each token parser responsible for
+the whitespace that follows it. ~(if #t 1 2)~ and ~( if #t 1 2 )~ parse
+identically.
+
+** Compile-Time Specification
+
+The ~static_assert~ suite in the test file is not documentation — it is the
+machine-checked specification:
+
+#+begin_src c++
+static_assert(char_p('x')(cursor{"xyz"}).has_value());
+static_assert(char_p('x')(cursor{"xyz"}).value().value == 'x');
+static_assert(char_p('x')(cursor{"xyz"}).value().rest.peek() == 'y');
+
+static_assert(pure(42)(cursor{"abc"}).value().value == 42);
+static_assert(pure(42)(cursor{"abc"}).value().rest.remaining() == "abc");
+
+static_assert(!char_p('x')(cursor{"abc"}).has_value());
+
 static_assert((char_p('a') | char_p('b'))(cursor{"b"}).value().value == 'b');
-
-// first success wins, second never runs
-static_assert((char_p('a') | char_p('b'))(cursor{"a"}).value().value == 'a');
-
-// both alternatives fail
 static_assert(!(char_p('a') | char_p('b'))(cursor{"c"}).has_value());
 #+end_src
 
-* Repetition: ~many~ and ~some~
-
-Repeating a parser zero or more times requires a fixed-capacity container because dynamic allocation is unavailable in ~constexpr~.
-~many~ uses ~foundation::static_vector<V, Capacity>~—the zero-allocation array from Phase 1:
-
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/alt.hpp::e7d2b575-1f00-46bd-8365-1abbe0de1b63]] :lines 2- :src cpp :end "e7d2b575-1f00-46bd-8365-1abbe0de1b63 end"
-
-~many<Capacity>(p)~ loops until ~p~ fails or the vector is full, always succeeding (zero matches is a valid result).
-~some<Capacity>(p)~ requires at least one match and propagates the error if ~p~ immediately fails.
-
-The ~Capacity~ is a non-type template parameter.
-This is a ~constexpr~ constraint: the compiler must know the maximum number of repetitions at compile time.
-For digit parsing (at most 20 digits in a 64-bit integer), ~some<20>(digit_p)~ is exact.
-For symbol tail characters (up to 64 characters), ~many<64>(symbol_char_p)~ is generous but bounded.
-The bounds are part of the type.
-
-* Whitespace: ~lexeme~
-
-Token-level whitespace handling is handled by wrapping a parser with ~lexeme~:
-
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/parser/alt.hpp::07cc42ff-6ee4-4b1a-90b0-b81c99574723]] :lines 2- :src cpp :end "07cc42ff-6ee4-4b1a-90b0-b81c99574723 end"
-
-~lexeme(p)~ calls ~skip_intertoken_space~ before running ~p~, then skips whitespace again after.
-This is the standard Parsec approach: make each token parser responsible for consuming the whitespace that follows it.
-The reader uses this when composing token parsers so that ~(if #t 1 2)~ and ~( if #t 1 2 )~ parse identically—whitespace is not structurally significant in Scheme.
-
-* Putting It Together: Real Scheme Atom Parsers
-
-With all the combinators in hand, here are the actual parsers the reader uses for Scheme atoms:
-
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/reader/atom.hpp::8b0f791f-6e09-40a4-94bb-fc995a3b434a]] :lines 2- :src cpp :end "8b0f791f-6e09-40a4-94bb-fc995a3b434a end"
-
-~integer_p()~ is written directly as a ~parser{lambda}~ rather than composed from smaller combinators, because the digit-to-integer accumulation loop is clearer as imperative code.
-It still uses the primitives: ~optional(char_p('-'))~ for the optional sign, ~some<20>(satisfy(digit_pred, "digit"))~ for the digit sequence.
-The ~optional~ always succeeds—it returns ~std::optional<char>~ with ~nullopt~ when there is no minus sign.
-The parser then accumulates the integer value with a multiply-and-add loop over the ~static_vector~ of digit characters.
-
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/reader/atom.hpp::0794bb9e-c834-40a6-851f-16541936e85a]] :lines 2- :src cpp :end "0794bb9e-c834-40a6-851f-16541936e85a end"
-
-~symbol_p()~ shows a subtlety: Scheme symbols have two distinct character classes—the initial character must be a letter or operator symbol (~+~, ~-~, ~*~, ~/~, ~=~, ~<~, ~>~, ~!~, ~?~), but subsequent characters can also include digits.
-This requires two separate ~satisfy~ calls: one for the first character and ~many<64>~ for the tail.
-Rather than collecting characters into a ~static_vector~ and joining them, the parser computes the symbol's length by subtracting the byte offsets of the start and end cursors, then extracts a ~string_view~ directly into the original source.
-No allocation, no copy—the symbol text is a zero-cost view into the input string.
-
-Both parsers are combined with ~|~ in the reader's full datum dispatcher.
-The reader tries ~integer_p()~ first; if that fails without consuming, it tries ~symbol_p()~; if that fails, it tries boolean, quote, and list—all via the same ~|~ operator.
-
-* The Design in Sum
-
-Phase 3 assembles these combinators into the complete S-expression reader that produces the ~datum_type~ tree.
-Everything in the reader—booleans, integers, symbols, quote forms, and nested lists—is expressed as a composition of the primitives and combinators described here.
-
-The parser combinator library is built from five conceptual layers:
-
-1. *Input*: ~cursor~—immutable, position-tracking view into source text. 2. *Output*: ~parse_result<T>~—either ~parse_state<T>{value, remaining}~ or ~parse_error{position, message}~. 3. *Wrapper*: ~parser<F>~—any callable with signature ~parse_result<T>(cursor)~ is a parser. 4. *Primitives*: ~pure~, ~satisfy~, ~char_p~—the irreducible building blocks. 5. *Combinators*: ~map~ (Functor), ~lift2~/~sequence_left~/~sequence_right~ (Applicative), ~operator|~ (Alternative), ~many~/~some~/~optional~, ~lexeme~.
-
-Everything in the reader is assembled from these five layers with no heap allocation, and all parsing behavior is verified at compile time through the ~static_assert~ suite.
-The type system enforces that parsers are combined correctly—mismatching types fail to compile rather than producing wrong results at runtime.
+Reading these top to bottom tells you the contract precisely. The compiler
+verifies them on every build.
 
 * References
 
-#+print_bibliography:
+Hutton, Graham and Meijer, Erik (1992). *Monadic Parser Combinators*,
+Technical Report NOTTCS-TR-92-4. [cite:@hutton1992monadic]
+
+Leijen, Daan and Meijer, Erik (2001). *Parsec: Direct Style Monadic Parser
+Combinators for the Real World*, Department of Computer Science, Universiteit
+Utrecht. [cite:@leijen2001parsec]
+
+McBride, Conor and Paterson, Ross (2008). *Applicative Programming with
+Effects*, Journal of Functional Programming. [cite:@mcbride2008applicative]

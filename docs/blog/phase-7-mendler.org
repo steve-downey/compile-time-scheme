@@ -1,52 +1,63 @@
-<div class="abstract">
-<p>
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+bibliography: references.bib
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 7 - Mendler Interpretation
+#+AUTHOR: Steve Downey
+#+DATE: 2026-06-19
+
+#+begin_abstract
 A catamorphism folds every child before the algebra sees the result. But
-Scheme's <code>if</code> must choose a branch before evaluating it, and lambda
+Scheme's ~if~ must choose a branch before evaluating it, and lambda
 application must extend the environment before evaluating the body. I use a
 Mendler-style fold that gives the algebra explicit control over which children
 to recurse into, and with what context.
-</p>
-</div>
+#+end_abstract
 
-# Mendler-Style Interpretation
+#+MACRO: TEASER_END
+{{{TEASER_END}}}
 
-The previous phase assembled all the runtime machinery: `Comp<MaxList>` trees
-as the interpreter input, `closure::value` as the output, and `env` as the
+* Mendler-Style Interpretation
+
+The previous phase assembled all the runtime machinery: ~Comp<MaxList>~ trees
+as the interpreter input, ~closure::value~ as the output, and ~env~ as the
 threading context. Now I write the interpreter itself.
 
-The natural tool for evaluating a `Fix<F>` tree is a catamorphism — a
+The natural tool for evaluating a ~Fix<F>~ tree is a catamorphism — a
 structural fold that peels off one layer, recursively folds all children, and
 passes the results to an algebra. But Scheme resists this approach. This
 phase explains why, and how Mendler's generalization escapes the trap.
 
-## F-Algebras and Catamorphisms
+** F-Algebras and Catamorphisms
 
-An F-algebra for a functor `F` and a carrier type `A` is a function
-`alg : F<A> → A`. A catamorphism over `Fix<F>` is mechanically derived from
+An F-algebra for a functor ~F~ and a carrier type ~A~ is a function
+~alg : F<A> → A~. A catamorphism over ~Fix<F>~ is mechanically derived from
 any such algebra:
 
-1. Unwrap one layer: `Fix<F>` → `F<Fix<F>>`
-2. `fmap` the catamorphism over all recursive children: `F<Fix<F>>` →
-   `F<A>`
-3. Apply the algebra: `F<A>` → `A`
+1. Unwrap one layer: ~Fix<F>~ → ~F<Fix<F>>~
+2. ~fmap~ the catamorphism over all recursive children: ~F<Fix<F>>~ →
+   ~F<A>~
+3. Apply the algebra: ~F<A>~ → ~A~
 
-The key word is *all*. `fmap` transforms every child before the algebra
+The key word is *all*. ~fmap~ transforms every child before the algebra
 sees any of them. The algebra receives fully-evaluated children; it has no
 say in the order, and it cannot skip any [cite:@bird1997algebra].
 
 This is the right tool for evaluating arithmetic expressions. Given a tree
-representing `(+ (* 3 4) 2)`, a catamorphism evaluates `(* 3 4)` to `12`,
-evaluates `2` to `2`, and then passes both results to the `+` algebra. The
+representing ~(+ (* 3 4) 2)~, a catamorphism evaluates ~(* 3 4)~ to ~12~,
+evaluates ~2~ to ~2~, and then passes both results to the ~+~ algebra. The
 algebra has nothing more to do; all the work happened in the fold.
 
 For Scheme, this does not work.
 
-## Why Catamorphisms Fail for Scheme
+** Why Catamorphisms Fail for Scheme
 
-### Conditional Branching
+*** Conditional Branching
 
-Consider `(if #f (error!) 42)`. The correct result is `42`. A catamorphism
-evaluates both `(error!)` and `42` before the algebra for `if` gets to run.
+Consider ~(if #f (error!) 42)~. The correct result is ~42~. A catamorphism
+evaluates both ~(error!)~ and ~42~ before the algebra for ~if~ gets to run.
 There is no way to short-circuit. The branch not taken is evaluated
 unconditionally.
 
@@ -54,15 +65,15 @@ Lazy evaluation — deciding based on the condition, then evaluating only the
 chosen branch — cannot be expressed as a catamorphism. The fold structure
 commits to evaluating every child.
 
-### Lambda Application
+*** Lambda Application
 
-Consider `(let ((x 10)) x)`, which desugars to `((lambda (x) x) 10)`. The
-body `x` must be evaluated in an environment where `x` is bound to `10`. But
+Consider ~(let ((x 10)) x)~, which desugars to ~((lambda (x) x) 10)~. The
+body ~x~ must be evaluated in an environment where ~x~ is bound to ~10~. But
 the catamorphism evaluates the body *before* the algebra runs, in whatever
-environment the fold was started with. The argument `10` is also evaluated
+environment the fold was started with. The argument ~10~ is also evaluated
 before the algebra runs.
 
-When the algebra for `comp_apply` finally executes, it has pre-evaluated
+When the algebra for ~comp_apply~ finally executes, it has pre-evaluated
 children — a closure and an integer — but it cannot go back and re-evaluate
 the body in the extended environment. The evaluation order is fixed by the
 fold.
@@ -72,55 +83,55 @@ recurse into the body immediately. But a lambda should not evaluate its body;
 it should capture the current environment and defer body evaluation until the
 lambda is applied.
 
-## Mendler's Approach
+** Mendler's Approach
 
-Mendler's generalization replaces the algebra's carrier `A` with an algebra
+Mendler's generalization replaces the algebra's carrier ~A~ with an algebra
 that receives an explicit recursion function [cite:@mendler1991recursive]
 [cite:@abel2012wellfounded]. Instead of:
 
-```
+#+begin_example
 alg : F<A> → A
-```
+#+end_example
 
 the algebra becomes:
 
-```
+#+begin_example
 alg : (∀ B. (B → A) → F<B> → A)
-```
+#+end_example
 
-In practice this means the algebra receives a `recurse` function alongside
-each layer. It can call `recurse` on any child, in any order, with any
-arguments it chooses. It can decline to call `recurse` on a child at all.
+In practice this means the algebra receives a ~recurse~ function alongside
+each layer. It can call ~recurse~ on any child, in any order, with any
+arguments it chooses. It can decline to call ~recurse~ on a child at all.
 
 This breaks the uniformity constraint that makes catamorphisms tractable —
 and breaks it in exactly the right direction for an interpreter that needs
 environment threading and lazy branching.
 
-## `mendler_run`: A Case-by-Case Walk
+** ~mendler_run~: A Case-by-Case Walk
 
-The Mendler-style interpreter for `Comp` trees is `mendler_run` in
-`src/smd/smdscheme/sender/fixpoint_eval.hpp`. It is not a catamorphism. It
-is a recursive function where the environment `env` is a parameter, not
+The Mendler-style interpreter for ~Comp~ trees is ~mendler_run~ in
+~src/smd/smdscheme/sender/fixpoint_eval.hpp~. It is not a catamorphism. It
+is a recursive function where the environment ~env~ is a parameter, not
 ambient state, and each case decides independently whether and how to recurse.
 
 The signature:
 
-```cpp
+#+begin_src c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
 template <int MaxList, int MaxBindings>
 [[nodiscard]] constexpr auto
 mendler_run(Comp<MaxList> const &comp,
             closure::env<Comp<MaxList>, MaxBindings> const &env)
     -> foundation::result<closure::value<Comp<MaxList>>>;
-```
+#+end_src
 
-`mendler_run(comp, env)` evaluates the tree rooted at `comp` in the
-environment `env` and returns either a value or an error. The dispatch is a
-`std::visit` over `unwrap_fix(comp)`, the outermost `CompF` layer.
+~mendler_run(comp, env)~ evaluates the tree rooted at ~comp~ in the
+environment ~env~ and returns either a value or an error. The dispatch is a
+~std::visit~ over ~unwrap_fix(comp)~, the outermost ~CompF~ layer.
 
-### `comp_pure`: Atoms
+*** ~comp_pure~: Atoms
 
-```cpp
+#+begin_src c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
 [](comp_pure const &p) -> Res {
     return std::visit(smd::fixpoint::overloaded{
@@ -131,25 +142,25 @@ environment `env` and returns either a value or an error. The dispatch is a
                           }},
                       p.atom);
 },
-```
+#+end_src
 
-Literals need no recursion. An integer becomes `value{int}`, a boolean
-becomes `value{bool}`, and a string becomes `value{symbol}`. The environment
+Literals need no recursion. An integer becomes ~value{int}~, a boolean
+becomes ~value{bool}~, and a string becomes ~value{symbol}~. The environment
 is not consulted.
 
-### `comp_lookup`: Variable Reference
+*** ~comp_lookup~: Variable Reference
 
-```cpp
+#+begin_src c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
 [&env](comp_lookup const &l) -> Res { return env.lookup(l.name); },
-```
+#+end_src
 
-Variable lookup delegates entirely to `env`. If the name is unbound,
-`env.lookup` returns a `parse_error` that propagates up.
+Variable lookup delegates entirely to ~env~. If the name is unbound,
+~env.lookup~ returns a ~parse_error~ that propagates up.
 
-### `comp_if`: Lazy Branching
+*** ~comp_if~: Lazy Branching
 
-```cpp
+#+begin_src c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
 [&env](comp_if<CompT> const &ci) -> Res {
     auto cond_r = mendler_run<MaxList, MaxBindings>(*ci.cond, env);
@@ -161,33 +172,33 @@ Variable lookup delegates entirely to `env`. If the name is unbound,
     return mendler_run<MaxList, MaxBindings>(
         taken ? *ci.cons : *ci.alt, env);
 },
-```
+#+end_src
 
 This is where the Mendler structure pays off. The condition is evaluated
-first. Then exactly one of `cons` or `alt` is recursed into — the other is
+first. Then exactly one of ~cons~ or ~alt~ is recursed into — the other is
 never touched. Any catamorphism over this node would force both branches
 first.
 
-The truthiness rule follows Scheme: anything other than `#f` is truthy.
+The truthiness rule follows Scheme: anything other than ~#f~ is truthy.
 
-### `comp_lambda`: Closure Creation
+*** ~comp_lambda~: Closure Creation
 
-```cpp
+#+begin_src c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
 [&env, &comp](comp_lambda<CompT, MaxList> const &) -> Res {
     return Val{closure::closure<CompT>{
         &comp, closure::constexpr_box<closure::env<CompT, 16>>{
                    new closure::env<CompT, 16>{env}}}};
 },
-```
+#+end_src
 
-A `lambda` expression does not evaluate its body. It captures the current
-environment in a `constexpr_box` and bundles it with a non-owning pointer to
-the `Comp` node itself. No recursion happens here.
+A ~lambda~ expression does not evaluate its body. It captures the current
+environment in a ~constexpr_box~ and bundles it with a non-owning pointer to
+the ~Comp~ node itself. No recursion happens here.
 
-### `comp_apply` with a Builtin
+*** ~comp_apply~ with a Builtin
 
-```cpp
+#+begin_src c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
 [&env, &app](closure::builtin const &bi) -> Res {
     // evaluate arg0 in current env
@@ -202,15 +213,15 @@ the `Comp` node itself. No recursion happens here.
     if (bi.op == closure::builtin_op::add) return Val{a + b};
     return Val{a * b};
 },
-```
+#+end_src
 
 The function is evaluated first, revealing it is a builtin. Arguments are
 then evaluated left-to-right in the current environment. The builtin
 operation is applied to the integer results.
 
-### `comp_apply` with a Closure
+*** ~comp_apply~ with a Closure
 
-```cpp
+#+begin_src c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
 [&env, &app](closure::closure<CompT> const &clo) -> Res {
     // extract lambda node and params
@@ -231,44 +242,44 @@ operation is applied to the integer results.
     // evaluate body in EXTENDED env
     return mendler_run<MaxList, 16>(*lam.body, new_env);
 },
-```
+#+end_src
 
-This is the core of lexical scoping. Arguments evaluate in `env` — the
-call-site environment. Then `new_env` starts from the closure's captured
+This is the core of lexical scoping. Arguments evaluate in ~env~ — the
+call-site environment. Then ~new_env~ starts from the closure's captured
 environment and is extended with the argument bindings. The body evaluates
-in `new_env`.
+in ~new_env~.
 
-The two environments serve different roles: `env` is where the caller lives;
-`new_env` is where the callee lives. Confusing them would be dynamic scoping.
+The two environments serve different roles: ~env~ is where the caller lives;
+~new_env~ is where the callee lives. Confusing them would be dynamic scoping.
 
-## The Reader Monad Pattern
+** The Reader Monad Pattern
 
-The signature `mendler_run(comp, env) → result<value>` is a Reader monad
-computation: `Reader Env (Result Value)`. The environment threads explicitly
+The signature ~mendler_run(comp, env) → result<value>~ is a Reader monad
+computation: ~Reader Env (Result Value)~. The environment threads explicitly
 through every recursive call. There is no mutable global environment, no
 stack of frames pushed and popped implicitly. Each call site passes the
 environment it wants the callee to use.
 
 Lambda application is the only site that extends the environment. Every other
-recursive call passes `env` unchanged. This makes the scoping rules visible
-in the call structure of the interpreter: find the `new_env` construction and
+recursive call passes ~env~ unchanged. This makes the scoping rules visible
+in the call structure of the interpreter: find the ~new_env~ construction and
 you have found the only place where new names enter scope.
 
-## Applicative Parallelism in Argument Evaluation
+** Applicative Parallelism in Argument Evaluation
 
-In the `comp_apply` case, the arguments are sibling `Box` nodes with no data
+In the ~comp_apply~ case, the arguments are sibling ~Box~ nodes with no data
 dependencies on each other. The current interpreter evaluates them
-sequentially in a `for` loop. But the tree structure makes their independence
+sequentially in a ~for~ loop. But the tree structure makes their independence
 structurally visible.
 
-This is not an accident. The `Comp` tree separates the representation of a
+This is not an accident. The ~Comp~ tree separates the representation of a
 computation from any particular evaluation strategy. The current interpreter
 chooses sequential evaluation for simplicity. The next phase introduces a
 sender-based interpreter that exploits this independence directly, launching
 argument evaluations as concurrent sender chains and joining them with
-`when_all`.
+~when_all~.
 
-# References
+* References
 
 Bird, Richard S. and de Moor, Oege (1997). *The Algebra of Programming*,
 Prentice Hall.
