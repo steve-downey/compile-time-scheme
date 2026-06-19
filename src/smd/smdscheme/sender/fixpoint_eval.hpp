@@ -73,7 +73,7 @@ mendler_run(Comp<MaxList> const &comp,
                     taken ? *ci.cons : *ci.alt, env);
             },
             // comp_lambda: create closure capturing current env and this node
-            [&env, &comp](comp_lambda<CompT, MaxList> const &lam) -> Res {
+            [&env, &comp](comp_lambda<CompT, MaxList> const &) -> Res {
                 return Val{closure::closure<CompT>{
                     &comp, closure::constexpr_box<closure::env<CompT, 16>>{
                                new closure::env<CompT, 16>{env}}}};
