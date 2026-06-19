@@ -34,6 +34,7 @@ namespace smd::smdscheme::fixpoint_eval {
 /// @param  comp         The computation tree root to evaluate.
 /// @param  env          Current variable bindings.
 /// @return The evaluated value or a parse_error.
+// 64e39fd9-d4f4-4e2e-ac7e-a018fdaae728
 template <int MaxList, int MaxBindings>
 [[nodiscard]] constexpr auto
 mendler_run(Comp<MaxList> const &comp,
@@ -183,6 +184,7 @@ mendler_run(Comp<MaxList> const &comp,
             }},
         smd::fixpoint::unwrap_fix(comp));
 }
+// 64e39fd9-d4f4-4e2e-ac7e-a018fdaae728 end
 
 } // namespace smd::smdscheme::fixpoint_eval
 

@@ -4,7 +4,7 @@
 #+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
 #+options: html5-fancy:t
 #+bibliography: references.bib
-#+TITLE: Building a Compile-Time Scheme in C++26: Phase 9 - Real World Integration
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 11 - Real World Integration
 #+AUTHOR: Steve Downey
 #+DATE: 2026-06-01
 
