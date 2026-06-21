@@ -1,10 +1,18 @@
-<div class="abstract" id="org9aa6cc0">
+<div class="abstract" id="org0f11449">
 <p>
-After journeying through the reader, elaborating core forms, building fixpoint trees, and wiring Mendler evaluation, the question remains: what does it look like to use these structures inside a practical C++26 program?
+After journeying through the lexer, elaborating core forms, establishing CPS, and mapping DOT pipelines, the question remains: what does it look like to use these structures inside a practical C++26 program?
 This phase focuses on invoking a Scheme script from C++, passing parameters, and interacting with the physical execution environment.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 10 - Constexpr Pipeline ←](phase-10-constexpr.md)
+
+</nav>
 
 
 # Execution Frontends
@@ -21,7 +29,7 @@ constexpr auto program =
     scm::compiled_closure<"(print-and-add current-year 10)">;
 ```
 
-Here, the template string `(print-and-add current-year 10)` is fully elaborated and evaluated through the Mendler interpreter at compile-time.
+Here, the template string `(print-and-add current-year 10)` is fully elaborated and safely evaluated down to the lowest CPS core at compile-time.
 
 The returned variable is a physical C++ generic lambda that represents the entry point to the pre-constructed AST sequence. At runtime, the caller initializes a dynamic variable environment and passes it into this entry point.
 
@@ -43,7 +51,7 @@ The execution requires registering variables natively. A `current-year` variable
 
 # FFI Abstractions
 
-To bridge the C++ type system with the generic value wrappers utilized internally, the architecture utilizes a \`std::span\` structure over dynamically generated \`scm::closure::value<Core>\` abstractions—the same `value<Core>` variant type that the closure backend (Phase 6) defines.
+To bridge the C++ type system with the generic value wrappers utilized internally, the architecture utilizes a \`std::span\` structure over dynamically generated \`scm::closure::value<Core>\` abstractions—the same `value<Core>` variant type that `cps_dispatch` (Phase 5) produces and the closure backend (Phase 6) defines.
 
 ```cpp
 constexpr auto
@@ -71,7 +79,7 @@ The execution mechanism ensures that native C++ callbacks receive an accurate me
 
 While the standard closure backend relies on standard C++ stack evaluation by wrapping tail-calls, the `beman::execution` Sender backend introduces a more sophisticated integration state. By observing how the sender graph evaluates Fibonacci equations, we can look at the requisite changes.
 
-First, standard instantiation requires `compile_to_sender` rather than the simplified `compiled_closure` variant—switching from the closure backend (Phase 6) to the sender backend (Phase 8).
+First, standard instantiation requires `compile_to_sender` rather than the simplified `compiled_closure` variant—switching from the closure backend (Phase 6) to the sender backend (Phase 7).
 
 ```cpp
 constexpr auto program =
@@ -149,7 +157,7 @@ consteval void compile_environment(std::vector<capture_desc> captures) {
 
 `reified_environment<Tag>` starts as a declared-but-undefined struct template. `compile_environment<Tag>` calls `std::meta::define_aggregate` at `consteval` time, which **injects data members** into that template specialization. After `compile_environment<Tag>` runs, `reified_environment<Tag>` becomes a complete aggregate type whose fields correspond exactly to the supplied `(type, name)` pairs — ordinary members, accessible by name, fully typed.
 
-This is distinct from the read-only introspection in Phase 9. There, reflection **read** information from existing types. Here, reflection **writes** a new type into existence.
+This is distinct from the read-only introspection in Phase 8. There, reflection **read** information from existing types. Here, reflection **writes** a new type into existence.
 
 
 ## A `consteval {}` Block
@@ -207,6 +215,12 @@ The practical motivation is decoupling the shape of the runtime environment from
 The isolated compile-time Scheme compiler can merge back into conventional C++ software logic smoothly when mapped cleanly.
 
 Execution graphs establish bindings safely and securely. You can compile scripting sequences straight into local variables and correctly pipe their state transitions out to standard C++ callbacks via explicit Sender receivers safely.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 12 - CPS →](phase-12-cps.md)
+
+</nav>
 
 
 # References

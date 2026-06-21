@@ -16,7 +16,11 @@ scoping with most-recent-first shadowing.
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-5-fixpoint-trees.org][Phase 5 - Fixpoint Trees ←]]
+#+html: </nav>
+
 
 * Values, Environments, and Closures
 
@@ -249,6 +253,11 @@ With ~value~, ~env~, and ~closure~ in place, the interpreter has a target
 type for its output. The next phase introduces the Mendler-style evaluator:
 a fold over ~Comp~ trees that threads an environment through each node and
 produces a ~closure::value~.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-7-mendler.org][Next: Phase 7 - Mendler Interpretation →]]
+#+html: </nav>
 
 * References
 

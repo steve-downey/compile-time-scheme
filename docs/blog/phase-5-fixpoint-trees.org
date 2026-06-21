@@ -16,7 +16,11 @@ over the tree structure.
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-4-elaboration.org][Phase 4 - Elaboration ←]]
+#+html: </nav>
+
 
 * From Arena to Fixed Point
 
@@ -210,6 +214,11 @@ and the evaluator.
 Mendler-style interpreter: a fold over ~Comp~ trees that threads an
 environment and produces ~closure::value~ results. The ~fmap_comp~ functor
 map defined here underpins that fold.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-6-closures.org][Next: Phase 6 - Closures and Values →]]
+#+html: </nav>
 
 * References
 

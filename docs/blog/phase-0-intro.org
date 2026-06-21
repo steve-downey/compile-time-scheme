@@ -16,7 +16,11 @@ evaluation — all inside the C++ constant evaluator.
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]]
+#+html: </nav>
+
 
 * The Motivation
 
@@ -120,6 +124,11 @@ the closure evaluator.
 
 *Phase 13 — Conclusion*: I reflect on what the climb taught me about C++26 ~constexpr~
 limits, fixpoint types, and the Mendler recursion scheme.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-1-foundation.org][Next: Phase 1 - Foundation →]]
+#+html: </nav>
 
 * References
 

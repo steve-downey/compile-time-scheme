@@ -14,7 +14,11 @@ This phase focuses on invoking a Scheme script from C++, passing parameters, and
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-10-constexpr.org][Phase 10 - Constexpr Pipeline ←]]
+#+html: </nav>
+
 
 * Execution Frontends
 
@@ -114,6 +118,11 @@ That would close the loop between compile-time Scheme evaluation and statically 
 The isolated compile-time Scheme compiler can merge back into conventional C++ software logic smoothly when mapped cleanly.
 
 Execution graphs establish bindings safely and securely. You can compile scripting sequences straight into local variables and correctly pipe their state transitions out to standard C++ callbacks via explicit Sender receivers safely.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-12-cps.org][Next: Phase 12 - CPS →]]
+#+html: </nav>
 
 * References
 

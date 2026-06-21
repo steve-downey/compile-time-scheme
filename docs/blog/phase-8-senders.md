@@ -1,4 +1,4 @@
-<div class="abstract" id="org856b221">
+<div class="abstract" id="org9efc5e9">
 <p>
 The Mendler interpreter evaluates arguments sequentially, but the tree
 structure says they are independent. I wrap each sub-expression in a sender
@@ -7,6 +7,14 @@ parallelism visible to the execution framework.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 7 - Mendler Interpretation ←](phase-7-mendler.md)
+
+</nav>
 
 
 # Sender-Based Evaluation
@@ -177,6 +185,12 @@ A CPS trampoline evaluates `(+ (f 1) (g 2))` by linearizing it: evaluate `f(1)`,
 The `Fix<CompF>` tree does not destroy it. In the tree, `(f 1)` and `(g 2)` are sibling `Box` nodes under the `comp_apply` for `+`. They have no edge between them. Any traversal that respects the tree structure can see that independence directly — and `when_all` does exactly that.
 
 This is the sense in which the representation **preserves** the parallelism structure. CPS flattens the tree into a sequence; `Fix<CompF>` keeps the branching. The sender framework can exploit branching. It cannot exploit a sequence.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 9 - Visualizing Execution →](phase-9-graphs.md)
+
+</nav>
 
 
 # References

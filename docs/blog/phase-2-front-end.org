@@ -14,7 +14,11 @@ combinators. No raw function pointers, no mutation, no heap — just composition
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-1-foundation.org][Phase 1 - Foundation ←]]
+#+html: </nav>
+
 
 * The Front End: Parsing with Applicative Combinators
 
@@ -364,6 +368,11 @@ static_assert(!(char_p('a') | char_p('b'))(cursor{"c"}).has_value());
 
 Reading these top to bottom tells you the contract precisely. The compiler
 verifies them on every build.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-3-reader.org][Next: Phase 3 - Reader →]]
+#+html: </nav>
 
 * References
 

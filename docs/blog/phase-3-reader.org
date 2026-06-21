@@ -15,7 +15,11 @@ is the key to homoiconicity.
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-2-front-end.org][Phase 2 - Front End ←]]
+#+html: </nav>
+
 
 * The Reader: Turning Text into Datum Trees
 
@@ -261,6 +265,11 @@ static_assert(run());
 
 The arena and the datum tree live entirely in constant-evaluation memory.
 No heap allocation, no runtime cost.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-4-elaboration.org][Next: Phase 4 - Elaboration →]]
+#+html: </nav>
 
 * References
 

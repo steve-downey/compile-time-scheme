@@ -1,11 +1,19 @@
-<div class="abstract" id="org0808e81">
+<div class="abstract" id="orgb939fac">
 <p>
 By Phase 4, my compile-time compiler could parse and elaborate code into a typed <code>core_type</code> AST, but recursive execution deeply stacked the C++ compiler's internal call limits.
-This phase introduces Continuation-Passing Style (CPS (Reynolds, John C., 1972)) at the C++ template layer as an alternative evaluation backend, enabling native Tail-Call Optimization (TCO) inside the C++ compiler itself.
-The CPS backend materializes lambda nodes in the <code>core_type</code> arena into concrete closure values through a continuation-threaded dispatch.
+Phase 5 fixes this by introducing Continuation-Passing Style (CPS (Reynolds, John C., 1972)) at the C++ template layer, enabling native Tail-Call Optimization (TCO) inside the C++ compiler itself.
+Phase 6 then materializes what CPS sets up, turning the lambda nodes in the <code>core_type</code> arena into concrete closure values.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 11 - Real World Integration ←](phase-11-real-world.md)
+
+</nav>
 
 
 # What is Continuation-Passing Style?
@@ -115,9 +123,15 @@ By forwarding \`cont\` and \`k\` into the recursive instantiation of \`cps\_disp
 
 # Conclusion
 
-By combining Continuation-Passing Style templates with native C++ Tail Call-Optimized return forms, this alternative backend maintains state securely through execution paths without resorting to complex heap-allocated C++ data structures or manual interpreter loops.
+By combining Continuation-Passing Style templates with native C++ Tail Call-Optimized return forms, my Scheme AST maintains state securely through execution paths without resorting to complex heap-allocated C++ data structures or manual interpreter loops.
 
-The closure value type that `cps_dispatch` produces is the same `closure::value<Core>` domain defined in Phase 6 — the CPS backend is an alternative evaluator over the same value representation that the Mendler interpreter uses.
+Phase 6 takes this structure and materializes it: it defines the `closure` value type that `cps_dispatch` produces, and shows how lambda nodes captured in the arena become concrete, executable closure objects.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 13 - Conclusion →](phase-13-conclusion.md)
+
+</nav>
 
 
 # References

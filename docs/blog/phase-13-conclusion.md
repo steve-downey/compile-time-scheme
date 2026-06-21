@@ -1,4 +1,4 @@
-<div class="abstract" id="orgdb987d6">
+<div class="abstract" id="org1f28f85">
 <p>
 The summit is reached. A Scheme-light compiler parses, elaborates,
 tree-transforms, and evaluates entirely at C++26 compile time. The
@@ -6,6 +6,14 @@ sender-based backend makes structural parallelism visible. What did I learn?
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 12 - CPS ←](phase-12-cps.md)
+
+</nav>
 
 
 # The View from the Summit
@@ -120,12 +128,7 @@ return sender_v::then(sender_v::when_all(eval_arg0, eval_arg1), apply_builtin);
 With `sync_wait` as the scheduler, execution is inline-sequential. A thread-pool scheduler would parallelize argument evaluation without changing the evaluation code. The sender graph makes structural independence visible to the framework (Niebler, Eric and others, 2020).
 
 
-## Phase 9 — Visualizing Execution
-
-C++26 reflection walks the nested sender type at `consteval` time and emits Graphviz DOT output. This makes the compiler's work visible: a flat tree of `scheme_node_data` nodes, classified as `just`, `then`, or `when_all`, rendered directly as a graph. The same applicative patterns from Phase 2 drive the string rendering.
-
-
-## Phase 10 — Constexpr Pipeline
+## Phase 9 — Constexpr Pipeline
 
 `constexpr_eval` chains the full pipeline — reader, elaborator, `core_to_comp`, `mendler_run` — and `static_assert` proves it works:
 
@@ -191,6 +194,12 @@ The mountain metaphor has driven this series, and it holds here too. Nobody clim
 C++26 `constexpr` is capable of a non-trivial functional compiler. The tools — `Fix<F>`, Mendler folds, sender composition — are general-purpose. They apply beyond Scheme. The techniques for zero-allocation parsing, arena-based ASTs, open-recursive computation trees, and Mendler-style interpretation are each useful independently of the compile-time constraint.
 
 The proof-of-concept proved what it set out to prove: the compiler can do real evaluative work, not just type-checking. The path is marked. The next expedition can begin from the summit.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md)
+
+</nav>
 
 
 # References

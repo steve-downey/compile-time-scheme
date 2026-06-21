@@ -1,4 +1,4 @@
-<div class="abstract" id="org7059613">
+<div class="abstract" id="orgc2e99d5">
 <p>
 By lowering my Scheme AST into heavily typed <code>std::execution</code> Senders, I gained improved performance.
 But I also created an introspective nightmare.
@@ -7,6 +7,14 @@ How do I prove what the C++ compiler is actually building without deciphering th
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 8 - Sender-Based Evaluation ←](phase-8-senders.md)
+
+</nav>
 
 
 # The Reflection Bridge
@@ -262,6 +270,12 @@ Here the nested `when_all` makes the recursive structure visible: the left branc
 Using the reflection bridge to populate my runtime topology completely removes the black-box nature of compile-time meta-programming. The C++26 reflection framework allows me to natively render the exact asynchronous execution pipeline (`std::execution`) constructed for any Scheme program.
 
 Running the output directly through `dot -Tpng -o plan.png` grants immediate, visual feedback of how functional continuations map to low-level native scheduling operations.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 10 - Constexpr Pipeline →](phase-10-constexpr.md)
+
+</nav>
 
 
 # References

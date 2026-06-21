@@ -1,4 +1,4 @@
-<div class="abstract" id="org3c2e868">
+<div class="abstract" id="orge93b32a">
 <p>
 The full pipeline evaluates at compile time. A <code>static_assert</code>
 proves that parsing, elaborating, tree-converting, and interpreting a Scheme
@@ -7,6 +7,14 @@ single byte of machine code.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 9 - Visualizing Execution ←](phase-9-graphs.md)
+
+</nav>
 
 
 # Constexpr Pipeline
@@ -146,6 +154,12 @@ This is not a deficiency. The two evaluators serve different purposes. `mendler_
 The `static_assert` battery proves the compiler is doing real work. Not just type-checking — **evaluating**. It parses the string `"((lambda (x) (+ x 1)) 41)"`, recognizes the lambda application, builds the environment, applies the argument `41` to the parameter `x`, evaluates the body `(+ x 1)` in the extended environment, and confirms the result is `42`. All of this before `main` has a chance to run.
 
 That is the point of targeting C++26. Not just to write Scheme in a C++ type, but to make the Scheme evaluator itself a compile-time computation.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 11 - Real World Integration →](phase-11-real-world.md)
+
+</nav>
 
 
 # References

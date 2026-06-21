@@ -1,4 +1,4 @@
-<div class="abstract" id="org16a4e2e">
+<div class="abstract" id="org7388108">
 <p>
 The reader takes a string and produces a tree of datums — integers, booleans,
 symbols, lists, and quoted forms. It sees data, not programs. That separation
@@ -6,6 +6,14 @@ is the key to homoiconicity.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 2 - Front End ←](phase-2-front-end.md)
+
+</nav>
 
 
 # The Reader: Turning Text into Datum Trees
@@ -225,6 +233,12 @@ static_assert(run());
 ```
 
 The arena and the datum tree live entirely in constant-evaluation memory. No heap allocation, no runtime cost.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 4 - Elaboration →](phase-4-elaboration.md)
+
+</nav>
 
 
 # References

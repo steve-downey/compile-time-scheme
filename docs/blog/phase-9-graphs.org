@@ -16,7 +16,11 @@ How do I prove what the C++ compiler is actually building without deciphering th
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-8-senders.org][Phase 8 - Sender-Based Evaluation ←]]
+#+html: </nav>
+
 
 * The Reflection Bridge
 
@@ -119,6 +123,11 @@ A thread-pool scheduler could exploit all three independent ~just~ evaluations s
 Using the reflection bridge to populate my runtime topology completely removes the black-box nature of compile-time meta-programming. The C++26 reflection framework allows me to natively render the exact asynchronous execution pipeline (~std::execution~) constructed for any Scheme program.
 
 Running the output directly through ~dot -Tpng -o plan.png~ grants immediate, visual feedback of how functional continuations map to low-level native scheduling operations.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-10-constexpr.org][Next: Phase 10 - Constexpr Pipeline →]]
+#+html: </nav>
 
 * References
 

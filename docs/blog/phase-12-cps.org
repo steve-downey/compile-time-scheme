@@ -15,7 +15,11 @@ Phase 6 then materializes what CPS sets up, turning the lambda nodes in the ~cor
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-11-real-world.org][Phase 11 - Real World Integration ←]]
+#+html: </nav>
+
 
 * What is Continuation-Passing Style?
 
@@ -83,6 +87,11 @@ By forwarding `cont` and `k` into the recursive instantiation of `cps_dispatch(a
 By combining Continuation-Passing Style templates with native C++ Tail Call-Optimized return forms, my Scheme AST maintains state securely through execution paths without resorting to complex heap-allocated C++ data structures or manual interpreter loops.
 
 Phase 6 takes this structure and materializes it: it defines the ~closure~ value type that ~cps_dispatch~ produces, and shows how lambda nodes captured in the arena become concrete, executable closure objects.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-13-conclusion.org][Next: Phase 13 - Conclusion →]]
+#+html: </nav>
 
 * References
 

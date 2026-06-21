@@ -16,7 +16,11 @@ single byte of machine code.
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-9-graphs.org][Phase 9 - Visualizing Execution ←]]
+#+html: </nav>
+
 
 * Constexpr Pipeline
 
@@ -188,6 +192,11 @@ extended environment, and confirms the result is ~42~. All of this before
 
 That is the point of targeting C++26. Not just to write Scheme in a C++
 type, but to make the Scheme evaluator itself a compile-time computation.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-11-real-world.org][Next: Phase 11 - Real World Integration →]]
+#+html: </nav>
 
 * References
 

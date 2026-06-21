@@ -1,4 +1,4 @@
-<div class="abstract" id="org2d82b87">
+<div class="abstract" id="orge20bcef">
 <p>
 Every structure in this compiler lives in compile-time memory. I establish the
 vocabulary types that make this possible: fixed-capacity vectors, a result monad,
@@ -7,6 +7,14 @@ replaces <code>std::indirect</code>.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 0 - Introduction ←](phase-0-intro.md)
+
+</nav>
 
 
 # The Foundation
@@ -158,6 +166,12 @@ The key invariant that makes `Box<A>` legal in `constexpr` contexts is **transie
 In SchemePoC the intermediate `Fix<CompF>` tree is built from `Box`-bearing nodes and fully consumed by the evaluator. The evaluator's result type, `result<value>`, contains only scalar fields — numbers, booleans, and environment handles — with no heap pointers. When the evaluation completes, the `Fix<CompF>` tree falls out of scope, its `Box` destructors run, every `new` is matched by a `delete`, and the result escapes cleanly.
 
 This is why `Box<A>` works: the allocation is real but temporary. The compiler tracks it, verifies the cleanup, and accepts the result as a compile-time constant.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 2 - Front End →](phase-2-front-end.md)
+
+</nav>
 
 
 # References

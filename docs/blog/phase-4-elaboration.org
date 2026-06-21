@@ -15,7 +15,11 @@ lists into semantic program nodes.
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-3-reader.org][Phase 3 - Reader ←]]
+#+html: </nav>
+
 
 * Assigning Meaning to Structure
 
@@ -290,6 +294,11 @@ handles that require the arena for dereferencing. The next step converts
 this into a self-contained ~Fix<CompF>~ tree — an IR that carries its own
 data and does not need an arena for traversal. That representation is what
 the Mendler-style interpreter walks.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-5-fixpoint-trees.org][Next: Phase 5 - Fixpoint Trees →]]
+#+html: </nav>
 
 * References
 

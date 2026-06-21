@@ -1,4 +1,4 @@
-<div class="abstract" id="org537f151">
+<div class="abstract" id="org48097a9">
 <p>
 Every Scheme expression evaluates to a value. I represent values as a
 six-alternative variant: integers, booleans, builtins, closures, symbols,
@@ -7,6 +7,14 @@ scoping with most-recent-first shadowing.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 5 - Fixpoint Trees ←](phase-5-fixpoint-trees.md)
+
+</nav>
 
 
 # Values, Environments, and Closures
@@ -190,6 +198,12 @@ struct constexpr_box {
 # What Comes Next
 
 With `value`, `env`, and `closure` in place, the interpreter has a target type for its output. The next phase introduces the Mendler-style evaluator: a fold over `Comp` trees that threads an environment through each node and produces a `closure::value`.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 7 - Mendler Interpretation →](phase-7-mendler.md)
+
+</nav>
 
 
 # References

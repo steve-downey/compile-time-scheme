@@ -1,4 +1,4 @@
-<div class="abstract" id="org0a7938b">
+<div class="abstract" id="org1a148a1">
 <p>
 A catamorphism folds every child before the algebra sees the result. But
 Scheme's <code>if</code> must choose a branch before evaluating it, and lambda
@@ -8,6 +8,14 @@ to recurse into, and with what context.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 6 - Closures and Values ←](phase-6-closures.md)
+
+</nav>
 
 
 # Mendler-Style Interpretation
@@ -215,6 +223,12 @@ Lambda application is the only site that extends the environment. Every other re
 In the `comp_apply` case, the arguments are sibling `Box` nodes with no data dependencies on each other. The current interpreter evaluates them sequentially in a `for` loop. But the tree structure makes their independence structurally visible.
 
 This is not an accident. The `Comp` tree separates the representation of a computation from any particular evaluation strategy. The current interpreter chooses sequential evaluation for simplicity. The next phase introduces a sender-based interpreter that exploits this independence directly, launching argument evaluations as concurrent sender chains and joining them with `when_all`.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 8 - Sender-Based Evaluation →](phase-8-senders.md)
+
+</nav>
 
 
 # References

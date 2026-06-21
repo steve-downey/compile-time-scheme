@@ -1,0 +1,73 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:t todo:t |:t
+#+options: html5-fancy:t
+#+TITLE: Building a Compile-Time Scheme in C++26 — Blog Series Index
+#+AUTHOR: Steve Downey
+
+* Overview
+
+This is the complete blog series documenting the implementation of a Scheme-light compiler in C++26, compiling entirely at compile-time inside the C++ constant evaluator. Each phase builds on the previous work, from zero-allocation parsing through fixpoint trees to Mendler-style evaluation and sender-based asynchronous execution.
+
+* Blog Posts
+
+** [[file:phase-0-intro.org][Phase 0 — Introduction and Motivation]]
+
+The overall design philosophy: expanding C++26 `constexpr` to prove what the constant evaluator can accomplish.
+
+** [[file:phase-1-foundation.org][Phase 1 — Foundation]]
+
+Establish the memory vocabulary: `result<T>`, `static_vector`, `Box<A>`, and the `Fix<F>` fixpoint combinator.
+
+** [[file:phase-2-front-end.org][Phase 2 — Front End]]
+
+Zero-allocation combinator parsers using immutable cursors and applicative composition.
+
+** [[file:phase-3-reader.org][Phase 3 — Reader]]
+
+Translate source text into a raw `Datum` tree, treating all input as nested shapes with no semantic judgement.
+
+** [[file:phase-4-elaboration.org][Phase 4 — Elaboration]]
+
+Classify `Datum` nodes into a typed core AST covering `if`, `lambda`, `let`, `let*`, `define`, and `quote`.
+
+** [[file:phase-5-fixpoint-trees.org][Phase 5 — Fixpoint Trees]]
+
+Define `Fix<CompF>` — a heap-pointer computation tree using open-recursive algebraic types and the fixpoint combinator.
+
+** [[file:phase-6-closures.org][Phase 6 — Closures and Values]]
+
+Define the runtime value domain: numbers, booleans, closures, and environments that bind names to values at evaluation time.
+
+** [[file:phase-7-mendler.org][Phase 7 — Mendler Interpretation]]
+
+Implement `mendler_run`, a Mendler-style fold over `Fix<CompF>` that is synchronous and fully `constexpr`-capable.
+
+** [[file:phase-8-senders.org][Phase 8 — Sender-Based Evaluation]]
+
+Implement `sender_mendler_run`, which rewrites evaluation as a graph of Beman Execution senders with `when_all` for argument-list parallelism.
+
+** [[file:phase-9-graphs.org][Phase 9 — Visualizing Execution]]
+
+Use C++26 reflection to walk the nested sender type structure at compile time and emit Graphviz DOT output of the execution graph.
+
+** [[file:phase-10-constexpr.org][Phase 10 — Constexpr Pipeline]]
+
+Wire all phases together into a single `constexpr` pipeline and demonstrate evaluation results baked into the binary.
+
+** [[file:phase-11-real-world.org][Phase 11 — Real World Integration]]
+
+Show how to embed the compiler in a real C++ program: pre-compiled closures, runtime environment injection, and FFI callbacks.
+
+** [[file:phase-12-cps.org][Phase 12 — CPS]]
+
+Explore Continuation-Passing Style as an alternative evaluation backend for the closure evaluator.
+
+** [[file:phase-13-conclusion.org][Phase 13 — Conclusion]]
+
+Reflect on what the climb taught me about C++26 `constexpr` limits, fixpoint types, and the Mendler recursion scheme.
+
+* Table of Contents
+
+#+toc: headlines 1

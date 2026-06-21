@@ -1,4 +1,4 @@
-<div class="abstract" id="orgaaec9bc">
+<div class="abstract" id="org83b70d9">
 <p>
 I represent the computation tree as <code>Fix&amp;lt;CompF&amp;gt;</code> — a type-level fixed-point
 combinator that ties the recursive knot. Each node is a variant layer
@@ -7,6 +7,14 @@ over the tree structure.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 4 - Elaboration ←](phase-4-elaboration.md)
+
+</nav>
 
 
 # From Arena to Fixed Point
@@ -262,6 +270,12 @@ The conversion step is a one-time cost at the boundary between the front end and
 # What Comes Next
 
 `Fix<CompF>` is the evaluator's input. The next phase introduces the Mendler-style interpreter: a fold over `Comp` trees that threads an environment and produces `closure::value` results. The `fmap_comp` functor map defined here underpins that fold.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 6 - Closures and Values →](phase-6-closures.md)
+
+</nav>
 
 
 # References

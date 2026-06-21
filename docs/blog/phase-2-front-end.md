@@ -1,10 +1,18 @@
-<div class="abstract" id="org6ffea2d">
+<div class="abstract" id="org4e15526">
 <p>
 Parsing Scheme starts with an immutable cursor and a library of applicative
 combinators. No raw function pointers, no mutation, no heap — just composition.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 1 - Foundation ←](phase-1-foundation.md)
+
+</nav>
 
 
 # The Front End: Parsing with Applicative Combinators
@@ -319,6 +327,12 @@ static_assert(!(char_p('a') | char_p('b'))(cursor{"c"}).has_value());
 ```
 
 Reading these top to bottom tells you the contract precisely. The compiler verifies them on every build.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 3 - Reader →](phase-3-reader.md)
+
+</nav>
 
 
 # References

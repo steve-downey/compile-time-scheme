@@ -1,4 +1,4 @@
-<div class="abstract" id="org0ddbda0">
+<div class="abstract" id="org7191c75">
 <p>
 I am building a Scheme-light compiler that parses, elaborates, and evaluates Lisp
 code entirely during C++26 compilation. This series documents each phase of that
@@ -7,6 +7,14 @@ evaluation — all inside the C++ constant evaluator.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md)
+
+</nav>
 
 
 # The Motivation
@@ -71,6 +79,12 @@ The reader parses Scheme data into a raw datum tree without asking any semantic 
 **Phase 12 — CPS**: I explore Continuation-Passing Style as an alternative backend for the closure evaluator.
 
 **Phase 13 — Conclusion**: I reflect on what the climb taught me about C++26 `constexpr` limits, fixpoint types, and the Mendler recursion scheme.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 1 - Foundation →](phase-1-foundation.md)
+
+</nav>
 
 
 # References

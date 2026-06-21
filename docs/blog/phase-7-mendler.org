@@ -17,7 +17,11 @@ to recurse into, and with what context.
 #+end_abstract
 
 #+MACRO: TEASER_END
-{{{TEASER_END}}}
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-6-closures.org][Phase 6 - Closures and Values ←]]
+#+html: </nav>
+
 
 * Mendler-Style Interpretation
 
@@ -278,6 +282,11 @@ chooses sequential evaluation for simplicity. The next phase introduces a
 sender-based interpreter that exploits this independence directly, launching
 argument evaluations as concurrent sender chains and joining them with
 ~when_all~.
+
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-8-senders.org][Next: Phase 8 - Sender-Based Evaluation →]]
+#+html: </nav>
 
 * References
 

@@ -1,4 +1,4 @@
-<div class="abstract" id="orge587de1">
+<div class="abstract" id="org0455558">
 <p>
 The elaborator transforms raw datum trees into a typed core AST. It recognizes
 <code>if</code>, <code>lambda</code>, <code>quote</code>, <code>define</code>, <code>let</code>, and <code>let*</code> — turning unstructured
@@ -6,6 +6,14 @@ lists into semantic program nodes.
 </p>
 
 </div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 3 - Reader ←](phase-3-reader.md)
+
+</nav>
 
 
 # Assigning Meaning to Structure
@@ -242,6 +250,12 @@ Every elaboration step returns `foundation::result<core_type>`. A parse failure 
 # What Comes Next
 
 The core AST produced here is still arena-based: children are integer handles that require the arena for dereferencing. The next step converts this into a self-contained `Fix<CompF>` tree — an IR that carries its own data and does not need an arena for traversal. That representation is what the Mendler-style interpreter walks.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [Next: Phase 5 - Fixpoint Trees →](phase-5-fixpoint-trees.md)
+
+</nav>
 
 
 # References
