@@ -20,7 +20,7 @@ How do I prove what the C++ compiler is actually building without deciphering th
 
 * The Reflection Bridge
 
-In Phase 8, I utilize C++26 Reflection (~std::meta::info~) alongside a custom ~string_writer~ Applicative [cite:@mcbride2008applicative] to project the generated execution typings into the Graphviz [cite:@graphviz_doc] dot-language for visual rendering.
+In this phase, I utilize C++26 Reflection (~std::meta::info~) alongside a custom ~string_writer~ Applicative [cite:@mcbride2008applicative] to project the generated execution typings into the Graphviz [cite:@graphviz_doc] dot-language for visual rendering.
 
 C++26 Reflection (P2996) allows C++ programs to imperatively query the structural definitions of types during constant evaluation.
 Instead of writing recursive template metaprogramming tricks with partial specializations, I write a straightforward loop that interacts via ~<meta>~ using the ~^^Sender~ reflection syntax.
@@ -65,6 +65,54 @@ While the Graphviz mapping is currently driven through a straightforward indexin
 #+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/dump_scheme_plan.hpp::e0d42f47-3007-4d03-955a-2e94c9fad8b1]] :lines 2- :src cpp :end "e0d42f47-3007-4d03-955a-2e94c9fad8b1 end"
 
 The ~dump_scheme_plan~ function encapsulates the compile-time reflection traversal into a ~constexpr~ lambda, cleanly executing the heavy `meta` machinery strictly during translation.
+
+* Example Output
+
+Running ~dump_scheme_plan~ on the sender type for ~(+ 1 2)~ — a binary addition of two constants — produces:
+
+#+begin_example
+digraph SchemeExecutionPlan {
+  node [shape=Mrecord, style=filled, fillcolor=lightcyan];
+  n0 [label="then\n[]"];
+  n0 -> n1;
+  n1 [label="when_all\n[]"];
+  n1 -> n2;
+  n1 -> n3;
+  n2 [label="just\n[]"];
+  n3 [label="just\n[]"];
+}
+#+end_example
+
+[[file:sender-graph-add.svg]]
+
+The structure is legible: ~then~ applies the addition function to the result of ~when_all~, which evaluates two ~just~ senders (the constants 1 and 2) in parallel.
+This is the sender equivalent of the Scheme expression tree — branching preserved, parallelism visible.
+
+For a more complex expression — ~fib(3)~, which expands to ~fib(2) + fib(1)~ where ~fib(2) = fib(1) + fib(0)~:
+
+#+begin_example
+digraph SchemeExecutionPlan {
+  node [shape=Mrecord, style=filled, fillcolor=lightcyan];
+  n0 [label="then\n[]"];
+  n0 -> n1;
+  n1 [label="when_all\n[]"];
+  n1 -> n2;
+  n1 -> n6;
+  n2 [label="then\n[]"];
+  n2 -> n3;
+  n3 [label="when_all\n[]"];
+  n3 -> n4;
+  n3 -> n5;
+  n4 [label="just\n[]"];
+  n5 [label="just\n[]"];
+  n6 [label="just\n[]"];
+}
+#+end_example
+
+[[file:sender-graph-fib3.svg]]
+
+Here the nested ~when_all~ makes the recursive structure visible: the left branch (~fib(2)~) decomposes into its own ~when_all~ of two base cases, while the right branch (~fib(1)~) is a single ~just~.
+A thread-pool scheduler could exploit all three independent ~just~ evaluations simultaneously.
 
 * Conclusion
 
