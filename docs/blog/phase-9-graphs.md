@@ -1,4 +1,4 @@
-<div class="abstract" id="orgc2e99d5">
+<div class="abstract" id="orgc5dfc87">
 <p>
 By lowering my Scheme AST into heavily typed <code>std::execution</code> Senders, I gained improved performance.
 But I also created an introspective nightmare.
@@ -19,7 +19,7 @@ How do I prove what the C++ compiler is actually building without deciphering th
 
 # The Reflection Bridge
 
-In this phase, I utilize C++26 Reflection (`std::meta::info`) alongside a custom `string_writer` Applicative (McBride, Conor and Paterson, Ross, 2008) to project the generated execution typings into the Graphviz (??, ????) dot-language for visual rendering.
+In this phase, I utilize C++26 Reflection (`std::meta::info`) alongside a custom `string_writer` Applicative (McBride, Conor and Paterson, Ross, 2008) to project the generated execution typings into the Graphviz (Graphviz, 2024) dot-language for visual rendering.
 
 C++26 Reflection (P2996) allows C++ programs to imperatively query the structural definitions of types during constant evaluation. Instead of writing recursive template metaprogramming tricks with partial specializations, I write a straightforward loop that interacts via `<meta>` using the `^^Sender` reflection syntax.
 
@@ -215,7 +215,7 @@ void dump_scheme_plan(std::ostream &out = std::cout) {
 }
 ```
 
-The `dump_scheme_plan` function encapsulates the compile-time reflection traversal into a `constexpr` lambda, cleanly executing the heavy \`meta\` machinery strictly during translation.
+The `dump_scheme_plan` function encapsulates the compile-time reflection traversal into a `constexpr` lambda, cleanly executing the heavy `meta` machinery strictly during translation.
 
 
 # Example Output
@@ -280,6 +280,6 @@ Running the output directly through `dot -Tpng -o plan.png` grants immediate, vi
 
 # References
 
-McBride, Conor and Paterson, Ross (2008). *Applicative Programming with Effects*, Journal of Functional Programming.
+Graphviz (2024). *Graphviz DOT Language*.
 
-(). *Graphviz DOT Language*.
+McBride, Conor and Paterson, Ross (2008). *Applicative Programming with Effects*, Journal of Functional Programming.

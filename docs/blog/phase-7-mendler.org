@@ -118,6 +118,16 @@ The Mendler-style interpreter for ~Comp~ trees is ~mendler_run~ in
 is a recursive function where the environment ~env~ is a parameter, not
 ambient state, and each case decides independently whether and how to recurse.
 
+A caveat on "Mendler-style": the code does not instantiate the literal
+~∀B.(B→A)→F<B>→A~ combinator with an abstract carrier and a passed-in ~recurse~
+argument. Each ~std::visit~ arm simply calls ~mendler_run~ by name on its
+concrete children — so the algebra and the recursion are the same function. What
+makes it *Mendler-style* is the discipline it realizes, not the type: every case
+controls whether, in what order, and in which environment its children are
+recursed, exactly the freedom Mendler's scheme grants. It is the Mendler
+recursion pattern hand-rolled in direct style, rather than a generic Mendler
+fold abstracted over the carrier.
+
 The signature:
 
 #+begin_src c++

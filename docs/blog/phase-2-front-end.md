@@ -1,4 +1,4 @@
-<div class="abstract" id="org4e15526">
+<div class="abstract" id="org406cced">
 <p>
 Parsing Scheme starts with an immutable cursor and a library of applicative
 combinators. No raw function pointers, no mutation, no heap — just composition.
@@ -19,7 +19,7 @@ combinators. No raw function pointers, no mutation, no heap — just composition
 
 Before I can elaborate, evaluate, or compile anything, I need to turn source text into a tree. The front end does that work: a cursor that tracks position without mutating, a result type that models success and failure, and a library of parser combinators that snap together like LEGO.
 
-The entire parser is `constexpr`. No allocation escapes. Everything composes from the same five primitive forms.
+The entire parser is `constexpr`. No allocation escapes. Everything composes from the same handful of primitive forms — `pure`, `satisfy`, `map`, `lift2`, and `operator|`.
 
 
 ## The Immutable Cursor
@@ -175,7 +175,7 @@ Every delimiter is parsed with two lines: `char_p('(')`, `char_p(')')`, `char_p(
 
 ## Applicative Combinators
 
-With the primitives in place, I can lift Applicative composition into the parser library (McBride, Conor and Paterson, Ross, 2008). The idea: build complex parsers by combining simple ones without monadic bind (Hutton, Graham and Meijer, Erik, 1992). Sequential composition and transformation are enough for a Scheme lexer.
+With the primitives in place, I can lift Applicative composition into the parser library (McBride, Conor and Paterson, Ross, 2008). The idea: build complex parsers by combining simple ones without monadic bind (Hutton, Graham and Meijer, Erik, 1996). Sequential composition and transformation are enough for a Scheme lexer.
 
 `map` applies a function to a successfully parsed value:
 
@@ -337,7 +337,7 @@ Reading these top to bottom tells you the contract precisely. The compiler verif
 
 # References
 
-Hutton, Graham and Meijer, Erik (1992). **Monadic Parser Combinators**, Technical Report NOTTCS-TR-92-4. (Hutton, Graham and Meijer, Erik, 1992)
+Hutton, Graham and Meijer, Erik (1992). **Monadic Parser Combinators**, Technical Report NOTTCS-TR-92-4. (Hutton, Graham and Meijer, Erik, 1996)
 
 Leijen, Daan and Meijer, Erik (2001). **Parsec: Direct Style Monadic Parser Combinators for the Real World**, Department of Computer Science, Universiteit Utrecht. (Leijen, Daan and Meijer, Erik, 2001)
 

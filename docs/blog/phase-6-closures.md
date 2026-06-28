@@ -1,4 +1,4 @@
-<div class="abstract" id="org48097a9">
+<div class="abstract" id="orgc36e7b6">
 <p>
 Every Scheme expression evaluates to a value. I represent values as a
 six-alternative variant: integers, booleans, builtins, closures, symbols,
@@ -108,7 +108,7 @@ struct closure {
 };
 ```
 
-`node` is a non-owning pointer into the computation tree (`Comp<MaxList>` — the `Fix<CompF>` tree from the previous phase). The program object owns that tree for the entire evaluation; closures hold raw pointers into it. There is no ownership question: the program outlives all closures.
+`node` is a non-owning pointer into the program's core tree — the `Core` type the value domain is parameterized on. The direct closure evaluator instantiates `Core` with the elaborator's `core_type` (the `fix<core_f_factory>` arena tree from Phase 4); the sender backend reuses the same `closure` template with the `Comp` (`Fix<CompF>`) tree from Phase 5. Either way, the program object owns that tree for the entire evaluation; closures hold raw pointers into it. There is no ownership question: the program outlives all closures.
 
 `captured` is an owned deep copy of the environment at the moment the lambda was evaluated. When the evaluator encounters a `lambda` form, it freezes the current environment and stores it in the closure. When the closure is later applied, evaluation resumes in that captured environment, extended with the argument bindings. This is the standard environment model of evaluation (Abelson, Harold and Sussman, Gerald Jay, 1996).
 
@@ -144,7 +144,7 @@ template <typename Core, int MaxBindings>
 }
 ```
 
-Every program starts with `+` and `*` in scope. Calling a builtin evaluates arguments first, collects them into a span, then passes them to the arithmetic dispatch.
+Every program starts with `+` and `*` in scope. Calling a builtin evaluates its two arguments, checks that both are integers, and computes the result inline — the dispatch is a direct switch on the `builtin_op` enum. (The collect-arguments-into-a-span calling convention belongs to foreign functions, covered next, not to builtins.)
 
 
 ## Foreign Functions
@@ -175,7 +175,7 @@ A `foreign_function` is a plain function pointer with the signature `result<valu
 
 The `closure` struct holds `constexpr_box<env<Core, 16>>` rather than `env<Core, 16>` directly. The reason is a circular dependency: `env` contains `value<Core>`, `value<Core>` contains `closure<Core>`, and `closure<Core>` contains `env`. C++ does not allow an incomplete type as a direct non-static data member, but it allows a pointer to one.
 
-`constexpr_box` is the same workaround pattern as `fixpoint::Box` from the previous phase — a raw `new~/~delete` owning pointer with deep-copy semantics:
+`constexpr_box` is the same workaround pattern as `fixpoint::Box` from the previous phase — a raw `new` / `delete` owning pointer with deep-copy semantics:
 
 ```c++
 // src/smd/smdscheme/closure/value.hpp
@@ -189,10 +189,12 @@ struct constexpr_box {
     }
 
     constexpr ~constexpr_box() { delete ptr; }
+    // ... default and explicit pointer ctors, move ctor,
+    //     copy/move assignment, operator*/->/bool, get()
 };
 ```
 
-`std::unique_ptr` cannot be used in `constexpr` because its copy constructor is deleted. `constexpr_box` provides the necessary deep-copy semantics while still destroying via `delete`. It appears here for the same reason `Box` appears in `comp_f_factory`: breaking a recursive type relationship that the C++ type system cannot yet express with a standard vocabulary type. `std::indirect` (Voutilainen, Ville and others, 2024) would replace both, but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support is not yet available in GCC 16 — so the raw pointer workaround is the mountain path I walk.
+`std::unique_ptr` cannot be used in `constexpr` because its copy constructor is deleted. `constexpr_box` provides the necessary deep-copy semantics while still destroying via `delete`. It appears here for the same reason `Box` appears in `comp_f_factory`: breaking a recursive type relationship that the C++ type system cannot yet express with a standard vocabulary type. `std::indirect` (Coe, Jonathan and others, 2024) would replace both, but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support is not yet available in GCC 16 — so the raw pointer workaround is the mountain path I walk.
 
 
 # What Comes Next
@@ -210,4 +212,4 @@ With `value`, `env`, and `closure` in place, the interpreter has a target type f
 
 Abelson, Harold and Sussman, Gerald Jay (1996). **Structure and Interpretation of Computer Programs**, 2nd ed., MIT Press. (Abelson, Harold and Sussman, Gerald Jay, 1996)
 
-P3019R13 (2024). **std::indirect and std::polymorphic**, ISO C++ Committee. (Voutilainen, Ville and others, 2024)
+P3019R13 (2024). **std::indirect and std::polymorphic**, ISO C++ Committee. (Coe, Jonathan and others, 2024)

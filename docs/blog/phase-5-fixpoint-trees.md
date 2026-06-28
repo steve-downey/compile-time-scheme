@@ -1,6 +1,6 @@
-<div class="abstract" id="org83b70d9">
+<div class="abstract" id="orga008ace">
 <p>
-I represent the computation tree as <code>Fix&amp;lt;CompF&amp;gt;</code> — a type-level fixed-point
+I represent the computation tree as <code>Fix&lt;CompF&gt;</code> — a type-level fixed-point
 combinator that ties the recursive knot. Each node is a variant layer
 parameterized by its children, enabling generic folds and transformations
 over the tree structure.
@@ -72,7 +72,7 @@ constexpr auto make_box(Args &&...args) -> Box<A> {
 }
 ```
 
-`Box` uses `new~/~delete`, which are `constexpr` in C++20 for transient allocations. The natural C++26 type for this role is `std::indirect` (Voutilainen, Ville and others, 2024), but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support is not yet available in GCC 16. `Box` avoids both constraints.
+`Box` uses `new` / `delete`, which are `constexpr` in C++20 for transient allocations. The natural C++26 type for this role is `std::indirect` (Coe, Jonathan and others, 2024), but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support is not yet available in GCC 16. `Box` avoids both constraints.
 
 
 # The CompF Functor
@@ -206,7 +206,7 @@ fmap_comp(F &&f,
 
 Leaves (`comp_pure`, `comp_lookup`) pass through unchanged. Internal nodes apply `f` to each child and rebuild the node with the transformed children. The type changes from `F<A>` to `F<B>` — the node shape is preserved, only the child type changes.
 
-This is the `fmap` that makes `CompF` a functor in the categorical sense. With `fmap_comp` in place, generic `fold_fix` (catamorphism) and `refold` (hylomorphism) operations become expressible in terms of it (Bird, Richard S. and de Moor, Oege, 1997).
+This is the `fmap` that makes `CompF` a functor in the categorical sense. With `fmap_comp` in place, generic recursion schemes — `fold_fix` (catamorphism) and `refold` (hylomorphism) — become expressible in terms of it (Bird, Richard S. and de Moor, Oege, 1997). (In this codebase such a generic fold is currently provided only for the separate `foundation::fix` type; for `Fix<CompF>` the later interpreters still walk the tree by hand.)
 
 
 # core\_to\_comp: The Conversion Anamorphism
@@ -262,7 +262,7 @@ The arena-based core tree and `Fix<CompF>` serve different roles.
 
 The arena tree is optimized for `constexpr` construction. Arena handles are plain integers — no allocations, no pointers. The elaborator runs entirely at compile time, filling a fixed-size arena on the stack. The arena can be statically sized because the program text is bounded.
 
-`Fix<CompF>` with `Box` children is optimized for traversal. A `Comp` node is self-contained: it does not need an external arena to dereference its children. The Mendler-style interpreter in the next phase walks `Comp` trees by pattern-matching on `unwrap_fix(node).inner` and recursing directly into `Box`-stored children. Passing only the node — no arena — keeps the interpreter's interface clean and makes closures straightforward to represent: a closure captures a `Box<Comp>` body, not a handle plus arena.
+`Fix<CompF>` with `Box` children is optimized for traversal. A `Comp` node is self-contained: it does not need an external arena to dereference its children. The Mendler-style interpreter in the next phase walks `Comp` trees by pattern-matching on `unwrap_fix(node)` and recursing directly into `Box`-stored children. Passing only the node — no arena — keeps the interpreter's interface clean and makes closures straightforward to represent: a closure captures a `Box<Comp>` body, not a handle plus arena.
 
 The conversion step is a one-time cost at the boundary between the front end and the evaluator.
 
@@ -284,4 +284,4 @@ Bird, Richard S. and de Moor, Oege (1997). **The Algebra of Programming**, Prent
 
 Meijer, Erik, Fokkinga, Maarten, and Paterson, Ross (1991). **Functional Programming with Bananas, Lenses, Envelopes and Barbed Wire**, FPCA.
 
-P3019R13 (2024). **std::indirect and std::polymorphic**, ISO C++ Committee. (Voutilainen, Ville and others, 2024)
+P3019R13 (2024). **std::indirect and std::polymorphic**, ISO C++ Committee. (Coe, Jonathan and others, 2024)

@@ -1,4 +1,4 @@
-<div class="abstract" id="org7191c75">
+<div class="abstract" id="org11dd166">
 <p>
 I am building a Scheme-light compiler that parses, elaborates, and evaluates Lisp
 code entirely during C++26 compilation. This series documents each phase of that
@@ -23,7 +23,7 @@ evaluation — all inside the C++ constant evaluator.
 
 This project is a proof of concept targeting C++26 on GCC16. It implements a fully staged compiler pipeline entirely inside the C++ compile-time evaluation engine. I transform a source text string into a syntax tree, elaborate it into an abstract semantic core, build a fixpoint computation tree, and evaluate it — all strictly before the compiler ever emits a single byte of executable machine code.
 
-Why? The connection between functional compilation and machine execution is deep (Steele, Guy L. and Sussman, Gerald Jay, 1977). Scheme's lambda calculus maps cleanly onto the abstract machines that execute it. I am not building this because the software industry desperately needs a compile-time Scheme embedded in C++. I am building this to expand my own understanding of modern C++ metaprogramming and to find out exactly where the language's boundaries lie.
+Why? The connection between functional compilation and machine execution is deep (Steele, Guy L., 1977). Scheme's lambda calculus maps cleanly onto the abstract machines that execute it. I am not building this because the software industry desperately needs a compile-time Scheme embedded in C++. I am building this to expand my own understanding of modern C++ metaprogramming and to find out exactly where the language's boundaries lie.
 
 
 # Exploring `constexpr` Boundaries
@@ -37,12 +37,12 @@ To survive this, I model zero-allocation combinator parsers using immutable curs
 
 # The Pipeline
 
-The current architecture flows through six stages:
+The current architecture flows through five stages, the last of which has two interchangeable evaluator variants:
 
 ```
 source string
   → reader (datum tree, arena-based)
-  → elaborator (core AST: if, lambda, let, let*, quote)
+  → elaborator (core AST: if, lambda, let, let*, define, quote)
   → Fix<CompF> computation tree
   → evaluator:
       ├─ mendler_run (synchronous, constexpr-capable)
@@ -89,4 +89,4 @@ The reader parses Scheme data into a raw datum tree without asking any semantic 
 
 # References
 
-Steele, Guy L. (1977). **Lambda: The Ultimate GOTO**, MIT AI Memo 443. (Steele, Guy L. and Sussman, Gerald Jay, 1977)
+Steele, Guy L. (1977). **Lambda: The Ultimate GOTO**, MIT AI Memo 443. (Steele, Guy L., 1977)

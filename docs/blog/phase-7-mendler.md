@@ -1,4 +1,4 @@
-<div class="abstract" id="org1a148a1">
+<div class="abstract" id="org1cefa28">
 <p>
 A catamorphism folds every child before the algebra sees the result. But
 Scheme's <code>if</code> must choose a branch before evaluating it, and lambda
@@ -61,7 +61,7 @@ The same problem appears with the lambda itself: a catamorphism would try to rec
 
 ## Mendler's Approach
 
-Mendler's generalization replaces the algebra's carrier `A` with an algebra that receives an explicit recursion function (Mendler, N. Paul, 1991) (Abel, Andreas and Pientka, Brigitte, 2012). Instead of:
+Mendler's generalization replaces the algebra's carrier `A` with an algebra that receives an explicit recursion function (Mendler, Nax Paul, 1987) (Abel, Andreas and Pientka, Brigitte, 2012). Instead of:
 
 ```
 alg : F<A> → A
@@ -81,6 +81,8 @@ This breaks the uniformity constraint that makes catamorphisms tractable — and
 ## `mendler_run`: A Case-by-Case Walk
 
 The Mendler-style interpreter for `Comp` trees is `mendler_run` in `src/smd/smdscheme/sender/fixpoint_eval.hpp`. It is not a catamorphism. It is a recursive function where the environment `env` is a parameter, not ambient state, and each case decides independently whether and how to recurse.
+
+A caveat on "Mendler-style": the code does not instantiate the literal `∀B.(B→A)→F<B>→A` combinator with an abstract carrier and a passed-in `recurse` argument. Each `std::visit` arm simply calls `mendler_run` by name on its concrete children — so the algebra and the recursion are the same function. What makes it **Mendler-style** is the discipline it realizes, not the type: every case controls whether, in what order, and in which environment its children are recursed, exactly the freedom Mendler's scheme grants. It is the Mendler recursion pattern hand-rolled in direct style, rather than a generic Mendler fold abstracted over the carrier.
 
 The signature:
 

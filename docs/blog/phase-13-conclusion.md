@@ -1,4 +1,4 @@
-<div class="abstract" id="org1f28f85">
+<div class="abstract" id="orgf743ba7">
 <p>
 The summit is reached. A Scheme-light compiler parses, elaborates,
 tree-transforms, and evaluates entirely at C++26 compile time. The
@@ -30,7 +30,7 @@ This final post reviews each phase, draws out the lessons, and sketches what the
 
 I establish the vocabulary: `result<T>` for error propagation without exceptions, `static_vector` for fixed-capacity sequences backed by `std::array`, `Box<A>` for owning heap indirection in `constexpr` contexts, and `Fix<F>` for the open-recursive fixpoint combinator. These four types carry the entire pipeline.
 
-`static_vector` is the easy one — a `std::array` with a size counter, no allocator, fully constexpr-friendly by design. `Box<A>` is the interesting case: raw `new~/~delete` inside a `constexpr` destructor, valid since C++20 as long as every allocation is freed before the compiler observes the result. `Fix<F>` turns an open-recursive functor into a proper recursive type by tying the knot with a heap pointer.
+`static_vector` is the easy one — a `std::array` with a size counter, no allocator, fully constexpr-friendly by design. `Box<A>` is the interesting case: raw `new` / `delete` inside a `constexpr` destructor, valid since C++20 as long as every allocation is freed before the compiler observes the result. `Fix<F>` turns an open-recursive functor into a proper recursive type by tying the knot with a heap pointer.
 
 
 ## Phase 2 — Front End
@@ -79,18 +79,18 @@ struct comp_f_factory {
 
 ## Phase 6 — Closures and Values
 
-The value domain is `closure::value<CompT>`: an `int`, a `bool`, a symbol, or a closure. A closure holds a `Box<Fix<CompF>>` for the body and a `static_vector` environment mapping names to values.
+The value domain is `closure::value<Core>`: an `int`, a `bool`, a symbol, a closure, a builtin, or a foreign function. A closure holds a non-owning pointer to its lambda node in the core tree and a captured copy of the environment (a `static_vector` of name/value bindings, held in a `constexpr_box`).
 
-The environment is copied on `lambda` entry — functional, not imperative. Builtin arithmetic and comparison operators are `ff` values: foreign-function entries that hold a function pointer rather than a tree body.
+The environment is copied on `lambda` entry — functional, not imperative. The builtin arithmetic operators (just `+` and `*`) are `builtin` values holding an operation enum (`builtin_op`); a separate `foreign_function` alternative holds a native function pointer for the FFI callbacks of Phase 11.
 
 
 ## Phase 7 — Mendler Interpretation
 
-`mendler_run` is the Mendler-style fold over `Fix<CompF>`. The Mendler scheme (Mendler, N. Paul, 1991) gives the algebra explicit control over recursion by threading the recursive call as an argument:
+`mendler_run` is the Mendler-style fold over `Fix<CompF>`. The Mendler scheme (Mendler, Nax Paul, 1987) gives the algebra explicit control over recursion by threading the recursive call as an argument:
 
 ```c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
-auto mendler_run(Comp<MaxList> const& comp, Env env) -> Res {
+auto mendler_run(Comp<MaxList> const& comp, Env const& env) -> Res {
     return std::visit(overloaded{
         [&](comp_pure const& p) -> Res { ... },
         [&](comp_lookup const& l) -> Res { ... },
@@ -125,7 +125,7 @@ auto eval_arg1 = sender_v::then(sender_v::just(0), [&](int) {
 return sender_v::then(sender_v::when_all(eval_arg0, eval_arg1), apply_builtin);
 ```
 
-With `sync_wait` as the scheduler, execution is inline-sequential. A thread-pool scheduler would parallelize argument evaluation without changing the evaluation code. The sender graph makes structural independence visible to the framework (Niebler, Eric and others, 2020).
+With `sync_wait` as the scheduler, execution is inline-sequential. A thread-pool scheduler would parallelize argument evaluation without changing the evaluation code. The sender graph makes structural independence visible to the framework (Dominiak, Michał and others, 2024).
 
 
 ## Phase 9 — Constexpr Pipeline
@@ -164,19 +164,19 @@ A standard fold is too uniform for language interpretation. `if` must evaluate o
 `when_all` works for fixed-arity arguments — binary builtins. Runtime-arity argument lists (closures, variadic forms) cannot be handled with a variadic `when_all` without type erasure. `any_sender` or coroutines add complexity the proof-of-concept avoids. Sequential evaluation is the current answer for variable-arity cases.
 
 
-## Desugaring is the right level for `let~/~let*`
+## Desugaring is the right level for `let` / `let*`
 
 No new IR nodes. No new interpreter cases. The elaborator rewrites `let` and `let*` into `lambda` + application before the interpreter ever sees them. `let*` nests single-binding lambdas so each binding scope sees earlier bindings. The interpreter stays simple; the elaborator absorbs the complexity.
 
 
 # What `std::indirect` Will Fix
 
-The natural C++26 type for owned indirection is `std::indirect` (Voutilainen, Ville and others, 2024). The obstacle is its explicit default constructor. `static_vector` value-initializes its backing `std::array<T, Capacity>`, which requires a non-explicit default. `Box` provides that — its default sets `ptr = nullptr`. When `std::indirect` gains a non-explicit default constructor, or gains full constexpr support, `Box` can be retired and the pipeline simplifies.
+The natural C++26 type for owned indirection is `std::indirect` (Coe, Jonathan and others, 2024). The obstacle is its explicit default constructor. `static_vector` value-initializes its backing `std::array<T, Capacity>`, which requires a non-explicit default. `Box` provides that — its default sets `ptr = nullptr`. When `std::indirect` gains a non-explicit default constructor, or gains full constexpr support, `Box` can be retired and the pipeline simplifies.
 
 
 # Future Work
 
-**call/cc**: First-class continuations. In a Mendler interpreter, this means reifying the "recurse" function as a value. The CPS structure is already implicit in the recursive call pattern (Steele, Guy L. and Sussman, Gerald Jay, 1977) (Appel, Andrew W., 1992).
+**call/cc**: First-class continuations. In a Mendler interpreter, this means reifying the "recurse" function as a value. The CPS structure is already implicit in the recursive call pattern (Steele, Guy L., 1977) (Appel, Andrew W., 1992).
 
 **set!**: Mutable bindings require a store — an indirection from environment names to mutable locations. A boxing transformation pass can introduce this before the interpreter runs.
 

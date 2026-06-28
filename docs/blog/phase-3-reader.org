@@ -29,7 +29,8 @@ That is the reader's job. It asks only one question of every character sequence:
 is this a valid Scheme datum? It never asks what the datum means.
 
 This separation is not accidental. It is homoiconicity: the same tree that
-represents data also represents code. The reader produces the same structure
+represents data also represents code — the data/code duality of S-expressions
+that goes back to McCarthy's original Lisp [cite:@mccarthy1960recursive]. The reader produces the same structure
 for the list ~(1 2 3)~ and for the expression ~(+ 1 2)~. The symbol ~+~ and
 the integer ~1~ are just atoms — the reader does not know that ~+~ is addition.
 That knowledge belongs to the elaborator.
@@ -137,7 +138,7 @@ accumulates the result without any intermediate string allocation:
 
 ~symbol_p~ uses ~is_initial_symbol_char~ for the first character and
 ~is_symbol_char~ for the tail. The result is a ~string_view~ into the original
-source, so no copy is made [cite:@mccarthy1960recursive]:
+source, so no copy is made:
 
 #+begin_src c++
 // src/smd/smdscheme/reader/atom.hpp
@@ -198,6 +199,8 @@ The list case accumulates arena handles as it goes:
         datum_list<datum, MaxNodes, MaxList> list{};
         while (true) {
             after = skip_intertoken_space(after);
+            if (after.empty())
+                return foundation::parse_error{after.position(), "expected ')'"};
             if (after.peek() == ')')
                 return parser::parse_state<datum>{datum{datum_f{list}}, after.bump()};
             auto elem = read_datum_node<MaxNodes, MaxList>(after, arena);

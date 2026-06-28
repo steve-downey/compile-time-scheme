@@ -35,9 +35,9 @@ compile time.
 The test file ~src/smd/smdscheme/sender/fixpoint_program.test.cpp~ contains
 this:
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/fixpoint_program.test.cpp::a817bd64-c6de-4e00-a16b-4df6c46e183d]] :lines 2- :src cpp :end "a817bd64-c6de-4e00-a16b-4df6c46e183d end"
+#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/fixpoint_program.test.cpp::a817bd64-c6de-4e00-a16b-4df6c46e183d]] :lines 2- :src cpp :end "a817bd64-c6de-4e00-a16b-4df6c46e183d end"
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/fixpoint_program.test.cpp::c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5]] :lines 2- :src cpp :end "c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5 end"
+#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/fixpoint_program.test.cpp::c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5]] :lines 2- :src cpp :end "c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5 end"
 
 These are not unit tests. They are compiler-enforced invariants. If any of
 them is wrong, the translation unit does not compile. The ~constexpr_eval~
@@ -70,7 +70,7 @@ There is nothing to object to here. ~std::array~ is constexpr-friendly by
 design, and a fixed-capacity array with a size counter has no moving parts
 that the compiler cannot reason about statically.
 
-~result<T>~ is a ~std::variant<T, parse_error>~. Variants are
+~result<T>~ wraps a ~std::variant<T, parse_error>~. Variants are
 constexpr-capable since C++17. Again, no issue.
 
 ~Box<A>~ is the interesting case.
@@ -102,8 +102,10 @@ compile-time constant.
 In the Mendler interpreter, ~Box~ pointers exist inside the computation tree
 and inside closures. Those closures are created during evaluation and freed
 when the result is produced. The final value returned from ~constexpr_eval~
-is a ~result<closure::value<CompT>>~ — a variant holding an ~int~, a ~bool~,
-or a ~closure::symbol~. None of those contain heap pointers. Every ~Box~
+is a ~result<closure::value<CompT>>~. For these example programs the payload is
+always an ~int~, a ~bool~, or a ~closure::symbol~ — none of which contain heap
+pointers. (The ~value~ variant can also hold a ~closure~, which does own a
+~Box~; but each example here reduces to a scalar or symbol.) Every ~Box~
 allocated during evaluation is freed before the ~static_assert~ observes the
 result. The transient allocation rule is satisfied.
 

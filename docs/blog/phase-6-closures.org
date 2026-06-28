@@ -131,11 +131,13 @@ struct closure {
 };
 #+end_src
 
-~node~ is a non-owning pointer into the computation tree
-(~Comp<MaxList>~ — the ~Fix<CompF>~ tree from the previous phase). The
-program object owns that tree for the entire evaluation; closures hold raw
-pointers into it. There is no ownership question: the program outlives all
-closures.
+~node~ is a non-owning pointer into the program's core tree — the ~Core~ type
+the value domain is parameterized on. The direct closure evaluator instantiates
+~Core~ with the elaborator's ~core_type~ (the ~fix<core_f_factory>~ arena tree
+from Phase 4); the sender backend reuses the same ~closure~ template with the
+~Comp~ (~Fix<CompF>~) tree from Phase 5. Either way, the program object owns
+that tree for the entire evaluation; closures hold raw pointers into it. There
+is no ownership question: the program outlives all closures.
 
 ~captured~ is an owned deep copy of the environment at the moment the lambda
 was evaluated. When the evaluator encounters a ~lambda~ form, it freezes the
@@ -179,9 +181,11 @@ template <typename Core, int MaxBindings>
 }
 #+end_src
 
-Every program starts with ~+~ and ~*~ in scope. Calling a builtin evaluates
-arguments first, collects them into a span, then passes them to the
-arithmetic dispatch.
+Every program starts with ~+~ and ~*~ in scope. Calling a builtin evaluates its
+two arguments, checks that both are integers, and computes the result inline —
+the dispatch is a direct switch on the ~builtin_op~ enum. (The
+collect-arguments-into-a-span calling convention belongs to foreign functions,
+covered next, not to builtins.)
 
 ** Foreign Functions
 
@@ -220,7 +224,7 @@ contains ~value<Core>~, ~value<Core>~ contains ~closure<Core>~, and
 direct non-static data member, but it allows a pointer to one.
 
 ~constexpr_box~ is the same workaround pattern as ~fixpoint::Box~ from the
-previous phase — a raw ~new~/~delete~ owning pointer with deep-copy
+previous phase — a raw ~new~ / ~delete~ owning pointer with deep-copy
 semantics:
 
 #+begin_src c++
@@ -235,6 +239,8 @@ struct constexpr_box {
     }
 
     constexpr ~constexpr_box() { delete ptr; }
+    // ... default and explicit pointer ctors, move ctor,
+    //     copy/move assignment, operator*/->/bool, get()
 };
 #+end_src
 

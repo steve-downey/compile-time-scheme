@@ -44,7 +44,7 @@ carry the entire pipeline.
 
 ~static_vector~ is the easy one — a ~std::array~ with a size counter, no
 allocator, fully constexpr-friendly by design. ~Box<A>~ is the interesting
-case: raw ~new~/~delete~ inside a ~constexpr~ destructor, valid since C++20
+case: raw ~new~ / ~delete~ inside a ~constexpr~ destructor, valid since C++20
 as long as every allocation is freed before the compiler observes the result.
 ~Fix<F>~ turns an open-recursive functor into a proper recursive type by
 tying the knot with a heap pointer.
@@ -90,7 +90,7 @@ never sees ~let~ at all.
 
 The elaborated core AST is arena-based and handle-indexed. To evaluate it, I
 translate it into ~Fix<CompF>~ — a heap-pointer computation tree using the
-open-recursive fixpoint combinator [cite:@meijer1991bananas].
+open-recursive fixpoint combinator [cite:@meijer1991functional].
 
 ~CompF~ is the open-recursive functor:
 
@@ -114,13 +114,15 @@ pass. From this point, the arena is no longer needed.
 
 ** Phase 6 — Closures and Values
 
-The value domain is ~closure::value<CompT>~: an ~int~, a ~bool~, a symbol, or
-a closure. A closure holds a ~Box<Fix<CompF>>~ for the body and a
-~static_vector~ environment mapping names to values.
+The value domain is ~closure::value<Core>~: an ~int~, a ~bool~, a symbol, a
+closure, a builtin, or a foreign function. A closure holds a non-owning pointer
+to its lambda node in the core tree and a captured copy of the environment (a
+~static_vector~ of name/value bindings, held in a ~constexpr_box~).
 
-The environment is copied on ~lambda~ entry — functional, not imperative.
-Builtin arithmetic and comparison operators are ~ff~ values: foreign-function
-entries that hold a function pointer rather than a tree body.
+The environment is copied on ~lambda~ entry — functional, not imperative. The
+builtin arithmetic operators (just ~+~ and ~*~) are ~builtin~ values holding an
+operation enum (~builtin_op~); a separate ~foreign_function~ alternative holds a
+native function pointer for the FFI callbacks of Phase 11.
 
 ** Phase 7 — Mendler Interpretation
 
@@ -130,7 +132,7 @@ recursion by threading the recursive call as an argument:
 
 #+begin_src c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
-auto mendler_run(Comp<MaxList> const& comp, Env env) -> Res {
+auto mendler_run(Comp<MaxList> const& comp, Env const& env) -> Res {
     return std::visit(overloaded{
         [&](comp_pure const& p) -> Res { ... },
         [&](comp_lookup const& l) -> Res { ... },
@@ -223,7 +225,7 @@ argument lists (closures, variadic forms) cannot be handled with a variadic
 proof-of-concept avoids. Sequential evaluation is the current answer for
 variable-arity cases.
 
-** Desugaring is the right level for ~let~/~let*~
+** Desugaring is the right level for ~let~ / ~let*~
 
 No new IR nodes. No new interpreter cases. The elaborator rewrites ~let~ and
 ~let*~ into ~lambda~ + application before the interpreter ever sees them.
