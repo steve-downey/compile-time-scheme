@@ -20,7 +20,10 @@ jobs:
     name: Test System Compiler with Makefile
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/bemanproject/testingcontainers-gcc:14@sha256:f7b898e2deb9b470fa47991c5fd37deb151348c1340921c1bf53a731d263e55f # ratchet:ghcr.io/bemanproject/testingcontainers-gcc:14
+      # The project requires the experimental reflection GCC-16 (-freflection / C++26),
+      # which is not apt-installable. Use the Beman reflection container whose default
+      # g++ already is that compiler (the same image the preset/build-and-test CI uses).
+      image: ghcr.io/bemanproject/infra-containers-gcc:latest
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
@@ -39,21 +42,10 @@ jobs:
       - name: Install system tools
         shell: bash
         run: |
-          # The testingcontainers-gcc:14 image ships a Kitware apt source whose
-          # signing key has rotated (NO_PUBKEY 65ADECD7A7039392), which makes
-          # `apt update` fail. cmake/ninja come from `make venv` (uv) here, so the
-          # Kitware repo is not needed for this job — drop it before updating.
-          sudo rm -f /etc/apt/sources.list.d/kitware*.list /etc/apt/sources.list.d/kitware*.sources
-          sudo apt update
-          sudo apt -y install build-essential gcc-16 g++-16 ccache jq
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 \
-            --slave /usr/bin/g++ g++ /usr/bin/g++-16 \
-            --slave /usr/bin/gcov gcov /usr/bin/gcov-16
-          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-16  100
-          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-16 100
-          sudo update-alternatives --set gcc  /usr/bin/gcc-16
-          sudo update-alternatives --set cc  /usr/bin/gcc-16
-          sudo update-alternatives --set c++  /usr/bin/g++-16
+          # The reflection GCC-16 is already the default compiler in this container.
+          # Only ccache is additionally needed (used as the CMake compiler launcher).
+          apt-get update
+          apt-get install -y --no-install-recommends ccache
 
       - name: Configure Environment
         shell: bash
