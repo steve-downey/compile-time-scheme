@@ -2,9 +2,10 @@
 
 name: Documentation
 
+# Disabled on push/PR/schedule: MrDocs cannot yet parse the project's
+# C++26/reflection + Beman execution headers, so the API-reference build fails.
+# Manual-only until the docs pipeline is viable.
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 permissions:
