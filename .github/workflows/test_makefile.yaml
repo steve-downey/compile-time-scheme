@@ -39,6 +39,11 @@ jobs:
       - name: Install system tools
         shell: bash
         run: |
+          # The testingcontainers-gcc:14 image ships a Kitware apt source whose
+          # signing key has rotated (NO_PUBKEY 65ADECD7A7039392), which makes
+          # `apt update` fail. cmake/ninja come from `make venv` (uv) here, so the
+          # Kitware repo is not needed for this job — drop it before updating.
+          sudo rm -f /etc/apt/sources.list.d/kitware*.list /etc/apt/sources.list.d/kitware*.sources
           sudo apt update
           sudo apt -y install build-essential gcc-16 g++-16 ccache jq
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 \
