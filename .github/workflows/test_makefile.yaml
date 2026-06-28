@@ -43,7 +43,7 @@ jobs:
           # gcc-16/g++-16 provide reflection; ccache is the Makefile's launcher.
           apt-get update
           apt-get install -y --no-install-recommends \
-            gcc-16 g++-16 ccache make git ca-certificates curl
+            gcc-16 g++-16 ccache make git ca-certificates curl python3
 
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
