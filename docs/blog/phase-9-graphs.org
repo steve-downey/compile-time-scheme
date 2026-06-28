@@ -34,9 +34,9 @@ Instead of writing recursive template metaprogramming tricks with partial specia
 Before generating Graphviz output, the reflected sender topology is materialized into a homogeneous, ~consteval~-friendly tree.
 Two types form this intermediate representation:
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/scheme_node_data.hpp::c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f]] :lines 2- :src cpp :end "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f end"
+#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/scheme_node_data.hpp::c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f]] :lines 2- :src cpp :end "c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f end"
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/scheme_tree.hpp::d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f60]] :lines 2- :src cpp :end "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f60 end"
+#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/scheme_tree.hpp::d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f60]] :lines 2- :src cpp :end "d2e3f4a5-b6c7-4d8e-9f0a-1b2c3d4e5f60 end"
 
 This is the same flat arena pattern as the datum and core trees from Phases 3 and 4: a ~static_vector~ of nodes addressed by integer index, trivially copyable, and safe to produce in a ~consteval~ context.
 The difference is that the recursion depth is bounded by the sender composition depth rather than the Scheme source nesting depth.
@@ -45,7 +45,7 @@ The difference is that the recursion depth is bounded by the sender composition 
 
 ~build_scheme_tree~ populates a ~scheme_tree~ by walking the sender type at ~consteval~ time:
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/build_scheme_tree.hpp::ad3fee60-a0ea-4464-966c-bae3a964db79]] :lines 2- :src cpp :end "ad3fee60-a0ea-4464-966c-bae3a964db79 end"
+#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/build_scheme_tree.hpp::ad3fee60-a0ea-4464-966c-bae3a964db79]] :lines 2- :src cpp :end "ad3fee60-a0ea-4464-966c-bae3a964db79 end"
 
 The traversal is straightforward: ~template_arguments_of(sender_type)~ yields ~[Tag, Data, Child...]~, and each child at positions ~[2+]~ is recursed into directly.
 
@@ -66,9 +66,9 @@ Using the ~Applicative~ typeclass from the foundation—the same typeclass that 
 The applicative and alternative interfaces allow me to map functionally over the returned string values.
 While the Graphviz mapping is currently driven through a straightforward indexing iteration, the types align nicely allowing pure state accumulation.
 
-#+transclude: [[orgit:~/src/steve-downey/schemepoc/schemepoc/::src/smd/smdscheme/sender/dump_scheme_plan.hpp::e0d42f47-3007-4d03-955a-2e94c9fad8b1]] :lines 2- :src cpp :end "e0d42f47-3007-4d03-955a-2e94c9fad8b1 end"
+#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/dump_scheme_plan.hpp::e0d42f47-3007-4d03-955a-2e94c9fad8b1]] :lines 2- :src cpp :end "e0d42f47-3007-4d03-955a-2e94c9fad8b1 end"
 
-The ~dump_scheme_plan~ function encapsulates the compile-time reflection traversal into a ~constexpr~ lambda, cleanly executing the heavy `meta` machinery strictly during translation.
+The ~dump_scheme_plan~ function encapsulates the compile-time reflection traversal into a ~constexpr~ lambda, cleanly executing the heavy ~meta~ machinery strictly during translation.
 
 * Example Output
 

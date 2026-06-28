@@ -28,7 +28,8 @@ without mutating, a result type that models success and failure, and a library
 of parser combinators that snap together like LEGO.
 
 The entire parser is ~constexpr~. No allocation escapes. Everything composes
-from the same five primitive forms.
+from the same handful of primitive forms — ~pure~, ~satisfy~, ~map~, ~lift2~,
+and ~operator|~.
 
 ** The Immutable Cursor
 

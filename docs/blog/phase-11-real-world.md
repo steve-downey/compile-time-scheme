@@ -1,4 +1,4 @@
-<div class="abstract" id="org0f11449">
+<div class="abstract" id="orgdb8ec0b">
 <p>
 After journeying through the lexer, elaborating core forms, establishing CPS, and mapping DOT pipelines, the question remains: what does it look like to use these structures inside a practical C++26 program?
 This phase focuses on invoking a Scheme script from C++, passing parameters, and interacting with the physical execution environment.
@@ -22,7 +22,7 @@ Throughout this project, the implementation has enforced a strict boundary betwe
 
 ## Standard Closure Evaluation
 
-The standard methodology for embedding the Scheme compiler into a runtime process involves pre-compiling a script via ~scm::compiled\_closure~—the closure backend from Phase 6 wrapped in a convenient variable template.
+The standard methodology for embedding the Scheme compiler into a runtime process involves pre-compiling a script via `scm::compiled_closure` — the closure backend from Phase 6, wrapped in a convenient variable template.
 
 ```cpp
 constexpr auto program =
@@ -31,7 +31,7 @@ constexpr auto program =
 
 Here, the template string `(print-and-add current-year 10)` is fully elaborated and safely evaluated down to the lowest CPS core at compile-time.
 
-The returned variable is a physical C++ generic lambda that represents the entry point to the pre-constructed AST sequence. At runtime, the caller initializes a dynamic variable environment and passes it into this entry point.
+The returned variable is a callable program object — a `closure::closure_program` functor — that represents the entry point to the pre-constructed AST sequence. At runtime, the caller initializes a dynamic variable environment and passes it into this entry point.
 
 ```cpp
 int main() {
@@ -51,7 +51,7 @@ The execution requires registering variables natively. A `current-year` variable
 
 # FFI Abstractions
 
-To bridge the C++ type system with the generic value wrappers utilized internally, the architecture utilizes a \`std::span\` structure over dynamically generated \`scm::closure::value<Core>\` abstractions—the same `value<Core>` variant type that `cps_dispatch` (Phase 5) produces and the closure backend (Phase 6) defines.
+To bridge the C++ type system with the generic value wrappers utilized internally, the architecture utilizes a `std::span` structure over dynamically generated `scm::closure::value<Core>` abstractions — the same `value<Core>` variant type that `cps_dispatch` (Phase 12) produces and the closure backend (Phase 6) defines.
 
 ```cpp
 constexpr auto
@@ -79,14 +79,14 @@ The execution mechanism ensures that native C++ callbacks receive an accurate me
 
 While the standard closure backend relies on standard C++ stack evaluation by wrapping tail-calls, the `beman::execution` Sender backend introduces a more sophisticated integration state. By observing how the sender graph evaluates Fibonacci equations, we can look at the requisite changes.
 
-First, standard instantiation requires `compile_to_sender` rather than the simplified `compiled_closure` variant—switching from the closure backend (Phase 6) to the sender backend (Phase 7).
+First, standard instantiation requires `compile_to_sender` rather than the simplified `compiled_closure` variant — switching from the closure backend (Phase 6) to the sender backend (Phase 8).
 
 ```cpp
 constexpr auto program =
     scm::sender::compile_to_sender<512, 16>(scheme_source).value();
 ```
 
-Second, the returned functional interface cannot be executed natively as an immediate synchronous call. Senders define workflows, and they mandate evaluation through a physical receiver or a scheduler structure context.
+Second, the returned program object is still invoked synchronously as `program(env)`, exactly like the closure backend. The difference is internal: the sender backend describes evaluation as a graph of senders and drives it to completion with `sync_wait` inside `operator()`, rather than walking the tree directly. The asynchronous machinery is hidden behind the same synchronous call interface.
 
 ```cpp
 auto env = scm::closure::default_env<Core, 16>();
@@ -102,7 +102,7 @@ auto result = program(env);
 scm::reflection::reified_environment<RuntimeStateTag> state{};
 ```
 
-Extraction happens by invoking `scm::sender_v::sync_wait(std::move(s))`, which initializes propagation across the pipeline, asynchronously awaiting resolution safely before unwrapping local evaluation values locally into `res_opt`.
+The call returns a `foundation::result<closure::value<Core>>` — the same result type the closure backend yields. The caller checks `result.has_value()` and extracts the payload with `std::get<int>(result.value())` (reporting `result.error().message` on failure); the `sync_wait` that drives the sender graph runs internally and never appears at the call site.
 
 
 # Reflection-Reified Environments

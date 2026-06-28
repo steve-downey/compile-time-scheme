@@ -1,4 +1,4 @@
-<div class="abstract" id="org9efc5e9">
+<div class="abstract" id="orgdba5feb">
 <p>
 The Mendler interpreter evaluates arguments sequentially, but the tree
 structure says they are independent. I wrap each sub-expression in a sender
@@ -26,7 +26,7 @@ This phase introduces a sender-based interpreter that makes that structural inde
 
 ## The P2300 Sender/Receiver Model
 
-P2300 (`std::execution`) is the C++26 proposal for structured concurrency (Niebler, Eric and others, 2020). The central abstraction is the **sender**: a value that **describes** work without performing it. A sender is connected to a **receiver** that handles its result, and a **scheduler** decides where the work runs.
+P2300 (`std::execution`) is the C++26 proposal for structured concurrency (Dominiak, Michał and others, 2024). The central abstraction is the **sender**: a value that **describes** work without performing it. A sender is connected to a **receiver** that handles its result, and a **scheduler** decides where the work runs.
 
 The vocabulary I use comes from `sender_v.hpp`:
 
@@ -40,10 +40,10 @@ using beman::execution26::when_all;
 
 -   `just(v)` — a sender that completes immediately with value `v`
 -   `then(s, f)` — when sender `s` completes with value `v`, call `f(v)` and produce its result
--   `when_all(s0, s1, ...)` — run all senders; when all complete, produce all their results as a tuple
+-   `when_all(s0, s1, ...)` — run all senders; when all complete, concatenate their value completions into a single `set_value` carrying all the results as separate arguments (not bundled into one tuple)
 -   `sync_wait(s)` — connect `s` to an inline receiver and block until it completes
 
-With `sync_wait`, everything runs on the calling thread in order. With a thread-pool scheduler, `when_all` arguments run concurrently — no changes to the sender descriptions needed.
+With `sync_wait`, everything runs on the calling thread in order. `when_all` is what makes the independence of the argument senders **expressible**: it states that `s0` and `s1` have no ordering dependency. Realising that as actual concurrency requires giving the children a scheduler — e.g. wrapping each in `on(pool, ...)` — which is the one addition the sender descriptions would need. As written here, each argument sender is `then(just(0), …)` with no scheduler, so under `sync_wait` they complete inline, in order.
 
 
 ## Beman Execution
@@ -147,9 +147,9 @@ The payoff comes in the `comp_apply` builtin case. Builtins take exactly two arg
 },
 ```
 
-`s0` and `s1` are constructed but not started. `when_all(s0, s1)` produces a new sender that, when connected, starts both. With `sync_wait`, this is sequential: `s0` runs to completion, then `s1`. With a thread-pool scheduler, both start immediately and run concurrently. The arithmetic in the `then` lambda runs only after both have produced results.
+`s0` and `s1` are constructed but not started. `when_all(s0, s1)` produces a new sender that, when connected, starts both. With `sync_wait` and the bare `then(just(0), …)` children used here, this is sequential: each child completes inline as it is started, so `s0` runs to completion, then `s1`. To actually overlap them the children must be placed on a scheduler — e.g. `on(pool, s0)` and `on(pool, s1)` — so that starting them hands work to a thread pool. Either way, the arithmetic in the `then` lambda runs only after both have produced results.
 
-The code does not change between the sequential and parallel cases. The sender structure already encodes the independence; the scheduler decides how to exploit it.
+What `when_all` contributes is the **structure**: it records that the two argument senders are independent. Whether that independence becomes real concurrency is a scheduling decision — give the children a pool scheduler and the same shape runs in parallel; omit it and it runs in order.
 
 
 ## Why Closures and Foreign Functions Stay Sequential

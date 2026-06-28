@@ -1,4 +1,4 @@
-<div class="abstract" id="org7388108">
+<div class="abstract" id="orgb1f52e1">
 <p>
 The reader takes a string and produces a tree of datums — integers, booleans,
 symbols, lists, and quoted forms. It sees data, not programs. That separation
@@ -20,7 +20,7 @@ is the key to homoiconicity.
 
 Before the elaborator can classify an `if` or a `lambda`, before evaluation can run, something has to take the raw source string and produce structure. That is the reader's job. It asks only one question of every character sequence: is this a valid Scheme datum? It never asks what the datum means.
 
-This separation is not accidental. It is homoiconicity: the same tree that represents data also represents code. The reader produces the same structure for the list `(1 2 3)` and for the expression `(+ 1 2)`. The symbol `+` and the integer `1` are just atoms — the reader does not know that `+` is addition. That knowledge belongs to the elaborator.
+This separation is not accidental. It is homoiconicity: the same tree that represents data also represents code — the data/code duality of S-expressions that goes back to McCarthy's original Lisp (McCarthy, John, 1960). The reader produces the same structure for the list `(1 2 3)` and for the expression `(+ 1 2)`. The symbol `+` and the integer `1` are just atoms — the reader does not know that `+` is addition. That knowledge belongs to the elaborator.
 
 
 ## Datum Types
@@ -111,7 +111,7 @@ The leaf parsers are built from the combinator library introduced in Phase 2. `i
 }
 ```
 
-`symbol_p` uses `is_initial_symbol_char` for the first character and `is_symbol_char` for the tail. The result is a `string_view` into the original source, so no copy is made (McCarthy, John, 1960):
+`symbol_p` uses `is_initial_symbol_char` for the first character and `is_symbol_char` for the tail. The result is a `string_view` into the original source, so no copy is made:
 
 ```c++
 // src/smd/smdscheme/reader/atom.hpp
@@ -172,6 +172,8 @@ if (c == '(') {
     datum_list<datum, MaxNodes, MaxList> list{};
     while (true) {
         after = skip_intertoken_space(after);
+        if (after.empty())
+            return foundation::parse_error{after.position(), "expected ')'"};
         if (after.peek() == ')')
             return parser::parse_state<datum>{datum{datum_f{list}}, after.bump()};
         auto elem = read_datum_node<MaxNodes, MaxList>(after, arena);

@@ -1,4 +1,4 @@
-<div class="abstract" id="orge93b32a">
+<div class="abstract" id="orgeea2aa4">
 <p>
 The full pipeline evaluates at compile time. A <code>static_assert</code>
 proves that parsing, elaborating, tree-converting, and interpreting a Scheme
@@ -75,7 +75,7 @@ class static_vector {
 
 There is nothing to object to here. `std::array` is constexpr-friendly by design, and a fixed-capacity array with a size counter has no moving parts that the compiler cannot reason about statically.
 
-`result<T>` is a `std::variant<T, parse_error>`. Variants are constexpr-capable since C++17. Again, no issue.
+`result<T>` wraps a `std::variant<T, parse_error>`. Variants are constexpr-capable since C++17. Again, no issue.
 
 `Box<A>` is the interesting case.
 
@@ -100,9 +100,9 @@ struct Box {
 
 Since C++20, `new` and `delete` are permitted in `constexpr` functions, subject to one constraint: all allocations made during a constant evaluation must be freed before that evaluation ends. The compiler tracks every allocation and rejects any evaluation that leaks heap memory into a compile-time constant.
 
-In the Mendler interpreter, `Box` pointers exist inside the computation tree and inside closures. Those closures are created during evaluation and freed when the result is produced. The final value returned from `constexpr_eval` is a `result<closure::value<CompT>>` — a variant holding an `int`, a `bool`, or a `closure::symbol`. None of those contain heap pointers. Every `Box` allocated during evaluation is freed before the `static_assert` observes the result. The transient allocation rule is satisfied.
+In the Mendler interpreter, `Box` pointers exist inside the computation tree and inside closures. Those closures are created during evaluation and freed when the result is produced. The final value returned from `constexpr_eval` is a `result<closure::value<CompT>>`. For these example programs the payload is always an `int`, a `bool`, or a `closure::symbol` — none of which contain heap pointers. (The `value` variant can also hold a `closure`, which does own a `Box`; but each example here reduces to a scalar or symbol.) Every `Box` allocated during evaluation is freed before the `static_assert` observes the result. The transient allocation rule is satisfied.
 
-The natural C++26 type for owned indirection is `std::indirect` (Voutilainen, Ville and others, 2024). It has the right value semantics and is designed for exactly this use case. The obstacle is its explicit default constructor: `static_vector` initializes its backing `std::array<T, Capacity>` with value initialization, which requires a non-explicit default constructor. `Box` provides that — its default leaves `ptr = nullptr`, which is the right representation for an unused slot. When `std::indirect` gains a non-explicit default constructor, or when consteval allocation lands and eliminates the need for the nullable-but-empty representation, `Box` can be retired.
+The natural C++26 type for owned indirection is `std::indirect` (Coe, Jonathan and others, 2024). It has the right value semantics and is designed for exactly this use case. The obstacle is its explicit default constructor: `static_vector` initializes its backing `std::array<T, Capacity>` with value initialization, which requires a non-explicit default constructor. `Box` provides that — its default leaves `ptr = nullptr`, which is the right representation for an unused slot. When `std::indirect` gains a non-explicit default constructor, or when consteval allocation lands and eliminates the need for the nullable-but-empty representation, `Box` can be retired.
 
 
 ## static\_vector for Arguments

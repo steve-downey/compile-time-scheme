@@ -1,4 +1,4 @@
-<div class="abstract" id="org0455558">
+<div class="abstract" id="orgba42121">
 <p>
 The elaborator transforms raw datum trees into a typed core AST. It recognizes
 <code>if</code>, <code>lambda</code>, <code>quote</code>, <code>define</code>, <code>let</code>, and <code>let*</code> — turning unstructured
@@ -204,7 +204,7 @@ return core{core_f{std::move(app)}};
 The binding expressions are elaborated in the outer scope — they cannot see each other or the bound names. That is the semantics of `let`: all bindings are evaluated before any of them are in scope.
 
 
-# let\\\* Desugaring
+# let\* Desugaring
 
 `let*` has different semantics: each binding is in scope for subsequent bindings. This translates to nested single-binding lambdas:
 

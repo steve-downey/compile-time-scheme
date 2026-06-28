@@ -176,7 +176,7 @@
 (use-package citeproc :ensure t :after org)
 
 ;; Export orgit links as GitHub source browser URLs
-(defvar orgit-base-url "https://github.com/steve-downey/schemepoc/blob/main/"
+(defvar orgit-base-url "https://github.com/steve-downey/compile-time-scheme/blob/main/"
   "Base URL for exporting orgit links.")
 
 (org-link-set-parameters

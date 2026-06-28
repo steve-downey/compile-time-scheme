@@ -62,12 +62,13 @@ worth solving.
 
 * The Pipeline
 
-The current architecture flows through six stages:
+The current architecture flows through five stages, the last of which has two
+interchangeable evaluator variants:
 
 #+begin_example
 source string
   → reader (datum tree, arena-based)
-  → elaborator (core AST: if, lambda, let, let*, quote)
+  → elaborator (core AST: if, lambda, let, let*, define, quote)
   → Fix<CompF> computation tree
   → evaluator:
       ├─ mendler_run (synchronous, constexpr-capable)

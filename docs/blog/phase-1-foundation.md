@@ -1,4 +1,4 @@
-<div class="abstract" id="orge20bcef">
+<div class="abstract" id="orgbc0185f">
 <p>
 Every structure in this compiler lives in compile-time memory. I establish the
 vocabulary types that make this possible: fixed-capacity vectors, a result monad,
@@ -47,7 +47,7 @@ class result {
 
 `result<T>` is a thin wrapper over `std::variant`. A `parse_error` carries a `source_pos` — line and column — and a static string literal naming what was expected. Because `message` is a pointer to a string literal, the struct holds no owned memory and is trivially copyable across evaluation boundaries.
 
-I deliberately chose this narrow design over `std::expected` (??, ????). `std::expected`'s richer monadic interface is appealing, but `result<T>` only needs the two constructors and three accessors that the parsing pipeline actually calls. The smaller surface keeps cognitive load low.
+I deliberately chose this narrow design over `std::expected` (cppreference.com, 2024). `std::expected`'s richer monadic interface is appealing, but `result<T>` only needs the two constructors and three accessors that the parsing pipeline actually calls. The smaller surface keeps cognitive load low.
 
 
 ## static\_vector\\<T, Capacity\\>
@@ -118,7 +118,7 @@ struct tree_arena {
 
 A `tree_arena<Datum, 1024>` holds up to 1024 datum nodes in a contiguous `static_vector`. An `arena_box<Datum>` is just an integer — the index of a node in the arena. Recursive structures embed `arena_box` handles instead of pointers. The entire tree lives in one flat array, and a datum node's children are adjacent integer offsets rather than scattered heap addresses.
 
-This pattern is sometimes called region-based memory management (??, a). The compile-time variant works because the arena itself is a `static_vector` — inline storage that the constant evaluator can reason about without tracing heap pointers.
+This pattern is sometimes called region-based memory management (Wikipedia, 2024). The compile-time variant works because the arena itself is a `static_vector` — inline storage that the constant evaluator can reason about without tracing heap pointers.
 
 The null handle has `id_ == -1` and converts to `false`, matching the conventional nullable-pointer idiom.
 
@@ -127,7 +127,7 @@ The null handle has `id_ == -1` and converts to `false`, matching the convention
 
 The arena-and-handle pattern works for the reader's datum tree because all nodes share the same type. The computation tree is different: `Fix<CompF>` is a recursive algebraic type whose node variants hold **owning** sub-trees of the same type. That requires a genuine owning pointer.
 
-I need something with value semantics: deep copy, destructor that frees, and a nullable default that does not allocate. The standard type for this role is `std::indirect` (Voutilainen, Ville and others, 2024), but `std::indirect`'s explicit default constructor blocks its use in aggregate-initialized containers like `static_vector`. Until that is resolved, I use `Box<A>`:
+I need something with value semantics: deep copy, destructor that frees, and a nullable default that does not allocate. The standard type for this role is `std::indirect` (Coe, Jonathan and others, 2024), but `std::indirect`'s explicit default constructor blocks its use in aggregate-initialized containers like `static_vector`. Until that is resolved, I use `Box<A>`:
 
 ```c++
 // src/smd/fixpoint/box.hpp

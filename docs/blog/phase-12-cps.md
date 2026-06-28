@@ -1,8 +1,7 @@
-<div class="abstract" id="orgb939fac">
+<div class="abstract" id="org2e63833">
 <p>
-By Phase 4, my compile-time compiler could parse and elaborate code into a typed <code>core_type</code> AST, but recursive execution deeply stacked the C++ compiler's internal call limits.
-Phase 5 fixes this by introducing Continuation-Passing Style (CPS (Reynolds, John C., 1972)) at the C++ template layer, enabling native Tail-Call Optimization (TCO) inside the C++ compiler itself.
-Phase 6 then materializes what CPS sets up, turning the lambda nodes in the <code>core_type</code> arena into concrete closure values.
+By Phase 4, my compile-time compiler could parse and elaborate code into a typed <code>core_type</code> AST, and Phase 6 gave it a closure-based value domain.
+This phase recasts evaluation in Continuation-Passing Style (CPS (Reynolds, John C., 1972)) at the C++ template layer: continuations are threaded explicitly through the closure evaluator, and tail positions are written as C++ return-position calls so the native optimizer can treat them as loops at runtime.
 </p>
 
 </div>
@@ -44,9 +43,9 @@ add_cps(3, 4, [](int partial_sum) {
 ```
 
 
-# Modeling the \`cps\_code\` Signature in C++26
+# Modeling the `cps_code` Signature in C++26
 
-To represent this statically at compile time without relying on dynamically allocated \`std::function\` closures, I use C++ templating. Our \`cps\_code\` wraps any callable object representing Scheme code.
+To represent this statically at compile time without relying on dynamically allocated `std::function` closures, I use C++ templating. Our `cps_code` wraps any callable object representing Scheme code.
 
 ```cpp
 template <class F>
@@ -61,7 +60,7 @@ struct cps_code {
 };
 ```
 
-Each CPS form takes an environment (\`env\`) containing variables and a continuation function (\`k\`). When execution finishes, it calls \`k(result)\` instead of returning it directly (or passes it out naturally back through the call).
+Each CPS form takes an environment (`env`) containing variables and a continuation function (`k`). When execution finishes, it calls `k(result)` instead of returning it directly (or passes it out naturally back through the call).
 
 
 # Dispatching Core Nodes in CPS
@@ -92,9 +91,9 @@ constexpr auto cps_dispatch(
                 return k(r.value());
 ```
 
-Notice how \`cps\_dispatch\` chains continuations via \`Cont\` and \`K\` template parameters. Eager sub-evaluation (such as determining node conditions or processing function arguments before an application) passes \`identity\_k\` continuations which simply return the result directly to the C++ call stack.
+Notice how `cps_dispatch` chains continuations via `Cont` and `K` template parameters. Eager sub-evaluation (such as determining node conditions or processing function arguments before an application) passes `identity_k` continuations which simply return the result directly to the C++ call stack.
 
-However, for capturing a lambda scope, the \`cps\_dispatch\` returns control directly through the continuation parameter \`cont\`:
+However, for capturing a lambda scope, the `cps_dispatch` returns control directly through the continuation parameter `cont`:
 
 ```cpp
 Val v{closure::closure<Core>{
@@ -111,21 +110,23 @@ return k(r.value());
 
 Because Scheme mandates Tail-Call Optimization (meaning infinite recursion without stack overflow is valid loop behavior), CPS architectures like the Rabbit compiler (Steele, Guy L., 1978) historically represented continuations as heap-allocated closures (a function pointer paired with a captured environment) to avoid consuming the C stack.
 
-However, since our `constexpr` paths are strictly evaluated at compile-time by C++ parsers like GCC, I delegate the job of transforming tail-recursive calls back to the native C++ optimizer. Instead of manually building a trampolining loop to evaluate defunctionalized continuations, my \`cps\_dispatch\` aligns its final AST execution steps (like executing the body of the lambda) natively in the C++ return position.
+Rather than represent continuations as heap-allocated data, I keep the continuation machinery simple and let the native C++ optimizer handle tail calls. Instead of manually building a trampolining loop to evaluate defunctionalized continuations, my `cps_dispatch` places its final AST execution steps (like executing the body of a lambda) in C++ return position.
 
 ```cpp
 return cps_dispatch<MaxNodes, MaxList>(
         arena.get(lam.body), arena, cont, new_env, k);
 ```
 
-By forwarding \`cont\` and \`k\` into the recursive instantiation of \`cps\_dispatch(arena.get(lam.body)&hellip;)\` inside the \`return\` statement, GCC's constexpr evaluator can collapse the compile-time execution frame. A recursive Scheme call executing this branch avoids consuming extra evaluation stack depth, enabling deep Scheme tail recursion within the C++ constant evaluator.
+By forwarding `cont` and `k` into the recursive instantiation of `cps_dispatch(arena.get(lam.body)...)` inside the `return` statement, a tail call stays in C++ return position. At runtime, compiling with `-O2` lets GCC apply sibling-call optimization there, so a tail-recursive Scheme loop need not grow the native C++ stack.
+
+One important caveat: this does **not** extend to the constant evaluator. GCC's `constexpr` interpreter counts every nested `cps_dispatch` call against `-fconstexpr-depth` regardless of return position, so deep tail recursion **evaluated at compile time** is still bounded by that depth limit rather than running as a true loop. The CPS structuring buys runtime TCO and a clean continuation discipline; it does not turn the compile-time evaluator into a constant-space loop.
 
 
 # Conclusion
 
 By combining Continuation-Passing Style templates with native C++ Tail Call-Optimized return forms, my Scheme AST maintains state securely through execution paths without resorting to complex heap-allocated C++ data structures or manual interpreter loops.
 
-Phase 6 takes this structure and materializes it: it defines the `closure` value type that `cps_dispatch` produces, and shows how lambda nodes captured in the arena become concrete, executable closure objects.
+Phase 6 already defined the `closure` value type that `cps_dispatch` produces; this phase showed how a CPS traversal of the `core_type` arena threads continuations through evaluation, resolving lambda applications in tail position.
 
 <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
 
