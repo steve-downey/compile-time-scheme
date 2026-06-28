@@ -1,97 +1,72 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: Makefile Workflow Test
+# Smoke-test the project's own `make` workflow against extrinsic drift
+# (dependency updates, uv-pinned tool versions, base-image/compiler changes).
+#
+# Runs on a base Ubuntu dev image, which carries the same stock GCC-16 used for
+# local development (reflection / -freflection is mainline in GCC 16). This is
+# deliberately NOT the Beman reusable system-compiler harness — it just exercises
+# the real Makefile build+test path with full tooling (ccache available).
+name: Make Workflow Smoke Test
 
-# Disabled on push/PR/schedule: this job needs one container with BOTH the
-# experimental reflection GCC-16 AND full dev/lint tooling (ccache, node, ruby,
-# go). No off-the-shelf image provides both, so it has never passed. Manual-only
-# until a suitable container exists.
 on:
+  push:
+    branches:
+      - main
+  pull_request:
   workflow_dispatch:
+  schedule:
+    - cron: '30 15 * * *'
+
 permissions:
   contents: read
 
 jobs:
-  test_matrix:
-    strategy:
-      fail-fast: false
-    name: Test System Compiler with Makefile
+  make-build-test:
+    name: make compile + test (Ubuntu GCC-16)
     runs-on: ubuntu-latest
     container:
-      # The project requires the experimental reflection GCC-16 (-freflection / C++26),
-      # which is not apt-installable. Use the Beman reflection container whose default
-      # g++ already is that compiler (the same image the preset/build-and-test CI uses).
-      image: ghcr.io/bemanproject/infra-containers-gcc:latest
+      # ubuntu:devel tracks the current Ubuntu dev release, whose archive carries
+      # GCC-16 (the same package used locally). Tracking devel is intentional: it
+      # surfaces extrinsic toolchain drift early.
+      image: ubuntu:devel
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
+      - name: Install toolchain
+        shell: bash
+        run: |
+          # Installed before checkout so git is available for submodule fetch.
+          # gcc-16/g++-16 provide reflection; ccache is the Makefile's launcher.
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            gcc-16 g++-16 ccache make git ca-certificates curl
+
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: 'recursive'
+
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          # Install a specific version of uv.
           version: "0.11.6"
-      - name: Install system tools
-        shell: bash
-        run: |
-          # The reflection GCC-16 is already the default compiler in this container.
-          # Only ccache is additionally needed (the Makefile sets it as the CMake
-          # compiler launcher). The base distro of the reflection container is not
-          # fixed, so detect the package manager rather than assume apt.
-          if command -v ccache >/dev/null 2>&1; then
-            echo "ccache already installed"
-          elif command -v apt-get >/dev/null 2>&1; then
-            apt-get update && apt-get install -y --no-install-recommends ccache
-          elif command -v pacman >/dev/null 2>&1; then
-            pacman -Sy --noconfirm ccache
-          elif command -v dnf >/dev/null 2>&1; then
-            dnf install -y ccache
-          elif command -v apk >/dev/null 2>&1; then
-            apk add --no-cache ccache
-          else
-            echo "::error::no known package manager and ccache is missing"; exit 1
-          fi
 
-      - name: Configure Environment
+      - name: Configure environment
         shell: bash
-        run: |
-          make venv
+        run: make venv
 
-        env:
-          CMAKE_GENERATOR: "Ninja Multi-Config"
-      - name: Build
+      - name: Compile
         shell: bash
         run: |
           source .venv/bin/activate
           make compile
+
       - name: Test
         shell: bash
         run: |
           source .venv/bin/activate
-          make test
-      - name: Generate Coverage Files
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          make coverage
-      - name: Lint
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          make lint
-      - name: Manual Lint
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          make lint
-      - name: Test Install
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          make testinstall
+          make ctest
