@@ -2,9 +2,10 @@
 
 name: Documentation
 
+# Disabled on push/PR/schedule: MrDocs cannot yet parse the project's
+# C++26/reflection + Beman execution headers, so the API-reference build fails.
+# Manual-only until the docs pipeline is viable.
 on:
-  push:
-  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -38,6 +39,17 @@ jobs:
           sudo apt-get update -qq
           sudo apt-get install -y clang-18 libclang-18-dev
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "0.11.6"
+
+      - name: Configure environment
+        # Provisions the uv-managed toolchain (CMake 4.x, Ninja). MrDocs shells out
+        # to `cmake`, and the project requires CMake >= 4.0; the runner's system
+        # cmake (3.31) is too old, so the venv must be on PATH for `make docs`.
+        run: make venv
+
       - name: Cache MrDocs
         uses: actions/cache@v5
         with:
@@ -45,7 +57,9 @@ jobs:
           key: mrdocs-${{ runner.os }}-${{ hashFiles('etc/install-mrdocs.sh') }}
 
       - name: Build documentation
-        run: make docs
+        run: |
+          source .venv/bin/activate
+          make docs
 
       - name: Locate output directory
         id: out

@@ -19,16 +19,12 @@ jobs:
   preset-test:
     uses: bemanproject/infra-workflows/.github/workflows/reusable-beman-preset-test.yml@ab547291c55be8aedbb183577f571ca75b962f5b # ratchet:bemanproject/infra-workflows/.github/workflows/reusable-beman-preset-test.yml@1.7.3
     with:
+      # GCC-16 only: the project requires experimental -freflection (P2996),
+      # which clang/appleclang/msvc do not support. See CLAUDE.md (GCC16/C++26 baseline).
       matrix_config: >
         [
           {"preset": "gcc-debug", "image": "ghcr.io/bemanproject/infra-containers-gcc:latest"},
-          {"preset": "gcc-release", "image": "ghcr.io/bemanproject/infra-containers-gcc:latest"},
-          {"preset": "llvm-debug", "image": "ghcr.io/bemanproject/infra-containers-clang:latest"},
-          {"preset": "llvm-release", "image": "ghcr.io/bemanproject/infra-containers-clang:latest"},
-          {"preset": "appleclang-debug", "runner": "macos-latest"},
-          {"preset": "appleclang-release", "runner": "macos-latest"},
-          {"preset": "msvc-debug", "runner": "windows-latest"},
-          {"preset": "msvc-release", "runner": "windows-latest"}
+          {"preset": "gcc-release", "image": "ghcr.io/bemanproject/infra-containers-gcc:latest"}
         ]
 
   build-and-test:
@@ -46,22 +42,6 @@ jobs:
                         "Debug.Default", "Release.Default", "Release.TSan",
                         "Release.MaxSan", "Debug.Werror",
                         "Debug.Coverage"
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          ],
-          "clang": [
-            { "versions": ["22"],
-              "tests": [
-                {"cxxversions": ["c++26"],
-                  "tests": [
-                    { "stdlibs": ["libstdc++", "libc++"],
-                      "tests": [
-                        "Debug.Default", "Release.Default", "Release.TSan",
-                        "Release.MaxSan", "Debug.Werror"
                       ]
                     }
                   ]

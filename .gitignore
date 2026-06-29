@@ -18,6 +18,10 @@ uv.lock
 /.claude/settings.local.json
 /.claude/
 
+# Documentation build artifacts (Antora npm deps + MrDocs tooling)
+/node_modules/
+/.tools/
+
 # Local workflow artifacts
 /build.log
 /compile_out.txt

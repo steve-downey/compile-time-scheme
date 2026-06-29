@@ -46,7 +46,8 @@ repos:
         args: ['-I', '.codespell_ignore', '--uri-ignore-words-list', '*']
         exclude: >
           (?x)^(
-            (papers|latex)/.*
+            (papers|latex)/.*|
+            package-lock\.json
           )$
 
   # Requires Go toolchain download which needs network access.

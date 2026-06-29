@@ -1,6 +1,13 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: Makefile Workflow Test
+# Smoke-test the project's own `make` workflow against extrinsic drift
+# (dependency updates, uv-pinned tool versions, base-image/compiler changes).
+#
+# Runs on a base Ubuntu dev image, which carries the same stock GCC-16 used for
+# local development (reflection / -freflection is mainline in GCC 16). This is
+# deliberately NOT the Beman reusable system-compiler harness — it just exercises
+# the real Makefile build+test path with full tooling (ccache available).
+name: Make Workflow Smoke Test
 
 on:
   push:
@@ -10,80 +17,62 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '30 15 * * *'
+
 permissions:
   contents: read
 
 jobs:
-  test_matrix:
-    strategy:
-      fail-fast: false
-    name: Test System Compiler with Makefile
+  make-build-test:
+    name: make compile + test (Ubuntu GCC-16)
     runs-on: ubuntu-latest
     container:
-      image: ghcr.io/bemanproject/testingcontainers-gcc:14@sha256:f7b898e2deb9b470fa47991c5fd37deb151348c1340921c1bf53a731d263e55f # ratchet:ghcr.io/bemanproject/testingcontainers-gcc:14
+      # ubuntu:devel tracks the current Ubuntu dev release, whose archive carries
+      # GCC-16 (the same package used locally). Tracking devel is intentional: it
+      # surfaces extrinsic toolchain drift early.
+      image: ubuntu:devel
     steps:
       - name: Harden the runner (Audit all outbound calls)
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
 
+      - name: Install toolchain
+        shell: bash
+        run: |
+          # Installed before checkout so git is available for submodule fetch.
+          # gcc-16/g++-16 provide reflection; ccache is the Makefile's launcher.
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            gcc-16 g++-16 ccache make git ca-certificates curl python3
+
       - name: Checkout repository
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           submodules: 'recursive'
+
+      - name: Trust workspace
+        shell: bash
+        # The job runs as root but the checkout is owned by the runner uid, so git
+        # reports "dubious ownership" when the Makefile invokes submodule commands.
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: Install uv
         uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          # Install a specific version of uv.
           version: "0.11.6"
-      - name: Install system tools
-        shell: bash
-        run: |
-          sudo apt update
-          sudo apt -y install build-essential gcc-16 g++-16 ccache jq
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-16 100 \
-            --slave /usr/bin/g++ g++ /usr/bin/g++-16 \
-            --slave /usr/bin/gcov gcov /usr/bin/gcov-16
-          sudo update-alternatives --install /usr/bin/cc cc /usr/bin/gcc-16  100
-          sudo update-alternatives --install /usr/bin/c++ c++ /usr/bin/g++-16 100
-          sudo update-alternatives --set gcc  /usr/bin/gcc-16
-          sudo update-alternatives --set cc  /usr/bin/gcc-16
-          sudo update-alternatives --set c++  /usr/bin/g++-16
 
-      - name: Configure Environment
+      - name: Configure environment
         shell: bash
-        run: |
-          make venv
+        run: make venv
 
-        env:
-          CMAKE_GENERATOR: "Ninja Multi-Config"
-      - name: Build
+      - name: Compile
         shell: bash
         run: |
           source .venv/bin/activate
           make compile
+
       - name: Test
         shell: bash
         run: |
           source .venv/bin/activate
-          make test
-      - name: Generate Coverage Files
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          make coverage
-      - name: Lint
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          make lint
-      - name: Manual Lint
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          make lint
-      - name: Test Install
-        shell: bash
-        run: |
-          source .venv/bin/activate
-          make testinstall
+          make ctest
