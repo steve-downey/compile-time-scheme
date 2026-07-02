@@ -131,11 +131,12 @@ The type changes from ~F<A>~ to ~F<B>~ — the node shape is preserved, only
 the child type changes.
 
 This is the ~fmap~ that makes ~CompF~ a functor in the categorical sense.
-With ~fmap_comp~ in place, generic recursion schemes — ~fold_fix~ (catamorphism)
-and ~refold~ (hylomorphism) — become expressible in terms of it
-[cite:@bird1997algebra]. (In this codebase such a generic fold is currently
-provided only for the separate ~foundation::fix~ type; for ~Fix<CompF>~ the
-later interpreters still walk the tree by hand.)
+With ~fmap_comp~ in place, generic recursion schemes — ~fold_fix~ (catamorphism),
+~refold~ (hylomorphism), ~mendler_fold~ (Mendler catamorphism), and
+~mendler_para~ (Mendler paramorphism) — become expressible in terms of it
+[cite:@bird1997algebra]. The Mendler-style combinators are the ones actually
+used by the interpreter: they thread context and give the algebra explicit
+control over recursion order (see Phase 7).
 
 * core_to_comp: The Conversion Anamorphism
 

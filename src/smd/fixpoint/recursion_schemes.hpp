@@ -46,6 +46,26 @@ auto refold(const Algebra &algebra, const Coalgebra &coalgebra,
     return algebra(evaluated);
 }
 
+template <typename Result, template <typename> class F, typename Ctx,
+          typename Algebra>
+constexpr auto mendler_fold(Algebra const &alg, Ctx const &ctx,
+                            Fix<F> const &tree) -> Result {
+    auto recurse = [&alg](Fix<F> const &child, Ctx const &c) -> Result {
+        return mendler_fold<Result, F>(alg, c, child);
+    };
+    return alg(recurse, ctx, unwrap_fix(tree));
+}
+
+template <typename Result, template <typename> class F, typename Ctx,
+          typename Algebra>
+constexpr auto mendler_para(Algebra const &alg, Ctx const &ctx,
+                            Fix<F> const &tree) -> Result {
+    auto recurse = [&alg](Fix<F> const &child, Ctx const &c) -> Result {
+        return mendler_para<Result, F>(alg, c, child);
+    };
+    return alg(recurse, ctx, tree, unwrap_fix(tree));
+}
+
 template <typename Result, template <typename> class F, typename Algebra,
           typename FMap>
 [[deprecated("use fold_fix")]]

@@ -1,4 +1,4 @@
-<div class="abstract" id="org1cefa28">
+<div class="abstract" id="orgfe2cc4a">
 <p>
 A catamorphism folds every child before the algebra sees the result. But
 Scheme's <code>if</code> must choose a branch before evaluating it, and lambda
@@ -78,13 +78,54 @@ In practice this means the algebra receives a `recurse` function alongside each 
 This breaks the uniformity constraint that makes catamorphisms tractable — and breaks it in exactly the right direction for an interpreter that needs environment threading and lazy branching.
 
 
-## `mendler_run`: A Case-by-Case Walk
+## The Generic Combinators
 
-The Mendler-style interpreter for `Comp` trees is `mendler_run` in `src/smd/smdscheme/sender/fixpoint_eval.hpp`. It is not a catamorphism. It is a recursive function where the environment `env` is a parameter, not ambient state, and each case decides independently whether and how to recurse.
+Before building the interpreter algebra, I define two generic Mendler-style recursion combinators in `src/smd/fixpoint/recursion_schemes.hpp`, alongside the existing `fold_fix` catamorphism.
 
-A caveat on "Mendler-style": the code does not instantiate the literal `∀B.(B→A)→F<B>→A` combinator with an abstract carrier and a passed-in `recurse` argument. Each `std::visit` arm simply calls `mendler_run` by name on its concrete children — so the algebra and the recursion are the same function. What makes it **Mendler-style** is the discipline it realizes, not the type: every case controls whether, in what order, and in which environment its children are recursed, exactly the freedom Mendler's scheme grants. It is the Mendler recursion pattern hand-rolled in direct style, rather than a generic Mendler fold abstracted over the carrier.
+`mendler_fold` is the basic Mendler catamorphism with context threading:
 
-The signature:
+```c++
+// src/smd/fixpoint/recursion_schemes.hpp
+template <typename Result, template <typename> class F, typename Ctx,
+          typename Algebra>
+constexpr auto mendler_fold(Algebra const &alg, Ctx const &ctx,
+                            Fix<F> const &tree) -> Result {
+    auto recurse = [&alg](Fix<F> const &child, Ctx const &c) -> Result {
+        return mendler_fold<Result, F>(alg, c, child);
+    };
+    return alg(recurse, ctx, unwrap_fix(tree));
+}
+```
+
+The algebra receives `recurse` — an opaque function it can call selectively — plus the current context and the unwrapped functor layer. It decides when, whether, and with what context to recurse on each child.
+
+`mendler_para` is the Mendler-style paramorphism: it additionally passes the original `Fix<F>` node to the algebra, enabling cases that need the whole recursive structure (such as creating closures that point into the tree):
+
+```c++
+// src/smd/fixpoint/recursion_schemes.hpp
+template <typename Result, template <typename> class F, typename Ctx,
+          typename Algebra>
+constexpr auto mendler_para(Algebra const &alg, Ctx const &ctx,
+                            Fix<F> const &tree) -> Result {
+    auto recurse = [&alg](Fix<F> const &child, Ctx const &c) -> Result {
+        return mendler_para<Result, F>(alg, c, child);
+    };
+    return alg(recurse, ctx, tree, unwrap_fix(tree));
+}
+```
+
+The algebra signature for `mendler_para` is: `(recurse_fn, Ctx const&, Fix<F> const&, F<Fix<F>> const&) → Result`.
+
+Both combinators are `constexpr`, enabling compile-time evaluation.
+
+
+## `mendler_run`: The Interpreter as an Algebra
+
+The Mendler-style interpreter for `Comp` trees is `mendler_run` in `src/smd/smdscheme/sender/fixpoint_eval.hpp`. It is a genuine Mendler-style paramorphism: the interpreter logic is an algebra passed to `mendler_para`, and the `recurse` function is received as an argument rather than called by name. Each case of the algebra controls whether, in what order, and with what environment its children are evaluated.
+
+The interpreter uses `mendler_para` (not plain `mendler_fold`) because the `comp_lambda` case needs the original `Fix<CompF>` node: closures store a non-owning pointer to the lambda node in the computation tree.
+
+The signature remains:
 
 ```c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
@@ -95,7 +136,7 @@ mendler_run(Comp<MaxList> const &comp,
     -> foundation::result<closure::value<Comp<MaxList>>>;
 ```
 
-`mendler_run(comp, env)` evaluates the tree rooted at `comp` in the environment `env` and returns either a value or an error. The dispatch is a `std::visit` over `unwrap_fix(comp)`, the outermost `CompF` layer.
+Internally, `mendler_run` defines a local algebra lambda and calls `mendler_para`. The algebra receives `recurse` (with signature `(Fix<CompF> const&, Env const&) → Result`), the current environment, the original `Fix` node, and the unwrapped `CompF` layer. Dispatch is a `std::visit` over the layer.
 
 
 ### `comp_pure`: Atoms
@@ -130,19 +171,18 @@ Variable lookup delegates entirely to `env`. If the name is unbound, `env.lookup
 
 ```c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
-[&env](comp_if<CompT> const &ci) -> Res {
-    auto cond_r = mendler_run<MaxList, MaxBindings>(*ci.cond, env);
+[&recurse, &env](comp_if<CompT> const &ci) -> Res {
+    auto cond_r = recurse(*ci.cond, env);
     if (!cond_r.has_value())
         return cond_r;
 
     bool taken = !std::holds_alternative<bool>(cond_r.value()) ||
                  std::get<bool>(cond_r.value());
-    return mendler_run<MaxList, MaxBindings>(
-        taken ? *ci.cons : *ci.alt, env);
+    return recurse(taken ? *ci.cons : *ci.alt, env);
 },
 ```
 
-This is where the Mendler structure pays off. The condition is evaluated first. Then exactly one of `cons` or `alt` is recursed into — the other is never touched. Any catamorphism over this node would force both branches first.
+This is where the Mendler structure pays off. The algebra calls `recurse` on the condition first. Then exactly one of `cons` or `alt` is recursed into — the other is never touched. Any catamorphism over this node would force both branches first.
 
 The truthiness rule follows Scheme: anything other than `#f` is truthy.
 
@@ -151,26 +191,26 @@ The truthiness rule follows Scheme: anything other than `#f` is truthy.
 
 ```c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
-[&env, &comp](comp_lambda<CompT, MaxList> const &) -> Res {
+[&env, &node](comp_lambda<CompT, MaxList> const &) -> Res {
     return Val{closure::closure<CompT>{
-        &comp, closure::constexpr_box<closure::env<CompT, 16>>{
+        &node, closure::constexpr_box<closure::env<CompT, 16>>{
                    new closure::env<CompT, 16>{env}}}};
 },
 ```
 
-A `lambda` expression does not evaluate its body. It captures the current environment in a `constexpr_box` and bundles it with a non-owning pointer to the `Comp` node itself. No recursion happens here.
+A `lambda` expression does not evaluate its body. It captures the current environment in a `constexpr_box` and bundles it with a non-owning pointer to the `Comp` node itself. No recursion happens here. The `node` reference comes from `mendler_para`'s paramorphism — this is why we use `mendler_para` rather than plain `mendler_fold`.
 
 
 ### `comp_apply` with a Builtin
 
 ```c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
-[&env, &app](closure::builtin const &bi) -> Res {
+[&recurse, &env, &app](closure::builtin const &bi) -> Res {
     // evaluate arg0 in current env
-    auto arg0_r = mendler_run<MaxList, MaxBindings>(*app.args[0], env);
+    auto arg0_r = recurse(*app.args[0], env);
     if (!arg0_r.has_value()) return arg0_r;
     // evaluate arg1 in current env
-    auto arg1_r = mendler_run<MaxList, MaxBindings>(*app.args[1], env);
+    auto arg1_r = recurse(*app.args[1], env);
     if (!arg1_r.has_value()) return arg1_r;
     // dispatch on op
     int a = std::get<int>(arg0_r.value());
@@ -187,7 +227,7 @@ The function is evaluated first, revealing it is a builtin. Arguments are then e
 
 ```c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
-[&env, &app](closure::closure<CompT> const &clo) -> Res {
+[&recurse, &env, &app](closure::closure<CompT> const &clo) -> Res {
     // extract lambda node and params
     auto const &lam = std::get<comp_lambda<CompT, MaxList>>(
         smd::fixpoint::unwrap_fix(*clo.node));
@@ -198,13 +238,13 @@ The function is evaluated first, revealing it is a builtin. Arguments are then e
 
     // evaluate args in CURRENT env, bind in new_env
     for (int i = 0; i < app.args.size(); ++i) {
-        auto arg_r = mendler_run<MaxList, MaxBindings>(*app.args[i], env);
+        auto arg_r = recurse(*app.args[i], env);
         if (!arg_r.has_value()) return arg_r;
         new_env.define(lam.params[i], arg_r.value());
     }
 
     // evaluate body in EXTENDED env
-    return mendler_run<MaxList, 16>(*lam.body, new_env);
+    return recurse(*lam.body, new_env);
 },
 ```
 
@@ -215,9 +255,9 @@ The two environments serve different roles: `env` is where the caller lives; `ne
 
 ## The Reader Monad Pattern
 
-The signature `mendler_run(comp, env) → result<value>` is a Reader monad computation: `Reader Env (Result Value)`. The environment threads explicitly through every recursive call. There is no mutable global environment, no stack of frames pushed and popped implicitly. Each call site passes the environment it wants the callee to use.
+The signature `mendler_run(comp, env) → result<value>` is a Reader monad computation: `Reader Env (Result Value)`. The environment threads explicitly through every call to `recurse`. There is no mutable global environment, no stack of frames pushed and popped implicitly. Each call site passes the environment it wants the callee to use — the `Ctx` parameter of `mendler_para` is exactly this threaded reader context.
 
-Lambda application is the only site that extends the environment. Every other recursive call passes `env` unchanged. This makes the scoping rules visible in the call structure of the interpreter: find the `new_env` construction and you have found the only place where new names enter scope.
+Lambda application is the only site that extends the environment. Every other call to `recurse` passes `env` unchanged. This makes the scoping rules visible in the algebra: find the `new_env` construction and you have found the only place where new names enter scope.
 
 
 ## Applicative Parallelism in Argument Evaluation

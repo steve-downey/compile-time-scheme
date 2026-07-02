@@ -16,9 +16,12 @@ using smd::fixpoint::Box;
 using smd::fixpoint::Fix;
 using smd::fixpoint::fold_fix;
 using smd::fixpoint::make_box;
+using smd::fixpoint::mendler_fold;
+using smd::fixpoint::mendler_para;
 using smd::fixpoint::overloaded;
 using smd::fixpoint::refold;
 using smd::fixpoint::unfold_fix;
+using smd::fixpoint::unwrap_fix;
 using smd::fixpoint::wrap_fix;
 
 namespace {
@@ -132,5 +135,137 @@ TEST_CASE("Refold - EquivalentToFoldOfUnfold") {
         auto via_refold =
             refold<int, NatF>(count_algebra, nat_coalgebra, fmap_nat_fn, n);
         CHECK(via_tree == via_refold);
+    }
+}
+
+// --- Mendler-style fold tests ---
+
+namespace {
+
+auto mendler_count_algebra = [](auto const &recurse, int ctx,
+                                NatF<Nat> const &layer) -> int {
+    return std::visit(overloaded{
+                          [&](Zero const &) -> int { return ctx; },
+                          [&](Succ<Nat> const &s) -> int {
+                              return recurse(*s.pred, ctx + 1);
+                          },
+                      },
+                      layer);
+};
+
+constexpr auto ce_make_zero() -> Nat {
+    return wrap_fix<NatF>(NatF<Nat>{Zero{}});
+}
+
+constexpr auto ce_make_succ(Nat n) -> Nat {
+    return wrap_fix<NatF>(NatF<Nat>{Succ<Nat>{make_box<Nat>(std::move(n))}});
+}
+
+constexpr auto constexpr_mendler_count(Nat const &n) -> int {
+    auto alg = [](auto const &recurse, int ctx,
+                  NatF<Nat> const &layer) -> int {
+        return std::visit(overloaded{
+                              [&](Zero const &) -> int { return ctx; },
+                              [&](Succ<Nat> const &s) -> int {
+                                  return recurse(*s.pred, ctx + 1);
+                              },
+                          },
+                          layer);
+    };
+    return mendler_fold<int, NatF>(alg, 0, n);
+}
+
+constexpr auto constexpr_mendler_para_depth(Nat const &n) -> int {
+    auto alg = [](auto const &recurse, int ctx, Nat const &,
+                  NatF<Nat> const &layer) -> int {
+        return std::visit(overloaded{
+                              [&](Zero const &) -> int { return ctx; },
+                              [&](Succ<Nat> const &s) -> int {
+                                  return recurse(*s.pred, ctx + 1);
+                              },
+                          },
+                          layer);
+    };
+    return mendler_para<int, NatF>(alg, 0, n);
+}
+
+} // namespace
+
+TEST_CASE("MendlerFold - NatZero") {
+    auto zero = make_zero();
+    CHECK(mendler_fold<int, NatF>(mendler_count_algebra, 0, zero) == 0);
+}
+
+TEST_CASE("MendlerFold - NatThree") {
+    auto three = make_succ(make_succ(make_succ(make_zero())));
+    CHECK(mendler_fold<int, NatF>(mendler_count_algebra, 0, three) == 3);
+}
+
+TEST_CASE("MendlerFold - WithContext") {
+    auto two = make_succ(make_succ(make_zero()));
+    CHECK(mendler_fold<int, NatF>(mendler_count_algebra, 10, two) == 12);
+}
+
+TEST_CASE("MendlerFold - Constexpr") {
+    constexpr auto result = [] consteval {
+        auto three = ce_make_succ(ce_make_succ(ce_make_succ(ce_make_zero())));
+        return constexpr_mendler_count(three);
+    }();
+    static_assert(result == 3);
+    CHECK(result == 3);
+}
+
+TEST_CASE("MendlerPara - NatZero") {
+    auto alg = [](auto const &recurse, int ctx, Nat const &,
+                  NatF<Nat> const &layer) -> int {
+        return std::visit(overloaded{
+                              [&](Zero const &) -> int { return ctx; },
+                              [&](Succ<Nat> const &s) -> int {
+                                  return recurse(*s.pred, ctx + 1);
+                              },
+                          },
+                          layer);
+    };
+    auto zero = make_zero();
+    CHECK(mendler_para<int, NatF>(alg, 0, zero) == 0);
+}
+
+TEST_CASE("MendlerPara - AccessesOriginalNode") {
+    auto alg = [](auto const &recurse, int ctx, Nat const &node,
+                  NatF<Nat> const &layer) -> int {
+        return std::visit(
+            overloaded{
+                [&](Zero const &) -> int {
+                    (void)node;
+                    return ctx;
+                },
+                [&](Succ<Nat> const &s) -> int {
+                    auto const &inner = unwrap_fix(node);
+                    (void)std::get<Succ<Nat>>(inner);
+                    return recurse(*s.pred, ctx + 1);
+                },
+            },
+            layer);
+    };
+    auto three = make_succ(make_succ(make_succ(make_zero())));
+    CHECK(mendler_para<int, NatF>(alg, 0, three) == 3);
+}
+
+TEST_CASE("MendlerPara - Constexpr") {
+    constexpr auto result = [] consteval {
+        auto two = ce_make_succ(ce_make_succ(ce_make_zero()));
+        return constexpr_mendler_para_depth(two);
+    }();
+    static_assert(result == 2);
+    CHECK(result == 2);
+}
+
+TEST_CASE("MendlerFold - EquivalentToFoldFix") {
+    for (int n = 0; n < 10; ++n) {
+        auto nat = unfold_fix<NatF>(nat_coalgebra, fmap_nat_fn, n);
+        auto via_fold = fold_fix<int>(count_algebra, fmap_nat_fn, nat);
+        auto via_mendler =
+            mendler_fold<int, NatF>(mendler_count_algebra, 0, nat);
+        CHECK(via_fold == via_mendler);
     }
 }

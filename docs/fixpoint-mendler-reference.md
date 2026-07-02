@@ -53,31 +53,52 @@ This control is incompatible with the catamorphic pattern of "process all childr
 
 ## Mendler-Style Folds
 
-Mendler's approach (1991) is to give the algebra an explicit "recurse" function:
+Mendler's approach (1991) is to give the algebra an explicit "recurse" function.
+The project provides two generic combinators in `src/smd/fixpoint/recursion_schemes.hpp`:
+
+**`mendler_fold`** — Mendler catamorphism with context threading:
 
 ```cpp
-template <typename R, template <typename> class F>
-auto mendler_fold(
-    const auto& alg,      // alg : (A → R) → F<A> → R
-    const Fix<F>& tree)
-    -> R
-{
-    return alg(
-        [](const Fix<F>& child) { return mendler_fold(alg, child); },
-        unwrap_fix(tree)
-    );
+template <typename Result, template <typename> class F, typename Ctx,
+          typename Algebra>
+constexpr auto mendler_fold(Algebra const &alg, Ctx const &ctx,
+                            Fix<F> const &tree) -> Result {
+    auto recurse = [&alg](Fix<F> const &child, Ctx const &c) -> Result {
+        return mendler_fold<Result, F>(alg, c, child);
+    };
+    return alg(recurse, ctx, unwrap_fix(tree));
 }
 ```
 
-The algebra **receives a function** that recurses on demand.
-It can choose whether to call it, and how many times, and with what arguments.
-This breaks the uniformity of the catamorphism and allows encoding of control flow.
+Algebra signature: `(recurse_fn, Ctx const&, F<Fix<F>> const&) → Result`
 
-In our implementation, `mendler_run` receives the full `Comp` node and the current environment.
-It controls recursion explicitly:
-- For `comp_if`: evaluate condition only, choose branch, recurse on that branch only.
-- For `comp_lambda`: capture the current env, return a closure (no recursion yet).
-- For `comp_apply` + closure: evaluate args in call-site env, build new env, recurse on body with extended env.
+**`mendler_para`** — Mendler paramorphism (primitive recursion) with context:
+
+```cpp
+template <typename Result, template <typename> class F, typename Ctx,
+          typename Algebra>
+constexpr auto mendler_para(Algebra const &alg, Ctx const &ctx,
+                            Fix<F> const &tree) -> Result {
+    auto recurse = [&alg](Fix<F> const &child, Ctx const &c) -> Result {
+        return mendler_para<Result, F>(alg, c, child);
+    };
+    return alg(recurse, ctx, tree, unwrap_fix(tree));
+}
+```
+
+Algebra signature: `(recurse_fn, Ctx const&, Fix<F> const&, F<Fix<F>> const&) → Result`
+
+The algebra **receives a function** that recurses on demand.
+It can choose whether to call it, how many times, and with what context.
+This breaks the uniformity of the catamorphism and allows encoding of control flow.
+The `Ctx` parameter threads an environment (or any state) through the recursion.
+The `mendler_para` variant additionally passes the original `Fix<F>` node, enabling
+cases that need the recursive structure itself (e.g., closures store a pointer to the node).
+
+The interpreter uses `mendler_para` with `Ctx = env<Comp<MaxList>, MaxBindings>`:
+- For `comp_if`: call `recurse` on condition only, choose branch, call `recurse` on that branch only.
+- For `comp_lambda`: capture the current env, return a closure (no `recurse` call — uses `node` from para).
+- For `comp_apply` + closure: call `recurse` on args in call-site env, build new env, call `recurse` on body with extended env.
 
 ## The `CompF` Functor
 
@@ -137,17 +158,18 @@ This is conceptually an **anamorphism** (unfold_fix), but implemented as manual 
 ## The Reader Monad Pattern
 
 `mendler_run(comp, env) -> result<value>` is `Reader Env (Result Value)` in monadic notation.
+The `Ctx` parameter of `mendler_para` is exactly this reader context.
 
-The environment flows through the interpretation:
-- Leaf nodes (`comp_pure`, `comp_lookup`) use `env` directly.
-- Control flow (`comp_if`) passes `env` unchanged to both branches.
+The environment flows through the interpretation via `recurse`:
+- Leaf nodes (`comp_pure`, `comp_lookup`) use `env` directly without calling `recurse`.
+- Control flow (`comp_if`) passes `env` unchanged to `recurse` on the chosen branch.
 - **Lambda application** is the only place that extends `env`:
-  1. Evaluate args in the **call-site** `env`.
+  1. Call `recurse` on args with the **call-site** `env`.
   2. Create `new_env` from the closure's captured env (or current env if uncaptured).
   3. Bind each arg in `new_env`.
-  4. Evaluate body in the **extended** `new_env`.
+  4. Call `recurse` on body with the **extended** `new_env`.
 
-This explicit threading of `env` through every recursive call implements the reader monad without relying on monadic bind syntax.
+This explicit threading of `env` through every call to `recurse` implements the reader monad without relying on monadic bind syntax.
 
 ## Applicative Parallelism Preserved
 
@@ -161,10 +183,10 @@ comp_apply {
 }
 ```
 
-The current `mendler_run` evaluates args sequentially:
+The current algebra evaluates args sequentially via `recurse`:
 ```cpp
 for (auto const& arg : app.args) {
-    auto arg_r = mendler_run(*arg, env);  // sequential
+    auto arg_r = recurse(*arg, env);  // sequential
     // ...
 }
 ```

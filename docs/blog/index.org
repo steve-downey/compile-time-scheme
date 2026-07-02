@@ -42,7 +42,7 @@ Define the runtime value domain: numbers, booleans, closures, and environments t
 
 ** [[file:phase-7-mendler.org][Phase 7 — Mendler Interpretation]]
 
-Implement ~mendler_run~, a Mendler-style fold over ~Fix<CompF>~ that is synchronous and fully ~constexpr~-capable.
+Implement ~mendler_run~ using a genuine ~mendler_para~ combinator — a Mendler-style paramorphism over ~Fix<CompF>~ that is synchronous and fully ~constexpr~-capable.
 
 ** [[file:phase-8-senders.org][Phase 8 — Sender-Based Evaluation]]
 

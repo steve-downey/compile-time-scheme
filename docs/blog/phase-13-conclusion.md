@@ -1,4 +1,4 @@
-<div class="abstract" id="orgf743ba7">
+<div class="abstract" id="orgfb86def">
 <p>
 The summit is reached. A Scheme-light compiler parses, elaborates,
 tree-transforms, and evaluates entirely at C++26 compile time. The
@@ -86,28 +86,29 @@ The environment is copied on `lambda` entry — functional, not imperative. The 
 
 ## Phase 7 — Mendler Interpretation
 
-`mendler_run` is the Mendler-style fold over `Fix<CompF>`. The Mendler scheme (Mendler, Nax Paul, 1987) gives the algebra explicit control over recursion by threading the recursive call as an argument:
+`mendler_run` is a genuine Mendler-style paramorphism over `Fix<CompF>`. The Mendler scheme (Mendler, Nax Paul, 1987) gives the algebra explicit control over recursion by threading the recursive call as an argument. The project provides two generic combinators (`mendler_fold` and `mendler_para`) in `src/smd/fixpoint/recursion_schemes.hpp`; the interpreter uses `mendler_para` because closures need the original `Fix` node:
 
 ```c++
 // src/smd/smdscheme/sender/fixpoint_eval.hpp
 auto mendler_run(Comp<MaxList> const& comp, Env const& env) -> Res {
-    return std::visit(overloaded{
-        [&](comp_pure const& p) -> Res { ... },
-        [&](comp_lookup const& l) -> Res { ... },
-        [&](comp_if<CompT> const& if_) -> Res {
-            auto cond = mendler_run(*if_.cond, env);
+    auto const algebra = [](auto const& recurse, Env const& env,
+                            CompT const& node, CompF const& layer) -> Res {
+        return std::visit(overloaded{
+            [&](comp_if<CompT> const& if_) -> Res {
+                auto cond = recurse(*if_.cond, env);
+                ...
+            },
+            [&](comp_lambda<CompT, MaxList> const&) -> Res {
+                return Val{closure{&node, ...}};  // uses node from para
+            },
             ...
-        },
-        [&](comp_apply<CompT, MaxList> const& app) -> Res {
-            auto func = mendler_run(*app.func, env);
-            ...
-        },
-        ...
-    }, smd::fixpoint::unwrap_fix(comp));
+        }, layer);
+    };
+    return mendler_para<Res, CompF>(algebra, env, comp);
 }
 ```
 
-A standard catamorphism would first fold all children, then pass the results to the algebra — too uniform for language interpretation, where `if` must evaluate only one branch and `lambda` must not evaluate its body at creation time. Mendler recursion passes the recursive call to the algebra so it can choose when and whether to recurse.
+A standard catamorphism would first fold all children, then pass the results to the algebra — too uniform for language interpretation, where `if` must evaluate only one branch and `lambda` must not evaluate its body at creation time. The algebra receives `recurse` as a parameter and calls it selectively, with whatever context it chooses.
 
 
 ## Phase 8 — Sender-Based Evaluation

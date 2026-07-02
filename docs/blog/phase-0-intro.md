@@ -1,4 +1,4 @@
-<div class="abstract" id="org11dd166">
+<div class="abstract" id="orge20d133">
 <p>
 I am building a Scheme-light compiler that parses, elaborates, and evaluates Lisp
 code entirely during C++26 compilation. This series documents each phase of that
@@ -66,7 +66,7 @@ The reader parses Scheme data into a raw datum tree without asking any semantic 
 
 **Phase 6 — Closures and Values**: I define the runtime value domain: numbers, booleans, closures, and the environments that bind names to values at evaluation time.
 
-**Phase 7 — Mendler Interpretation**: I implement `mendler_run`, a Mendler-style interpreter over `Fix<CompF>` that is synchronous and fully `constexpr`-capable.
+**Phase 7 — Mendler Interpretation**: I implement `mendler_run` using a genuine `mendler_para` combinator — a Mendler-style paramorphism over `Fix<CompF>` that gives the interpreter algebra explicit control over recursion. The interpreter is synchronous and fully `constexpr`-capable.
 
 **Phase 8 — Sender-Based Evaluation**: I implement `sender_mendler_run`, which rewrites evaluation as a graph of Beman Execution senders with `when_all` for argument-list parallelism.
 
