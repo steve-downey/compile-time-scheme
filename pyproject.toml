@@ -1,17 +1,16 @@
 [project]
-name = "concept-map"
+name = "schemepoc"
 version = "0.1.0"
-description = "Add your description here"
+description = "Proof of concept for a compile time scheme compiler"
 readme = "README.md"
 requires-python = ">=3.13"
-dependencies = [
-    "copier>=9.16.0",
-]
+dependencies = []
 
 [dependency-groups]
 dev = [
   "clang-format==22.1.5",
-  "cmake==4.3.4",
+  "cmake==4.3.2",
+  "copier>=9.15.1",
   "gcovr>=8.6",
   "mbake==1.4.6",
   "ninja>=1.13",
