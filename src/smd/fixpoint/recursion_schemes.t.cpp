@@ -162,8 +162,7 @@ constexpr auto ce_make_succ(Nat n) -> Nat {
 }
 
 constexpr auto constexpr_mendler_count(Nat const &n) -> int {
-    auto alg = [](auto const &recurse, int ctx,
-                  NatF<Nat> const &layer) -> int {
+    auto alg = [](auto const &recurse, int ctx, NatF<Nat> const &layer) -> int {
         return std::visit(overloaded{
                               [&](Zero const &) -> int { return ctx; },
                               [&](Succ<Nat> const &s) -> int {
@@ -233,19 +232,18 @@ TEST_CASE("MendlerPara - NatZero") {
 TEST_CASE("MendlerPara - AccessesOriginalNode") {
     auto alg = [](auto const &recurse, int ctx, Nat const &node,
                   NatF<Nat> const &layer) -> int {
-        return std::visit(
-            overloaded{
-                [&](Zero const &) -> int {
-                    (void)node;
-                    return ctx;
-                },
-                [&](Succ<Nat> const &s) -> int {
-                    auto const &inner = unwrap_fix(node);
-                    (void)std::get<Succ<Nat>>(inner);
-                    return recurse(*s.pred, ctx + 1);
-                },
-            },
-            layer);
+        return std::visit(overloaded{
+                              [&](Zero const &) -> int {
+                                  (void)node;
+                                  return ctx;
+                              },
+                              [&](Succ<Nat> const &s) -> int {
+                                  auto const &inner = unwrap_fix(node);
+                                  (void)std::get<Succ<Nat>>(inner);
+                                  return recurse(*s.pred, ctx + 1);
+                              },
+                          },
+                          layer);
     };
     auto three = make_succ(make_succ(make_succ(make_zero())));
     CHECK(mendler_para<int, NatF>(alg, 0, three) == 3);

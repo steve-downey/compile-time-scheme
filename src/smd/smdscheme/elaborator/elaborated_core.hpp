@@ -84,6 +84,28 @@ struct core_define {
     foundation::arena_box<R, MaxNodes> value; ///< The defining expression.
 };
 
+/// A Scheme @c set! assignment: mutates the existing binding for @c name.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_set {
+    std::string_view name;                    ///< The variable being assigned.
+    foundation::arena_box<R, MaxNodes> value; ///< The new-value expression.
+};
+
+/// A Scheme @c begin sequence: evaluates each expression in order and yields
+/// the value of the last.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum number of sequenced expressions.
+template <typename R, int MaxNodes, int MaxList>
+struct core_begin {
+    foundation::static_vector<foundation::arena_box<R, MaxNodes>, MaxList>
+        exprs; ///< The sequenced expressions (at least one).
+};
+
 /// Factory template that produces the open-recursive variant layer for the core
 /// AST.
 ///
@@ -97,7 +119,8 @@ struct core_f_factory {
         std::variant<core_integer, core_boolean, core_symbol, core_quote,
                      core_if<R, MaxNodes>, core_lambda<R, MaxNodes, MaxList>,
                      core_application<R, MaxNodes, MaxList>,
-                     core_define<R, MaxNodes>>;
+                     core_define<R, MaxNodes>, core_set<R, MaxNodes>,
+                     core_begin<R, MaxNodes, MaxList>>;
 };
 
 /// The concrete recursive core AST type, formed as the fixed point of

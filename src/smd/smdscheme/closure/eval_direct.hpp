@@ -197,6 +197,10 @@ template <int MaxNodes, int MaxList, int MaxBindings>
                         [](closure::symbol const &) -> Res {
                             return foundation::parse_error{
                                 {}, "attempted to call non-function"};
+                        },
+                        [](closure::unspecified const &) -> Res {
+                            return foundation::parse_error{
+                                {}, "attempted to call non-function"};
                         }},
                     func_r.value());
             },
@@ -205,6 +209,24 @@ template <int MaxNodes, int MaxList, int MaxBindings>
                     {},
                     "eval_direct: define not supported in expression "
                     "context"};
+            },
+            [&](elaborator::core_set<Core, MaxNodes> const &cs) -> Res {
+                auto val_r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                    arena.get(cs.value), arena, environment);
+                if (!val_r.has_value())
+                    return val_r.error();
+                return environment.assign(cs.name, val_r.value());
+            },
+            [&](elaborator::core_begin<Core, MaxNodes, MaxList> const &cb)
+                -> Res {
+                Res last{foundation::parse_error{{}, "begin: empty"}};
+                for (int i = 0; i < cb.exprs.size(); ++i) {
+                    last = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                        arena.get(cb.exprs[i]), arena, environment);
+                    if (!last.has_value())
+                        return last;
+                }
+                return last;
             }},
         node.inner);
 }

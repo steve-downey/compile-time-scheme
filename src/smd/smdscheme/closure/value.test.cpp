@@ -131,3 +131,43 @@ TEST_CASE("ValueTest - DefineShadows") {
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 2);
 }
+
+TEST_CASE("ValueTest - StoreAllocGetSet") {
+    using Val = closure::value<core>;
+    closure::store<core, closure::default_max_store> st;
+    int a = st.alloc(Val{1});
+    int b = st.alloc(Val{2});
+    REQUIRE(a != b);
+    REQUIRE(std::get<int>(st.get(a)) == 1);
+    REQUIRE(std::get<int>(st.get(b)) == 2);
+    st.set(a, Val{42});
+    REQUIRE(std::get<int>(st.get(a)) == 42);
+    REQUIRE(std::get<int>(st.get(b)) == 2); // untouched
+}
+
+TEST_CASE("ValueTest - AssignMutatesBoundInStore") {
+    closure::store<core, closure::default_max_store> st;
+    auto e = closure::default_env<core, 8>(st);
+    e.define("x"sv, closure::value<core>{1});
+
+    auto ar = e.assign("x"sv, closure::value<core>{99});
+    REQUIRE(ar.has_value());
+    REQUIRE(std::holds_alternative<closure::unspecified>(ar.value()));
+
+    auto r = e.lookup("x"sv);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 99);
+}
+
+TEST_CASE("ValueTest - AssignUnboundIsError") {
+    closure::store<core, closure::default_max_store> st;
+    auto e = closure::default_env<core, 8>(st);
+    REQUIRE_FALSE(e.assign("nope"sv, closure::value<core>{1}).has_value());
+}
+
+TEST_CASE("ValueTest - AssignWithoutStoreIsError") {
+    // Functional (no-store) env cannot support set!.
+    auto e = closure::default_env<core, 8>();
+    e.define("x"sv, closure::value<core>{1});
+    REQUIRE_FALSE(e.assign("x"sv, closure::value<core>{2}).has_value());
+}

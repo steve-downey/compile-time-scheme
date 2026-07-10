@@ -19,12 +19,14 @@
 namespace smd::smdscheme::sender_cps {
 
 using elaborator::core_application;
+using elaborator::core_begin;
 using elaborator::core_boolean;
 using elaborator::core_define;
 using elaborator::core_if;
 using elaborator::core_integer;
 using elaborator::core_lambda;
 using elaborator::core_quote;
+using elaborator::core_set;
 using elaborator::core_symbol;
 using smd::fixpoint::overloaded;
 
@@ -229,6 +231,10 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                         [](closure::symbol const &) -> Res {
                             return Res{foundation::parse_error{
                                 {}, "attempted to call non-function"}};
+                        },
+                        [](closure::unspecified const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
                         }},
                     func_r.value());
                 // e619ae0a-47be-48b4-86f5-1dfac90299e6 end
@@ -238,6 +244,23 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                     {},
                     "sender_cps: define not supported in expression "
                     "context"}};
+            },
+            [&](core_set<Core, MaxNodes> const &cs) -> Res {
+                auto val_r = eval_node<MaxNodes, MaxList, MaxBindings>(
+                    arena.get(cs.value), arena, environment);
+                if (!val_r.has_value())
+                    return val_r;
+                return environment.assign(cs.name, val_r.value());
+            },
+            [&](core_begin<Core, MaxNodes, MaxList> const &cb) -> Res {
+                Res last{foundation::parse_error{{}, "begin: empty"}};
+                for (int i = 0; i < cb.exprs.size(); ++i) {
+                    last = eval_node<MaxNodes, MaxList, MaxBindings>(
+                        arena.get(cb.exprs[i]), arena, environment);
+                    if (!last.has_value())
+                        return last;
+                }
+                return last;
             }},
         node.inner);
 }

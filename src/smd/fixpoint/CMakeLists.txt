@@ -19,10 +19,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
         PRIVATE smd.fixpoint Catch2::Catch2WithMain
     )
 
-    file(
-        GLOB TEST_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/*.t.cpp"
-    )
+    file(GLOB TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*.t.cpp")
     target_sources(fixpoint_test PRIVATE ${TEST_FILES})
 
     include(Catch)
