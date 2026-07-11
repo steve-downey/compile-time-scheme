@@ -50,21 +50,19 @@ mendler_run(Comp<MaxList> const &comp,
     using Res = foundation::result<Val>;
     using Env = closure::env<CompT, MaxBindings>;
 
-    auto const algebra = [](auto const &recurse, Env const &env,
-                            CompT const &node,
-                            comp_f_factory<MaxList>::template type<CompT> const
-                                &layer) -> Res {
+    auto const algebra =
+        [](auto const &recurse, Env const &env, CompT const &node,
+           comp_f_factory<MaxList>::template type<CompT> const &layer) -> Res {
         return std::visit(
             smd::fixpoint::overloaded{
                 [](comp_pure const &p) -> Res {
-                    return std::visit(
-                        smd::fixpoint::overloaded{
-                            [](int i) -> Res { return Val{i}; },
-                            [](bool b) -> Res { return Val{b}; },
-                            [](std::string_view sv) -> Res {
-                                return Val{closure::symbol{sv}};
-                            }},
-                        p.atom);
+                    return std::visit(smd::fixpoint::overloaded{
+                                          [](int i) -> Res { return Val{i}; },
+                                          [](bool b) -> Res { return Val{b}; },
+                                          [](std::string_view sv) -> Res {
+                                              return Val{closure::symbol{sv}};
+                                          }},
+                                      p.atom);
                 },
                 [&env](comp_lookup const &l) -> Res {
                     return env.lookup(l.name);
@@ -81,9 +79,8 @@ mendler_run(Comp<MaxList> const &comp,
                 },
                 [&env, &node](comp_lambda<CompT, MaxList> const &) -> Res {
                     return Val{closure::closure<CompT>{
-                        &node,
-                        closure::constexpr_box<closure::env<CompT, 16>>{
-                            new closure::env<CompT, 16>{env}}}};
+                        &node, closure::constexpr_box<closure::env<CompT, 16>>{
+                                   new closure::env<CompT, 16>{env}}}};
                 },
                 [&recurse, &env](comp_apply<CompT, MaxList> const &app) -> Res {
                     auto func_r = recurse(*app.func, env);
@@ -138,9 +135,8 @@ mendler_run(Comp<MaxList> const &comp,
                                         {}, "arity mismatch"}};
 
                                 auto new_env =
-                                    clo.captured
-                                        ? *clo.captured
-                                        : closure::env<CompT, 16>{env};
+                                    clo.captured ? *clo.captured
+                                                 : closure::env<CompT, 16>{env};
 
                                 for (int i = 0; i < app.args.size(); ++i) {
                                     auto arg_r = recurse(*app.args[i], env);
@@ -152,8 +148,8 @@ mendler_run(Comp<MaxList> const &comp,
 
                                 return recurse(*lam.body, new_env);
                             },
-                            [&recurse, &env, &app](
-                                closure::foreign_function<CompT> const &ff)
+                            [&recurse, &env,
+                             &app](closure::foreign_function<CompT> const &ff)
                                 -> Res {
                                 foundation::static_vector<Val, MaxList>
                                     evaluated_args;
@@ -163,9 +159,9 @@ mendler_run(Comp<MaxList> const &comp,
                                         return arg_r;
                                     evaluated_args.push_back(arg_r.value());
                                 }
-                                return ff.fn(std::span<Val const>(
-                                    evaluated_args.begin(),
-                                    evaluated_args.end()));
+                                return ff.fn(
+                                    std::span<Val const>(evaluated_args.begin(),
+                                                         evaluated_args.end()));
                             },
                             [](int const &) -> Res {
                                 return Res{foundation::parse_error{
