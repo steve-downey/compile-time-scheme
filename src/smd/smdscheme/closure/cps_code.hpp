@@ -262,6 +262,10 @@ constexpr auto cps_dispatch(
                         [](closure::symbol const &) -> Res {
                             return Res{foundation::parse_error{
                                 {}, "attempted to call non-function"}};
+                        },
+                        [](closure::unspecified const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
                         }},
                     func_r.value());
             },
@@ -270,6 +274,33 @@ constexpr auto cps_dispatch(
                     {},
                     "cps_dispatch: define not supported in expression "
                     "context"}};
+            },
+            [&](elaborator::core_set<Core, MaxNodes> const &cs) -> Res {
+                auto val_r = cps_dispatch<MaxNodes, MaxList>(
+                    arena.get(cs.value), arena, identity_k<Core>{}, env,
+                    identity_k<Core>{});
+                if (!val_r.has_value())
+                    return val_r;
+                auto assign_r = env.assign(cs.name, val_r.value());
+                if (!assign_r.has_value())
+                    return assign_r;
+                auto r = cont(assign_r.value());
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
+            },
+            [&](elaborator::core_begin<Core, MaxNodes, MaxList> const &cb)
+                -> Res {
+                int const n = cb.exprs.size();
+                for (int i = 0; i < n - 1; ++i) {
+                    auto r = cps_dispatch<MaxNodes, MaxList>(
+                        arena.get(cb.exprs[i]), arena, identity_k<Core>{}, env,
+                        identity_k<Core>{});
+                    if (!r.has_value())
+                        return r;
+                }
+                return cps_dispatch<MaxNodes, MaxList>(
+                    arena.get(cb.exprs[n - 1]), arena, cont, env, k);
             }},
         node.inner);
 }

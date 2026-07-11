@@ -174,8 +174,27 @@ mendler_run(Comp<MaxList> const &comp,
                             [](closure::symbol const &) -> Res {
                                 return Res{foundation::parse_error{
                                     {}, "attempted to call non-function"}};
+                            },
+                            [](closure::unspecified const &) -> Res {
+                                return Res{foundation::parse_error{
+                                    {}, "attempted to call non-function"}};
                             }},
                         func_r.value());
+                },
+                [&recurse, &env](comp_set<CompT> const &s) -> Res {
+                    auto val_r = recurse(*s.value, env);
+                    if (!val_r.has_value())
+                        return val_r;
+                    return env.assign(s.name, val_r.value());
+                },
+                [&recurse, &env](comp_begin<CompT, MaxList> const &b) -> Res {
+                    Res last{foundation::parse_error{{}, "begin: empty"}};
+                    for (int i = 0; i < b.exprs.size(); ++i) {
+                        last = recurse(*b.exprs[i], env);
+                        if (!last.has_value())
+                            return last;
+                    }
+                    return last;
                 }},
             layer);
     };

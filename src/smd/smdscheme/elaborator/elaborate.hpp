@@ -318,6 +318,43 @@ constexpr auto elaborate_list(
 
             return inner;
         }
+
+        if (name == "set!") {
+            if (lst.elements.size() != 3)
+                return foundation::parse_error{{},
+                                               "set!: expected name and value"};
+            auto const &name_node = datum_arena.get(lst.elements[1]);
+            if (!std::holds_alternative<reader::datum_symbol>(name_node.inner))
+                return foundation::parse_error{{},
+                                               "set!: name must be a symbol"};
+
+            auto val_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[2]), datum_arena, core_arena);
+            if (!val_r.has_value())
+                return val_r;
+
+            return core{core_f{core_set<core, MaxNodes>{
+                std::get<reader::datum_symbol>(name_node.inner).name,
+                make_arena_box(core_arena, std::move(val_r.value()))}}};
+        }
+
+        if (name == "begin") {
+            if (lst.elements.size() < 2)
+                return foundation::parse_error{
+                    {}, "begin: expected at least one expression"};
+
+            core_begin<core, MaxNodes, MaxList> seq{};
+            for (int i = 1; i < lst.elements.size(); ++i) {
+                auto expr_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[i]), datum_arena, core_arena);
+                if (!expr_r.has_value())
+                    return expr_r;
+                seq.exprs.push_back(
+                    make_arena_box(core_arena, std::move(expr_r.value())));
+            }
+
+            return core{core_f{std::move(seq)}};
+        }
     }
 
     // Regular application

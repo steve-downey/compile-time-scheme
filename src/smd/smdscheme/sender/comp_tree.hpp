@@ -63,6 +63,26 @@ struct comp_apply {
 };
 // 31435b33-ce4b-4e8e-ae10-abc64aa13501 end
 
+/// A computation node for @c set! assignment: mutates the binding for @c name
+/// to the value produced by the child computation.
+///
+/// @tparam A The type of the recursive child.
+template <typename A>
+struct comp_set {
+    std::string_view name;
+    smd::fixpoint::Box<A> value;
+};
+
+/// A computation node for @c begin: evaluates each child in order and yields
+/// the value of the last.
+///
+/// @tparam A        The type of recursive children.
+/// @tparam MaxList  Maximum number of sequenced expressions.
+template <typename A, int MaxList>
+struct comp_begin {
+    foundation::static_vector<smd::fixpoint::Box<A>, MaxList> exprs;
+};
+
 // 950ee4f0-367a-47bb-9335-30191f783119
 /// Factory template producing the open-recursive variant layer for CompF.
 /// Each structural node (comp_if, comp_lambda, comp_apply) is parameterized
@@ -75,7 +95,8 @@ struct comp_f_factory {
     /// One variant layer; @p A is the recursive self-reference.
     template <typename A>
     using type = std::variant<comp_pure, comp_lookup, comp_if<A>,
-                              comp_lambda<A, MaxList>, comp_apply<A, MaxList>>;
+                              comp_lambda<A, MaxList>, comp_apply<A, MaxList>,
+                              comp_set<A>, comp_begin<A, MaxList>>;
 };
 
 /// The concrete recursive computation tree type.
@@ -128,6 +149,19 @@ fmap_comp(F &&f,
                 return comp_apply<B, MaxList>{
                     smd::fixpoint::make_box<B>(std::invoke(f, *app.func)),
                     std::move(args_result)};
+            },
+            [&f](comp_set<A> const &s) -> ResultF {
+                return comp_set<B>{s.name, smd::fixpoint::make_box<B>(
+                                               std::invoke(f, *s.value))};
+            },
+            [&f](comp_begin<A, MaxList> const &b) -> ResultF {
+                foundation::static_vector<smd::fixpoint::Box<B>, MaxList>
+                    exprs_result;
+                for (auto const &e : b.exprs) {
+                    exprs_result.push_back(
+                        smd::fixpoint::make_box<B>(std::invoke(f, *e)));
+                }
+                return comp_begin<B, MaxList>{std::move(exprs_result)};
             }},
         layer);
 }
@@ -244,6 +278,34 @@ core_to_comp(elaborator::core_type<MaxNodes, MaxList> const &node,
                 return foundation::parse_error{
                     {},
                     "comp_tree: define not supported in expression context"};
+            },
+            [&arena](elaborator::core_set<Core, MaxNodes> const &cs) -> Res {
+                auto val_r =
+                    core_to_comp<MaxNodes, MaxList>(arena.get(cs.value), arena);
+                if (!val_r.has_value())
+                    return val_r.error();
+
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(CompLayer{
+                    comp_set<CompT>{cs.name, smd::fixpoint::make_box<CompT>(
+                                                 val_r.value())}});
+            },
+            [&arena](elaborator::core_begin<Core, MaxNodes, MaxList> const &cb)
+                -> Res {
+                foundation::static_vector<smd::fixpoint::Box<CompT>, MaxList>
+                    expr_boxes;
+                for (auto const &expr_box : cb.exprs) {
+                    auto expr_r = core_to_comp<MaxNodes, MaxList>(
+                        arena.get(expr_box), arena);
+                    if (!expr_r.has_value())
+                        return expr_r.error();
+                    expr_boxes.push_back(
+                        smd::fixpoint::make_box<CompT>(expr_r.value()));
+                }
+
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(CompLayer{
+                    comp_begin<CompT, MaxList>{std::move(expr_boxes)}});
             }},
         node.inner);
 }

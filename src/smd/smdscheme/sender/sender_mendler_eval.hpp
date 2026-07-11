@@ -247,8 +247,39 @@ template <int MaxList, int MaxBindings>
                         [](closure::symbol const &) -> Res {
                             return Res{foundation::parse_error{
                                 {}, "attempted to call non-function"}};
+                        },
+                        [](closure::unspecified const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
                         }},
                     func_r.value());
+            },
+
+            // comp_set: evaluate the new-value expression, then assign
+            [&env](fixpoint_eval::comp_set<CompT> const &s) -> Res {
+                auto val_r = detail::unwrap_sender<Res>(
+                    sender_v::then(sender_v::just(0), [&](int) -> Res {
+                        return sender_mendler_run<MaxList, MaxBindings>(
+                            *s.value, env);
+                    }));
+                if (!val_r.has_value())
+                    return val_r;
+                return env.assign(s.name, val_r.value());
+            },
+
+            // comp_begin: evaluate each expression in order, yield the last
+            [&env](fixpoint_eval::comp_begin<CompT, MaxList> const &b) -> Res {
+                Res last{foundation::parse_error{{}, "begin: empty"}};
+                for (int i = 0; i < b.exprs.size(); ++i) {
+                    last = detail::unwrap_sender<Res>(
+                        sender_v::then(sender_v::just(0), [&](int) -> Res {
+                            return sender_mendler_run<MaxList, MaxBindings>(
+                                *b.exprs[i], env);
+                        }));
+                    if (!last.has_value())
+                        return last;
+                }
+                return last;
             }},
         smd::fixpoint::unwrap_fix(comp));
 }
