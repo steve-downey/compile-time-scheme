@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/BlankSpruce/gersemi/0.24.0/gersemi/configuration.schema.json
+
+# Point gersemi at the files that define our custom CMake commands so it
+# knows their signatures and can format calls to them instead of just
+# warning about "unknown command". See:
+# https://github.com/BlankSpruce/gersemi#lets-make-a-deal
+definitions:
+  - infra/cmake/beman-install-library.cmake
+  - installtest/CMakeLists.txt
