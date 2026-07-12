@@ -87,24 +87,27 @@ auto run_mendler(std::string_view src)
 
 // --- shared assertions (backend-agnostic) ------------------------------------
 
-template <class R> void expect_int(R const &r, int expected) {
+template <class R>
+void expect_int(R const &r, int expected) {
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<int>(r.value()));
     REQUIRE(std::get<int>(r.value()) == expected);
 }
 
-template <class R> void expect_unspecified(R const &r) {
+template <class R>
+void expect_unspecified(R const &r) {
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<closure::unspecified>(r.value()));
 }
 
 /// Exercises every set!/begin behaviour through @p run.
-template <class Run> void check_backend(Run run) {
-    expect_int(run("(begin 1 2 3)"sv), 3);                        // sequencing
-    expect_int(run("(let ((x 1)) (begin (set! x 2) x))"sv), 2);  // local mutate
-    expect_unspecified(run("(let ((x 1)) (set! x 2))"sv));       // result value
-    REQUIRE_FALSE(run("(set! nope 1)"sv).has_value());           // unbound
-    expect_int(run(counter_src), 2);                             // shared cell
+template <class Run>
+void check_backend(Run run) {
+    expect_int(run("(begin 1 2 3)"sv), 3);                      // sequencing
+    expect_int(run("(let ((x 1)) (begin (set! x 2) x))"sv), 2); // local mutate
+    expect_unspecified(run("(let ((x 1)) (set! x 2))"sv));      // result value
+    REQUIRE_FALSE(run("(set! nope 1)"sv).has_value());          // unbound
+    expect_int(run(counter_src), 2);                            // shared cell
 }
 
 } // namespace
