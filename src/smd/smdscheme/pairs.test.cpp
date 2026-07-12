@@ -127,10 +127,9 @@ void check_backend(Run run) {
     expect_bool(run("(pair? 5)"sv), false);
 
     // Aliasing / shared mutation — impossible with deep-copy pairs.
-    expect_int(
-        run("(let ((p (cons 1 2)))"
-            "  (let ((q p)) (begin (set-car! q 9) (car p))))"sv),
-        9);
+    expect_int(run("(let ((p (cons 1 2)))"
+                   "  (let ((q p)) (begin (set-car! q 9) (car p))))"sv),
+               9);
     expect_unspecified(run("(let ((p (cons 1 2))) (set-car! p 5))"sv));
 
     // Identity vs structure.
@@ -141,8 +140,8 @@ void check_backend(Run run) {
     expect_bool(run("(equal? '(1 2 3) '(1 2 9))"sv), false);
 
     // Errors.
-    REQUIRE_FALSE(run("(car 5)"sv).has_value());        // not a pair
-    REQUIRE_FALSE(run("(cons 1)"sv).has_value());        // arity
+    REQUIRE_FALSE(run("(car 5)"sv).has_value());  // not a pair
+    REQUIRE_FALSE(run("(cons 1)"sv).has_value()); // arity
 }
 
 } // namespace

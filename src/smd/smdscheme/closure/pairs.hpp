@@ -18,8 +18,8 @@ namespace smd::smdscheme::closure {
 /// (direct, CPS, the two sender backends, and the two Mendler interpreters)
 /// evaluates the arguments of a @ref elaborator::core_prim / @c comp_prim node
 /// in its own idiom, then delegates here.  Keeping the ~dozen operations in one
-/// place is why adding pairs costs one @c std::visit arm per backend rather than
-/// a dozen: the interpretation lives here, not at each visit site.
+/// place is why adding pairs costs one @c std::visit arm per backend rather
+/// than a dozen: the interpretation lives here, not at each visit site.
 ///
 /// @p heap is the shared pair heap (from the environment); it may be null, in
 /// which case any operation that needs to allocate or dereference a cell errors
@@ -103,7 +103,8 @@ template <typename Core, int MaxPairs>
     case eq:
     case eqv:
         if (args.size() != 2)
-            return foundation::parse_error{{}, "eq?/eqv?: expected 2 arguments"};
+            return foundation::parse_error{{},
+                                           "eq?/eqv?: expected 2 arguments"};
         // pair_ref::operator== is identity; every other alternative compares by
         // value — exactly eq?/eqv? semantics.
         return Val{args[0] == args[1]};
