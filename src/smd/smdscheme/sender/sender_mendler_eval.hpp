@@ -6,6 +6,7 @@
 #include <smd/smdscheme/sender/comp_tree.hpp>
 #include <smd/smdscheme/sender/sender_v.hpp>
 
+#include <smd/smdscheme/closure/pairs.hpp>
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/foundation/static_vector.hpp>
@@ -251,6 +252,14 @@ template <int MaxList, int MaxBindings>
                         [](closure::unspecified const &) -> Res {
                             return Res{foundation::parse_error{
                                 {}, "attempted to call non-function"}};
+                        },
+                        [](closure::pair_ref const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
+                        },
+                        [](closure::null_t const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
                         }},
                     func_r.value());
             },
@@ -280,6 +289,24 @@ template <int MaxList, int MaxBindings>
                         return last;
                 }
                 return last;
+            },
+
+            // comp_prim: evaluate arguments, then apply the pair/list primitive
+            [&env](fixpoint_eval::comp_prim<CompT, MaxList> const &p) -> Res {
+                foundation::static_vector<Val, MaxList> vals;
+                for (int i = 0; i < p.args.size(); ++i) {
+                    auto r = detail::unwrap_sender<Res>(
+                        sender_v::then(sender_v::just(0), [&](int) -> Res {
+                            return sender_mendler_run<MaxList, MaxBindings>(
+                                *p.args[i], env);
+                        }));
+                    if (!r.has_value())
+                        return r;
+                    vals.push_back(r.value());
+                }
+                return closure::apply_prim(
+                    p.op, std::span<Val const>(vals.begin(), vals.end()),
+                    env.pairs());
             }},
         smd::fixpoint::unwrap_fix(comp));
 }

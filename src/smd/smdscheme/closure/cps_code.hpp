@@ -3,12 +3,14 @@
 #ifndef SRC_SMD_SMDSCHEME_CLOSURE_CPS_CODE_HPP
 #define SRC_SMD_SMDSCHEME_CLOSURE_CPS_CODE_HPP
 
+#include <smd/smdscheme/closure/pairs.hpp>
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
 
 #include <smd/fixpoint/overloaded.hpp>
 
+#include <span>
 #include <variant>
 
 namespace smd::smdscheme::cps {
@@ -266,6 +268,14 @@ constexpr auto cps_dispatch(
                         [](closure::unspecified const &) -> Res {
                             return Res{foundation::parse_error{
                                 {}, "attempted to call non-function"}};
+                        },
+                        [](closure::pair_ref const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
+                        },
+                        [](closure::null_t const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
                         }},
                     func_r.value());
             },
@@ -301,6 +311,27 @@ constexpr auto cps_dispatch(
                 }
                 return cps_dispatch<MaxNodes, MaxList>(
                     arena.get(cb.exprs[n - 1]), arena, cont, env, k);
+            },
+            [&](elaborator::core_prim<Core, MaxNodes, MaxList> const &cp)
+                -> Res {
+                foundation::static_vector<Val, MaxList> vals;
+                for (int i = 0; i < cp.args.size(); ++i) {
+                    auto r = cps_dispatch<MaxNodes, MaxList>(
+                        arena.get(cp.args[i]), arena, identity_k<Core>{}, env,
+                        identity_k<Core>{});
+                    if (!r.has_value())
+                        return r;
+                    vals.push_back(r.value());
+                }
+                auto pr = closure::apply_prim(
+                    cp.op, std::span<Val const>(vals.begin(), vals.end()),
+                    env.pairs());
+                if (!pr.has_value())
+                    return pr;
+                auto r = cont(pr.value());
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
             }},
         node.inner);
 }

@@ -3,6 +3,7 @@
 #ifndef SRC_SMD_SMDSCHEME_CLOSURE_EVAL_DIRECT_HPP
 #define SRC_SMD_SMDSCHEME_CLOSURE_EVAL_DIRECT_HPP
 
+#include <smd/smdscheme/closure/pairs.hpp>
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
@@ -201,6 +202,14 @@ template <int MaxNodes, int MaxList, int MaxBindings>
                         [](closure::unspecified const &) -> Res {
                             return foundation::parse_error{
                                 {}, "attempted to call non-function"};
+                        },
+                        [](closure::pair_ref const &) -> Res {
+                            return foundation::parse_error{
+                                {}, "attempted to call non-function"};
+                        },
+                        [](closure::null_t const &) -> Res {
+                            return foundation::parse_error{
+                                {}, "attempted to call non-function"};
                         }},
                     func_r.value());
             },
@@ -227,6 +236,20 @@ template <int MaxNodes, int MaxList, int MaxBindings>
                         return last;
                 }
                 return last;
+            },
+            [&](elaborator::core_prim<Core, MaxNodes, MaxList> const &cp)
+                -> Res {
+                foundation::static_vector<Val, MaxList> vals;
+                for (int i = 0; i < cp.args.size(); ++i) {
+                    auto r = eval_direct<MaxNodes, MaxList, MaxBindings>(
+                        arena.get(cp.args[i]), arena, environment);
+                    if (!r.has_value())
+                        return r.error();
+                    vals.push_back(r.value());
+                }
+                return closure::apply_prim(
+                    cp.op, std::span<Val const>(vals.begin(), vals.end()),
+                    environment.pairs());
             }},
         node.inner);
 }

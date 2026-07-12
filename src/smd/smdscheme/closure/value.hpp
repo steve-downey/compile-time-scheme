@@ -31,6 +31,31 @@ struct unspecified {
         -> bool = default;
 };
 
+/// The empty list @c '().
+///
+/// A distinct value type — not @ref unspecified — because the empty list is
+/// ordinary data (@c null? tests for it) whereas @ref unspecified is the result
+/// of a side effect.  All @c null_t values compare equal.
+struct null_t {
+    friend constexpr auto operator==(null_t, null_t) -> bool = default;
+};
+
+/// A Scheme pair: a non-owning handle (stable location) into a @ref pair_heap.
+///
+/// A pair is the first value that is recursive, shareable, and mutable, so it
+/// cannot be a deep-copy value the way a scalar is: two names must be able to
+/// refer to the *same* cell for @c eq? identity and @c set-car! mutation to
+/// work.  Following the @ref store model used by @c set!, a pair is therefore
+/// an integer index into a shared heap; the @c int also breaks the @c pair ↔
+/// @c value type cycle without indirection.  Equality is identity: two
+/// @c pair_ref compare equal iff they name the same cell.
+struct pair_ref {
+    int loc = -1; ///< Stable heap location; -1 means "no pair".
+    friend constexpr auto operator==(pair_ref lhs, pair_ref rhs) -> bool {
+        return lhs.loc == rhs.loc;
+    }
+};
+
 // Forward declaration of env to resolve circular dependency
 template <typename Core, int MaxBindings>
 class env;
@@ -138,7 +163,7 @@ struct symbol {
 template <typename Core>
 struct foreign_function {
     using val_t = std::variant<int, bool, builtin, closure<Core>, symbol,
-                               foreign_function, unspecified>;
+                               foreign_function, unspecified, pair_ref, null_t>;
     using sig_t = foundation::result<val_t> (*)(std::span<val_t const>);
 
     sig_t fn; ///< Pointer to the native implementation.
@@ -150,14 +175,16 @@ struct foreign_function {
 };
 
 /// The runtime Scheme value type: integer, boolean, builtin, closure,
-/// symbol, foreign function, or the unspecified value.
+/// symbol, foreign function, the unspecified value, a pair handle, or the
+/// empty list.
 ///
 /// @tparam Core The core AST type (used to type @ref closure and
 ///              @ref foreign_function).
 // 7251dd2e-066e-4c1e-8360-c33b15301355
 template <typename Core>
-using value = std::variant<int, bool, builtin, closure<Core>, symbol,
-                           foreign_function<Core>, unspecified>;
+using value =
+    std::variant<int, bool, builtin, closure<Core>, symbol,
+                 foreign_function<Core>, unspecified, pair_ref, null_t>;
 // 7251dd2e-066e-4c1e-8360-c33b15301355 end
 
 /// Fixed capacity of the mutable value @ref store shared by an @ref env.
@@ -199,6 +226,81 @@ class store {
     foundation::static_vector<value<Core>, MaxStore> cells_{};
 };
 
+/// Fixed capacity of the @ref pair_heap shared by an @ref env.
+inline constexpr int default_max_pairs = 256;
+
+/// One cons cell: a @c car and a @c cdr, each an arbitrary @ref value.
+///
+/// @tparam Core The core AST type.
+template <typename Core>
+struct pair_cell {
+    value<Core> car{};
+    value<Core> cdr{};
+};
+
+/// A flat, constexpr, allocation-free heap of cons cells, addressed by stable
+/// integer locations (@ref pair_ref).
+///
+/// The same design as @ref store: @ref foundation::static_vector is
+/// array-backed so locations never move, and the heap is shared (by non-owning
+/// pointer) across every @ref env copy — including closure captures — so that a
+/// @c set-car! on a pair is visible through every handle that names it.  The
+/// heap must outlive all envs that point at it (it lives for one program
+/// evaluation).  In a constant evaluation it is a transient local; at runtime
+/// it is caller-owned.  A pair handle therefore cannot escape the evaluation
+/// that built the heap.
+///
+/// @tparam Core     The core AST type.
+/// @tparam MaxPairs Maximum number of cons cells.
+template <typename Core, int MaxPairs>
+class pair_heap {
+  public:
+    /// Appends @p c and returns its stable location.
+    constexpr auto alloc(pair_cell<Core> c) -> int {
+        int loc = cells_.size();
+        cells_.push_back(std::move(c));
+        return loc;
+    }
+
+    /// Returns the cell at @p loc (read-only).
+    [[nodiscard]] constexpr auto get(int loc) const -> pair_cell<Core> const & {
+        return cells_[loc];
+    }
+
+    /// Returns the cell at @p loc for mutation (@c set-car! / @c set-cdr!).
+    [[nodiscard]] constexpr auto at(int loc) -> pair_cell<Core> & {
+        return cells_[loc];
+    }
+
+  private:
+    foundation::static_vector<pair_cell<Core>, MaxPairs> cells_{};
+};
+
+/// Structural (deep) equality — the @c equal? predicate.
+///
+/// Pairs are compared by walking the shared @p heap: two @ref pair_ref are
+/// @c equal? iff their cars and cdrs are recursively @c equal?.  Every other
+/// value type compares by its own @c operator== (which, for @ref pair_ref
+/// alone, is identity — hence the special case here).
+///
+/// @tparam Core     The core AST type.
+/// @tparam MaxPairs Heap capacity.
+template <typename Core, int MaxPairs>
+[[nodiscard]] constexpr auto values_equal(value<Core> const &a,
+                                          value<Core> const &b,
+                                          pair_heap<Core, MaxPairs> const &heap)
+    -> bool {
+    if (a.index() != b.index())
+        return false;
+    if (std::holds_alternative<pair_ref>(a)) {
+        auto const &pa = heap.get(std::get<pair_ref>(a).loc);
+        auto const &pb = heap.get(std::get<pair_ref>(b).loc);
+        return values_equal(pa.car, pb.car, heap) &&
+               values_equal(pa.cdr, pb.cdr, heap);
+    }
+    return a == b;
+}
+
 /// A variable binding environment with linear search and most-recent-first
 /// shadowing.
 ///
@@ -225,6 +327,18 @@ class env {
     /// Constructs a mutable environment backed by @p s.
     constexpr explicit env(store<Core, default_max_store> *s) : store_(s) {}
 
+    /// Constructs an environment backed by store @p s and pair heap @p p.
+    constexpr env(store<Core, default_max_store> *s,
+                  pair_heap<Core, default_max_pairs> *p)
+        : store_(s), pairs_(p) {}
+
+    /// Returns the shared pair heap (non-owning; null if this environment has
+    /// none).  Pair primitives allocate and mutate cells through it.
+    [[nodiscard]] constexpr auto pairs() const
+        -> pair_heap<Core, default_max_pairs> * {
+        return pairs_;
+    }
+
     /// Adds a new binding for @p name → @p val.
     /// Later bindings shadow earlier ones for the same name.
     constexpr auto define(std::string_view name, value<Core> val) -> void;
@@ -248,6 +362,8 @@ class env {
             val{}; ///< Inline value in functional mode; unused if loc>=0.
     };
     store<Core, default_max_store> *store_ =
+        nullptr; ///< Non-owning; may be null.
+    pair_heap<Core, default_max_pairs> *pairs_ =
         nullptr; ///< Non-owning; may be null.
     foundation::static_vector<binding, MaxBindings> bindings_{};
 };
@@ -317,6 +433,25 @@ template <typename Core, int MaxBindings>
 [[nodiscard]] constexpr auto default_env(store<Core, default_max_store> &s)
     -> env<Core, MaxBindings> {
     env<Core, MaxBindings> e{&s};
+    e.define("+", value<Core>{builtin{builtin_op::add}});
+    e.define("*", value<Core>{builtin{builtin_op::multiply}});
+    return e;
+}
+
+/// Returns an environment backed by store @p s and pair heap @p p,
+/// pre-populated with the built-in @c + and @c * operators.  Supports both @c
+/// set! (via @p s) and the pair primitives (via @p p).
+///
+/// Both @p s and @p p must outlive the returned environment and every
+/// environment copied from it (including closure captures).
+///
+/// @tparam Core        Core AST type.
+/// @tparam MaxBindings Environment capacity.
+template <typename Core, int MaxBindings>
+[[nodiscard]] constexpr auto default_env(store<Core, default_max_store> &s,
+                                         pair_heap<Core, default_max_pairs> &p)
+    -> env<Core, MaxBindings> {
+    env<Core, MaxBindings> e{&s, &p};
     e.define("+", value<Core>{builtin{builtin_op::add}});
     e.define("*", value<Core>{builtin{builtin_op::multiply}});
     return e;

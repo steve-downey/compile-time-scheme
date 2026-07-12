@@ -106,6 +106,49 @@ struct core_begin {
         exprs; ///< The sequenced expressions (at least one).
 };
 
+/// The pair/list primitive operations, dispatched at evaluation time by
+/// @ref core_prim.
+///
+/// These are ordinary procedures (all arguments are evaluated), but they are
+/// modelled as a core form rather than as first-class @c builtin values for two
+/// reasons: they need access to the shared pair heap (which rides in the
+/// environment), and they must be *hermetic* so that quoting a list cannot be
+/// broken by a user rebinding @c cons.  @c null is the nullary constructor of
+/// the empty list @c '().
+enum class prim_op {
+    cons,
+    car,
+    cdr,
+    set_car,
+    set_cdr,
+    pairp,
+    nullp,
+    eq,
+    eqv,
+    equal,
+    list,
+    null
+};
+
+/// A primitive application: an operation applied to (already-evaluated)
+/// argument expressions.
+///
+/// A single generic node covers every pair/list primitive.  Choosing one node
+/// with a runtime @ref prim_op switch over roughly a dozen separate core nodes
+/// keeps the number of new @c std::visit arms across the six evaluators small —
+/// an instance of the expression problem, resolved toward "cheap to add
+/// operations" at the cost of per-operation static case analysis.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum number of arguments.
+template <typename R, int MaxNodes, int MaxList>
+struct core_prim {
+    prim_op op; ///< Which primitive to apply.
+    foundation::static_vector<foundation::arena_box<R, MaxNodes>, MaxList>
+        args; ///< Argument expressions (arity checked per op at eval time).
+};
+
 /// Factory template that produces the open-recursive variant layer for the core
 /// AST.
 ///
@@ -120,7 +163,8 @@ struct core_f_factory {
                      core_if<R, MaxNodes>, core_lambda<R, MaxNodes, MaxList>,
                      core_application<R, MaxNodes, MaxList>,
                      core_define<R, MaxNodes>, core_set<R, MaxNodes>,
-                     core_begin<R, MaxNodes, MaxList>>;
+                     core_begin<R, MaxNodes, MaxList>,
+                     core_prim<R, MaxNodes, MaxList>>;
 };
 
 /// The concrete recursive core AST type, formed as the fixed point of

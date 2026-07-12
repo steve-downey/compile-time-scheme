@@ -70,3 +70,46 @@ TEST_CASE("ElaborateTest - BeginEmptyIsError") {
     scm::foundation::tree_arena<Core, 32> ca;
     REQUIRE(!elab("(begin)", da, ca).has_value());
 }
+
+TEST_CASE("ElaborateTest - ConsElaboratesToCorePrim") {
+    scm::foundation::tree_arena<scm::reader::datum_type<32, 16>, 32> da;
+    scm::foundation::tree_arena<Core, 32> ca;
+    auto er = elab("(cons 1 2)", da, ca);
+    REQUIRE(er.has_value());
+    using Prim = scm::elaborator::core_prim<Core, 32, 16>;
+    REQUIRE(std::holds_alternative<Prim>(er.value().inner));
+    REQUIRE(std::get<Prim>(er.value().inner).op ==
+            scm::elaborator::prim_op::cons);
+    REQUIRE(std::get<Prim>(er.value().inner).args.size() == 2);
+}
+
+TEST_CASE("ElaborateTest - QuotedListElaboratesWithoutError") {
+    // '(1 2 3) previously errored ("lists/nested quotes not yet supported").
+    // It now lowers to a construction expression (nested cons -> null).
+    scm::foundation::tree_arena<scm::reader::datum_type<64, 16>, 64> da;
+    scm::foundation::tree_arena<scm::elaborator::core_type<64, 16>, 64> ca;
+    auto dr =
+        scm::reader::read_datum<64, 16>(scm::parser::cursor{"'(1 2 3)"}, da);
+    REQUIRE(dr.has_value());
+    auto er = scm::elaborator::elaborate<64, 16>(dr.value().value, da, ca);
+    REQUIRE(er.has_value());
+    using Prim =
+        scm::elaborator::core_prim<scm::elaborator::core_type<64, 16>, 64, 16>;
+    REQUIRE(std::holds_alternative<Prim>(er.value().inner));
+    // Outermost node is (cons 1 <rest>).
+    REQUIRE(std::get<Prim>(er.value().inner).op ==
+            scm::elaborator::prim_op::cons);
+}
+
+TEST_CASE("ElaborateTest - QuotedEmptyListElaboratesToNull") {
+    scm::foundation::tree_arena<scm::reader::datum_type<32, 16>, 32> da;
+    scm::foundation::tree_arena<Core, 32> ca;
+    auto dr = scm::reader::read_datum<32, 16>(scm::parser::cursor{"'()"}, da);
+    REQUIRE(dr.has_value());
+    auto er = scm::elaborator::elaborate<32, 16>(dr.value().value, da, ca);
+    REQUIRE(er.has_value());
+    using Prim = scm::elaborator::core_prim<Core, 32, 16>;
+    REQUIRE(std::holds_alternative<Prim>(er.value().inner));
+    REQUIRE(std::get<Prim>(er.value().inner).op ==
+            scm::elaborator::prim_op::null);
+}

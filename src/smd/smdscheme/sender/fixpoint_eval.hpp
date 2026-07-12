@@ -5,6 +5,7 @@
 
 #include <smd/smdscheme/sender/comp_tree.hpp>
 
+#include <smd/smdscheme/closure/pairs.hpp>
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/foundation/static_vector.hpp>
@@ -178,6 +179,14 @@ mendler_run(Comp<MaxList> const &comp,
                             [](closure::unspecified const &) -> Res {
                                 return Res{foundation::parse_error{
                                     {}, "attempted to call non-function"}};
+                            },
+                            [](closure::pair_ref const &) -> Res {
+                                return Res{foundation::parse_error{
+                                    {}, "attempted to call non-function"}};
+                            },
+                            [](closure::null_t const &) -> Res {
+                                return Res{foundation::parse_error{
+                                    {}, "attempted to call non-function"}};
                             }},
                         func_r.value());
                 },
@@ -195,6 +204,18 @@ mendler_run(Comp<MaxList> const &comp,
                             return last;
                     }
                     return last;
+                },
+                [&recurse, &env](comp_prim<CompT, MaxList> const &p) -> Res {
+                    foundation::static_vector<Val, MaxList> vals;
+                    for (int i = 0; i < p.args.size(); ++i) {
+                        auto r = recurse(*p.args[i], env);
+                        if (!r.has_value())
+                            return r;
+                        vals.push_back(r.value());
+                    }
+                    return closure::apply_prim(
+                        p.op, std::span<Val const>(vals.begin(), vals.end()),
+                        env.pairs());
                 }},
             layer);
     };
