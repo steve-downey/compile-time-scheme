@@ -83,6 +83,18 @@ struct comp_begin {
     foundation::static_vector<smd::fixpoint::Box<A>, MaxList> exprs;
 };
 
+/// A computation node for a pair/list primitive application (the Comp mirror of
+/// @ref elaborator::core_prim).  Carries the operation and its argument
+/// children; the interpretation lives in @ref closure::apply_prim.
+///
+/// @tparam A        The type of recursive children.
+/// @tparam MaxList  Maximum number of arguments.
+template <typename A, int MaxList>
+struct comp_prim {
+    elaborator::prim_op op;
+    foundation::static_vector<smd::fixpoint::Box<A>, MaxList> args;
+};
+
 // 950ee4f0-367a-47bb-9335-30191f783119
 /// Factory template producing the open-recursive variant layer for CompF.
 /// Each structural node (comp_if, comp_lambda, comp_apply) is parameterized
@@ -96,7 +108,8 @@ struct comp_f_factory {
     template <typename A>
     using type = std::variant<comp_pure, comp_lookup, comp_if<A>,
                               comp_lambda<A, MaxList>, comp_apply<A, MaxList>,
-                              comp_set<A>, comp_begin<A, MaxList>>;
+                              comp_set<A>, comp_begin<A, MaxList>,
+                              comp_prim<A, MaxList>>;
 };
 
 /// The concrete recursive computation tree type.
@@ -162,6 +175,15 @@ fmap_comp(F &&f,
                         smd::fixpoint::make_box<B>(std::invoke(f, *e)));
                 }
                 return comp_begin<B, MaxList>{std::move(exprs_result)};
+            },
+            [&f](comp_prim<A, MaxList> const &p) -> ResultF {
+                foundation::static_vector<smd::fixpoint::Box<B>, MaxList>
+                    args_result;
+                for (auto const &arg : p.args) {
+                    args_result.push_back(
+                        smd::fixpoint::make_box<B>(std::invoke(f, *arg)));
+                }
+                return comp_prim<B, MaxList>{p.op, std::move(args_result)};
             }},
         layer);
 }
@@ -306,6 +328,23 @@ core_to_comp(elaborator::core_type<MaxNodes, MaxList> const &node,
                 return smd::fixpoint::wrap_fix<
                     comp_f_factory<MaxList>::template type>(CompLayer{
                     comp_begin<CompT, MaxList>{std::move(expr_boxes)}});
+            },
+            [&arena](elaborator::core_prim<Core, MaxNodes, MaxList> const &cp)
+                -> Res {
+                foundation::static_vector<smd::fixpoint::Box<CompT>, MaxList>
+                    arg_boxes;
+                for (auto const &arg_box : cp.args) {
+                    auto arg_r = core_to_comp<MaxNodes, MaxList>(
+                        arena.get(arg_box), arena);
+                    if (!arg_r.has_value())
+                        return arg_r.error();
+                    arg_boxes.push_back(
+                        smd::fixpoint::make_box<CompT>(arg_r.value()));
+                }
+
+                return smd::fixpoint::wrap_fix<
+                    comp_f_factory<MaxList>::template type>(CompLayer{
+                    comp_prim<CompT, MaxList>{cp.op, std::move(arg_boxes)}});
             }},
         node.inner);
 }

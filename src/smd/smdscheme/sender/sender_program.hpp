@@ -3,6 +3,7 @@
 #ifndef SRC_SMD_SMDSCHEME_SENDER_SENDER_PROGRAM_HPP
 #define SRC_SMD_SMDSCHEME_SENDER_SENDER_PROGRAM_HPP
 
+#include <smd/smdscheme/closure/pairs.hpp>
 #include <smd/smdscheme/closure/value.hpp>
 #include <smd/smdscheme/elaborator/elaborate.hpp>
 #include <smd/smdscheme/elaborator/elaborated_core.hpp>
@@ -25,6 +26,7 @@ using elaborator::core_define;
 using elaborator::core_if;
 using elaborator::core_integer;
 using elaborator::core_lambda;
+using elaborator::core_prim;
 using elaborator::core_quote;
 using elaborator::core_set;
 using elaborator::core_symbol;
@@ -231,6 +233,14 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                         [](closure::unspecified const &) -> Res {
                             return Res{foundation::parse_error{
                                 {}, "attempted to call non-function"}};
+                        },
+                        [](closure::pair_ref const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
+                        },
+                        [](closure::null_t const &) -> Res {
+                            return Res{foundation::parse_error{
+                                {}, "attempted to call non-function"}};
                         }},
                     func_r.value());
                 // e619ae0a-47be-48b4-86f5-1dfac90299e6 end
@@ -257,6 +267,19 @@ auto eval_node(elaborator::core_type<MaxNodes, MaxList> const &node,
                         return last;
                 }
                 return last;
+            },
+            [&](core_prim<Core, MaxNodes, MaxList> const &cp) -> Res {
+                foundation::static_vector<Val, MaxList> vals;
+                for (int i = 0; i < cp.args.size(); ++i) {
+                    auto r = eval_node<MaxNodes, MaxList, MaxBindings>(
+                        arena.get(cp.args[i]), arena, environment);
+                    if (!r.has_value())
+                        return r;
+                    vals.push_back(r.value());
+                }
+                return closure::apply_prim(
+                    cp.op, std::span<Val const>(vals.begin(), vals.end()),
+                    environment.pairs());
             }},
         node.inner);
 }

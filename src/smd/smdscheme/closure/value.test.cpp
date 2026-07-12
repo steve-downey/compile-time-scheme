@@ -171,3 +171,52 @@ TEST_CASE("ValueTest - AssignWithoutStoreIsError") {
     e.define("x"sv, closure::value<core>{1});
     REQUIRE_FALSE(e.assign("x"sv, closure::value<core>{2}).has_value());
 }
+
+TEST_CASE("ValueTest - PairHeapAllocGetAt") {
+    using Val = closure::value<core>;
+    closure::pair_heap<core, closure::default_max_pairs> heap;
+    int a = heap.alloc({Val{1}, Val{2}});
+    int b = heap.alloc({Val{3}, closure::value<core>{closure::null_t{}}});
+    REQUIRE(a != b);
+    REQUIRE(std::get<int>(heap.get(a).car) == 1);
+    REQUIRE(std::get<int>(heap.get(a).cdr) == 2);
+    REQUIRE(std::get<int>(heap.get(b).car) == 3);
+    REQUIRE(std::holds_alternative<closure::null_t>(heap.get(b).cdr));
+    // set-car! / set-cdr! mutate in place through at().
+    heap.at(a).car = Val{42};
+    REQUIRE(std::get<int>(heap.get(a).car) == 42);
+    REQUIRE(std::get<int>(heap.get(b).car) == 3); // untouched
+}
+
+TEST_CASE("ValueTest - PairRefIdentity") {
+    // eq? on pairs is handle identity, not structure.
+    REQUIRE(closure::pair_ref{3} == closure::pair_ref{3});
+    REQUIRE_FALSE(closure::pair_ref{3} == closure::pair_ref{4});
+}
+
+TEST_CASE("ValueTest - EqualIsStructural") {
+    using Val = closure::value<core>;
+    closure::pair_heap<core, closure::default_max_pairs> heap;
+    // Two distinct cells (1 . 2): different handles, structurally equal.
+    Val p{closure::pair_ref{heap.alloc({Val{1}, Val{2}})}};
+    Val q{closure::pair_ref{heap.alloc({Val{1}, Val{2}})}};
+    REQUIRE_FALSE(std::get<closure::pair_ref>(p) ==
+                  std::get<closure::pair_ref>(q)); // eq? => false
+    REQUIRE(closure::values_equal(p, q, heap));    // equal? => true
+    // Distinct structure compares unequal.
+    Val r{closure::pair_ref{heap.alloc({Val{1}, Val{9}})}};
+    REQUIRE_FALSE(closure::values_equal(p, r, heap));
+    // Nested pairs recurse.
+    Val np{closure::pair_ref{heap.alloc({p, Val{closure::null_t{}}})}};
+    Val nq{closure::pair_ref{heap.alloc({q, Val{closure::null_t{}}})}};
+    REQUIRE(closure::values_equal(np, nq, heap));
+}
+
+static_assert([] {
+    using Val = closure::value<core>;
+    closure::pair_heap<core, closure::default_max_pairs> heap;
+    int loc = heap.alloc({Val{10}, Val{20}});
+    heap.at(loc).cdr = Val{99};
+    return std::get<int>(heap.get(loc).car) == 10 &&
+           std::get<int>(heap.get(loc).cdr) == 99;
+}());

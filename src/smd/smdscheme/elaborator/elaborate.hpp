@@ -7,38 +7,120 @@
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/reader/read_datum.hpp>
 
+#include <optional>
+
 namespace smd::smdscheme::elaborator {
 namespace detail {
 
-/// Converts a quoted datum into its atom representation.
+/// Maps a head symbol to its pair/list primitive, if it names one.
 ///
-/// Only integer, boolean, and symbol atoms are supported; nested lists in
-/// quote position return an error.
+/// Recognizing primitives by head symbol makes them hermetic: quoting a list
+/// lowers to @c cons regardless of any user binding named @c cons.  The cost is
+/// that these names are not first-class rebindable values — acceptable, and
+/// consistent with @c set! / @c begin being core forms.
+constexpr auto prim_op_for(std::string_view name) -> std::optional<prim_op> {
+    if (name == "cons")
+        return prim_op::cons;
+    if (name == "car")
+        return prim_op::car;
+    if (name == "cdr")
+        return prim_op::cdr;
+    if (name == "set-car!")
+        return prim_op::set_car;
+    if (name == "set-cdr!")
+        return prim_op::set_cdr;
+    if (name == "pair?")
+        return prim_op::pairp;
+    if (name == "null?")
+        return prim_op::nullp;
+    if (name == "eq?")
+        return prim_op::eq;
+    if (name == "eqv?")
+        return prim_op::eqv;
+    if (name == "equal?")
+        return prim_op::equal;
+    if (name == "list")
+        return prim_op::list;
+    return std::nullopt;
+}
+
+/// Elaborates a quoted datum into a core expression that *constructs* the
+/// datum.
+///
+/// Rather than a second literal-data representation, a quoted compound datum is
+/// lowered to construction: @c '(1 2 3) becomes nested @c cons applications
+/// bottoming in the empty list.  Atoms remain @ref core_quote.  This reuses the
+/// pair heap and leaves every evaluator's atom path untouched.
 ///
 /// @tparam MaxNodes Arena capacity.
 /// @tparam MaxList  Maximum list length.
-/// @param  d      The datum to quote.
-/// @param  arena  The datum arena (used only for type information here).
+/// @param  d           The datum to quote.
+/// @param  datum_arena Read-only datum arena.
+/// @param  core_arena  Core arena receiving the constructed nodes.
 template <int MaxNodes, int MaxList>
-constexpr auto elaborate_quote(
+constexpr auto elaborate_quoted_datum(
     reader::datum_type<MaxNodes, MaxList> const &d,
     const foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
-                                 MaxNodes> & /*arena*/)
-    -> foundation::result<std::variant<int, bool, std::string_view>> {
+                                 MaxNodes> &datum_arena,
+    foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes> &core_arena)
+    -> foundation::result<core_type<MaxNodes, MaxList>> {
+    using core = core_type<MaxNodes, MaxList>;
+    using core_f =
+        typename core_f_factory<MaxNodes, MaxList>::template type<core>;
+    using DatumT = reader::datum_type<MaxNodes, MaxList>;
+    using DatumList = reader::datum_list<DatumT, MaxNodes, MaxList>;
+    using DatumQuote = reader::datum_quote<DatumT, MaxNodes>;
+    using Prim = core_prim<core, MaxNodes, MaxList>;
+
     if (std::holds_alternative<reader::datum_integer>(d.inner)) {
-        return std::variant<int, bool, std::string_view>{
-            std::get<reader::datum_integer>(d.inner).value};
+        return core{
+            core_f{core_quote{std::get<reader::datum_integer>(d.inner).value}}};
     }
     if (std::holds_alternative<reader::datum_boolean>(d.inner)) {
-        return std::variant<int, bool, std::string_view>{
-            std::get<reader::datum_boolean>(d.inner).value};
+        return core{
+            core_f{core_quote{std::get<reader::datum_boolean>(d.inner).value}}};
     }
     if (std::holds_alternative<reader::datum_symbol>(d.inner)) {
-        return std::variant<int, bool, std::string_view>{
-            std::get<reader::datum_symbol>(d.inner).name};
+        return core{
+            core_f{core_quote{std::get<reader::datum_symbol>(d.inner).name}}};
     }
-    return foundation::parse_error{
-        {}, "quote: lists/nested quotes not yet supported"};
+    if (std::holds_alternative<DatumList>(d.inner)) {
+        auto const &lst = std::get<DatumList>(d.inner);
+        // Right-fold the elements into cons cells, bottoming in null.
+        core tail = core{core_f{Prim{prim_op::null, {}}}};
+        for (int i = lst.elements.size() - 1; i >= 0; --i) {
+            auto elem_r = elaborate_quoted_datum<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[i]), datum_arena, core_arena);
+            if (!elem_r.has_value())
+                return elem_r;
+            Prim cell{prim_op::cons, {}};
+            cell.args.push_back(
+                make_arena_box(core_arena, std::move(elem_r.value())));
+            cell.args.push_back(make_arena_box(core_arena, std::move(tail)));
+            tail = core{core_f{std::move(cell)}};
+        }
+        return tail;
+    }
+    if (std::holds_alternative<DatumQuote>(d.inner)) {
+        // A quote inside a quote is data: '(quote <inner>).
+        auto const &q = std::get<DatumQuote>(d.inner);
+        auto inner_r = elaborate_quoted_datum<MaxNodes, MaxList>(
+            datum_arena.get(q.quoted), datum_arena, core_arena);
+        if (!inner_r.has_value())
+            return inner_r;
+        Prim after{prim_op::cons, {}};
+        after.args.push_back(
+            make_arena_box(core_arena, std::move(inner_r.value())));
+        after.args.push_back(
+            make_arena_box(core_arena, core{core_f{Prim{prim_op::null, {}}}}));
+        Prim outer{prim_op::cons, {}};
+        outer.args.push_back(make_arena_box(
+            core_arena, core{core_f{core_quote{std::string_view{"quote"}}}}));
+        outer.args.push_back(
+            make_arena_box(core_arena, core{core_f{std::move(after)}}));
+        return core{core_f{std::move(outer)}};
+    }
+    return foundation::parse_error{{}, "quote: unsupported datum"};
 }
 
 /// Forward declaration (mutual recursion with @c elaborate_list).
@@ -112,11 +194,8 @@ constexpr auto elaborate_list(
             if (lst.elements.size() != 2)
                 return foundation::parse_error{{},
                                                "quote: expected 1 argument"};
-            auto atom_r = elaborate_quote<MaxNodes, MaxList>(
-                datum_arena.get(lst.elements[1]), datum_arena);
-            if (!atom_r.has_value())
-                return foundation::parse_error{{}, atom_r.error().message};
-            return core{core_f{core_quote{atom_r.value()}}};
+            return elaborate_quoted_datum<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[1]), datum_arena, core_arena);
         }
 
         if (name == "define") {
@@ -355,6 +434,23 @@ constexpr auto elaborate_list(
 
             return core{core_f{std::move(seq)}};
         }
+
+        // Pair / list primitives: cons, car, cdr, set-car!, set-cdr!, pair?,
+        // null?, eq?, eqv?, equal?, list.  Lowered to a hermetic core_prim;
+        // per-op arity is checked at evaluation time.
+        if (auto op = prim_op_for(name); op.has_value()) {
+            core_prim<core, MaxNodes, MaxList> node{};
+            node.op = *op;
+            for (int i = 1; i < lst.elements.size(); ++i) {
+                auto arg_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[i]), datum_arena, core_arena);
+                if (!arg_r.has_value())
+                    return arg_r;
+                node.args.push_back(
+                    make_arena_box(core_arena, std::move(arg_r.value())));
+            }
+            return core{core_f{std::move(node)}};
+        }
     }
 
     // Regular application
@@ -416,11 +512,8 @@ constexpr auto elaborate_node(
         auto const &q =
             std::get<reader::datum_quote<reader::datum_type<MaxNodes, MaxList>,
                                          MaxNodes>>(d.inner);
-        auto atom_r = elaborate_quote<MaxNodes, MaxList>(
-            datum_arena.get(q.quoted), datum_arena);
-        if (!atom_r.has_value())
-            return atom_r.error();
-        return core{core_f{core_quote{atom_r.value()}}};
+        return elaborate_quoted_datum<MaxNodes, MaxList>(
+            datum_arena.get(q.quoted), datum_arena, core_arena);
     }
     if (std::holds_alternative<reader::datum_list<
             reader::datum_type<MaxNodes, MaxList>, MaxNodes, MaxList>>(
