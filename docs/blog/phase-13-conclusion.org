@@ -287,7 +287,7 @@ expedition can begin from the summit.
 
 
 #+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
-[[file:index.org][↑ Series Index]]
+[[file:index.org][↑ Series Index]] | [[file:phase-14-set-bang.org][Next: Phase 14 - Mutation: set! →]]
 #+html: </nav>
 
 * References
