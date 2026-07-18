@@ -177,6 +177,8 @@ Divergence issue docs live in `docs/divergences/`, one numbered file per issue, 
 File one when the implementation knowingly deviates from ANSI Common Lisp semantics, when a step is implemented differently than `docs/cl-pivot-plan.md` specifies, or when a frozen-tree edit inside a `src/smd/smdscheme/**` UUID anchor block is unavoidable.
 `docs/divergences/DIV-0001-single-package-and-case.md` is the first, seeded for D2/D7 (single package, keywords only, uppercase-fold-only reader), status `accepted-permanent`.
 
+The `docs/blog/%.md` Makefile rule's generated `.md.deps` now also captures `orgit:` transclusion targets (previously only `[[file:...]]` links), so blog posts rebuild when their transcluded `smdscheme` source files change (Step L3).
+
 ## 2026-07-18 Step L1: smdlisp skeleton landed
 
 `src/smd/smdlisp/` now exists with `CMakeLists.txt`, `version.hpp`, `version.cpp`, `version.test.cpp`, wired into `src/smd/CMakeLists.txt` via `add_subdirectory(smdlisp)` (added after `smdscheme`).
