@@ -10,7 +10,4 @@ target_sources(
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
             FILES value.hpp
 )
-target_link_libraries(
-    smdlisp.closure
-    PUBLIC smdscheme.foundation
-)
+target_link_libraries(smdlisp.closure PUBLIC smdscheme.foundation)

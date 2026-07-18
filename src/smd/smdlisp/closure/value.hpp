@@ -99,8 +99,8 @@ template <typename Core>
 struct foreign_function {
     using val_t = std::variant<nil_t, int, symbol, keyword, builtin,
                                closure<Core>, foreign_function>;
-    using sig_t = smd::smdscheme::foundation::result<val_t> (*)(
-        std::span<val_t const>);
+    using sig_t =
+        smd::smdscheme::foundation::result<val_t> (*)(std::span<val_t const>);
 
     sig_t fn = nullptr; ///< Pointer to the native implementation.
 
@@ -119,8 +119,8 @@ struct foreign_function {
 /// @tparam Core The core AST type (used to type @ref closure and
 ///              @ref foreign_function).
 template <typename Core>
-using value = std::variant<nil_t, int, symbol, keyword, builtin,
-                           closure<Core>, foreign_function<Core>>;
+using value = std::variant<nil_t, int, symbol, keyword, builtin, closure<Core>,
+                           foreign_function<Core>>;
 
 /// The sole truthiness authority for the whole project (decision D3).
 ///

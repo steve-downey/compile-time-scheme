@@ -16,8 +16,7 @@ target_sources(
 )
 target_link_libraries(
     smdlisp.smdlisp
-    PUBLIC smdscheme.foundation smdscheme.parser smdlisp.reader
-           smdlisp.closure
+    PUBLIC smdscheme.foundation smdscheme.parser smdlisp.reader smdlisp.closure
 )
 
 find_package(Catch2 REQUIRED)

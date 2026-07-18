@@ -20,20 +20,20 @@ using val = smd::smdlisp::closure::value<dummy_core>;
 // Merge criteria (docs/cl-pivot-plan.md, Step L7): truthiness of nil, the
 // integer 0, a t-symbol, and a keyword.
 
-static_assert(
-    !smd::smdlisp::closure::is_true(val{smd::smdlisp::closure::nil_t{}}));
+static_assert(!smd::smdlisp::closure::is_true(val{
+    smd::smdlisp::closure::nil_t{}}));
 static_assert(smd::smdlisp::closure::is_true(val{0}));
-static_assert(smd::smdlisp::closure::is_true(
-    val{smd::smdlisp::closure::symbol{"T"}}));
-static_assert(smd::smdlisp::closure::is_true(
-    val{smd::smdlisp::closure::keyword{"FOO"}}));
+static_assert(smd::smdlisp::closure::is_true(val{
+    smd::smdlisp::closure::symbol{"T"}}));
+static_assert(smd::smdlisp::closure::is_true(val{
+    smd::smdlisp::closure::keyword{"FOO"}}));
 
 // nil is false regardless of how it is spelled; every other integer,
 // including negatives, stays true too.
 static_assert(smd::smdlisp::closure::is_true(val{42}));
 static_assert(smd::smdlisp::closure::is_true(val{-1}));
-static_assert(smd::smdlisp::closure::is_true(
-    val{smd::smdlisp::closure::builtin{smd::smdlisp::closure::builtin_op::add}}));
+static_assert(smd::smdlisp::closure::is_true(val{
+    smd::smdlisp::closure::builtin{smd::smdlisp::closure::builtin_op::add}}));
 
 static_assert(smd::smdlisp::closure::nil_t{} == smd::smdlisp::closure::nil_t{});
 static_assert(smd::smdlisp::closure::symbol{"FOO"} ==
@@ -47,10 +47,10 @@ static_assert(!(smd::smdlisp::closure::keyword{"FOO"} ==
 
 // A symbol and a keyword spelled the same way are still distinct value
 // kinds: the variant holds either alternative, never both at once.
-static_assert(std::holds_alternative<smd::smdlisp::closure::keyword>(
-    val{smd::smdlisp::closure::keyword{"FOO"}}));
-static_assert(!std::holds_alternative<smd::smdlisp::closure::symbol>(
-    val{smd::smdlisp::closure::keyword{"FOO"}}));
+static_assert(std::holds_alternative<smd::smdlisp::closure::keyword>(val{
+    smd::smdlisp::closure::keyword{"FOO"}}));
+static_assert(!std::holds_alternative<smd::smdlisp::closure::symbol>(val{
+    smd::smdlisp::closure::keyword{"FOO"}}));
 
 } // namespace
 
