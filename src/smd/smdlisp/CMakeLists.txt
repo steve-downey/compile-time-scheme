@@ -1,6 +1,8 @@
 # src/smd/smdlisp/CMakeLists.txt                                    -*-CMake-*-
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+add_subdirectory(reader)
+
 add_library(smdlisp.smdlisp STATIC "")
 target_sources(
     smdlisp.smdlisp
@@ -13,7 +15,7 @@ target_sources(
 )
 target_link_libraries(
     smdlisp.smdlisp
-    PUBLIC smdscheme.foundation smdscheme.parser
+    PUBLIC smdscheme.foundation smdscheme.parser smdlisp.reader
 )
 
 find_package(Catch2 REQUIRED)

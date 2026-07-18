@@ -70,7 +70,7 @@
 - [x] Step L1: smdlisp skeleton
 - [x] Step L2: blog phase 15 — why not call/cc
 - [x] Step L3: blog deps infra fix (optional)
-- [ ] Step L4: CL lexical layer
+- [x] Step L4: CL lexical layer
 - [ ] Step L5: CL atoms
 - [ ] Step L6: CL datum reader (+ phase 16 draft)
 - [ ] Step L7: CL value model
