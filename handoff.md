@@ -176,3 +176,10 @@ All nonlocal control is one-shot and upward-only, dynamic-extent per CL; a dead 
 Divergence issue docs live in `docs/divergences/`, one numbered file per issue, named `DIV-NNNN-short-slug.md`, using `docs/divergences/TEMPLATE.md` as the skeleton.
 File one when the implementation knowingly deviates from ANSI Common Lisp semantics, when a step is implemented differently than `docs/cl-pivot-plan.md` specifies, or when a frozen-tree edit inside a `src/smd/smdscheme/**` UUID anchor block is unavoidable.
 `docs/divergences/DIV-0001-single-package-and-case.md` is the first, seeded for D2/D7 (single package, keywords only, uppercase-fold-only reader), status `accepted-permanent`.
+
+## 2026-07-18 Step L2 (blog phase 15)
+
+`docs/blog/phase-15-why-common-lisp.org` is drafted (`DRAFT — pending author revision`), covering plan section 0: the sender one-shot completion contract, why multishot `call/cc` cannot ride it, Kiselyov's independent argument against `call/cc`, Common Lisp's dynamic-extent control operators, the thesis, and what the pivot does and does not change.
+`docs/blog/index.org` gained a Phase 15 entry (and, in the process, a Phase 14 entry it was missing before this step).
+`make blog-md` renders phase-15 cleanly; `docs/blog/phase-14-set-bang.md` and `docs/blog/index.md` had never been generated/committed before this step and are now included as part of keeping the rendered set consistent with their `.org` sources — no existing phase `.org`/`.md` content changed.
+`docs/blog/references.bib`'s `beman_execution` entry has no `author` field; citing it with `[cite:@beman_execution]` breaks the GFM export with an opaque `org-element-insert-before: No location found to insert node` error. Give it an `author` field before citing it, or avoid citing it.
