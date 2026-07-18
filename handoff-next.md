@@ -1,5 +1,13 @@
 # Next steps: Common Lisp pivot, Steps L4 and L7 (parallel)
 
+> **2026-07-18 update:** L4, L7, and now **L5 are all DONE**. Track A's next
+> unblocked step is **L6** (CL datum reader, depends on L5, done); Track B's
+> next unblocked step is **L8** (cons cells and list builtins, depends on L7,
+> done). See the "Step L5 — DONE" entry below, next to the L4 entry, and
+> `handoff.md`'s "2026-07-18 Step L5: CL atoms landed" section for what L5
+> actually exposes. The rest of this file's framing (written when L4/L7 were
+> dispatched together) is left as historical context; do not re-run L4/L7/L5.
+
 ## Direction
 
 The project is pivoting from Scheme-light to Common Lisp-light semantics.
@@ -47,6 +55,16 @@ Landed: `src/smd/smdlisp/reader/{cl_chars.hpp,cl_chars.test.cpp,CMakeLists.txt}`
 See `handoff.md` "2026-07-18 Step L4: CL lexical layer landed" for the exposed predicate names and a naming hazard worth reading before L5/L6 touch this header: the cursor-consuming skip function is named `skip_cl_intertoken_space`, not `skip_intertoken_space`, to avoid a permanent ADL ambiguity against `smdscheme::parser::skip_intertoken_space` (same `cursor` argument type). Apply the same care to any new `smdlisp` function taking a `smdscheme::parser::cursor` by value.
 `make compile`/`make test` (295/295)/`make lint` all green at landing; `src/smd/smdscheme/**` untouched.
 No divergence doc was needed for this step (predicate shape and comment/case-fold behavior follow the plan directly).
+
+### Step L5 — CL atoms — DONE (2026-07-18, in worktree cl-pivot/l5-cl-atoms)
+
+Landed: `src/smd/smdlisp/reader/{atom.hpp,atom.test.cpp}`, added to the existing `smdlisp.reader` target's `FILE_SET` (no new CMake target).
+`atom = std::variant<atom_integer, atom_symbol, atom_keyword>`; `atom_keyword` is a distinct kind from `atom_symbol` per D7 (spelling stored without the leading `:`). Both hold a `folded_name` (own fixed storage, not a `string_view` into source — folding per D2 rewrites characters). Public parsers: `integer_p()`, `symbol_p()`, `keyword_p()`, `atom_p()` (tries them in that order), and `read_atom(std::string_view)` as the convenience entry point (`read_atom("foo")` → symbol `FOO`; `read_atom(":bar")` → keyword `BAR`). `t`/`nil` are not special-cased; they read as ordinary symbols `T`/`NIL`.
+
+**Read before touching this file again, especially for L6:** integer recognition is NOT greedy-digit scanning (that was the initial port from `smdscheme::reader::integer_p` and it failed `make test` on `read_atom("1+")`, since CL symbols may start with a digit). The fix, and the reason, is `docs/divergences/DIV-0002-atom-maximal-munch.md` — atoms are read as a whole maximal-munch token first, then classified as integer-or-symbol. L6's datum reader should call `atom_p()` (or `read_atom` for whole-string cases) rather than reimplementing token scanning, or it will likely reintroduce the same bug.
+
+`make compile`/`make test` (333/333, including 37 new `AtomTest` cases)/`make lint` all green at landing; `src/smd/smdscheme/**` untouched (`git diff -- src/smd/smdscheme` empty).
+One divergence doc filed: `docs/divergences/DIV-0002-atom-maximal-munch.md` (plan sketch "same rules as Scheme side" for integers didn't survive contact with CL's digit-permissive symbol syntax; category 2 divergence — step implemented differently than the plan specifies).
 
 ### Step L7 — CL value model
 
