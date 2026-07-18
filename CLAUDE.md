@@ -33,7 +33,7 @@ make compile-headers    # verify interface header sets compile independently
 make help               # show all targets
 ```
 
-Selecting a different compiler: `make TOOLCHAIN=gcc-15` or `make TOOLCHAIN=clang-21`. Default is `gcc-16`.
+Selecting a different compiler: `make TOOLCHAIN=gcc-17` or `make TOOLCHAIN=clang-23`. Default is `gcc-16`. Prefer the newest available toolchains (trunk is fine) over compromising on technique; toolchain files live in `etc/`.
 
 Selecting a build config: `make CONFIG=RelWithDebInfo` (default is `Asan`). Available: `RelWithDebInfo`, `Debug`, `Tsan`, `Asan`, `Gcov`.
 
