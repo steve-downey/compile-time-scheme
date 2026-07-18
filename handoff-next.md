@@ -41,13 +41,12 @@ Since these two steps run in parallel in separate worktrees, expect a merge step
 Per plan section 9, these two steps both depend only on L1 (done) and are explicitly independent of each other — the plan's parallelism summary (section 9, "Parallelism summary") puts L4 on Track A (code spine: L1 -> L4 -> L5 -> L6 -> ...) and L7 on Track B (values: L7 -> L8 -> L9, starting right after L1, parallel to L4-L6).
 Dispatch them as separate workers in separate worktrees.
 
-### Step L4 — CL lexical layer
+### Step L4 — CL lexical layer — DONE (2026-07-18, in worktree cl-pivot/l4-cl-chars)
 
-Goal: `src/smd/smdlisp/reader/cl_chars.hpp` (+ test): CL constituent/terminating character predicates, case folding of a single char, `;`-comment skipping integrated with intertoken space.
-Reuses `smdscheme::parser::cursor` unchanged (do not copy or modify it); supplies CL predicates instead of the Scheme ones that live in `smdscheme`'s `parser/cursor.hpp` usage sites — this step only adds the new CL-flavored predicate header, it does not touch `smdscheme`.
-Merge criteria: static_asserts for folding, comment skipping, delimiter set.
-Dependencies: L1 (done).
-Full spec: `docs/cl-pivot-plan.md` section 9, "Step L4 — CL lexical layer".
+Landed: `src/smd/smdlisp/reader/{cl_chars.hpp,cl_chars.test.cpp,CMakeLists.txt}`, `smdlisp.reader` CMake target, wired into `src/smd/smdlisp/CMakeLists.txt`.
+See `handoff.md` "2026-07-18 Step L4: CL lexical layer landed" for the exposed predicate names and a naming hazard worth reading before L5/L6 touch this header: the cursor-consuming skip function is named `skip_cl_intertoken_space`, not `skip_intertoken_space`, to avoid a permanent ADL ambiguity against `smdscheme::parser::skip_intertoken_space` (same `cursor` argument type). Apply the same care to any new `smdlisp` function taking a `smdscheme::parser::cursor` by value.
+`make compile`/`make test` (295/295)/`make lint` all green at landing; `src/smd/smdscheme/**` untouched.
+No divergence doc was needed for this step (predicate shape and comment/case-fold behavior follow the plan directly).
 
 ### Step L7 — CL value model
 
