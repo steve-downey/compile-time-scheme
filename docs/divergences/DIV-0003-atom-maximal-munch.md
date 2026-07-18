@@ -1,4 +1,4 @@
-# DIV-0002: atom reader uses whole-token classification, not greedy-digit integer scanning
+# DIV-0003: atom reader uses whole-token classification, not greedy-digit integer scanning
 
 - **Status:** accepted-permanent
 - **Date:** 2026-07-18
