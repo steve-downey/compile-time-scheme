@@ -176,3 +176,5 @@ All nonlocal control is one-shot and upward-only, dynamic-extent per CL; a dead 
 Divergence issue docs live in `docs/divergences/`, one numbered file per issue, named `DIV-NNNN-short-slug.md`, using `docs/divergences/TEMPLATE.md` as the skeleton.
 File one when the implementation knowingly deviates from ANSI Common Lisp semantics, when a step is implemented differently than `docs/cl-pivot-plan.md` specifies, or when a frozen-tree edit inside a `src/smd/smdscheme/**` UUID anchor block is unavoidable.
 `docs/divergences/DIV-0001-single-package-and-case.md` is the first, seeded for D2/D7 (single package, keywords only, uppercase-fold-only reader), status `accepted-permanent`.
+
+The `docs/blog/%.md` Makefile rule's generated `.md.deps` now also captures `orgit:` transclusion targets (previously only `[[file:...]]` links), so blog posts rebuild when their transcluded `smdscheme` source files change (Step L3).

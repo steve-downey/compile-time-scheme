@@ -374,7 +374,10 @@ docs/blog/%.md : docs/blog/%.org
 	--eval "(org-export-to-file 'gfm \"$(abspath $@)\")"
 	echo $@ : \\ > $@.deps
 	echo "  $<" \\ >> $@.deps
-	sed -n "s/^.*\[\[file:\(\S*\)::.*$$/\1/p" < $<  | sort -u | xargs printf "  %s \\\\\\n" >> $@.deps
+	sed -n \
+	  -e "s/^.*\[\[file:\(\S*\)::.*$$/\1/p" \
+	  -e "s/^.*\[\[orgit:[^:]*::\([^:]*\)::.*$$/\1/p" \
+	  < $< | sort -u | xargs printf "  %s \\\\\\n" >> $@.deps
 
 -include $(BLOG_ORGFILES:.org=.md.deps)
 
