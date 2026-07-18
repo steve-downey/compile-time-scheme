@@ -63,3 +63,31 @@
 - [x] Step 32: optional Beman Task integration, only if needed
 - [x] Step 33: reflection spike
 - [x] Step 34: documentation consolidation
+
+## Common Lisp pivot (docs/cl-pivot-plan.md)
+
+- [x] Step L0: governance install
+- [ ] Step L1: smdlisp skeleton
+- [ ] Step L2: blog phase 15 — why not call/cc
+- [ ] Step L3: blog deps infra fix (optional)
+- [ ] Step L4: CL lexical layer
+- [ ] Step L5: CL atoms
+- [ ] Step L6: CL datum reader (+ phase 16 draft)
+- [ ] Step L7: CL value model
+- [ ] Step L8: cons cells and list builtins (adapt landed pairs work)
+- [ ] Step L9: Lisp-2 environment
+- [ ] Step L10: CL core model and baseline elaborator
+- [ ] Step L11: direct evaluator (+ phase 17 draft)
+- [ ] Step L12: setq, defun, defvar, defparameter (adapt landed set! work)
+- [ ] Step L13: CPS closure backend (+ phase 18 draft)
+- [ ] Step L14: block / return-from
+- [ ] Step L15: catch / throw / unwind-protect (+ phase 19 draft)
+- [ ] Step L16: special variables and dynamic binding
+- [ ] Step L17: macro expander with host macros
+- [ ] Step L18: backquote
+- [ ] Step L19: defmacro (+ phase 20 draft)
+- [ ] Step L20: multiple values
+- [ ] Step L21: sender backend for the CL core (+ phase 21 draft)
+- [ ] Step L22: public API, Godbolt, FFI parity
+- [ ] Step L23: tagbody / go (optional, D8)
+- [ ] Step L24: documentation consolidation (+ phase 22 draft)
