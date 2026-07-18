@@ -1,19 +1,19 @@
 # Next steps: Common Lisp pivot, Steps L4 and L7 (parallel)
 
-> **2026-07-18 update:** L4, L7, and L8 are now all landed (see the `DONE`
+> **2026-07-18 update:** L4, L5, L7, and L8 are all landed (see the `DONE`
 > markers below and `handoff.md`'s corresponding dated sections).
-> The next unchecked steps per `checklist.md` are **L5** (Track A: CL atoms,
-> depends on L4, done) and **L9** (Track B: Lisp-2 environment, depends on
-> L8, done) — independent of each other per the plan's parallelism summary
-> (section 9), so they can again run as two parallel workers in two
-> worktrees.
-> L9 in particular should start by reading L7's and L8's `handoff.md`
-> entries for the `closure<Core>::captured` raw-pointer/`MaxBindings==16`
-> situation the L9 sketch (plan section 9) explicitly asks it to
-> parameterize.
-> The rest of this file below is the (now historical, but still accurate
-> for what it describes) L4/L7 dispatch note; it is left in place rather
-> than rewritten, annotated only where its content went stale.
+> The next unchecked steps per `checklist.md` are **L6** (Track A: CL datum
+> reader, depends on L5, done) and **L9** (Track B: Lisp-2 environment,
+> depends on L8, done; dispatched, in flight as of this update) —
+> independent of each other per the plan's parallelism summary.
+> L9 should start from L7's and L8's `handoff.md` entries for the
+> `closure<Core>::captured` raw-pointer/`MaxBindings==16` situation the L9
+> sketch (plan section 9) explicitly asks it to parameterize.
+> L6 should call into `atom_p()`/`read_atom()` per L5's maximal-munch note
+> (`docs/divergences/DIV-0003-atom-maximal-munch.md`) rather than
+> reimplementing token scanning.
+> The rest of this file below is the (now historical) L4/L7 dispatch note,
+> annotated where its content went stale; do not re-run L4/L5/L7/L8.
 
 ## Direction
 
@@ -62,6 +62,16 @@ Landed: `src/smd/smdlisp/reader/{cl_chars.hpp,cl_chars.test.cpp,CMakeLists.txt}`
 See `handoff.md` "2026-07-18 Step L4: CL lexical layer landed" for the exposed predicate names and a naming hazard worth reading before L5/L6 touch this header: the cursor-consuming skip function is named `skip_cl_intertoken_space`, not `skip_intertoken_space`, to avoid a permanent ADL ambiguity against `smdscheme::parser::skip_intertoken_space` (same `cursor` argument type). Apply the same care to any new `smdlisp` function taking a `smdscheme::parser::cursor` by value.
 `make compile`/`make test` (295/295)/`make lint` all green at landing; `src/smd/smdscheme/**` untouched.
 No divergence doc was needed for this step (predicate shape and comment/case-fold behavior follow the plan directly).
+
+### Step L5 — CL atoms — DONE (2026-07-18, in worktree cl-pivot/l5-cl-atoms)
+
+Landed: `src/smd/smdlisp/reader/{atom.hpp,atom.test.cpp}`, added to the existing `smdlisp.reader` target's `FILE_SET` (no new CMake target).
+`atom = std::variant<atom_integer, atom_symbol, atom_keyword>`; `atom_keyword` is a distinct kind from `atom_symbol` per D7 (spelling stored without the leading `:`). Both hold a `folded_name` (own fixed storage, not a `string_view` into source — folding per D2 rewrites characters). Public parsers: `integer_p()`, `symbol_p()`, `keyword_p()`, `atom_p()` (tries them in that order), and `read_atom(std::string_view)` as the convenience entry point (`read_atom("foo")` → symbol `FOO`; `read_atom(":bar")` → keyword `BAR`). `t`/`nil` are not special-cased; they read as ordinary symbols `T`/`NIL`.
+
+**Read before touching this file again, especially for L6:** integer recognition is NOT greedy-digit scanning (that was the initial port from `smdscheme::reader::integer_p` and it failed `make test` on `read_atom("1+")`, since CL symbols may start with a digit). The fix, and the reason, is `docs/divergences/DIV-0003-atom-maximal-munch.md` — atoms are read as a whole maximal-munch token first, then classified as integer-or-symbol. L6's datum reader should call `atom_p()` (or `read_atom` for whole-string cases) rather than reimplementing token scanning, or it will likely reintroduce the same bug.
+
+`make compile`/`make test` (333/333, including 37 new `AtomTest` cases)/`make lint` all green at landing; `src/smd/smdscheme/**` untouched (`git diff -- src/smd/smdscheme` empty).
+One divergence doc filed: `docs/divergences/DIV-0003-atom-maximal-munch.md` (plan sketch "same rules as Scheme side" for integers didn't survive contact with CL's digit-permissive symbol syntax; category 2 divergence — step implemented differently than the plan specifies).
 
 ### Step L7 — CL value model — DONE (2026-07-18, in worktree cl-pivot/l7-cl-value)
 
