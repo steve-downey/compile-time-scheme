@@ -67,7 +67,7 @@
 ## Common Lisp pivot (docs/cl-pivot-plan.md)
 
 - [x] Step L0: governance install
-- [ ] Step L1: smdlisp skeleton
+- [x] Step L1: smdlisp skeleton
 - [ ] Step L2: blog phase 15 — why not call/cc
 - [ ] Step L3: blog deps infra fix (optional)
 - [ ] Step L4: CL lexical layer
