@@ -142,3 +142,37 @@ Headers, implementations, and tests live together by component.
 - CPS and sender paths were repaired for moved symbols in `closure` and `elaborator` namespaces.
 - `src/smd/smdscheme/elaborator/eval_direct.hpp` and `src/smd/smdscheme/elaborator/eval_direct.test.cpp` were rewritten to remove regex-introduced corruption and restore a compiling direct-evaluator path.
 - `src/examples/hello.cpp` now prints `smdscheme v<major>.<minor>.<patch>`, matching the example test expectation.
+
+## 2026-07-18 Common Lisp pivot
+
+The project pivoted from Scheme-light to Common Lisp-light semantics.
+Rationale is in `docs/cl-pivot-plan.md` section 0: the sender backend's one-shot completion contract cannot express multishot `call/cc`, and full `call/cc` is unsound with `dynamic-wind`/resource cleanup regardless.
+Common Lisp's nonlocal control operators (`block`/`return-from`, `catch`/`throw`, `tagbody`/`go`, `unwind-protect`) are dynamic-extent and one-shot by design, which is exactly what CPS and sender backends can express soundly.
+
+`src/smd/smdscheme/**` is now frozen for semantic changes.
+Blog phases 5-12 transclude live code from it by UUID anchor; an in-place pivot would silently rewrite published posts.
+The Scheme pipeline stays buildable, tested, and demoable as-is.
+
+New work lives in `src/smd/smdlisp/`, namespace `smd::smdlisp`, one sub-namespace per directory, mirroring the `smdscheme` component structure:
+
+```txt
+src/smd/smdlisp/CMakeLists.txt
+src/smd/smdlisp/smdlisp.hpp
+src/smd/smdlisp/reader/
+src/smd/smdlisp/macroexpand/
+src/smd/smdlisp/elaborator/
+src/smd/smdlisp/closure/
+src/smd/smdlisp/sender/
+```
+
+`smdlisp` consumes `smdscheme`'s language-agnostic `foundation` and `parser` targets via their canonical includes and CMake targets; it does not copy them.
+The Scheme-flavored components (`reader`, `elaborator`, `closure`, `sender`) are adapted by copy into `smdlisp`, then diverge freely.
+
+Decision records D1-D10 in `docs/cl-pivot-plan.md` section 4 govern the pivot and are binding unless overturned by a divergence doc plus orchestrator sign-off: D1 layout/frozen-tree, D2 uppercase case folding at read time, D3 `nil`/`t` semantics, D4 Lisp-2 namespaces, D5 one-shot dynamic-extent exits (the thesis), D6 proper lists first, D7 one package plus keywords, D8 `tagbody`/`go` optional, D9 macro expansion as a separate datum-to-datum pass, D10 out-of-scope features.
+
+`nil` is the sole false value in `smdlisp`; truthiness goes through one `is_true` function, never per-site encodings (D3).
+All nonlocal control is one-shot and upward-only, dynamic-extent per CL; a dead exit is a diagnosed error, not undefined behavior (D5).
+
+Divergence issue docs live in `docs/divergences/`, one numbered file per issue, named `DIV-NNNN-short-slug.md`, using `docs/divergences/TEMPLATE.md` as the skeleton.
+File one when the implementation knowingly deviates from ANSI Common Lisp semantics, when a step is implemented differently than `docs/cl-pivot-plan.md` specifies, or when a frozen-tree edit inside a `src/smd/smdscheme/**` UUID anchor block is unavoidable.
+`docs/divergences/DIV-0001-single-package-and-case.md` is the first, seeded for D2/D7 (single package, keywords only, uppercase-fold-only reader), status `accepted-permanent`.
