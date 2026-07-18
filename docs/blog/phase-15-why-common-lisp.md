@@ -1,0 +1,84 @@
+**DRAFT &#x2014; pending author revision**
+
+<div class="abstract" id="orgd6c0880">
+<p>
+Phase 13's future-work list put <code>call/cc</code> first: "reifying the recurse function as a value."
+I never climbed that peak.
+This post is why.
+Beman Execution completes an operation exactly once, through exactly one of <code>set_value</code>, <code>set_error</code>, or <code>set_stopped</code>.
+Multishot <code>call/cc</code> needs to run a captured continuation more than once, including after the code that captured it has already returned &#x2014; that is not a smaller version of what a one-shot contract offers, it is a different contract.
+Independently of the sender problem, Oleg Kiselyov already made the case that <code>call/cc</code> is a bad idea on its own merits, and I agree with him.
+Common Lisp never had <code>call/cc</code> to begin with.
+Its nonlocal exits &#x2014; <code>block/return-from</code>, <code>catch/throw</code>, <code>tagbody/go</code>, <code>unwind-protect</code> &#x2014; are one-shot and dynamic-extent by design.
+That turns out to be exactly the discipline a sender already enforces.
+So the project is pivoting from Scheme-light to Common-Lisp-light, and this is the rationale before the code.
+</p>
+
+</div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 14 - Mutation: set!, begin, and a Store ←](phase-14-set-bang.md)
+
+</nav>
+
+
+# Where I said I'd go next
+
+The conclusion in Phase 13 filed `call/cc` under future work, first on the list: "First-class continuations. In a Mendler interpreter, this means reifying the 'recurse' function as a value. The CPS structure is already implicit in the recursive call pattern" (Steele, Guy L., 1977) (Appel, Andrew W., 1992). That framing was correct and it was also the whole problem. Reifying "what happens next" as an ordinary value is precisely what the rest of this project cannot afford. I did not find that out by staring at the mountain longer. I found it out by trying to build the next backend and hitting a contract that `call/cc` cannot satisfy.
+
+
+# The sender's contract: exactly once
+
+The sender backend, since Phase 8, is built on Beman Execution's sender/receiver model (Dominiak, Michał and others, 2024). An operation state completes through exactly one of three channels: `set_value`, `set_error`, or `set_stopped`. Exactly one, exactly once. Nothing in the model calls a receiver's completion function twice, and nothing resumes an operation state after it has completed &#x2014; the state is gone, its resources released, its work done. `sender_mendler_run`, `sync_wait`, `when_all`, every piece of that backend already leans on this without my having to say so. I did not choose one-shot completion as a design preference. It came with the vocabulary the moment I picked senders, three phases before I noticed it was going to matter.
+
+
+# What multishot call/cc would need from a sender
+
+`call/cc` reifies the current continuation as a first-class value. You can invoke that value zero times, once, or many times, and you can invoke it after the code that captured it has already returned. That is the whole feature, and it is also exactly the thing a completed operation state cannot do. Invoking a captured continuation a second time means resuming a computation whose operation state already fired `set_value` once &#x2014; re-running it, or restoring it from some checkpoint taken before completion. The sender contract forbids both. There is no "resume from here again" channel to call. A sender backend can express at most a one-shot, upward-only escape: leave early, leave once, and do not come back. That is not a corner case I could shim around with an adapter. It is the definition of the interface I am building on.
+
+
+# An argument against call/cc that doesn't need senders
+
+Set the sender problem aside and `call/cc` is still a bad idea, and I did not have to invent this argument &#x2014; Oleg Kiselyov made it in "An argument against call/cc," and the project adopts his position outright (Kiselyov, Oleg, 2005). The sharpest case is `dynamic-wind` and resource cleanup. `dynamic-wind` pairs an entry thunk and an exit thunk around a body, the way `unwind-protect` pairs a cleanup form around one &#x2014; the pattern this project has leaned on since `Box`'s constexpr destructors in Phase 1 and the arena scoping in Phase 5. Re-entering a captured continuation re-runs the entry thunk against resources the matching exit thunk already released. The RAII correspondence &#x2014; acquire once, release once, in order &#x2014; breaks the moment a continuation can jump back into a scope whose cleanup already ran. The second problem is smaller to state and just as corrosive: once any function call can be a re-entry point into a past control state, you cannot read a function and know how many times its caller's frame runs. Local reasoning about linear resource use is gone, not degraded. `call/cc` is the most expressive control operator there is; that is exactly the problem, not a redeeming feature of it.
+
+
+# What Common Lisp already had
+
+Common Lisp never added `call/cc`. It has four nonlocal control operators instead: `block/return-from` for a lexical named exit, `catch/throw` for a dynamic tagged exit, `tagbody/go` for jumps inside one body, and `unwind-protect` for cleanup that runs on every exit path (Steele, Guy L., 1990). Every one of them is dynamic-extent: once an exit point's extent ends, using it is undefined. Not slow, not deprecated &#x2014; undefined, the same way reading past the end of an array is undefined. An exit is used at most once, and only while its enclosing form is still on the stack. That is one-shot and upward-only, stated as a language rule two decades before this project needed the same rule for a different reason. Common Lisp got there first, by not going as far.
+
+
+# The thesis
+
+Common Lisp's control operators are the largest control vocabulary a structured-concurrency backend can express soundly, and this project sets out to demonstrate that correspondence directly, not just assert it. `block/return-from` maps to early completion on a scope's own continuation. `catch/throw` maps to a dynamic search over live completion targets. `unwind-protect` maps to cleanup that runs on `set_value`, `set_error`, and `set_stopped` alike, because on a sender, "the exit path" is not one path, it is three. None of that needs a continuation that outlives its capture. All of it needs exactly the one-shot discipline senders already have.
+
+
+# What doesn't change
+
+This is not a rewrite of Phases 0 through 14. That history stands as written, including Phase 14 &#x2014; the last Scheme-semantics post, and the most recent thing I built before deciding to turn. `smd/smdscheme` is not going away. It is frozen for semantic changes, not deleted: it keeps compiling, keeps passing its tests, keeps running the demo, because Phases 5 through 12 transclude live code out of it by UUID anchor, and rewriting it in place would silently falsify posts that are already published. The new work lives beside it, in `smd/smdlisp`, under its own namespace, consuming `smdscheme`'s language-agnostic foundation and parser rather than copying them.
+
+
+# What the pivot keeps
+
+Phase 14 built a store: a flat array of mutable cells addressed by a stable integer location, with the environment holding a non-owning pointer to it so that copying an environment copies the pointer, not the cells. That is not Scheme-specific machinery I have to discard and rebuild. It is the mechanism `setq` needs, almost unchanged &#x2014; write through the same location, just resolved through Lisp-2 lookup and, later, through special-variable rules the store does not know about yet. The pairs and list primitives landed alongside it &#x2014; `cons`, `car`, `cdr`, quoted lists over `pair_heap/pair_ref` cells &#x2014; are the same story. Common Lisp's list machinery is that work with `nil` standing in for the empty list instead of a separate null type, and `car/cdr` of `nil` answering `nil` instead of raising an error. Most of the plumbing for the next several posts is already sitting in the tree. I just have to point it at a different language.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [← Phase 14 - Mutation: set!, begin, and a Store](phase-14-set-bang.md)
+
+</nav>
+
+
+# References
+
+Appel, Andrew W. (1992). *Compiling with Continuations*, Cambridge University Press.
+
+Dominiak, Michał and others (2024). *P2300: std::execution*, C++ Standards Committee Papers.
+
+Kiselyov, Oleg (2005). *An argument against call/cc*.
+
+Steele, Guy L. (1977). *Lambda: The Ultimate GOTO*, MIT AI Lab.
+
+Steele, Guy L. (1990). *Common Lisp the Language*, Digital Press.

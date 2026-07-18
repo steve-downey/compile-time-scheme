@@ -68,7 +68,7 @@
 
 - [x] Step L0: governance install
 - [x] Step L1: smdlisp skeleton
-- [ ] Step L2: blog phase 15 — why not call/cc
+- [x] Step L2: blog phase 15 — why not call/cc
 - [x] Step L3: blog deps infra fix (optional)
 - [ ] Step L4: CL lexical layer
 - [ ] Step L5: CL atoms

@@ -1,0 +1,191 @@
+<div class="abstract" id="org4a875ac">
+<p>
+In the conclusion I filed <code>set!</code> under future work: "Mutable bindings require a store &#x2014; an indirection from environment names to mutable locations. A boxing transformation pass can introduce this before the interpreter runs." Then I wanted a counter, and a counter needs mutation. So I came back down from the summit and built the store. I skipped the boxing pass and boxed everything &#x2014; more on that below.
+</p>
+
+</div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 13 - Conclusion ←](phase-13-conclusion.md)
+
+</nav>
+
+
+# Why set! was hard here
+
+Every value in this compiler is functional. An `env` maps names directly to values, and a `closure` captures its environment by *deep copy* &#x2014; a `constexpr_box` holding a fresh `env` (Phase 6). That copy is the whole reason lexical scope works without a garbage collector. It is also exactly what makes `set!` hard.
+
+Consider the canonical counter:
+
+```scheme
+(let ((c 0))
+  (let ((f (lambda () (begin (set! c (+ c 1)) c))))
+    (begin (f) (f))))
+```
+
+`f` closes over `c`. Each call must mutate the *same* `c` and see the previous call's increment. But the closure captured `c` by value. Mutating the copy inside `f` changes nothing anyone else can see. Two calls would both return `1`. The functional environment has no shared cell to write to &#x2014; copying the environment copied the value.
+
+The environment model of evaluation solves this by adding a layer of indirection: names bind to *locations*, and locations live in a mutable store that every copy of the environment shares (Abelson, Harold and Sussman, Gerald Jay, 1996). That is the design Phase 13 promised. Here it is.
+
+
+# set! needs something to sequence
+
+Before the store, a smaller problem. `set!` returns nothing useful; its whole point is the effect. But bodies in this language were single-expression, and `(set! x 2)` evaluated on its own throws its effect away with nowhere to observe it. There was no way to say "assign, *then* read back."
+
+So this work also adds `begin`. It evaluates each sub-expression in order in the same environment and yields the last. Effects accumulate through the shared store; the final expression reads the result. `set!` is untestable without it, which is why the two forms land together.
+
+
+# The store
+
+A store is a flat array of mutable cells addressed by a stable integer. It is the same `static_vector` discipline as everywhere else &#x2014; array-backed, no allocator, fully `constexpr`. The stability matters: a `static_vector` never reallocates, so a location handed out once is valid for the whole evaluation.
+
+```c++
+// src/smd/smdscheme/closure/value.hpp
+template <typename Core, int MaxStore>
+class store {
+  public:
+    constexpr auto alloc(value<Core> v) -> int {   // returns the location
+        int loc = cells_.size();
+        cells_.push_back(std::move(v));
+        return loc;
+    }
+    [[nodiscard]] constexpr auto get(int loc) const -> value<Core> const & {
+        return cells_[loc];
+    }
+    constexpr auto set(int loc, value<Core> v) -> void {
+        cells_[loc] = std::move(v);
+    }
+  private:
+    foundation::static_vector<value<Core>, MaxStore> cells_{};
+};
+```
+
+The environment now holds a *non-owning* pointer to a store, plus a name-to-location map. This is the trick that makes the whole thing fit without rewriting every evaluator: copying an `env` copies the pointer, not the store. Every copy &#x2014; including the deep copy a closure takes on capture &#x2014; points at the one shared store. Write through the pointer and every holder of that location sees it.
+
+```c++
+// src/smd/smdscheme/closure/value.hpp
+template <typename Core, int MaxBindings>
+class env {
+    // ...
+  private:
+    struct binding {
+        std::string_view name;
+        int loc = -1;      // store location in mutable mode; -1 otherwise
+        value<Core> val{}; // inline value in functional mode; unused if loc >= 0
+    };
+    store<Core, default_max_store> *store_ = nullptr; // non-owning; may be null
+    foundation::static_vector<binding, MaxBindings> bindings_{};
+};
+```
+
+I kept `env` dual-mode. With no store pointer it behaves exactly as before &#x2014; bindings hold their values inline, and the six existing evaluators that never touch mutation keep passing byte-for-byte. With a store, `define` allocates a cell and remembers the location, `lookup` reads through it, and a new `assign` writes through it:
+
+```c++
+// src/smd/smdscheme/closure/value.hpp
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::assign(std::string_view name,
+                                              value<Core> val) const
+    -> foundation::result<value<Core>> {
+    if (store_ == nullptr)
+        return foundation::parse_error{
+            {}, "set!: environment has no mutable store"};
+    for (int i = bindings_.size() - 1; i >= 0; --i) {
+        if (bindings_[i].name == name) {
+            store_->set(bindings_[i].loc, std::move(val));
+            return value<Core>{unspecified{}};
+        }
+    }
+    return foundation::parse_error{{}, "set!: unbound variable"};
+}
+```
+
+`assign` is `const`. It does not touch the environment's own map &#x2014; only the store the pointer names &#x2014; so an evaluator holding an `env const&` can still mutate. Unbound is an error, not an implicit `define`; that is what Scheme requires, and the functional-mode branch turns a stray `set!` into a diagnostic instead of a silent no-op.
+
+
+# The value that isn't one
+
+`set!` has to return something. Scheme calls it unspecified. I made it a real alternative rather than reusing a sentinel:
+
+```c++
+// src/smd/smdscheme/closure/value.hpp
+struct unspecified {
+    friend constexpr auto operator==(unspecified, unspecified) -> bool = default;
+};
+
+template <typename Core>
+using value = std::variant<int, bool, builtin, closure<Core>, symbol,
+                           foreign_function<Core>, unspecified>;
+```
+
+The value variant grew a seventh alternative, and that is where the compiler earns its keep. Every `std::visit` over `value` that enumerated the non-callable cases &#x2014; the "attempted to call a non-function" arms in each evaluator &#x2014; stopped compiling until it grew an `unspecified` arm. The exhaustiveness of `overloaded` turns "did I update every backend?" from a question into a build error. I did not have to remember the list. The type checker kept it.
+
+
+# One change, six evaluators
+
+The core AST, the `Comp` tree, the value variant, and `env` are shared across every backend. Adding `core_set` / `core_begin` (and their `comp_set` / `comp_begin` mirrors on the `Fix<CompF>` side) is therefore not a per-backend choice &#x2014; it is one coordinated edit that every `std::visit` site must answer. Six evaluators had to learn the two new forms: the direct closure evaluator, its CPS variant, the two sender backends over the core arena, and the Mendler and sender-Mendler interpreters over `Comp`.
+
+The semantics are the same in all six. `begin` evaluates its expressions in order and returns the last. `set!` evaluates the value expression, calls `env.assign`, and yields `unspecified`. The direct evaluator is the whole story in miniature:
+
+```c++
+// src/smd/smdscheme/closure/eval_direct.hpp  (shape, not verbatim)
+[&](core_begin<Core, MaxNodes, MaxList> const &b) -> Res {
+    Res last{ /* "begin: empty" */ };
+    for (auto const &e : b.exprs) {
+        last = eval_direct(arena.get(e), arena, environment);
+        if (!last.has_value()) return last;      // short-circuit on error
+    }
+    return last;                                  // value of the last form
+},
+[&](core_set<Core, MaxNodes> const &s) -> Res {
+    auto v = eval_direct(arena.get(s.value), arena, environment);
+    if (!v.has_value()) return v;
+    return environment.assign(s.name, v.value()); // writes through the store
+},
+```
+
+Nothing here threads a `store&` parameter. The store rides inside the `env` that was already threaded through every recursive call. That is the entire payoff of putting the pointer in the environment rather than in the evaluator's signature: the plumbing was already there.
+
+
+# The acceptance test
+
+The counter from the top is the test that matters. It is the one program that fails under naive per-closure capture and passes only if mutation survives the deep copy:
+
+```scheme
+(let ((c 0))
+  (let ((f (lambda () (begin (set! c (+ c 1)) c))))
+    (begin (f) (f))))   ; => 2
+```
+
+`c` is boxed into the store once. `f` captures an `env` whose `c` binding names that cell; the deep copy duplicates the *pointer*, not the cell. The first call writes `1`, the second reads `1` and writes `2`. It returns `2` on all six backends. That number, on all six, is the definition of "correct `set!`" for this project.
+
+
+# What boxing everything costs
+
+Phase 13 said a *boxing transformation pass* would introduce the store. The principled version analyzes the program, finds the variables that are actually captured and mutated, and boxes only those &#x2014; everything else stays a cheap functional binding (Appel, Andrew W., 1992). I did not write that pass. Every binding gets a store cell, mutated or not.
+
+For a proof-of-concept this is the right trade. The analysis is real work and buys nothing a demo can observe; boxing unconditionally is a dozen lines and obviously correct. The cost is a store slot per binding and a lookup that now hops through a location. Both are bounded and constant. When the interpreter starts caring about allocation pressure, the boxing pass is where to spend the effort &#x2014; not before.
+
+
+# The lifetime knife-edge
+
+The store is a local in the caller's scope &#x2014; the test harness, or a program's evaluation &#x2014; and the environment holds a raw `store*` into it. That pointer is valid for exactly one evaluation. It is the same boundary Phase 10 drew around `constexpr`: transient allocation is fine as long as nothing escapes the evaluation that observes it.
+
+Which means the design has a knife-edge. If a program ever *returned* a closure to be applied after its run finished, the closure's `env` would dangle its `store*` into a destroyed local. Today nothing does &#x2014; closures live and die inside a single evaluation &#x2014; so a per-run store is correct and cheap. The day a REPL or a persisted closure appears, the store has to be owned alongside the program tree, not borrowed from a stack frame. I have marked the spot. I have not yet had to stand on it.
+
+`call/cc` is still up the mountain, and it wants the same thing from a different direction: reifying the recursion itself as a value. Mutable state was the easier of the two to bring down. It is enough to write a counter, which is all I came back for.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [← Phase 13 - Conclusion](phase-13-conclusion.md)
+
+</nav>
+
+
+# References
+
+Abelson, Harold and Sussman, Gerald Jay (1996). *Structure and Interpretation of Computer Programs*, MIT Press.
+
+Appel, Andrew W. (1992). *Compiling with Continuations*, Cambridge University Press.

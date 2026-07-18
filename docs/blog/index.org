@@ -72,6 +72,10 @@ Reflect on what the climb taught me about C++26 ~constexpr~ limits, fixpoint typ
 
 Come back down from the summit for ~set!~: a shared store of mutable cells, an environment that binds names to locations, and the ~begin~ sequencing it takes to observe an effect.
 
+** [[file:phase-15-why-common-lisp.org][Phase 15 — Why Not call/cc: From Scheme to Common Lisp]]
+
+/DRAFT — pending author revision./ Why ~call/cc~ stops here: a sender's one-shot completion contract cannot express a multishot continuation, Kiselyov's independent case against ~call/cc~, and why Common Lisp's dynamic-extent control operators are exactly the discipline senders already enforce.
+
 * Table of Contents
 
 #+toc: headlines 1

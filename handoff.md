@@ -198,3 +198,10 @@ smdlisp_test      -- Catch2 test executable, globs *test.cpp under src/smd/smdli
 `make compile`, `make test` (286/286 passed, including the 3 new `VersionTest` cases), and `make lint` all passed at the point of landing this step.
 
 The root `CMakeLists.txt`'s `beman_install_library(schemepoc.schemepoc TARGETS ...)` list was intentionally left unchanged; it does not yet list any `smdlisp.*` target, and adding install/export wiring for `smdlisp` was out of scope for L1 (`make compile`/`make test`/`make lint` do not exercise `make install`). A later step (plausibly L22, public API) should revisit whether `smdlisp.smdlisp` needs to join that install list.
+
+## 2026-07-18 Step L2 (blog phase 15)
+
+`docs/blog/phase-15-why-common-lisp.org` is drafted (`DRAFT — pending author revision`), covering plan section 0: the sender one-shot completion contract, why multishot `call/cc` cannot ride it, Kiselyov's independent argument against `call/cc`, Common Lisp's dynamic-extent control operators, the thesis, and what the pivot does and does not change.
+`docs/blog/index.org` gained a Phase 15 entry (and, in the process, a Phase 14 entry it was missing before this step).
+`make blog-md` renders phase-15 cleanly; `docs/blog/phase-14-set-bang.md` and `docs/blog/index.md` had never been generated/committed before this step and are now included as part of keeping the rendered set consistent with their `.org` sources — no existing phase `.org`/`.md` content changed.
+`docs/blog/references.bib`'s `beman_execution` entry had no `author` field, which broke the GFM export with an opaque `org-element-insert-before: No location found to insert node` error when cited; this step added the missing `author` field (a bib entry without one cannot be cited safely).
