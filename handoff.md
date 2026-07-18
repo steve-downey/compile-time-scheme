@@ -176,3 +176,23 @@ All nonlocal control is one-shot and upward-only, dynamic-extent per CL; a dead 
 Divergence issue docs live in `docs/divergences/`, one numbered file per issue, named `DIV-NNNN-short-slug.md`, using `docs/divergences/TEMPLATE.md` as the skeleton.
 File one when the implementation knowingly deviates from ANSI Common Lisp semantics, when a step is implemented differently than `docs/cl-pivot-plan.md` specifies, or when a frozen-tree edit inside a `src/smd/smdscheme/**` UUID anchor block is unavoidable.
 `docs/divergences/DIV-0001-single-package-and-case.md` is the first, seeded for D2/D7 (single package, keywords only, uppercase-fold-only reader), status `accepted-permanent`.
+
+## 2026-07-18 Step L1: smdlisp skeleton landed
+
+`src/smd/smdlisp/` now exists with `CMakeLists.txt`, `version.hpp`, `version.cpp`, `version.test.cpp`, wired into `src/smd/CMakeLists.txt` via `add_subdirectory(smdlisp)` (added after `smdscheme`).
+
+CMake target names, chosen to mirror `smdscheme`'s own top-level umbrella target and to stay forward-compatible with the section-7 layout (`reader/`, `macroexpand/`, `elaborator/`, `closure/`, `sender/` subdirectories arriving in later steps, each contributing its own `smdlisp.<subdir>` target that the umbrella target will eventually link, exactly as `smdscheme.smdscheme` links `smdscheme.foundation`, `smdscheme.parser`, etc.):
+
+```txt
+smdlisp.smdlisp   -- STATIC library target, currently just version.{hpp,cpp}
+smdlisp_test      -- Catch2 test executable, globs *test.cpp under src/smd/smdlisp recursively
+```
+
+`smdlisp.smdlisp` links `PUBLIC` against `smdscheme.foundation` and `smdscheme.parser` (both already-built `smdscheme` targets, consumed via their canonical includes, per D1 "use as-is, no copy").
+`version.hpp` proves the dependency direction compiles and links by defining two trivial `constexpr` functions, `links_smdscheme_foundation()` and `links_smdscheme_parser()`, that touch `smd::smdscheme::foundation::version_major` and construct a `smd::smdscheme::parser::cursor`; both are exercised by `static_assert` and by a Catch2 `TEST_CASE` in `version.test.cpp`.
+
+`src/smd/smdscheme/**` was not touched (verified via `git diff -- src/smd/smdscheme` showing nothing).
+
+`make compile`, `make test` (286/286 passed, including the 3 new `VersionTest` cases), and `make lint` all passed at the point of landing this step.
+
+The root `CMakeLists.txt`'s `beman_install_library(schemepoc.schemepoc TARGETS ...)` list was intentionally left unchanged; it does not yet list any `smdlisp.*` target, and adding install/export wiring for `smdlisp` was out of scope for L1 (`make compile`/`make test`/`make lint` do not exercise `make install`). A later step (plausibly L22, public API) should revisit whether `smdlisp.smdlisp` needs to join that install list.
