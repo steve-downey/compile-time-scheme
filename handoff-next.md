@@ -1,5 +1,20 @@
 # Next steps: Common Lisp pivot, Steps L4 and L7 (parallel)
 
+> **2026-07-18 update:** L4, L7, and L8 are now all landed (see the `DONE`
+> markers below and `handoff.md`'s corresponding dated sections).
+> The next unchecked steps per `checklist.md` are **L5** (Track A: CL atoms,
+> depends on L4, done) and **L9** (Track B: Lisp-2 environment, depends on
+> L8, done) — independent of each other per the plan's parallelism summary
+> (section 9), so they can again run as two parallel workers in two
+> worktrees.
+> L9 in particular should start by reading L7's and L8's `handoff.md`
+> entries for the `closure<Core>::captured` raw-pointer/`MaxBindings==16`
+> situation the L9 sketch (plan section 9) explicitly asks it to
+> parameterize.
+> The rest of this file below is the (now historical, but still accurate
+> for what it describes) L4/L7 dispatch note; it is left in place rather
+> than rewritten, annotated only where its content went stale.
+
 ## Direction
 
 The project is pivoting from Scheme-light to Common Lisp-light semantics.
@@ -48,13 +63,19 @@ See `handoff.md` "2026-07-18 Step L4: CL lexical layer landed" for the exposed p
 `make compile`/`make test` (295/295)/`make lint` all green at landing; `src/smd/smdscheme/**` untouched.
 No divergence doc was needed for this step (predicate shape and comment/case-fold behavior follow the plan directly).
 
-### Step L7 — CL value model
+### Step L7 — CL value model — DONE (2026-07-18, in worktree cl-pivot/l7-cl-value)
 
-Goal: `src/smd/smdlisp/closure/value.hpp` (+ test), adapted from the Scheme value model (`src/smd/smdscheme/closure/value.hpp`, read-only reference, do not edit): kinds `nil`, `integer`, `symbol`, `keyword`, `builtin`, `closure`, `foreign_function` (cons arrives later, in L8 — do not add it now).
-One truthiness function, `constexpr auto is_true(value const&) -> bool` — `nil` is the sole false value (decision D3) — used by every later `if` site; do not reintroduce the Scheme per-site `#f` encoding.
-Merge criteria: static_asserts for truthiness of `nil`, `0`, the `t` symbol, and keywords.
-Dependencies: L1 (done); runs parallel with L4-L6.
-Full spec: `docs/cl-pivot-plan.md` section 9, "Step L7 — CL value model".
+Landed: `src/smd/smdlisp/closure/{value.hpp,value.test.cpp,CMakeLists.txt}`, `smdlisp.closure` CMake target, wired into `src/smd/smdlisp/CMakeLists.txt`.
+See `handoff.md` "2026-07-18 Step L7: CL value model landed" for the value-kind list and, importantly, the raw-pointer captured-env constraint in `closure<Core>` (`env<Core, 16> const *captured`) that L9 must address when it builds real `env`.
+`make compile`/`make test` (296/296)/`make lint` all green at landing; `src/smd/smdscheme/**` untouched.
+
+### Step L8 — Cons cells and list builtins — DONE (2026-07-18, in worktree cl-pivot/l8-cons-cells)
+
+Landed: `src/smd/smdlisp/closure/value.hpp` gained `pair_ref`/`pair_cell`/`pair_heap` (adapted by copy from Scheme's PR #26) and `pair_ref` as a new `value<Core>`/`foreign_function<Core>::val_t` alternative; new files `src/smd/smdlisp/closure/{pairs.hpp,pairs.test.cpp}`, both wired into the existing `smdlisp_closure_headers` FILE_SET (no new CMake target — `pairs.hpp` joins `value.hpp` under `smdlisp.closure`).
+See `handoff.md` "2026-07-18 Step L8: cons cells and list builtins landed" for the full API surface: `enum class list_op { cons, car, cdr, list, null, eq, eql, atom }` and `apply_prim<Core, MaxPairs>(list_op, std::span<value<Core> const>, pair_heap<Core, MaxPairs>*) -> foundation::result<value<Core>>`.
+Read it before L9 or L10 touch pairs: it records the CL deltas (`nil`, not a separate `null_t`, is the empty list; `car`/`cdr` of `nil` is `nil`; predicates return the symbol `T` or `nil`, not `bool`) and points at `docs/divergences/DIV-0002-eq-eql-conflated.md` (new this step: `eq`/`eql` are implemented identically, same simplification Scheme made for `eq?`/`eqv?`, currently unobservable since there are no numeric types beyond `int`).
+`list_op` is a free-standing enum, not reused from an `elaborator::prim_op` — `smdlisp` has no elaborator yet (L10). Whichever step adds a `core_prim`-equivalent node should map its primitive-symbol table onto `list_op` directly rather than reinventing the op set.
+`make compile`/`make test` (316/316, including 11 new `PairsTest` cases)/`make lint` all green at landing; `src/smd/smdscheme/**` untouched (the `pairs.test.cpp` glob hit under `src/smd/smdscheme/` in build logs is a pre-existing, unrelated file at that path, not something this step created or touched).
 
 ## Standing constraints (apply to both steps)
 
