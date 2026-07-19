@@ -1,83 +1,122 @@
-# Next step: Common Lisp pivot, Step L10 (CL core model and baseline elaborator)
+# Next step: Common Lisp pivot, Step L11 (direct evaluator, + phase 17 draft)
 
-> **2026-07-18 update:** L6 (this worktree, `cl-pivot/l6-datum-reader`) is done — see `handoff.md`'s
-> "Step L6: CL datum reader landed" section. L9 (Lisp-2 environment) landed and merged into `main` earlier
-> today (`main` is at commit `50f2819`, "Merge step L9: Lisp-2 environment"; `wt-l9` has already been removed
-> as a worktree). Per `docs/cl-pivot-plan.md` section 9, **Step L10 depends on L6 and L9 and both are now
-> satisfied** once this branch merges to `main`. L10 is the next unchecked step in `checklist.md`.
-> The rest of this file is written for whoever picks up L10.
+> **2026-07-19 update:** L10 (this worktree, `cl-pivot/l10-elaborator`) is done — see `handoff.md`'s
+> "Step L10: CL core model and baseline elaborator landed" section. Per `docs/cl-pivot-plan.md` section 9,
+> **Step L11 depends on L10**, which is now satisfied once this branch merges to `main`. L11 is the next
+> unchecked step in `checklist.md`. The rest of this file is written for whoever picks up L11.
 
-## What L10 needs from L6 (this step)
+## What L11 needs from L10 (this step)
 
-L10 builds `src/smd/smdlisp/elaborator/{elaborated_core.hpp,elaborate.hpp}`, consuming the datum tree this step
-produced. Read `handoff.md`'s "Step L6: CL datum reader landed" section in full before starting; the essentials:
+L11 builds `src/smd/smdlisp/closure/eval_direct.hpp` (+ tests): a structural-recursive evaluator over the
+core tree L10 produced. Read `handoff.md`'s "Step L10" section in full before starting; the essentials:
 
-- `smd::smdlisp::reader::datum_type<MaxNodes, MaxList>` is a `smdscheme::foundation::fix`-based arena tree over
-  **six** alternatives: `datum_integer`, `datum_symbol`, `datum_keyword`, `datum_list<R, MaxNodes, MaxList>`,
-  `datum_quote<R, MaxNodes>`, `datum_function<R, MaxNodes>`. `datum_symbol`/`datum_keyword` hold a `folded_name`
-  (from `reader/atom.hpp`) with a `.view()` accessor, not a bare `string_view`.
-- `datum_keyword` is a **separate variant alternative** from `datum_symbol`, not a naming convention — L10's
-  elaborator can use `std::holds_alternative<datum_keyword>(...)` directly instead of inspecting a spelling for
-  a leading colon.
-- `datum_function<R, MaxNodes>{ arena_box<R, MaxNodes> target; }` is what `#'x` reads as. **It is not a list.**
-  L10's special-operator table needs a `function` case (per the plan's "Special operators recognized here:
-  `quote`, `if`, `progn`, `let`, `let*`, `lambda`, `function`") that pattern-matches on `datum_function`
-  directly, in addition to (or instead of, depending on how L10 wants to unify `(function f)` written as a
-  list with `#'f` written as sharpsign-quote — the plan's gap analysis table treats `function` as one special
-  operator covering both spellings, so L10 will likely need to accept *both* a `datum_function` node and a
-  `(function f)`-shaped `datum_list` and elaborate them the same way).
-- Lists are proper only — no dotted pairs (D6). `datum_list::elements` is a `static_vector<arena_box<R,
-  MaxNodes>, MaxList>`; iterate it directly for form elements (head symbol, args, body forms, etc.).
-- Atom classification already happened in the reader; **do not** re-derive "is this a keyword" or "is this the
-  symbol T/NIL" from spelling in the elaborator either, if it can instead pattern-match on the datum kind
-  (`datum_keyword` vs `datum_symbol`) that the reader already produced. `t` and `nil` are *not* distinguished at
-  the datum layer — they are ordinary `datum_symbol` nodes spelled `T`/`NIL`. Per decision D3, giving `NIL` (and
-  by extension `T`) their special meaning is explicitly an elaborator/value-layer job, not a reader job — this
-  step deliberately left that alone, matching L5's atom reader, which made the same choice for the same reason
-  (see L5's handoff entry).
-- `read_datum<MaxNodes, MaxList>(cursor, tree_arena&)` is the entry point; call it the same way
-  `smdscheme::elaborator::elaborate.test.cpp`'s `elab()` helper calls `smdscheme::reader::read_datum` (read
-  `src/smd/smdscheme/elaborator/elaborate.test.cpp` for the exact calling pattern L10's own tests should mirror
-  — same `tree_arena<datum_type<N,M>, N>` + `tree_arena<Core, N>` two-arena setup).
+- The core tree is `smd::smdlisp::elaborator::core_type<MaxNodes, MaxList>`
+  (`src/smd/smdlisp/elaborator/elaborated_core.hpp`), a `smdscheme::foundation::fix`-based arena tree over
+  **twelve** alternatives: `core_integer`, `core_symbol` (VARIABLE-namespace ref), `core_keyword`
+  (self-evaluating), `core_nil`, `core_true`, `core_quote` (atom-only: `variant<int, core_symbol,
+  core_keyword>`), `core_cons<R,MaxNodes>` (hermetic pair constructor, quote-only — see below),
+  `core_if<R,MaxNodes>` (always 3 branches; a 2-arg source `if` already got an implicit `core_nil`
+  alternative at elaboration time), `core_progn<R,MaxNodes,MaxList>`, `core_lambda<R,MaxNodes,MaxList>`
+  (params + **body as a sequence**, `static_vector<arena_box,MaxList>`, implicit progn — not a single
+  expression), `core_function<R,MaxNodes>` (FUNCTION-namespace name-ref *or* an embedded lambda, see next
+  bullet), `core_application<R,MaxNodes,MaxList>`.
+- **`core_application.func` is always an `arena_box` to a `core_function` node — never a bare `core_symbol`.**
+  This is the load-bearing D4 invariant: evaluating an application means evaluating `func` as a
+  `core_function` (which is either "look up this name in the FUNCTION namespace" — `env::lookup_function` —
+  or "this *is* the lambda, materialize a closure directly, no lookup"), never falling back to VARIABLE
+  -namespace lookup. `std::get<core_function<Core,MaxNodes>>(...)` on `func`'s target node should always
+  succeed; if it doesn't, that is an elaborator bug, not a runtime condition to handle gracefully.
+- `NIL`/`T` are `core_nil{}`/`core_true{}`, **distinct from `core_symbol`**, both for bare unquoted source
+  and for quoted `'nil`/`'t` (elaboration intercepts both spellings before ever producing a `core_symbol` or
+  `core_quote`). The evaluator needs one case each: `core_nil{}` → `closure::value<Core>{closure::nil_t{}}`,
+  `core_true{}` → whatever the value model treats as canonical true. **Recommendation, not yet decided:**
+  `pairs.hpp`'s `apply_prim` (L8) already treats `symbol{"T"}` as the canonical true return value for
+  predicates (`null`/`eq`/`eql`/`atom`) — for consistency, `core_true` should probably evaluate to that same
+  `closure::value<Core>{closure::symbol{"T"}}` rather than inventing a second "true" representation. This is
+  explicitly the decision the L10 plan text deferred to L11 ("follow what the value model supports"); make
+  the call, then update `handoff.md`'s L10 entry's parenthetical or add a note here — either way, write it
+  down once decided, since L12+ (`eq`/`eql` on `T`, `defun`-returned booleans, etc.) needs to agree with it.
+- **Quoted list data is `core_cons`, not a value-level `pairs.hpp` builtin call.** `detail::elaborate_quoted_datum`
+  (L10) lowers `'(1 2 3)` to nested `core_cons<Core,MaxNodes>{ arena_box car; arena_box cdr; }` cells
+  bottoming in `core_nil{}` — a *hermetic* construction node, deliberately bypassing the FUNCTION-namespace
+  `CONS` builtin so a later `(defun cons ...)` (L12) can never break the meaning of already-elaborated quote
+  forms. The evaluator needs a `core_cons` case: evaluate `car`/`cdr` (they're already fully elaborated
+  sub-expressions — for quote-constructed data these are always literals/`core_cons`/`core_nil`, never
+  something needing further lookup) and allocate a `closure::pair_ref` into the shared `pair_heap`, exactly
+  the same runtime action `apply_prim(list_op::cons, ...)` (`pairs.hpp`) already performs — L11 will likely
+  want to route both through the same helper rather than duplicating cons-cell construction logic.
+- `core_symbol`/`core_keyword`'s `name` field is a `reader::folded_name` (owned storage: `array<char,64>` +
+  `int`, `.view()` for a `string_view`), **not** a bare `string_view` — this was a deliberate fix mid-step
+  for a real AddressSanitizer-caught stack-use-after-return (full story in `handoff.md`'s L10 entry). If L11
+  adds any new core-node field that stores a name/spelling, check whether it can trace back to a `read_datum`
+  *root* return value (not arena-backed) before deciding whether a view is safe or an owned copy is required.
+  `core_function.target`'s `string_view` and `core_lambda.params`' `string_view`s remain views (audited safe
+  in L10 — always sourced through `datum_arena.get(...)`, never the un-arena-backed root); don't naively
+  "fix" those too, they're fine as-is and changing them would be pure churn.
+- Elaborator-level errors carry a default-valued `source_pos` (`foundation::parse_error{{}, "msg"}`) —
+  matches the Scheme elaborator exactly, not a shortcut specific to `smdlisp`. Don't expect real positions
+  out of `elaborate()`'s errors; only `read_datum`'s errors carry real ones.
+- Calling pattern for tests: mirror `src/smd/smdlisp/elaborator/elaborate.test.cpp`'s `elab()` helper (read
+  then elaborate, two arenas passed by reference from the caller/`TEST_CASE`, **not** function-local — the
+  AddressSanitizer bug above is exactly what goes wrong if a helper function owns the arenas/datum result and
+  returns something that outlives it incorrectly; `elab()`'s current form is already safe, since `core_arena`
+  is caller-owned and `core_symbol`/`core_keyword` no longer view into `datum_arena` — copy that pattern, don't
+  reinvent it).
 
-## Known open item: DIV-0004 (orgit transclusion path), not blocking L10
+## What L11 needs from L9 (Lisp-2 environment, already merged before L10 started)
 
-`docs/divergences/DIV-0004-orgit-transclusion-worktree-path.md` (filed this step, status `open`) records that
-`docs/blog/phase-16-reading-common-lisp.org`'s six `#+transclude:` links point at
-`orgit:~/src/compile-time-scheme/wt-l6::...` rather than the usual `orgit:~/src/compile-time-scheme/main::...`,
-because the anchored text does not exist in `main` until this branch merges. **After this branch merges to
-`main` and before `wt-l6` is deleted as a worktree**, someone (the orchestrator, or whoever lands the merge)
-should re-point those six links to `main` — mechanical `sed`, no content change — since `wt-l6`'s worktree may
-not exist by the time someone next runs `make blog-md` on `main`. The rendered `.md` is already correct and
-already committed; only the `.org` source's re-render path is at risk. This will recur for every later step
-with both new code and a blog deliverable (L11, L13, L15, L19, L21, L24) unless the orchestrator adopts a
-standing convention for it.
+Not re-explained in full here — read `handoff.md`'s "Step L9" section — but the headline facts an evaluator
+needs: `env<Core, MaxBindings>` has **two independent namespaces** (`define_value`/`lookup_value` and
+`define_function`/`lookup_function`), no parent-link (a nested scope is a *copy* with more bindings
+appended), and `default_env<Core, MaxBindings>()` installs `+`, `*`, `CONS`, `CAR`, `CDR`, `LIST`, `NULL`,
+`EQ`, `EQL`, `ATOM`, `FUNCALL`, `APPLY` into the **function** namespace only, as `closure::builtin_op`
+tagged values. Dispatching a looked-up `builtin` value (bridging `closure::builtin_op` to `pairs.hpp`'s
+`list_op` for the 8 shared names, plus giving `funcall`/`apply` real semantics) is explicitly an L10/L11 job
+per L9's handoff — L10 didn't touch it (out of scope, no evaluator work), so **L11 owns this bridge**.
 
-## Known cross-cutting item: `closure/pairs.*` clang-format drift, not blocking L10 but worth a standalone fix
+## The closure-capture ownership question L11 must finally solve
 
-Also recorded in `handoff.md`'s L6 section: `src/smd/smdlisp/closure/pairs.hpp` and `pairs.test.cpp` are
-reformatted by the pinned `clang-format v21.1.2` pre-commit hook in this environment even with **zero** content
-changes — confirmed by reverting to `main`'s committed content and re-running the hook, which reformats them
-again, deterministically. This is the same class of issue `main` commit `b011d52` ("Apply clang-format/gersemi
-formatting to merged smdlisp files") already fixed for `closure/value.{hpp,test.cpp}` right after L9 landed;
-`pairs.{hpp,test.cpp}` looks like it needs the identical standalone fix. L6 did not touch `closure/**` (out of
-lane) and did not fix this — flagging it here so whoever next touches `closure/` (or does a formatting-only
-pass on `main`, per the project's "formatting fixes land directly on `main`, separately from feature work"
-policy in `docs/cl-pivot-plan.md` section 2 and `docs/codestyle.org`'s Agentic Instructions) picks it up.
+L9's handoff flagged this as open and explicitly deferred it to "whichever step first constructs real
+closures (L10/L11's evaluator)" — L10 built no evaluator, so it is unresolved and now squarely L11's problem:
 
-## Standing constraints (apply to L10 and everything after)
+`closure<Core, MaxBindings>::captured` is currently a **non-owning raw pointer** (`env<Core,MaxBindings>
+const *`), because `env.hpp` must include `value.hpp` (for `value<Core>`), so `value.hpp` cannot include
+`env.hpp` back to embed a complete `env` by value — a real header-cycle constraint, not a style choice (see
+L9's handoff entry for the full reasoning). This means: whatever L11's evaluator does when a `lambda`
+elaborates to a runtime closure, it must decide **where the captured `env` instance physically lives** such
+that the closure's raw pointer stays valid for as long as the closure might be called. A `constexpr`
+call-stack-local `env` (e.g. a temporary built inside `eval_direct`'s recursive call for a `lambda` node)
+will **not** survive being returned/stored anywhere — this is the exact same class of bug L10 hit and fixed
+for `core_symbol`/`core_keyword` (stack-use-after-return), just one layer up (runtime values instead of core
+nodes). L9's handoff sketches the likely fix: an "env arena" in the same stable-index style already used by
+`pair_heap` (and by the Scheme `store`) — a closure would capture a stable, arena-owned pointer, never a
+pointer onto a C++ call-stack local that could be outlived by the evaluator frame that created it. L11 needs
+to actually build that (or an equivalent), not just note it again.
+
+## Standing constraints (apply to L11 and everything after)
 
 - `src/smd/smdscheme/**` is frozen for semantic changes (D1); blog phases 5-12 transclude live code from it by
   UUID anchor. Read-only reference, never edit.
-- New work goes in `src/smd/smdlisp/`, namespace `smd::smdlisp`, one sub-namespace per directory. L10 adds
-  `src/smd/smdlisp/elaborator/`.
+- New work goes in `src/smd/smdlisp/`, namespace `smd::smdlisp`, one sub-namespace per directory. L11 adds to
+  `src/smd/smdlisp/closure/` (new file `eval_direct.hpp` + test).
 - Keep C++26/GCC16 baseline; tests use Catch2; mirror file prolog / include guard / canonical-include
   conventions already used throughout `src/smd/smdlisp/`.
-- File a divergence doc under `docs/divergences/` (`TEMPLATE.md` skeleton, next free number is **DIV-0005**)
-  for anything done differently than the plan specifies, or any knowing ANSI CL deviation.
-- Before handoff: `make compile`, `make test`, `make lint` (and `make blog-md` if the step has a blog
-  deliverable — L10 does not; L11 does, per the phase table).
-- Do not continue past the assigned step into later steps unless blocked; if blocked, document the blocker
-  here instead.
-- Work in a fresh worktree off current `main` (which now includes L0-L9 plus, once this branch merges, L6);
-  do not reuse `wt-l6` or `wt-l9` (both should be considered disposable/already-merged).
+- File a divergence doc under `docs/divergences/` (`TEMPLATE.md` skeleton) for anything done differently than
+  the plan specifies, or any knowing ANSI CL deviation. Next free number is **DIV-0005** (L10 didn't need one;
+  every L10 deviation from the Scheme original was a structural C++ adaptation already implied by L9's
+  landed choices, not an ANSI CL semantics cut or a plan-contradicting step).
+- Before handoff: `make compile`, `make test`, `make lint`. L11 **does** have a blog deliverable (phase 17,
+  "`nil`, `t`, and living in a Lisp-2" per the plan's phase table) — draft
+  `docs/blog/phase-17-nil-t-lisp2.org` (or similar slug) and run `make blog-md` to confirm it renders; also
+  check `docs/divergences/DIV-0004-orgit-transclusion-worktree-path.md` — it documents that a fresh
+  worktree's `orgit:` transclusion links must point at the worktree's own path during development (not
+  `main`, which won't yet contain code the current branch hasn't merged) and get mechanically repointed to
+  `main` after merge. This recurs for L11 exactly as DIV-0004 predicted.
+- Merge criteria per the plan (section 9, Step L11), as compile-time static_asserts:
+  ```lisp
+  (if nil 1 2)                           ; => 2
+  ((lambda (x) (car (cdr x))) '(1 2 3))  ; => 2
+  (funcall #'cons 1 nil)                 ; => (1)
+  ```
+- Do not continue past L11 into L12 (`setq`/`defun`/`defvar`/`defparameter`) unless blocked; if blocked,
+  document the blocker here instead.
