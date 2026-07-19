@@ -3,6 +3,7 @@
 
 add_subdirectory(reader)
 add_subdirectory(closure)
+add_subdirectory(elaborator)
 
 add_library(smdlisp.smdlisp STATIC "")
 target_sources(
@@ -16,7 +17,12 @@ target_sources(
 )
 target_link_libraries(
     smdlisp.smdlisp
-    PUBLIC smdscheme.foundation smdscheme.parser smdlisp.reader smdlisp.closure
+    PUBLIC
+        smdscheme.foundation
+        smdscheme.parser
+        smdlisp.reader
+        smdlisp.closure
+        smdlisp.elaborator
 )
 
 find_package(Catch2 REQUIRED)
