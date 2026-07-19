@@ -88,14 +88,13 @@ class env {
 
 template <typename Core, int MaxBindings>
 constexpr auto env<Core, MaxBindings>::define_value(symbol name,
-                                                     value<Core> val) -> void {
+                                                    value<Core> val) -> void {
     values_.push_back(binding{name, std::move(val)});
 }
 
 template <typename Core, int MaxBindings>
 constexpr auto env<Core, MaxBindings>::define_function(symbol name,
-                                                        value<Core> fn)
-    -> void {
+                                                       value<Core> fn) -> void {
     functions_.push_back(binding{name, std::move(fn)});
 }
 
