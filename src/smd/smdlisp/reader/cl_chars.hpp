@@ -43,6 +43,7 @@ constexpr auto is_delimiter(char c) -> bool {
     return is_whitespace(c) || is_terminating_macro_char(c);
 }
 
+// b56c684b-835e-471d-b113-ab07741071eb
 /// Case-folds a single character to uppercase, ASCII only.
 ///
 /// Per docs/cl-pivot-plan.md decision D2, @c smdlisp folds unescaped symbol
@@ -55,7 +56,9 @@ constexpr auto to_upper_char(char c) -> char {
     }
     return c;
 }
+// b56c684b-835e-471d-b113-ab07741071eb end
 
+// 2bc98e28-002e-4db3-b4de-a8967e5d8cec
 /// Advances @p cur past a @c ; line comment, consuming through (but not
 /// including) the next newline, or through end of input if none remains.
 /// @pre !cur.empty() && cur.peek() == ';'
@@ -66,6 +69,7 @@ constexpr auto skip_line_comment(smdscheme::parser::cursor cur)
     }
     return cur;
 }
+// 2bc98e28-002e-4db3-b4de-a8967e5d8cec end
 
 /// Advances @p cur past all leading intertoken space: interleaved runs of
 /// whitespace and @c ; line comments, to a fixpoint.

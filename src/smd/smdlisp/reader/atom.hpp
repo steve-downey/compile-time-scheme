@@ -46,11 +46,11 @@ struct folded_name {
     /// the copy it was taken from) is alive.
     [[nodiscard]] constexpr auto view() const -> std::string_view {
         return std::string_view(storage.data(),
-                                 static_cast<std::size_t>(length));
+                                static_cast<std::size_t>(length));
     }
 
-    friend constexpr auto operator==(folded_name const &,
-                                      folded_name const &) -> bool = default;
+    friend constexpr auto operator==(folded_name const &, folded_name const &)
+        -> bool = default;
 };
 
 /// A Common Lisp symbol, folded to uppercase per decision D2 (e.g. @c foo
@@ -105,10 +105,11 @@ namespace detail {
             }
             auto end_cur = chars.value().rest;
             int len = end_cur.position().offset - start.position().offset;
-            auto text = start.remaining().substr(0, static_cast<std::size_t>(len));
+            auto text =
+                start.remaining().substr(0, static_cast<std::size_t>(len));
             return smdscheme::parser::parse_result<std::string_view>{
                 smdscheme::parser::parse_state<std::string_view>{text,
-                                                                  end_cur}};
+                                                                 end_cur}};
         }};
 }
 
@@ -127,6 +128,7 @@ namespace detail {
 
 // -- integer_p ------------------------------------------------------------
 
+// 53ab854d-6317-4432-a49d-1bf4712a29a1
 /// Returns a parser for a Common Lisp integer literal.
 ///
 /// Reads a whole token (@ref detail::atom_token_p) and accepts it only if
@@ -148,13 +150,13 @@ namespace detail {
             std::size_t digits_start = negative ? 1 : 0;
             if (digits_start >= text.size()) {
                 return smdscheme::foundation::parse_error{cur.position(),
-                                                           "integer"};
+                                                          "integer"};
             }
             int n = 0;
             for (std::size_t i = digits_start; i < text.size(); ++i) {
                 if (text[i] < '0' || text[i] > '9') {
                     return smdscheme::foundation::parse_error{cur.position(),
-                                                               "integer"};
+                                                              "integer"};
                 }
                 n = n * 10 + (text[i] - '0');
             }
@@ -163,6 +165,7 @@ namespace detail {
                     atom_integer{negative ? -n : n}, tok.value().rest}};
         }};
 }
+// 53ab854d-6317-4432-a49d-1bf4712a29a1 end
 
 // -- symbol_p ---------------------------------------------------------------
 
@@ -258,7 +261,7 @@ namespace detail {
                         atom{sym_r.value().value}, sym_r.value().rest}};
             }
             return smdscheme::foundation::parse_error{cur.position(),
-                                                       "expected atom"};
+                                                      "expected atom"};
         }};
 }
 

@@ -76,6 +76,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ Why ~call/cc~ stops here: a sender's one-shot completion contract cannot express a multishot continuation, Kiselyov's independent case against ~call/cc~, and why Common Lisp's dynamic-extent control operators are exactly the discipline senders already enforce.
 
+** [[file:phase-16-reading-common-lisp.org][Phase 16 — Reading Common Lisp: Case, Keywords, and #']]
+
+/DRAFT — pending author revision./ The ~smdlisp~ reader: case folding to uppercase at read time, keywords as a distinct datum kind, ~;~ comments as intertoken space, the maximal-munch fix behind DIV-0003 (the ~1+~ bug), and ~#'~ lowering to its own datum kind instead of a synthesized ~(function x)~ list.
+
 * Table of Contents
 
 #+toc: headlines 1

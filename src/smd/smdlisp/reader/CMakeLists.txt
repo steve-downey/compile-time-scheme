@@ -8,6 +8,6 @@ target_sources(
         FILE_SET smdlisp_reader_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES atom.hpp cl_chars.hpp
+            FILES atom.hpp cl_chars.hpp datum_type.hpp read_datum.hpp
 )
 target_link_libraries(smdlisp.reader PUBLIC smdscheme.parser)

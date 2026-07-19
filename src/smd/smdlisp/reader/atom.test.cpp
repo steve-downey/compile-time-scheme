@@ -75,7 +75,8 @@ static_assert([] {
 
 static_assert([] {
     auto r = read_atom("foo");
-    return r.has_value() && std::holds_alternative<atom_symbol>(r.value().value) &&
+    return r.has_value() &&
+           std::holds_alternative<atom_symbol>(r.value().value) &&
            std::get<atom_symbol>(r.value().value).name.view() == "FOO";
 }());
 
@@ -276,14 +277,16 @@ TEST_CASE("AtomTest - read_atom yields an integer for 42") {
     REQUIRE(std::get<atom_integer>(r.value().value).value == 42);
 }
 
-TEST_CASE("AtomTest - read_atom yields a symbol for negative-looking non-number -foo") {
+TEST_CASE("AtomTest - read_atom yields a symbol for negative-looking "
+          "non-number -foo") {
     auto r = read_atom("-foo");
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<atom_symbol>(r.value().value));
     REQUIRE(std::get<atom_symbol>(r.value().value).name.view() == "-FOO");
 }
 
-TEST_CASE("AtomTest - a keyword and a symbol with the same letters are distinct kinds (D7)") {
+TEST_CASE("AtomTest - a keyword and a symbol with the same letters are "
+          "distinct kinds (D7)") {
     auto sym = read_atom("bar");
     auto kw = read_atom(":bar");
     REQUIRE(sym.has_value());

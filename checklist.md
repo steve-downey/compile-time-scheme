@@ -72,7 +72,7 @@
 - [x] Step L3: blog deps infra fix (optional)
 - [x] Step L4: CL lexical layer
 - [x] Step L5: CL atoms
-- [ ] Step L6: CL datum reader (+ phase 16 draft)
+- [x] Step L6: CL datum reader (+ phase 16 draft)
 - [x] Step L7: CL value model
 - [x] Step L8: cons cells and list builtins (adapt landed pairs work)
 - [x] Step L9: Lisp-2 environment
