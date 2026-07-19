@@ -75,7 +75,7 @@
 - [ ] Step L6: CL datum reader (+ phase 16 draft)
 - [x] Step L7: CL value model
 - [x] Step L8: cons cells and list builtins (adapt landed pairs work)
-- [ ] Step L9: Lisp-2 environment
+- [x] Step L9: Lisp-2 environment
 - [ ] Step L10: CL core model and baseline elaborator
 - [ ] Step L11: direct evaluator (+ phase 17 draft)
 - [ ] Step L12: setq, defun, defvar, defparameter (adapt landed set! work)

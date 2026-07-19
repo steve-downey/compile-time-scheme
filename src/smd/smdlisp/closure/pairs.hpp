@@ -57,9 +57,9 @@ enum class list_op { cons, car, cdr, list, null, eq, eql, atom };
 /// @param  heap  The shared pair heap, or null.
 /// @return The resulting value or a @c foundation::parse_error.
 template <typename Core, int MaxPairs>
-[[nodiscard]] constexpr auto
-apply_prim(list_op op, std::span<value<Core> const> args,
-           pair_heap<Core, MaxPairs> *heap)
+[[nodiscard]] constexpr auto apply_prim(list_op op,
+                                        std::span<value<Core> const> args,
+                                        pair_heap<Core, MaxPairs> *heap)
     -> smd::smdscheme::foundation::result<value<Core>> {
     using Val = value<Core>;
     using smd::smdscheme::foundation::parse_error;
@@ -107,7 +107,7 @@ apply_prim(list_op op, std::span<value<Core> const> args,
         if (args.size() != 1)
             return parse_error{{}, "null: expected 1 argument"};
         return std::holds_alternative<nil_t>(args[0]) ? true_value
-                                                        : false_value;
+                                                      : false_value;
 
     case eq:
     case eql:
@@ -122,7 +122,7 @@ apply_prim(list_op op, std::span<value<Core> const> args,
             return parse_error{{}, "atom: expected 1 argument"};
         // Everything that is not a cons cell is an atom, including nil.
         return std::holds_alternative<pair_ref>(args[0]) ? false_value
-                                                           : true_value;
+                                                         : true_value;
     }
     return parse_error{{}, "unknown list primitive"};
 }

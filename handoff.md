@@ -257,3 +257,44 @@ Public API: `integer_p()`, `symbol_p()`, `keyword_p()` (each a parser factory re
 A lone `-` (no digits following) correctly reads as the symbol `-`, not a truncated integer.
 
 `make compile`, `make test` (333/333 passed, including 37 new `AtomTest` cases), and `make lint` all passed at the point of landing this step. `git diff -- src/smd/smdscheme` was empty (frozen tree untouched); the only changes are the two new files under `src/smd/smdlisp/reader/` plus the one-line `FILES` addition in that directory's `CMakeLists.txt`.
+
+## 2026-07-18 Step L9: Lisp-2 environment landed
+
+`src/smd/smdlisp/closure/{env.hpp,env.test.cpp}` are new, added to the existing `smdlisp_closure_headers` FILE_SET in `src/smd/smdlisp/closure/CMakeLists.txt` (no new CMake target — `env.hpp` joins `value.hpp`/`pairs.hpp` under `smdlisp.closure`, and `env.test.cpp` is picked up automatically by the `smdlisp_test` target's `GLOB_RECURSE *test.cpp`).
+
+**Env API** (`smd::smdlisp::closure::env<Core, MaxBindings>`), per decision D4 (Lisp-2: separate variable and function namespaces):
+
+```cpp
+template <typename Core, int MaxBindings>
+class env {
+  public:
+    constexpr auto define_value(symbol name, value<Core> val) -> void;
+    constexpr auto define_function(symbol name, value<Core> fn) -> void;
+    [[nodiscard]] constexpr auto lookup_value(symbol name) const
+        -> smd::smdscheme::foundation::result<value<Core>>;
+    [[nodiscard]] constexpr auto lookup_function(symbol name) const
+        -> smd::smdscheme::foundation::result<value<Core>>;
+};
+```
+
+Two independent `foundation::static_vector<binding, MaxBindings>` lists (`values_`, `functions_`), each linear and most-recent-first (later `define_*` shadows an earlier one for the same name in *that* namespace only — `f` as a variable and `f` as a function coexist without interaction, verified by `static_assert` and `TEST_CASE("EnvTest - VariableAndFunctionCoexist")`), matching the Scheme `env`'s search order.
+Unlike `smd::smdscheme::closure::env`, there is no backing `store` yet: every binding holds its value inline (the Scheme original's "functional" mode) because `setq`/`set_value` is explicitly out of scope for this step (arrives in L12) — nothing needs to be mutable yet.
+There is also no parent-environment link, same as the Scheme original: a nested lexical scope is a *copy* of the enclosing `env` with more bindings appended, not a chain walked outward; `TEST_CASE("EnvTest - CopyingEnvCopiesBothNamespaces")` pins that a copy's extensions do not leak back into the original.
+`lookup_value`/`lookup_function` return `foundation::result<value<Core>>`, erroring with `"unbound variable"` / `"undefined function"` respectively (distinct messages, matching ANSI CL's `UNBOUND-VARIABLE`/`UNDEFINED-FUNCTION` condition names) when the name has no binding in that namespace; the two namespaces fail independently of each other (`TEST_CASE`s `UnboundVariableIsError`, `UndefinedFunctionIsError`, `NamespacesAreIndependent`).
+
+**Default environment / builtin dispatch story.** `default_env<Core, MaxBindings>()` installs `+`, `*`, `CONS`, `CAR`, `CDR`, `LIST`, `NULL`, `EQ`, `EQL`, `ATOM`, `FUNCALL`, `APPLY` into the *function* namespace only (never the variable namespace — pinned by `TEST_CASE("EnvTest - DefaultEnvInstallsBuiltinsInFunctionNamespace")`), spelled uppercase to match what the reader will produce after D2 case folding (`+`/`*` are unaffected, having no letters).
+Per the plan's explicit invitation to reorganize builtin representation across `value.hpp`/`pairs.hpp`, `value.hpp`'s `builtin_op` enum is now the single tag type used for every function-namespace builtin: it grew from `{add, multiply}` to `{add, multiply, cons, car, cdr, list, null, eq, eql, atom, funcall, apply}`.
+`pairs.hpp`'s `list_op` enum and `apply_prim` are **unchanged** — deliberately kept as a second, separate enum, because `pairs.hpp` includes `value.hpp` (for `value<Core>`), so `value.hpp` cannot name `pairs.hpp`'s `list_op` back without a header cycle.
+The two enums share the same names for the eight list operations by construction, so the bridge from `builtin_op` to `list_op` is a same-name lookup, not a semantic mapping; whichever step first builds an evaluator that actually dispatches a looked-up `builtin` value (L10/L11) does that translation and is also where `funcall`/`apply` get real semantics — both are installed as builtin tags here but have no `apply_prim` case, since invoking a closure needs the evaluator, not value-level plumbing.
+
+**Closure-capture ownership decision (the L7 handoff's open question).** `value.hpp`'s `closure<Core, MaxBindings = 16>` is now templated on `MaxBindings` (previously hard-wired to `env<Core, 16>`), fixing the wart the plan called out, with a default so `closure<Core>` alone still names a usable type.
+`captured` **stays a non-owning raw pointer** (`env<Core, MaxBindings> const *`) — it does **not** become an owning `constexpr_box<env<Core, MaxBindings>>` deep copy the way `smd::smdscheme::closure::closure` does it.
+This was a forced choice, not a style preference: `env.hpp` must include `value.hpp` (`env` stores `value<Core>`, needs `symbol`, `builtin_op`), so `value.hpp` cannot include `env.hpp` back without a header cycle, and therefore cannot embed a complete `env` by value inside `closure`/`value<Core>`.
+`smdscheme` avoids this entirely by defining `constexpr_box`, `closure`, and `env` together in one file (`value.hpp`) rather than splitting `env` into its own header; the plan's step L9 spec explicitly asks for a separate `env.hpp`, so that escape hatch was not available here.
+The documented alternative, recorded here per the step's instruction: ownership of the concrete `env` instances a real closure captures is deferred to whichever step first constructs them (L10's elaborator / L11's evaluator).
+The natural fit, sketched in `value.hpp`'s updated `closure` doc comment, is an "env arena" in the same stable-index style already used by `pair_heap` (and by the Scheme `store`): a closure would capture a stable, arena-owned pointer, never a raw pointer onto a C++ call-stack local that could be outlived by the evaluator frame that created it.
+This is an internal C++ ownership-technique decision, not a deviation from ANSI CL semantics or from the plan's stated API, so no divergence doc was filed for it (matching the plan's explicit "worker discretion, no divergence doc needed" framing for the adjacent `MaxBindings` parameterization).
+
+`make lint`'s `pre-commit run -a` also reformatted two pre-existing L8 files this step touched only by proximity — `src/smd/smdlisp/closure/pairs.hpp` and `pairs.test.cpp` — via `clang-format`; those changes are whitespace/line-wrapping only (confirmed by rebuilding after the reformat: only `pairs.test.cpp` needed recompilation, and all 324 tests still passed), not semantic, and are included in this step's commit since they live inside this step's `closure/**` lane and were required to make `make lint` pass.
+
+`make compile`, `make test` (324/324 passed, including 8 new `EnvTest` cases), and `make lint` all passed at the point of landing this step. `git diff --stat -- src/smd/smdscheme` is empty; the frozen tree was not touched.

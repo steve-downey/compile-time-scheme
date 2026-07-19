@@ -15,12 +15,32 @@ namespace smd::smdlisp::closure {
 
 /// Built-in operations supported at the value level.
 ///
-/// A placeholder set for now; the list/predicate builtins (`cons`, `car`,
-/// `cdr`, `null`, `eq`, `eql`, `atom`, ...) live in their own @ref list_op
-/// enum in `pairs.hpp` (step L8) rather than growing this one; the
-/// environment work in step L9 installs both sets as function-namespace
-/// builtins.
-enum class builtin_op { add, multiply };
+/// Step L9 (the Lisp-2 environment) needs one tag type it can install into
+/// the *function* namespace for every default builtin, so this enum is the
+/// superset covering arithmetic (`add`, `multiply`) and the step L8 list
+/// primitives — `cons`, `car`, `cdr`, `list`, `null`, `eq`, `eql`, `atom`,
+/// named identically to `pairs.hpp`'s `list_op` — plus `funcall` and
+/// `apply`.  `pairs.hpp::apply_prim` still consumes its own `list_op`; the
+/// two enums are deliberately kept as separate types rather than merged,
+/// because `pairs.hpp` includes `value.hpp` (for `value<Core>`), so
+/// `value.hpp` naming `list_op` back would be a header cycle.  A later
+/// evaluator step (L10/L11) bridges the two over their shared names.
+/// `funcall` and `apply` have no `apply_prim` case: invoking a closure
+/// value needs the evaluator itself, not just value-level plumbing.
+enum class builtin_op {
+    add,
+    multiply,
+    cons,
+    car,
+    cdr,
+    list,
+    null,
+    eq,
+    eql,
+    atom,
+    funcall,
+    apply
+};
 
 /// A built-in operator value (holds the operation kind).
 struct builtin {
@@ -57,31 +77,47 @@ struct pair_ref {
     }
 };
 
-/// Forward declaration of the Lisp-2 environment (defined in step L9's
-/// `env.hpp`) needed only to name the pointer type captured by @ref closure.
+/// Forward declaration of the Lisp-2 environment, defined in `env.hpp`
+/// (step L9).
 template <typename Core, int MaxBindings>
 class env;
 
 /// A first-class closure: a lambda node paired with a captured environment.
 ///
-/// `node` points into the core arena; it is non-owning.  `captured` is a
-/// non-owning pointer to the lexical environment at closure-creation time.
-/// It is deliberately a raw pointer rather than an owning box: `env` is not
-/// defined until step L9, and a raw pointer to an incomplete type needs no
-/// destructor machinery, so `closure` (and therefore @ref value) can be a
-/// complete, usable type before `env` exists.  Steps that actually build
-/// closures (L9 onward) may need to revisit ownership once capture is wired
-/// up.
+/// `node` points into the core arena; it is non-owning.  `MaxBindings`
+/// parameterizes the capacity of the captured @ref env — the "hard-wired
+/// 16" wart the plan calls out — and defaults to 16 so `closure<Core>`
+/// alone still names a usable type.
 ///
-/// @tparam Core The core AST type.
-template <typename Core>
+/// **Capture ownership, decided in step L9.** `captured` stays a
+/// non-owning raw pointer rather than becoming an owning
+/// `constexpr_box<env<Core, MaxBindings>>` deep copy the way
+/// `smd::smdscheme::closure::closure` does it.  That is not a style
+/// choice: `env.hpp` includes `value.hpp` (`env` needs `value<Core>`,
+/// `symbol`, `builtin_op`, ...), so `value.hpp` cannot include `env.hpp`
+/// back without a header cycle, and therefore cannot embed a complete
+/// `env` by value.  `smdscheme` sidesteps the cycle by defining `closure`,
+/// `constexpr_box`, and `env` together in one file; the plan for step L9
+/// asks for `env` in its own header instead, so that escape hatch is not
+/// available here.  Ownership of the concrete `env` instances a closure
+/// captures is therefore deferred to whichever step first constructs real
+/// closures (L10/L11's evaluator).  The natural fit is an "env arena" in
+/// the same stable-index style already used by @ref pair_heap (and by the
+/// Scheme `store`): a closure would capture a stable, arena-owned pointer,
+/// never a raw pointer onto a C++ call-stack local that could outlive its
+/// evaluator frame.
+///
+/// @tparam Core        The core AST type.
+/// @tparam MaxBindings Capacity of the captured environment (default 16).
+template <typename Core, int MaxBindings = 16>
 struct closure {
     Core const *node = nullptr; ///< Non-owning pointer to the lambda node.
-    env<Core, 16> const *captured =
-        nullptr; ///< Non-owning; environment ownership lands with L9.
+    env<Core, MaxBindings> const *captured =
+        nullptr; ///< Non-owning; see the ownership note above.
 
-    friend constexpr auto operator==(closure<Core> const &lhs,
-                                     closure<Core> const &rhs) -> bool {
+    friend constexpr auto operator==(closure<Core, MaxBindings> const &lhs,
+                                     closure<Core, MaxBindings> const &rhs)
+        -> bool {
         // Simple structural equality for test purposes.
         return lhs.node == rhs.node;
     }
