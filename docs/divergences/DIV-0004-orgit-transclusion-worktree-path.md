@@ -57,3 +57,9 @@ Close this divergence once `docs/blog/phase-16-reading-common-lisp.org`'s six or
 `~/src/compile-time-scheme/wt-l6` to `~/src/compile-time-scheme/main` after this branch merges (a
 one-line-per-link `sed` change, no content change), and note whether the orchestrator adopts a standing
 convention for the steps listed above so this does not need a fresh divergence doc each time.
+
+## Resolution (2026-07-19, orchestrator)
+
+The six orgit links were re-pointed from `wt-l6` to `main` immediately after the merge (commit follows this doc's update); the re-rendered `.md` differs only in an org-export id.
+Standing convention adopted for all later blog-bearing steps (L11, L13, L15, L19, L21, L24): workers author orgit links against their own worktree path so `make blog-md` works pre-merge; the orchestrator re-points them to `main` and re-renders as part of the merge, with no fresh divergence doc per occurrence.
+Status: resolved.
