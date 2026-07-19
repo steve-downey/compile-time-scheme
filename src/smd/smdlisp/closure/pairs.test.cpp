@@ -93,11 +93,14 @@ static_assert([] {
     auto r_diff = apply_prim<dummy_core>(list_op::eq, diff, &heap);
     auto rl_same = apply_prim<dummy_core>(list_op::eql, same, &heap);
     auto rl_diff = apply_prim<dummy_core>(list_op::eql, diff, &heap);
-    return r_same.has_value() && std::holds_alternative<symbol>(r_same.value()) &&
-           r_diff.has_value() && std::holds_alternative<nil_t>(r_diff.value()) &&
+    return r_same.has_value() &&
+           std::holds_alternative<symbol>(r_same.value()) &&
+           r_diff.has_value() &&
+           std::holds_alternative<nil_t>(r_diff.value()) &&
            rl_same.has_value() &&
            std::holds_alternative<symbol>(rl_same.value()) &&
-           rl_diff.has_value() && std::holds_alternative<nil_t>(rl_diff.value());
+           rl_diff.has_value() &&
+           std::holds_alternative<nil_t>(rl_diff.value());
 }());
 
 static_assert([] {
@@ -109,11 +112,14 @@ static_assert([] {
     auto r_diff = apply_prim<dummy_core>(list_op::eq, diff, &heap);
     auto rl_same = apply_prim<dummy_core>(list_op::eql, same, &heap);
     auto rl_diff = apply_prim<dummy_core>(list_op::eql, diff, &heap);
-    return r_same.has_value() && std::holds_alternative<symbol>(r_same.value()) &&
-           r_diff.has_value() && std::holds_alternative<nil_t>(r_diff.value()) &&
+    return r_same.has_value() &&
+           std::holds_alternative<symbol>(r_same.value()) &&
+           r_diff.has_value() &&
+           std::holds_alternative<nil_t>(r_diff.value()) &&
            rl_same.has_value() &&
            std::holds_alternative<symbol>(rl_same.value()) &&
-           rl_diff.has_value() && std::holds_alternative<nil_t>(rl_diff.value());
+           rl_diff.has_value() &&
+           std::holds_alternative<nil_t>(rl_diff.value());
 }());
 
 static_assert([] {
@@ -179,9 +185,8 @@ static_assert([] {
 static_assert([] {
     // (list) = nil; no heap needed for the empty case.
     std::array<val, 0> args{};
-    auto r = apply_prim<dummy_core>(list_op::list, args,
-                                    static_cast<pair_heap<dummy_core, 4> *>(
-                                        nullptr));
+    auto r = apply_prim<dummy_core>(
+        list_op::list, args, static_cast<pair_heap<dummy_core, 4> *>(nullptr));
     return r.has_value() && std::holds_alternative<nil_t>(r.value());
 }());
 
@@ -309,8 +314,7 @@ TEST_CASE("PairsTest - ListBuildsProperList") {
 TEST_CASE("PairsTest - EmptyListIsNil") {
     std::array<val, 0> args{};
     auto r = apply_prim<dummy_core>(
-        list_op::list, args,
-        static_cast<pair_heap<dummy_core, 4> *>(nullptr));
+        list_op::list, args, static_cast<pair_heap<dummy_core, 4> *>(nullptr));
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<nil_t>(r.value()));
 }
