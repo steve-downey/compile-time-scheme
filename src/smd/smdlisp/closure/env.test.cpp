@@ -21,7 +21,104 @@ using smd::smdlisp::closure::builtin;
 using smd::smdlisp::closure::builtin_op;
 using smd::smdlisp::closure::default_env;
 using smd::smdlisp::closure::env;
+using smd::smdlisp::closure::store;
 using smd::smdlisp::closure::symbol;
+
+// -- store (step L12) -----------------------------------------------------
+
+static_assert([] {
+    store<dummy_core, smd::smdlisp::closure::default_max_store> s;
+    int loc = s.alloc(val{1});
+    if (std::get<int>(s.get(loc)) != 1)
+        return false;
+    s.set(loc, val{2});
+    return std::get<int>(s.get(loc)) == 2;
+}());
+
+// -- mutable-mode env / setq (step L12) -----------------------------------
+
+static_assert([] {
+    // With no store, define_value/define_function behave exactly as
+    // before (functional mode): set_value errors rather than mutating.
+    env<dummy_core, 4> e;
+    e.define_value(symbol{"X"}, val{1});
+    auto r = e.set_value(symbol{"X"}, val{2});
+    return !r.has_value();
+}());
+
+static_assert([] {
+    // Store-backed: define_value stores indirectly, set_value mutates in
+    // place, and the mutation is visible through a *copy* of the
+    // environment (mirroring how a closure's captured environment must
+    // see a later setq -- the reason set!/setq needs a shared store at
+    // all).
+    store<dummy_core, smd::smdlisp::closure::default_max_store> s;
+    env<dummy_core, 4> e{&s};
+    e.define_value(symbol{"X"}, val{1});
+    env<dummy_core, 4> copy = e; // shallow copy: shares the same store*
+    auto set_r = e.set_value(symbol{"X"}, val{2});
+    if (!set_r.has_value() || std::get<int>(set_r.value()) != 2)
+        return false; // setq returns the assigned value (this step's
+                      // decision -- see env::set_value's docs).
+    auto v = copy.lookup_value(symbol{"X"});
+    return v.has_value() && std::get<int>(v.value()) == 2;
+}());
+
+static_assert([] {
+    // setq on an unbound variable is an error.
+    store<dummy_core, smd::smdlisp::closure::default_max_store> s;
+    env<dummy_core, 4> e{&s};
+    auto r = e.set_value(symbol{"NOPE"}, val{1});
+    return !r.has_value();
+}());
+
+// -- special-variable marking (step L12; behavior arrives in L16) --------
+
+static_assert([] {
+    env<dummy_core, 4> e;
+    if (e.is_special(symbol{"X"}))
+        return false;
+    e.declare_special(symbol{"X"});
+    return e.is_special(symbol{"X"}) && !e.is_special(symbol{"Y"});
+}());
+
+static_assert([] {
+    // define_special_value both binds and marks special in one call
+    // (defvar/defparameter's primitive).
+    env<dummy_core, 4> e;
+    e.define_special_value(symbol{"X"}, val{7});
+    auto v = e.lookup_value(symbol{"X"});
+    return v.has_value() && std::get<int>(v.value()) == 7 &&
+           e.is_special(symbol{"X"});
+}());
+
+// -- defun self-recursion support: define_function/patch_function -------
+
+static_assert([] {
+    // Store-backed: define_function returns a store location; patching it
+    // with the real value is visible through a captured copy taken
+    // between the two calls (the shape defun's evaluator case relies on
+    // for self-recursive functions -- see env::patch_function's docs).
+    store<dummy_core, smd::smdlisp::closure::default_max_store> s;
+    env<dummy_core, 4> e{&s};
+    int loc = e.define_function(symbol{"F"}, val{0});
+    env<dummy_core, 4> captured = e; // shares the store*
+    e.patch_function(symbol{"F"}, loc, val{42});
+    auto v = captured.lookup_function(symbol{"F"});
+    return v.has_value() && std::get<int>(v.value()) == 42;
+}());
+
+static_assert([] {
+    // Functional mode (no store): patch_function falls back to an
+    // ordinary shadowing define_function, so the CURRENT environment
+    // still ends up with the correct value (external callers see it),
+    // even though a captured copy taken before the patch will not.
+    env<dummy_core, 4> e;
+    int loc = e.define_function(symbol{"F"}, val{0});
+    e.patch_function(symbol{"F"}, loc, val{42});
+    auto v = e.lookup_function(symbol{"F"});
+    return v.has_value() && std::get<int>(v.value()) == 42;
+}());
 
 // Merge criteria (docs/cl-pivot-plan.md, step L9): `f` as a variable and
 // `f` as a function coexist without shadowing each other; lookups fail
@@ -185,4 +282,78 @@ TEST_CASE("EnvTest - CopyingEnvCopiesBothNamespaces") {
     REQUIRE(copy.lookup_function(symbol{"F"}).has_value());
     // The original is unaffected by the copy's extension.
     REQUIRE_FALSE(e.lookup_value(symbol{"Y"}).has_value());
+}
+
+// -- step L12: mutable-mode env, setq, defun self-recursion support ------
+
+TEST_CASE("EnvTest - StoreBackedDefaultEnvInstallsBuiltinsAndSupportsSetq") {
+    store<dummy_core, smd::smdlisp::closure::default_max_store> s;
+    auto e = default_env<dummy_core, 16>(s);
+    auto plus = e.lookup_function(symbol{"+"});
+    REQUIRE(plus.has_value());
+
+    e.define_value(symbol{"X"}, val{1});
+    auto set_r = e.set_value(symbol{"X"}, val{9});
+    REQUIRE(set_r.has_value());
+    REQUIRE(std::get<int>(set_r.value()) == 9);
+    auto v = e.lookup_value(symbol{"X"});
+    REQUIRE(v.has_value());
+    REQUIRE(std::get<int>(v.value()) == 9);
+}
+
+TEST_CASE("EnvTest - SetqOnUnboundVariableIsError") {
+    store<dummy_core, smd::smdlisp::closure::default_max_store> s;
+    env<dummy_core, 4> e{&s};
+    auto r = e.set_value(symbol{"NOPE"}, val{1});
+    REQUIRE_FALSE(r.has_value());
+}
+
+TEST_CASE("EnvTest - SetqWithNoStoreIsError") {
+    env<dummy_core, 4> e; // functional mode, no store
+    e.define_value(symbol{"X"}, val{1});
+    auto r = e.set_value(symbol{"X"}, val{2});
+    REQUIRE_FALSE(r.has_value());
+}
+
+TEST_CASE("EnvTest - DeclareSpecialAndIsSpecial") {
+    env<dummy_core, 4> e;
+    REQUIRE_FALSE(e.is_special(symbol{"X"}));
+    e.declare_special(symbol{"X"});
+    REQUIRE(e.is_special(symbol{"X"}));
+    REQUIRE_FALSE(e.is_special(symbol{"Y"}));
+}
+
+TEST_CASE("EnvTest - DefineSpecialValueBindsAndMarks") {
+    env<dummy_core, 4> e;
+    e.define_special_value(symbol{"X"}, val{7});
+    auto v = e.lookup_value(symbol{"X"});
+    REQUIRE(v.has_value());
+    REQUIRE(std::get<int>(v.value()) == 7);
+    REQUIRE(e.is_special(symbol{"X"}));
+}
+
+TEST_CASE("EnvTest - PatchFunctionVisibleThroughCapturedCopy") {
+    store<dummy_core, smd::smdlisp::closure::default_max_store> s;
+    env<dummy_core, 4> e{&s};
+    int loc = e.define_function(symbol{"F"}, val{0});
+    env<dummy_core, 4> captured = e;
+    e.patch_function(symbol{"F"}, loc, val{42});
+
+    auto v = captured.lookup_function(symbol{"F"});
+    REQUIRE(v.has_value());
+    REQUIRE(std::get<int>(v.value()) == 42);
+
+    // The original environment also observes the patch.
+    auto v2 = e.lookup_function(symbol{"F"});
+    REQUIRE(v2.has_value());
+    REQUIRE(std::get<int>(v2.value()) == 42);
+}
+
+TEST_CASE("EnvTest - PatchFunctionFunctionalModeFallsBackToShadow") {
+    env<dummy_core, 4> e; // no store
+    int loc = e.define_function(symbol{"F"}, val{0});
+    e.patch_function(symbol{"F"}, loc, val{42});
+    auto v = e.lookup_function(symbol{"F"});
+    REQUIRE(v.has_value());
+    REQUIRE(std::get<int>(v.value()) == 42);
 }

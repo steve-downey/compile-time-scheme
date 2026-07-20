@@ -78,7 +78,7 @@
 - [x] Step L9: Lisp-2 environment
 - [x] Step L10: CL core model and baseline elaborator
 - [x] Step L11: direct evaluator (+ phase 17 draft)
-- [ ] Step L12: setq, defun, defvar, defparameter (adapt landed set! work)
+- [x] Step L12: setq, defun, defvar, defparameter (adapt landed set! work)
 - [ ] Step L13: CPS closure backend (+ phase 18 draft)
 - [ ] Step L14: block / return-from
 - [ ] Step L15: catch / throw / unwind-protect (+ phase 19 draft)

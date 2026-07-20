@@ -70,8 +70,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
     elaborator::core_type<MaxNodes, MaxList> const &node,
     smd::smdscheme::foundation::tree_arena<
         elaborator::core_type<MaxNodes, MaxList>, MaxNodes> const &arena,
-    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> const
-        &environment,
+    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> &environment,
     env_arena<elaborator::core_type<MaxNodes, MaxList>, MaxBindings, MaxEnvs>
         &envs)
     -> smd::smdscheme::foundation::result<
@@ -281,6 +280,24 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
 ///    variable and function binding lists — one capture, two namespaces.
 ///  - **`funcall`/`apply` have call semantics**, not `apply_prim` cases;
 ///    see @ref apply_function_value.
+///  - **Step L12: @p environment is a mutable reference, not `const&`.**
+///    Earlier steps never needed to mutate the environment an expression
+///    was evaluated in, but `setq`/`defun`/`defvar`/`defparameter` all do
+///    (`core_setq`'s @ref env::set_value, `core_defun`'s
+///    @ref env::define_function / @ref env::patch_function,
+///    `core_defvar`/`core_defparameter`'s @ref env::define_special_value).
+///    This is also the mechanism that makes top-level sequencing work with
+///    *no* new plumbing: `core_progn`'s loop below evaluates every
+///    expression through this exact same `environment` reference (never a
+///    copy), so a `defun` earlier in a `progn` is visible to a sibling
+///    expression evaluated later in the *same* `progn` call -- which is
+///    exactly the merge criterion's shape, `(progn (defun ...) (twice
+///    4))`. See docs/cl-pivot-plan.md step L12's handoff note for why this
+///    was chosen over building a separate "run a sequence of top-level
+///    forms" entry point: the plan's own merge criterion already wraps
+///    both forms in one `progn`, so no second top-level driver was needed
+///    for this step. Real multi-form top-level input with no wrapping
+///    `progn` is out of scope for L12.
 ///
 /// @tparam MaxNodes    Arena capacity; bounds tree depth.
 /// @tparam MaxList     Maximum argument/body/list length.
@@ -301,7 +318,11 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
 ///                      resolved).
 /// @param  node        The core node to evaluate.
 /// @param  arena       Core arena; must outlive the evaluation.
-/// @param  environment Current variable/function bindings and pair heap.
+/// @param  environment Current variable/function bindings and pair heap;
+///                      mutable (step L12; see above) -- callers must pass
+///                      an actual environment object, not a temporary that
+///                      does not outlive later sibling evaluations sharing
+///                      it (e.g. later expressions in the same `progn`).
 /// @param  envs        Shared, caller-owned storage for captured
 ///                      environments; must outlive every closure this
 ///                      call (or anything it returns) might produce.
@@ -313,8 +334,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
     elaborator::core_type<MaxNodes, MaxList> const &node,
     smd::smdscheme::foundation::tree_arena<
         elaborator::core_type<MaxNodes, MaxList>, MaxNodes> const &arena,
-    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> const
-        &environment,
+    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> &environment,
     env_arena<elaborator::core_type<MaxNodes, MaxList>, MaxBindings, MaxEnvs>
         &envs)
     -> smd::smdscheme::foundation::result<
@@ -453,6 +473,65 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                     std::span<Val const>(evaluated_args.begin(),
                                          evaluated_args.end()),
                     arena, environment.pairs(), envs);
+            },
+            // Step L12: setq/defun/defvar/defparameter. No blog deliverable
+            // for this step (phase 18 arrives at L13), so no UUID anchor is
+            // added here -- see docs/cl-pivot-plan.md's phase table.
+            [&](elaborator::core_setq<Core, MaxNodes> const &cs) -> Res {
+                // `setq` mutates the nearest LEXICAL variable binding;
+                // special-variable/dynamic-binding interaction is
+                // deferred to step L16 (env::set_value's docs).  ANSI CL:
+                // setq returns the assigned value, not an unspecified
+                // marker.
+                auto val_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(cs.value), arena, environment, envs);
+                if (!val_r.has_value())
+                    return val_r.error();
+                return environment.set_value(symbol{cs.name}, val_r.value());
+            },
+            [&](elaborator::core_defun<Core, MaxNodes> const &cd) -> Res {
+                // Reserve the FUNCTION-namespace binding, capture the
+                // (still-placeholder-bound) environment, build the real
+                // closure value, then patch the placeholder in place --
+                // see env::patch_function's docs for why this order lets
+                // a self-recursive defun find its own name.
+                auto const &lam_node = arena.get(cd.lambda);
+                int loc =
+                    environment.define_function(symbol{cd.name}, Val{nil_t{}});
+                auto const *captured = envs.alloc(environment);
+                Val fn_val = Val{closure<Core>{&lam_node, captured}};
+                environment.patch_function(symbol{cd.name}, loc, fn_val);
+                // ANSI CL: defun returns the function name.
+                return Val{symbol{cd.name}};
+            },
+            [&](elaborator::core_defvar<Core, MaxNodes> const &cdv) -> Res {
+                // ANSI CL: defvar always proclaims the name special, but
+                // only evaluates/binds the value form if not already
+                // bound in the variable namespace.
+                environment.declare_special(symbol{cdv.name});
+                if (environment.lookup_value(symbol{cdv.name}).has_value())
+                    return Val{symbol{cdv.name}};
+                auto val_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(cdv.value), arena, environment, envs);
+                if (!val_r.has_value())
+                    return val_r.error();
+                environment.define_value(symbol{cdv.name}, val_r.value());
+                return Val{symbol{cdv.name}};
+            },
+            [&](elaborator::core_defparameter<Core, MaxNodes> const &cdp)
+                -> Res {
+                // ANSI CL: defparameter always proclaims special AND
+                // always (re)evaluates and (re)binds the value.
+                environment.declare_special(symbol{cdp.name});
+                auto val_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(cdp.value), arena, environment, envs);
+                if (!val_r.has_value())
+                    return val_r.error();
+                environment.define_value(symbol{cdp.name}, val_r.value());
+                return Val{symbol{cdp.name}};
             }},
         node.inner);
 }

@@ -230,6 +230,92 @@ struct core_application {
         args; ///< Argument expressions (VARIABLE-namespace context).
 };
 
+/// A Common Lisp `setq` assignment (step L12): mutates the nearest LEXICAL
+/// variable binding for @ref name, returning the assigned value per ANSI CL
+/// (not Scheme's `unspecified`) -- see
+/// @ref smd::smdlisp::closure::env::set_value's docs for the mutation
+/// mechanism (a shared @ref smd::smdlisp::closure::store, adapted from the
+/// landed `set!`/@c store machinery in `smd::smdscheme::closure`) and for
+/// why it errors rather than building any special-variable/dynamic-binding
+/// behavior (explicitly deferred to step L16).
+///
+/// @ref name is a plain `std::string_view`, not an owned @ref
+/// reader::folded_name like @ref core_symbol: `setq`'s name is always a
+/// list ELEMENT (`(setq name expr)`), always reached through
+/// `datum_arena.get(...)`, never the datum reader's un-arena-backed ROOT
+/// return value -- the same "list elements are always arena-backed"
+/// reasoning that already lets @ref core_function's bare-symbol
+/// alternative and @ref core_lambda::params stay `string_view` (see this
+/// file's L10 handoff note on that exact reasoning) applies here too.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_setq {
+    std::string_view name; ///< The variable being assigned (VARIABLE
+                           ///< namespace, lexical only -- see @ref
+                           ///< smd::smdlisp::closure::env::set_value).
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        value; ///< The new-value expression.
+};
+
+/// A top-level `defun` (step L12): binds @ref name in the FUNCTION
+/// namespace (decision D4) to a closure over the lambda reached through
+/// @ref lambda.
+///
+/// @ref lambda is built by reusing @ref detail::elaborate_lambda on a
+/// synthetic formals/body view of the `defun` form's own elements (see
+/// `elaborate.hpp`'s `DEFUN` case) rather than duplicating formals/body
+/// parsing -- so @ref lambda always refers to an ordinary @ref core_lambda
+/// node, exactly as if the same formals and body had been written inside a
+/// literal `(lambda ...)` form.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_defun {
+    std::string_view name; ///< Function name (FUNCTION namespace).
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        lambda; ///< Handle to a @ref core_lambda node.
+};
+
+/// A top-level `defvar` (step L12): proclaims @ref name special (the mark
+/// is stored now via @ref smd::smdlisp::closure::env::declare_special;
+/// dynamic binding using it arrives in step L16) and, only if @ref name is
+/// not already bound in the VARIABLE namespace, binds it to the evaluated
+/// @ref value. Per ANSI CL, an already-bound `defvar` does not re-evaluate
+/// or rebind @ref value -- see the evaluator's `core_defvar` case.
+///
+/// This baseline elaborator requires a value form (`(defvar name value)`);
+/// the no-value-form (`(defvar name)`, proclaim-only) and docstring
+/// variants ANSI CL also permits are out of scope for this step, matching
+/// the established "in-scope subset, no divergence doc" pattern already
+/// used for e.g. `lambda`'s "at least one body expression" restriction
+/// (step L10).
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_defvar {
+    std::string_view name; ///< The variable being proclaimed special.
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        value; ///< The initial-value expression (see restriction above).
+};
+
+/// A top-level `defparameter` (step L12): proclaims @ref name special (see
+/// @ref core_defvar) and unconditionally (re)evaluates @ref value and
+/// (re)binds @ref name in the VARIABLE namespace, unlike @ref core_defvar's
+/// bind-only-if-unbound rule.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_defparameter {
+    std::string_view name; ///< The variable being proclaimed special.
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        value; ///< The (always evaluated) new-value expression.
+};
+
 /// Factory template that produces the open-recursive variant layer for the
 /// core AST.
 ///
@@ -243,7 +329,9 @@ struct core_f_factory {
         core_integer, core_symbol, core_keyword, core_nil, core_true,
         core_quote, core_cons<R, MaxNodes>, core_if<R, MaxNodes>,
         core_progn<R, MaxNodes, MaxList>, core_lambda<R, MaxNodes, MaxList>,
-        core_function<R, MaxNodes>, core_application<R, MaxNodes, MaxList>>;
+        core_function<R, MaxNodes>, core_application<R, MaxNodes, MaxList>,
+        core_setq<R, MaxNodes>, core_defun<R, MaxNodes>,
+        core_defvar<R, MaxNodes>, core_defparameter<R, MaxNodes>>;
 };
 
 /// The concrete recursive core AST type, formed as the fixed point of

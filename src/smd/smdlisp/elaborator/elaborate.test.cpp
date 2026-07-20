@@ -330,6 +330,114 @@ TEST_CASE("ElaborateTest - LambdaEmptyBodyIsError") {
     REQUIRE(!elab("(lambda (x))", da, ca).has_value());
 }
 
+// -- setq / defun / defvar / defparameter (step L12) ---------------------
+
+TEST_CASE("ElaborateTest - SetqElaboratesToCoreSetq") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(setq x 1)", da, ca);
+    REQUIRE(er.has_value());
+    using Setq = lisp::elaborator::core_setq<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Setq>(er.value().inner));
+    REQUIRE(std::get<Setq>(er.value().inner).name == "X");
+}
+
+TEST_CASE("ElaborateTest - SetqWrongArityIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(setq x)", da, ca).has_value());
+    REQUIRE(!elab("(setq x 1 2)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - SetqNonSymbolNameIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(setq 1 2)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DefunElaboratesToCoreDefunWrappingLambda") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(defun twice (x) (+ x x))", da, ca);
+    REQUIRE(er.has_value());
+    using Defun = lisp::elaborator::core_defun<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Defun>(er.value().inner));
+    auto const &def = std::get<Defun>(er.value().inner);
+    REQUIRE(def.name == "TWICE");
+    using Lam = lisp::elaborator::core_lambda<Core, MaxNodes, MaxList>;
+    auto const &lam_node = ca.get(def.lambda);
+    REQUIRE(std::holds_alternative<Lam>(lam_node.inner));
+    auto const &lam = std::get<Lam>(lam_node.inner);
+    REQUIRE(lam.params.size() == 1);
+    REQUIRE(lam.params[0] == "X");
+    REQUIRE(lam.body.size() == 1);
+}
+
+TEST_CASE("ElaborateTest - DefunMultiFormBodyIsImplicitProgn") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(defun f (x) x (+ x 1))", da, ca);
+    REQUIRE(er.has_value());
+    using Defun = lisp::elaborator::core_defun<Core, MaxNodes>;
+    auto const &def = std::get<Defun>(er.value().inner);
+    using Lam = lisp::elaborator::core_lambda<Core, MaxNodes, MaxList>;
+    auto const &lam = std::get<Lam>(ca.get(def.lambda).inner);
+    REQUIRE(lam.body.size() == 2);
+}
+
+TEST_CASE("ElaborateTest - DefunWrongArityIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(defun f (x))", da, ca).has_value());
+    REQUIRE(!elab("(defun f)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DefunNonSymbolNameIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(defun 1 (x) x)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DefunDuplicateParamIsError") {
+    // Reuses elaborate_lambda's own checks -- pins that reuse actually
+    // happens rather than a separate, laxer formals parser for defun.
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(defun f (x x) x)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DefvarElaboratesToCoreDefvar") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(defvar x 1)", da, ca);
+    REQUIRE(er.has_value());
+    using Defvar = lisp::elaborator::core_defvar<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Defvar>(er.value().inner));
+    REQUIRE(std::get<Defvar>(er.value().inner).name == "X");
+}
+
+TEST_CASE("ElaborateTest - DefvarWrongArityIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(defvar x)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DefparameterElaboratesToCoreDefparameter") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(defparameter x 1)", da, ca);
+    REQUIRE(er.has_value());
+    using Defparam = lisp::elaborator::core_defparameter<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Defparam>(er.value().inner));
+    REQUIRE(std::get<Defparam>(er.value().inner).name == "X");
+}
+
+TEST_CASE("ElaborateTest - DefparameterWrongArityIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(defparameter x)", da, ca).has_value());
+}
+
 // -- let / let* -----------------------------------------------------------
 
 TEST_CASE("ElaborateTest - LetDesugarsToApplicationOfLambda") {
