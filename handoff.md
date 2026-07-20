@@ -366,3 +366,151 @@ Six new UUID anchor pairs were added (three in the new files, three retrofitted 
 `make compile`, `make test` (439/439 passed, including 18 new `EvalDirectTest` cases plus the 3 merge-criteria `static_assert`s), and `make lint` all passed clean at landing. `git diff --stat -- src/smd/smdscheme` is empty (frozen tree untouched). No divergence doc filed: the closure-capture-ownership design and the pair-heap-in-env extension are internal C++ architecture decisions the plan explicitly invited this step to make (matching L9's own precedent for the adjacent `MaxBindings`-parameterization decision), and making `+`/`*` variadic is a reduction in ANSI divergence, not an introduction of one; next free divergence number remains **DIV-0005**.
 
 Blog: `docs/blog/phase-17-nil-t-lisp2.org` drafted (`DRAFT — pending author revision`), covering the four points above (one `is_true` function, Lisp-2 lookup with no cross-namespace fallback, `funcall`/`#'` real call semantics, the closure-capture-ownership resolution) via five new UUID anchors: `82728208-0712-4e1a-9252-036e99276919` (`value.hpp`, `is_true`), `a73f8d39-7455-4ddc-a541-7424ab1d3a35` (`env.hpp`, `env_arena::alloc`), `6332b396-3733-4eb0-adc5-af7a57adb809` (`eval_direct.hpp`, `core_if`'s `is_true` call site), `bd5cf19a-ccb0-45a1-b208-b76970bcb0c6` (`eval_direct.hpp`, the `core_symbol`/`core_function` Lisp-2 dispatch), `1d30e953-16e2-4812-9eee-10934eafdec3` (`eval_direct.hpp`, the `builtin` dispatch including `funcall`/`apply`). `docs/blog/index.org` gained the Phase 17 entry. Per DIV-0004's now-standing convention, the six `#+transclude:` links point at `orgit:~/src/compile-time-scheme/wt-l11::...` (this step's own worktree); the orchestrator repoints them to `main` after merge. `make blog-md` renders `docs/blog/phase-17-nil-t-lisp2.md` cleanly (all five transclusions resolve); two org-markup bugs of my own making were caught and fixed while drafting — adjacent `~verbatim~/~verbatim~` spans without an intervening space merge into one giant verbatim span in GFM export (org's closing-`~` rule requires the following character to be whitespace/punctuation, not another `~` used to open the next span), and a `~word~` immediately followed by a bare letter (`~static_assert~s`) has the same problem, since the letter right after the closing `~` isn't a valid post-match boundary character either. `docs/blog/phase-1-foundation.md`, `phase-5-fixpoint-trees.md`, and `phase-8-senders.md` were incidentally re-rendered by the first `make blog-md` run in this worktree (their transclusions had gone stale/blank in the committed `.md`, unrelated to this step) and were reverted with `git checkout` before committing, per the "existing phases' output unchanged" requirement; `index.md`'s id churn was kept since its content genuinely changed for the new Phase 17 entry, matching L6's precedent.
+
+## 2026-07-20 Step L17: macro expander with host macros landed (Track C, ran parallel to L12)
+
+`src/smd/smdlisp/macroexpand/{expander.hpp,expander.test.cpp,CMakeLists.txt}` are new, wired into
+`src/smd/smdlisp/CMakeLists.txt` via `add_subdirectory(macroexpand)` (appended after `closure`) plus a link
+edit adding `smdlisp.macroexpand` to `smdlisp.smdlisp`'s `target_link_libraries`. New CMake target
+`smdlisp.macroexpand` (STATIC, header-only, mirrors `smdlisp.reader`/`smdlisp.elaborator`'s pattern), linking
+`PUBLIC smdscheme.foundation smdlisp.reader smdlisp.elaborator` — it needs `smdlisp.elaborator` (unlike
+`reader`/`closure`) because `expander.hpp` directly includes `elaborate.hpp` for the pipeline-wiring entry
+point (below). This step ran concurrently with L12 in a sibling worktree (Track A, `setq`/`defun`); per the
+plan's parallelism summary this is exactly the expected Track C / Track A split, and the only anticipated
+merge conflict was on `src/smd/smdlisp/CMakeLists.txt` (both steps add an `add_subdirectory` line and a link
+entry) — this step did not touch `elaborator/` or `closure/` themselves, only *consumed* `elaborate.hpp`/
+`elaborated_core.hpp` as read-only includes, so there should be no conflict beyond that one file's two
+`add_subdirectory`/link lines, resolvable by keeping both lines side by side in whichever order the
+orchestrator's merge lands them.
+
+**Where the pass sits (decision D9).** `smd::smdlisp::macroexpand` operates entirely on
+`reader::datum_type<MaxNodes, MaxList>` trees (L6) — nothing in `expander.hpp` constructs or inspects an
+`elaborator::core_type` node except `expand_and_elaborate` (below), which only calls `elaborator::elaborate`
+as the next pipeline stage once expansion has finished. No changes were needed in `elaborator/`, `closure/`,
+or `reader/` to land this step — the datum tree's existing shape (arena + `arena_box` handles, `datum_list`'s
+`static_vector<arena_box, MaxList>` elements) was sufficient to build every replacement form the six macros
+below need.
+
+**Registry / API shape**, matching the plan's sketch almost exactly:
+
+```cpp
+template <int MaxNodes, int MaxList>
+using macro_fn = smdscheme::foundation::result<reader::datum_type<MaxNodes, MaxList>> (*)(
+    call_form<MaxNodes, MaxList> const &call, arena_type<MaxNodes, MaxList> &arena);
+
+template <int MaxNodes, int MaxList>
+struct host_macro {
+    std::string_view name{};             // folded operator spelling, e.g. "COND"
+    macro_fn<MaxNodes, MaxList> expand{};
+};
+
+template <int MaxNodes, int MaxList>
+using macro_table = smdscheme::foundation::static_vector<host_macro<MaxNodes, MaxList>, max_host_macros>;
+```
+
+`macro_fn` is a real function pointer (not a type-erased callable): host macros are ordinary, stateless,
+`constexpr`-callable C++ functions, matching the plan's "Host macro: C++ function from a call-form datum to
+a replacement datum." `host_macro::name` is a plain `std::string_view` compared against a call form's head
+symbol's folded spelling (`reader::folded_name::view()`) — the exact same pattern
+`detail::elaborate_list`/`detail::elaborate_function_position` in `elaborate.hpp` already use for special-form
+dispatch, reused rather than inventing a second symbol-matching mechanism, per the handoff briefing's explicit
+instruction (`smdlisp`'s reader layer has no `symbol` type of its own; `closure::symbol` is a *value*-layer
+type from L7, irrelevant here since this pass runs before evaluation).
+
+**Arena reuse decision.** Expansion writes every newly constructed replacement node into the *same* datum
+arena the reader already populated — no second arena. This is the simplest design that satisfies "the
+expander speaks the reader's datum language": every handle `expand()` produces or consumes is an ordinary
+`arena_box` into the one arena the caller already owns, exactly mirroring how the elaborator's `core_arena` is
+a single caller-owned arena threaded through every recursive call.
+
+**Budget.** `macroexpand_1` applies at most one step at the head position (returns the datum unchanged plus an
+`expanded` flag if the head is not a list, is an empty list, its head is not a symbol, or the head symbol
+names no registered macro). `macroexpand` iterates `macroexpand_1` at the head position to a fixpoint under a
+`max_expansions` budget (`default_max_expansions = 64`); exhausting the budget without reaching a fixpoint is
+a diagnosed `parse_error` ("macroexpand: expansion budget exceeded"), never a hang — pinned by
+`ExpanderTest - MacroexpandBudgetExhaustionIsDiagnosedError`, which registers a pathological test-only macro
+that always re-expands into a call of itself and confirms `macroexpand` reports an error at a small budget
+(8) rather than looping.
+
+**Whole-tree wiring (`expand()`).** `macroexpand`/`macroexpand_1` alone only ever inspect *one* expression's
+own head, matching ANSI CL's `macroexpand`/`macroexpand-1` exactly — they do not recurse into subforms. Making
+the actual pipeline work (a `cond` nested inside an `if`'s branch, or inside a `let`'s body, must also get
+expanded) needed one more function, `expand()`: at each list node, apply `macroexpand` at the head to a
+fixpoint first, then recurse into the (possibly replaced) list's own elements — *except* when the list's head
+symbol is `QUOTE`, whose argument is literal data and must never be macro-walked (`'(cond a b)` must stay the
+literal three-element list `(COND A B)`, not silently evaluate to `2`; pinned by
+`ExpanderTest - ExpandDoesNotWalkIntoQuotedData`). A `#'`/`(function ...)` node (`reader::datum_function`) is
+walked into its embedded lambda body only when its target is a `(lambda ...)` form (code); a bare
+function-name symbol target is left untouched (nothing to walk). `expand_and_elaborate(pd, datum_arena,
+core_arena, table, max_expansions) -> result<core_type>` is the actual pipeline entry point: calls `expand()`
+then `elaborator::elaborate()` on the result, matching `elaborate()`'s own `(datum, datum_arena, core_arena)`
+signature shape with the macro table and budget appended.
+
+**`expand()` is generic and special-form-agnostic — this is a deliberate, documented scope cut, not an
+oversight (DIV-0005).** It does not know `if`/`let`/`lambda`/etc.'s argument shapes the way the elaborator
+does (by design, per D9 — macro expansion stays independent of the elaborator), so it cannot distinguish "this
+sublist is a binding/parameter list, not code" from "this sublist is an ordinary subexpression." In the narrow
+case where a program reuses one of the six macro names as a variable or parameter name (e.g.
+`(lambda (cond) cond)`), the walk may misinterpret the unrelated list `(cond)` as an attempted zero-clause
+`cond` call, and `cond_expand` would then reject it with a spurious "expected at least one clause"-shaped
+error. This is not exercised by any test here and is not expected to matter for any of this project's example
+programs; see DIV-0005 for the full writeup and the companion (unrelated) hygiene note below.
+
+**The six baseline macros — composability was the API-shape sanity check, and it held.** `cond`, `when`,
+`unless`, `and`, `or`, `case` are all ordinary `host_macro` registry entries (via `default_macro_table<MaxNodes,
+MaxList>()`), each an unconditionally-called free function — no ad-hoc special-casing anywhere in
+`macroexpand_1`/`macroexpand`/`expand()` for any particular macro name, confirming the plan's explicit
+API-shape test ("if implementing these six needs ad-hoc special-casing rather than each being an ordinary
+registry entry, the API shape is wrong"). Each expander peels off exactly *one* clause/argument per call and
+leaves the rest as a fresh call of the same (or a related) macro, relying entirely on `expand()`'s recursive
+walk to keep unwinding the result to a fixpoint — none of the six builds a multi-level expansion by hand:
+
+- `(cond)` → `NIL`; `(cond (test forms...) rest...)` → `(if test (progn forms...) (cond rest...))`. A
+  test-only clause with zero body forms (`(cond (a))`, legal in full ANSI CL) is **not supported** — a
+  documented, tested scope cut (`ExpanderTest - CondWithNoClausesExpandsToNil` covers the zero-clause case;
+  the zero-form-clause restriction mirrors L10's own "at least one body expression" cut for `lambda`/`progn`).
+- `(when test forms...)` → `(if test (progn forms...))`, `NIL` body if `forms...` is empty.
+- `(unless test forms...)` → `(if test NIL (progn forms...))`, `NIL` alternative if `forms...` is empty.
+- `(and)` → `T`; `(and e)` → `e`; `(and e1 e2...)` → `(if e1 (and e2...) NIL)`.
+- `(or)` → `NIL`; `(or e)` → `e`; `(or e1 e2...)` → `(let ((%OR-TMP e1)) (if %OR-TMP %OR-TMP (or e2...)))` —
+  binds `e1` once via `let` rather than emitting `(if e1 e1 (or e2...))` directly, so `e1` is evaluated exactly
+  once even though its value is needed in two positions, matching ANSI `or`'s single-evaluation contract.
+- `(case keyform ((k1 k2...) forms...)... (t forms...))` → `(let ((%CASE-KEY keyform)) (cond ((eql %CASE-KEY
+  'k1) forms...)... (t forms...)))` — each clause's key spec becomes an `eql`-against-quoted-key test (a
+  multi-key clause becomes an `(or (eql ...) (eql ...) ...)`, itself expanded by `or`'s own macro when
+  `expand()`'s recursive walk reaches it); a bare `T`/`OTHERWISE` key spec (not inside a list) is the
+  catch-all, matching ANSI CL exactly — `(t ...)`/`(otherwise ...)` with the symbol *inside* a list is an
+  ordinary one-key clause instead, also matching ANSI CL. `case`'s `let`-bound temp emits `COND`, which
+  `expand()`'s walk expands in turn (relying on `cond`'s own zero-body-clause restriction transitively, so a
+  case clause with no body forms is rejected the same way a bare `cond` clause would be).
+
+**Non-hygienic temp variables (DIV-0005, second half).** `or`'s `%OR-TMP` and `case`'s `%CASE-KEY` are fixed,
+ordinary (interned) symbol spellings, not `gensym`-style fresh/uninterned names — this project has no notion
+of uninterned symbols yet (that arrives with L18/L19's backquote/`defmacro` machinery). A user form that
+happened to bind a variable literally named `%OR-TMP` or `%CASE-KEY` inside the relevant macro's arguments
+could observe variable capture. Nested `or`/`case` expansions do not collide with *each other* (each `let`
+introduces its own fresh scope, most-recent-binding-wins lookup per L9's `env`), only a user-supplied name
+could collide. Documented in DIV-0005 alongside the generic-walk limitation above; both are accepted scope
+cuts for this step, not bugs.
+
+**Merge criteria.** `(cond (nil 1) (t 2))` ⇒ `2` is proven both as a compile-time `static_assert` and as
+`TEST_CASE("ExpanderTest - CondEndToEnd")` in `expander.test.cpp`, via `expand_and_elaborate` +
+`eval_direct` — **no evaluator or elaborator changes were needed**, exactly as the plan predicts: every one
+of the six macros bottoms out in `if`/`progn`/`let`/application, all already-elaborable special forms as of
+L10. Plus expansion-shape `TEST_CASE`s for all six macros (checking the constructed datum tree's structure
+directly via `std::holds_alternative`/symbol-name comparisons, since datum trees have no `operator==`), a
+`macroexpand_1`/`macroexpand` plumbing pair (no-op on a non-macro call; the budget-exhaustion diagnosis
+described above), a whole-tree-recursion test (`(if (when t 1) 2 3)` — the nested `when` gets expanded even
+though it's not at the top level), the quote-boundary test described above, and end-to-end `eval_direct`
+`TEST_CASE`s for `when`/`unless`/`and`/`or`/`case` beyond the mandated `cond` case (including `case`'s
+otherwise-fallthrough path).
+
+`make compile`, `make test` (461/461 passed, including 22 new `ExpanderTest` cases plus the merge-criteria
+`static_assert`), and `make lint` all passed clean at landing. `git diff --stat -- src/smd/smdscheme` is empty
+(frozen tree untouched); `git diff --stat -- src/smd/smdlisp/reader src/smd/smdlisp/elaborator
+src/smd/smdlisp/closure` is also empty (those three lanes — the latter two owned by the concurrent L12 worker
+— were read from, via ordinary includes, but never modified). **DIV-0005** filed this step (see
+`docs/divergences/DIV-0005-macroexpand-not-hygienic-or-form-aware.md`) for the two scope cuts above (no
+gensym; `expand()`'s form-agnostic walk); checked immediately before filing that DIV-0005 was still free (the
+concurrent L12 worktree, `wt-l12`, had not claimed it as of this step's landing). No blog deliverable for this
+step (phase 20 arrives at L19 per the plan's phase table).
