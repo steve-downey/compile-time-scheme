@@ -77,7 +77,7 @@
 - [x] Step L8: cons cells and list builtins (adapt landed pairs work)
 - [x] Step L9: Lisp-2 environment
 - [x] Step L10: CL core model and baseline elaborator
-- [ ] Step L11: direct evaluator (+ phase 17 draft)
+- [x] Step L11: direct evaluator (+ phase 17 draft)
 - [ ] Step L12: setq, defun, defvar, defparameter (adapt landed set! work)
 - [ ] Step L13: CPS closure backend (+ phase 18 draft)
 - [ ] Step L14: block / return-from

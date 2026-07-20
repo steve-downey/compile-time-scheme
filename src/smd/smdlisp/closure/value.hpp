@@ -241,10 +241,12 @@ class pair_heap {
 /// than re-encoding truthiness locally.
 ///
 /// @tparam Core The core AST type.
+// 82728208-0712-4e1a-9252-036e99276919
 template <typename Core>
 [[nodiscard]] constexpr auto is_true(value<Core> const &v) -> bool {
     return !std::holds_alternative<nil_t>(v);
 }
+// 82728208-0712-4e1a-9252-036e99276919 end
 
 } // namespace smd::smdlisp::closure
 

@@ -10,4 +10,7 @@ target_sources(
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
             FILES elaborated_core.hpp elaborate.hpp
 )
-target_link_libraries(smdlisp.elaborator PUBLIC smdscheme.foundation smdlisp.reader)
+target_link_libraries(
+    smdlisp.elaborator
+    PUBLIC smdscheme.foundation smdlisp.reader
+)
