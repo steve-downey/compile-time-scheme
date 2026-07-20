@@ -2,8 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 add_subdirectory(reader)
-add_subdirectory(closure)
 add_subdirectory(elaborator)
+add_subdirectory(closure)
 
 add_library(smdlisp.smdlisp STATIC "")
 target_sources(

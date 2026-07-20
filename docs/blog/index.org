@@ -80,6 +80,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ The ~smdlisp~ reader: case folding to uppercase at read time, keywords as a distinct datum kind, ~;~ comments as intertoken space, the maximal-munch fix behind DIV-0003 (the ~1+~ bug), and ~#'~ lowering to its own datum kind instead of a synthesized ~(function x)~ list.
 
+** [[file:phase-17-nil-t-lisp2.org][Phase 17 — nil, t, and Living in a Lisp-2]]
+
+/DRAFT — pending author revision./ The direct evaluator: one ~is_true~ function instead of Scheme's per-site ~#f~ encoding, a Lisp-2 environment where variable and function lookup never touch, ~funcall~ and ~#'~ as real call semantics, and the closure-capture-ownership question resolved with an arena instead of an owning pointer.
+
 * Table of Contents
 
 #+toc: headlines 1

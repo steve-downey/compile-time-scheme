@@ -8,6 +8,9 @@ target_sources(
         FILE_SET smdlisp_closure_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES value.hpp pairs.hpp env.hpp
+            FILES value.hpp pairs.hpp env.hpp eval_direct.hpp
 )
-target_link_libraries(smdlisp.closure PUBLIC smdscheme.foundation)
+target_link_libraries(
+    smdlisp.closure
+    PUBLIC smdscheme.foundation smdlisp.elaborator smd.fixpoint
+)
