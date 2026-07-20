@@ -297,7 +297,8 @@ constexpr auto elaborate_function_position(
 /// Elaborates a datum list into a core form.
 ///
 /// Recognizes the special operators `quote`, `if`, `progn`, `let`, `let*`,
-/// `lambda`, and `function` by inspecting the leading symbol (folded
+/// `lambda`, `function`, `setq`, `defun`, `defvar`, and `defparameter` (the
+/// last four added in step L12) by inspecting the leading symbol (folded
 /// spellings, per decision D2). Any other head is an ordinary application,
 /// whose head is elaborated through @ref elaborate_function_position (a
 /// bare symbol resolves in the FUNCTION namespace; a `(lambda ...)` head is
@@ -597,6 +598,106 @@ constexpr auto elaborate_list(
 
             return nested;
         }
+
+        if (name == "SETQ") {
+            if (lst.elements.size() != 3)
+                return smdscheme::foundation::parse_error{
+                    {}, "setq: expected name and value"};
+
+            auto const &name_node = datum_arena.get(lst.elements[1]);
+            if (!std::holds_alternative<reader::datum_symbol>(name_node.inner))
+                return smdscheme::foundation::parse_error{
+                    {}, "setq: name must be a symbol"};
+
+            auto val_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[2]), datum_arena, core_arena);
+            if (!val_r.has_value())
+                return val_r;
+
+            return core{core_f{core_setq<core, MaxNodes>{
+                std::get<reader::datum_symbol>(name_node.inner).name.view(),
+                smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(val_r.value()))}}};
+        }
+
+        if (name == "DEFUN") {
+            // (defun name (formals...) body...)
+            if (lst.elements.size() < 4)
+                return smdscheme::foundation::parse_error{
+                    {},
+                    "defun: expected name, formals, and at least one body "
+                    "expression"};
+
+            auto const &name_node = datum_arena.get(lst.elements[1]);
+            if (!std::holds_alternative<reader::datum_symbol>(name_node.inner))
+                return smdscheme::foundation::parse_error{
+                    {}, "defun: name must be a symbol"};
+            auto fn_name =
+                std::get<reader::datum_symbol>(name_node.inner).name.view();
+
+            // Reuse elaborate_lambda's formals/body parsing (duplicate
+            // -parameter check, formal-is-symbol check, body elaboration)
+            // by presenting it a synthetic "(<unused> (formals...)
+            // body...)" list built from defun's own elements, shifted by
+            // one: elaborate_lambda never reads element 0's content, only
+            // element 1 (formals) and elements 2.. (body).
+            DatumList shifted{};
+            shifted.elements.push_back(lst.elements[0]);
+            shifted.elements.push_back(lst.elements[2]);
+            for (int i = 3; i < lst.elements.size(); ++i)
+                shifted.elements.push_back(lst.elements[i]);
+
+            auto lam_r = elaborate_lambda<MaxNodes, MaxList>(
+                shifted, datum_arena, core_arena);
+            if (!lam_r.has_value())
+                return lam_r;
+
+            return core{core_f{core_defun<core, MaxNodes>{
+                fn_name, smdscheme::foundation::make_arena_box(
+                             core_arena, std::move(lam_r.value()))}}};
+        }
+
+        if (name == "DEFVAR") {
+            if (lst.elements.size() != 3)
+                return smdscheme::foundation::parse_error{
+                    {}, "defvar: expected name and value"};
+
+            auto const &name_node = datum_arena.get(lst.elements[1]);
+            if (!std::holds_alternative<reader::datum_symbol>(name_node.inner))
+                return smdscheme::foundation::parse_error{
+                    {}, "defvar: name must be a symbol"};
+
+            auto val_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[2]), datum_arena, core_arena);
+            if (!val_r.has_value())
+                return val_r;
+
+            return core{core_f{core_defvar<core, MaxNodes>{
+                std::get<reader::datum_symbol>(name_node.inner).name.view(),
+                smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(val_r.value()))}}};
+        }
+
+        if (name == "DEFPARAMETER") {
+            if (lst.elements.size() != 3)
+                return smdscheme::foundation::parse_error{
+                    {}, "defparameter: expected name and value"};
+
+            auto const &name_node = datum_arena.get(lst.elements[1]);
+            if (!std::holds_alternative<reader::datum_symbol>(name_node.inner))
+                return smdscheme::foundation::parse_error{
+                    {}, "defparameter: name must be a symbol"};
+
+            auto val_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[2]), datum_arena, core_arena);
+            if (!val_r.has_value())
+                return val_r;
+
+            return core{core_f{core_defparameter<core, MaxNodes>{
+                std::get<reader::datum_symbol>(name_node.inner).name.view(),
+                smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(val_r.value()))}}};
+        }
     }
 
     // Ordinary application: the head resolves in the FUNCTION namespace
@@ -701,7 +802,8 @@ constexpr auto elaborate_node(
 /// This is the public entry point for the elaboration phase: it converts
 /// the raw datum from the reader into a typed core expression, classifying
 /// the special operators `quote`, `if`, `progn`, `let`, `let*`, `lambda`,
-/// and `function`, and emitting errors for malformed input.
+/// `function`, `setq`, `defun`, `defvar`, and `defparameter`, and emitting
+/// errors for malformed input.
 ///
 /// @tparam MaxNodes Arena capacity.
 /// @tparam MaxList  Maximum list/argument length.
