@@ -1,4 +1,4 @@
-# DIV-0005: `defvar`/`defparameter` require a value form; no docstring support
+# DIV-0006: `defvar`/`defparameter` require a value form; no docstring support
 
 - **Status:** accepted-permanent
 - **Date:** 2026-07-20
