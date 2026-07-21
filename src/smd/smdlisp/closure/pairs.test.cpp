@@ -190,6 +190,58 @@ static_assert([] {
     return r.has_value() && std::holds_alternative<nil_t>(r.value());
 }());
 
+static_assert([] {
+    // (append '(1 2) '(3 4)) = (1 2 3 4). Step L18: append backs ,@
+    // unquote-splicing in backquote templates.
+    pair_heap<dummy_core, 16> heap;
+    // Build '(3 4) bottom-up.
+    val lst2{nil_t{}};
+    std::array<val, 2> c2b{val{4}, lst2};
+    lst2 = apply_prim<dummy_core>(list_op::cons, c2b, &heap).value();
+    std::array<val, 2> c2a{val{3}, lst2};
+    lst2 = apply_prim<dummy_core>(list_op::cons, c2a, &heap).value();
+
+    val lst1{nil_t{}};
+    std::array<val, 2> c1b{val{2}, lst1};
+    lst1 = apply_prim<dummy_core>(list_op::cons, c1b, &heap).value();
+    std::array<val, 2> c1a{val{1}, lst1};
+    lst1 = apply_prim<dummy_core>(list_op::cons, c1a, &heap).value();
+
+    std::array<val, 2> append_args{lst1, lst2};
+    auto appended = apply_prim<dummy_core>(list_op::append, append_args, &heap);
+    if (!appended.has_value())
+        return false;
+
+    std::array<val, 1> a1{appended.value()};
+    auto car1 = apply_prim<dummy_core>(list_op::car, a1, &heap).value();
+    auto cdr1 = apply_prim<dummy_core>(list_op::cdr, a1, &heap).value();
+    std::array<val, 1> a2{cdr1};
+    auto car2 = apply_prim<dummy_core>(list_op::car, a2, &heap).value();
+    auto cdr2 = apply_prim<dummy_core>(list_op::cdr, a2, &heap).value();
+    std::array<val, 1> a3{cdr2};
+    auto car3 = apply_prim<dummy_core>(list_op::car, a3, &heap).value();
+    auto cdr3 = apply_prim<dummy_core>(list_op::cdr, a3, &heap).value();
+    std::array<val, 1> a4{cdr3};
+    auto car4 = apply_prim<dummy_core>(list_op::car, a4, &heap).value();
+    auto cdr4 = apply_prim<dummy_core>(list_op::cdr, a4, &heap).value();
+
+    return std::holds_alternative<int>(car1) && std::get<int>(car1) == 1 &&
+           std::holds_alternative<int>(car2) && std::get<int>(car2) == 2 &&
+           std::holds_alternative<int>(car3) && std::get<int>(car3) == 3 &&
+           std::holds_alternative<int>(car4) && std::get<int>(car4) == 4 &&
+           std::holds_alternative<nil_t>(cdr4);
+}());
+
+static_assert([] {
+    // (append nil '(1 2)) = '(1 2): appending onto nil is just the tail.
+    pair_heap<dummy_core, 8> heap;
+    std::array<val, 2> lst_args{val{1}, val{2}};
+    auto lst = apply_prim<dummy_core>(list_op::list, lst_args, &heap).value();
+    std::array<val, 2> append_args{val{nil_t{}}, lst};
+    auto r = apply_prim<dummy_core>(list_op::append, append_args, &heap);
+    return r.has_value() && r.value() == lst;
+}());
+
 } // namespace
 
 TEST_CASE("PairsTest - HeaderIsIdempotent") { REQUIRE(true); }
@@ -323,5 +375,60 @@ TEST_CASE("PairsTest - ConsWithoutHeapIsError") {
     std::array<val, 2> args{val{1}, val{2}};
     auto r = apply_prim<dummy_core>(
         list_op::cons, args, static_cast<pair_heap<dummy_core, 4> *>(nullptr));
+    REQUIRE_FALSE(r.has_value());
+}
+
+TEST_CASE("PairsTest - AppendCopiesFirstListOntoSecond") {
+    pair_heap<dummy_core, 8> heap;
+    std::array<val, 2> lst1_args{val{1}, val{2}};
+    auto lst1 = apply_prim<dummy_core>(list_op::list, lst1_args, &heap).value();
+    std::array<val, 1> lst2_args{val{3}};
+    auto lst2 = apply_prim<dummy_core>(list_op::list, lst2_args, &heap).value();
+    std::array<val, 2> append_args{lst1, lst2};
+    auto r = apply_prim<dummy_core>(list_op::append, append_args, &heap);
+    REQUIRE(r.has_value());
+
+    std::array<val, 1> a1{r.value()};
+    auto car1 = apply_prim<dummy_core>(list_op::car, a1, &heap).value();
+    auto cdr1 = apply_prim<dummy_core>(list_op::cdr, a1, &heap).value();
+    std::array<val, 1> a2{cdr1};
+    auto car2 = apply_prim<dummy_core>(list_op::car, a2, &heap).value();
+    auto cdr2 = apply_prim<dummy_core>(list_op::cdr, a2, &heap).value();
+    std::array<val, 1> a3{cdr2};
+    auto car3 = apply_prim<dummy_core>(list_op::car, a3, &heap).value();
+    auto cdr3 = apply_prim<dummy_core>(list_op::cdr, a3, &heap).value();
+    REQUIRE(std::get<int>(car1) == 1);
+    REQUIRE(std::get<int>(car2) == 2);
+    REQUIRE(std::get<int>(car3) == 3);
+    REQUIRE(std::holds_alternative<nil_t>(cdr3));
+
+    // The original first-argument list is untouched: append copies its
+    // spine rather than mutating cdr in place.
+    std::array<val, 1> orig{lst1};
+    auto orig_cdr1 = apply_prim<dummy_core>(list_op::cdr, orig, &heap).value();
+    std::array<val, 1> orig2{orig_cdr1};
+    auto orig_cdr2 = apply_prim<dummy_core>(list_op::cdr, orig2, &heap).value();
+    REQUIRE(std::holds_alternative<nil_t>(orig_cdr2));
+}
+
+TEST_CASE("PairsTest - AppendWrongArityIsError") {
+    pair_heap<dummy_core, 4> heap;
+    std::array<val, 1> args{val{nil_t{}}};
+    auto r = apply_prim<dummy_core>(list_op::append, args, &heap);
+    REQUIRE_FALSE(r.has_value());
+}
+
+TEST_CASE("PairsTest - AppendWithoutHeapIsError") {
+    std::array<val, 2> args{val{nil_t{}}, val{nil_t{}}};
+    auto r = apply_prim<dummy_core>(
+        list_op::append, args,
+        static_cast<pair_heap<dummy_core, 4> *>(nullptr));
+    REQUIRE_FALSE(r.has_value());
+}
+
+TEST_CASE("PairsTest - AppendFirstArgumentMustBeProperList") {
+    pair_heap<dummy_core, 4> heap;
+    std::array<val, 2> args{val{42}, val{nil_t{}}};
+    auto r = apply_prim<dummy_core>(list_op::append, args, &heap);
     REQUIRE_FALSE(r.has_value());
 }

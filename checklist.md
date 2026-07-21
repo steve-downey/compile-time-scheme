@@ -84,7 +84,7 @@
 - [ ] Step L15: catch / throw / unwind-protect (+ phase 19 draft)
 - [ ] Step L16: special variables and dynamic binding
 - [x] Step L17: macro expander with host macros
-- [ ] Step L18: backquote
+- [x] Step L18: backquote
 - [ ] Step L19: defmacro (+ phase 20 draft)
 - [ ] Step L20: multiple values
 - [ ] Step L21: sender backend for the CL core (+ phase 21 draft)

@@ -17,16 +17,18 @@ namespace smd::smdlisp::closure {
 ///
 /// Step L9 (the Lisp-2 environment) needs one tag type it can install into
 /// the *function* namespace for every default builtin, so this enum is the
-/// superset covering arithmetic (`add`, `multiply`) and the step L8 list
-/// primitives — `cons`, `car`, `cdr`, `list`, `null`, `eq`, `eql`, `atom`,
-/// named identically to `pairs.hpp`'s `list_op` — plus `funcall` and
-/// `apply`.  `pairs.hpp::apply_prim` still consumes its own `list_op`; the
-/// two enums are deliberately kept as separate types rather than merged,
-/// because `pairs.hpp` includes `value.hpp` (for `value<Core>`), so
-/// `value.hpp` naming `list_op` back would be a header cycle.  A later
-/// evaluator step (L10/L11) bridges the two over their shared names.
-/// `funcall` and `apply` have no `apply_prim` case: invoking a closure
-/// value needs the evaluator itself, not just value-level plumbing.
+/// superset covering arithmetic (`add`, `multiply`) and the list primitives
+/// — `cons`, `car`, `cdr`, `list`, `null`, `eq`, `eql`, `atom` (step L8), and
+/// `append` (step L18, added to support `,@` unquote-splicing in backquote
+/// templates) — named identically to `pairs.hpp`'s `list_op` — plus
+/// `funcall` and `apply`.  `pairs.hpp::apply_prim` still consumes its own
+/// `list_op`; the two enums are deliberately kept as separate types rather
+/// than merged, because `pairs.hpp` includes `value.hpp` (for
+/// `value<Core>`), so `value.hpp` naming `list_op` back would be a header
+/// cycle.  A later evaluator step (L10/L11) bridges the two over their
+/// shared names.  `funcall` and `apply` have no `apply_prim` case: invoking
+/// a closure value needs the evaluator itself, not just value-level
+/// plumbing.
 enum class builtin_op {
     add,
     multiply,
@@ -38,6 +40,7 @@ enum class builtin_op {
     eq,
     eql,
     atom,
+    append,
     funcall,
     apply
 };

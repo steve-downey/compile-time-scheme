@@ -1,227 +1,142 @@
-# Next steps: Common Lisp pivot, Step L13 (spine, Track A) and Step L18 (backquote, Track C)
+# Next step: Common Lisp pivot, Step L19 (`defmacro`, Track C)
 
-> **2026-07-20 update (orchestrator):** L12 (`cl-pivot/l12-setq-defun`) and L17 (`cl-pivot/l17-macroexpand`)
-> both landed on `main` this round, run in parallel in sibling worktrees — see `handoff.md`'s
-> "Step L12: `setq`, `defun`, `defvar`, `defparameter` landed" and "Step L17: macro expander with host macros
-> landed" sections. That satisfies the dependencies of the next two steps:
+> **2026-07-21 update:** Step L18 (backquote, `cl-pivot/l18-backquote`) landed — see `handoff.md`'s
+> "Step L18: backquote landed" section. That satisfies L19's stated dependency ("Dependencies: L18 (and
+> transitively L11)").
 >
-> - **Step L13 (CPS closure backend, spine / Track A) depends on L12** — now satisfied.
-> - **Step L18 (backquote, Track C) depends on L17** — now satisfied.
+> **Status of L13 (CPS closure backend, Track A/spine) is unknown to this handoff.** L13 was dispatched to run
+> concurrently with L18 in a sibling worktree, touching `src/smd/smdlisp/closure/` (new `cps_code.hpp`/
+> `closure_program.hpp` + tests). L18 also touched `src/smd/smdlisp/closure/` (additive only: a new
+> `builtin_op::append`/`list_op::append`, a new `to_list_op` bridge case, a new `default_env` builtin install —
+> see `handoff.md`'s L18 section). Whoever picks up L19 should check whether L13 has landed on `main` yet
+> before starting (`git log --oneline main` or ask the orchestrator) and branch off current `main` either way;
+> if L13 hasn't landed, L19 depends on L11/L18 only and does not need to wait, per the plan's parallelism
+> summary (Track C runs parallel to L14-L16, and by extension is independent of L13's spine work — only the
+> `closure/` file lane might need a small merge at integration, same story L18 already went through cleanly).
 >
-> These two steps are in **disjoint file lanes** (L13 in `src/smd/smdlisp/closure/`; L18 in
-> `src/smd/smdlisp/reader/` + `src/smd/smdlisp/macroexpand/`, with one shared `append`-builtin touch to
-> `closure/` — see the coordination note in Part 2), so they are **parallel-eligible**, exactly as L12/L17
-> were: dispatch one worker per step, each in its own worktree off current `main`. This file has a section per
-> step; whoever picks up a step should read only their own Part plus "Standing constraints (apply to both)" at
-> the end.
->
-> **Divergence numbering:** DIV-0001..DIV-0006 are now taken. DIV-0005 = L17's macroexpand hygiene/walk cuts;
-> DIV-0006 = L12's `defvar`/`defparameter` value-form requirement. **Next free number is DIV-0007** — but
-> re-check `docs/divergences/` immediately before filing, since L13 and L18 may again run concurrently and
-> either could claim DIV-0007 first; the second to land renumbers.
+> **Divergence numbering:** DIV-0001..DIV-0007 are now taken (DIV-0007 = L18's nested-backquote/`append`-arity
+> scope cuts). **Next free number is DIV-0008** — re-check `docs/divergences/` immediately before filing, since
+> L13 (if still in flight) could file its own divergence doc concurrently and claim a number first.
 
 ---
 
-# Part 1 — Step L13: CPS closure backend for the baseline (spine, Track A)
+## What L18 landed, that L19 builds on
 
-### What L13 needs from L12 (just landed)
+Read `handoff.md`'s "Step L18: backquote landed" section in full before starting. The essentials:
 
-L12 added four new elaborated-core kinds (`core_setq`, `core_defun`, `core_defvar`, `core_defparameter`,
-all in `src/smd/smdlisp/elaborator/elaborated_core.hpp`) and their `eval_direct.hpp` evaluator cases. Read
-`handoff.md`'s "Step L12" section in full before starting; the essentials L13 will lean on directly:
+- **Reader: three new datum kinds** (`reader::datum_backquote<R,MaxNodes>{templ}`,
+  `reader::datum_unquote<R,MaxNodes>{target}`, `reader::datum_unquote_splice<R,MaxNodes>{target}`), lowering
+  `` ` ``/`,`/`,@` syntax — the datum tree's variant is now 9 alternatives, not 6. `` ` ``, `,`, and `,@` are all
+  terminating macro characters now (`cl_chars.hpp`).
+- **Macroexpand: `expand_backquote_template` (`macroexpand/expander.hpp`) lowers a backquote template into an
+  ordinary `CONS`/`APPEND`/`QUOTE` call-form datum tree**, e.g. `` `(a ,x ,@ys) `` → `(CONS (QUOTE A) (CONS X
+  (APPEND YS NIL)))`. `expand()`'s whole-tree walk was extended with a new case: a `datum_backquote` node is
+  lowered, then the lowered result is walked by `expand()` itself (recursively) so any macro call sitting in an
+  unquoted position still gets expanded, and the lowered form's synthesized `(QUOTE ...)` sub-forms
+  automatically hit the pre-existing "never walk into QUOTE's argument" rule with no new logic needed for that
+  half. A bare `,`/`,@` with no enclosing backquote is a diagnosed error, not a silent pass-through.
+- **`append` joined the builtin set** (`closure::builtin_op::append`, `closure::list_op::append`,
+  `detail::append_impl` in `pairs.hpp`, a `to_list_op` bridge case and dispatch-switch arm in `eval_direct.hpp`,
+  an `"APPEND"` install in `env.hpp`'s `default_env`). **Per DIV-0007, `append` is two-argument only** — not
+  ANSI CL's variadic form. If `defmacro`-defined macros end up wanting to call `append` with more than two
+  arguments (unlikely, since backquote's own lowering never needs more than two), widen `apply_prim`'s `append`
+  case to a `std::span` fold rather than assuming the two-argument signature is permanent.
+- **Nested backquote is NOT supported** (DIV-0007): a `` ` `` template appearing inside another backquote
+  template is treated as opaque literal data (wrapped in `QUOTE`), not re-expanded at its own comma-nesting
+  level. If any `defmacro`-defined macro body needs a backquote template that itself contains another
+  backquote, this will either silently do nothing useful (if the inner template has no `,`/`,@`) or produce a
+  diagnosed `"quote: unsupported datum"` elaboration error (if it does) — not silently wrong evaluation, but
+  also not supported. Revisit DIV-0007 if this bites.
+- **No gensym / hygiene machinery was built this step**, despite L17's DIV-0005 explicitly flagging L18/L19 as
+  the natural place for it (`or`/`case`'s `%OR-TMP`/`%CASE-KEY` fixed temp names are still not hygienic). L18's
+  backquote lowering does not itself need fresh symbols (every synthesized name — `CONS`, `QUOTE`, `APPEND`,
+  `NIL` — is a fixed, meaningful spelling, not a gensym'd temp), so building gensym infrastructure was not
+  forced by this step and was left for whoever needs it first. **`defmacro`-defined macros are exactly where
+  user code is most likely to need `gensym`** (a macro-writer avoiding variable capture in its own expansion,
+  the same problem `or`/`case`'s host macros have but user-authored instead of host-authored) — if L19's own
+  merge criteria don't strictly require it, consider whether to build it now (an uninterned-symbol kind, or
+  just a counter-suffixed interned-symbol scheme as a documented scope cut) or file a divergence doc explaining
+  why it's deferred again.
+- **Symbol-matching pattern, still the same one to reuse:** compare `reader::folded_name::view()` against a
+  `std::string_view` literal (`sym.name.view() == "DEFMACRO"`), exactly as `elaborate_list`/`expand()`/every
+  host macro in `expander.hpp` already do.
 
-- **`core_type`'s variant gained four kinds this step** (`core_setq`, `core_defun`, `core_defvar`,
-  `core_defparameter`) on top of L10's set. **A CPS/closure-compilation pass that pattern-matches on
-  `core_type`'s variant needs a case for every kind, including these four** — the plan's own merge criterion
-  ("every L11/L12 end-to-end test also passes through `compile_to_closure`") makes this explicit: L12's
-  evaluator-level tests (`setq`/`defun`/`defvar`/`defparameter`) need matching CPS/closure coverage, not just
-  L11's.
-- **`env`'s mutable-mode / `store` machinery (`env.hpp`, from L12) is what makes `setq`/`defun`
-  self-recursion work at the tree-walking-evaluator level.** Whatever runtime environment representation the
-  CPS/closure backend uses at *its* layer (which may or may not be the same `closure::env` type — check
-  `smd::smdscheme::closure::cps_code.hpp`/`closure_program.hpp` for how the Scheme backend's CPS layer
-  represents environments/`store`s before assuming `smdlisp`'s `env`/`store` port over unchanged) needs an
-  equivalent mutation story for `setq` to work through CPS, and an equivalent reserve-then-patch (or some
-  other self-reference mechanism) for `defun` self-recursion to work through CPS. Do not assume this is free
-  just because the direct evaluator already has it — CPS conversion of a mutable-store-backed interpreter is
-  a real design question, not a mechanical port, and the Scheme original's own `begin`/`set!` CPS wiring
-  (which the plan explicitly points at as "the pattern") is the concrete reference to read first.
-- **`eval_direct`'s `environment` parameter is `env<...>&` (mutable), not `const&`, as of L12** — this
-  was the mechanism that made top-level sequencing "just work" via `core_progn` without any new plumbing (see
-  `handoff.md`'s L12 section, "Top-level sequencing decision"). If the CPS/closure backend has its own
-  environment-threading discipline, check whether it has (or needs) the analogous "the same environment
-  object, not a copy, flows through a `progn`'s sequenced continuations" property — this is likely inherent to
-  how CPS naturally threads state through continuations, but confirm rather than assume, since it is exactly
-  what let `defun` inside a `progn` see itself later in the same `progn`.
-- **`defun` returns the function name (a `closure::symbol`); `setq` returns the assigned value; `defvar`/
-  `defparameter` return the variable name (a `closure::symbol`).** All ANSI CL return-value behaviors, not
-  Scheme conventions (Scheme's `define`/`set!`/`begin` mostly return an `unspecified` value the Scheme
-  original's CPS backend does not have to thread meaningfully) — the CPS backend's compiled representation of
-  these four forms needs to produce these specific values as their continuation's argument, not `unspecified`
-  or any other placeholder.
-- **A durable lifetime lesson repeated at every layer so far (L10, L11): a `value<Core>`'s `symbol`/`keyword`
-  hold a bare `std::string_view`, not an owned spelling.** Any CPS/closure-compiled representation that
-  produces a `symbol`/`keyword` value (e.g. `defun`'s return value, or a quoted symbol/keyword) needs to keep
-  whatever it points into (a core node, an arena) alive for as long as the produced value might be inspected.
-  Read L10's and L11's handoff entries for the exact shape of this bug before writing any new test helper that
-  returns a value out of a function.
+## What L19 needs to build (plan section 9, step L19)
 
-### What L13 needs from L10/L11 (unchanged)
+> Object-language macros: `defmacro` registers a macro whose expander is a compiled closure run by the
+> **compile-time evaluator** during the expansion pass, receiving the macro call as list values (L8) and
+> returning a value that is reified back into the datum arena. This is the "compiler running the language it
+> compiles, at compile time" milestone; the datum⇄value reification pair is the new machinery.
+> Merge criteria: a `defmacro`-defined `my-when` behaves identically to the host `when`; expansion-budget error
+> test.
+> Deliverable: blog phase 20 draft.
+> Dependencies: L18 (and transitively L11).
 
-Not re-explained here — read `handoff.md`'s "Step L10" and "Step L11" sections — but headline facts: the
-direct evaluator (`eval_direct.hpp`) is the semantic reference implementation; the CPS/closure backend must
-match its observable behavior exactly (same merge criteria, same error messages where the plan's merge
-criteria check them). `apply_function_value` is the single call-dispatch point in the direct evaluator; if the
-CPS backend needs an analogous single dispatch point, it likely needs its own version rather than reusing
-`apply_function_value` directly (CPS calling convention differs from direct evaluation's call/return).
+Read this literally: it names a **new kind of bridge** that nothing before this step has needed —
+**datum-to-value** (turning a macro call's argument list, currently a `reader::datum_list` of `arena_box`
+handles, into a `closure::value<Core>` list built of `pair_ref`/`cons` cells, so `eval_direct` can pass it as an
+ordinary argument to the macro's compiled closure) and **value-to-datum** (the reverse: taking whatever
+`value<Core>` the macro's closure body returns — presumably itself a cons-cell list structure, since a macro
+expander returns code-as-data — and "reifying" it back into a fresh `reader::datum_type` node in the datum
+arena, so `expand()`'s ordinary walk can keep processing the result exactly like a host macro's return value).
+Neither direction exists anywhere in the codebase yet:
 
-### Merge criteria (plan section 9, step L13)
+- `elaborate_quoted_datum` (elaborator) goes datum → **core** (compile-time AST), not datum → **value**
+  (runtime). A `defmacro` expansion needs to happen *before* elaboration (D9: macro expansion is a datum-to-
+  datum pass), so going through the elaborator + `eval_direct` for every macro call would work but produces a
+  `value<Core>`, which is the right target — this is likely the correct reuse (elaborate the call's argument
+  forms as if they were quoted data, i.e. run them through something `elaborate_quoted_datum`-shaped, then
+  `eval_direct` the result) rather than inventing a third lowering path.
+- The reverse (value → datum) is genuinely new: nothing today ever turns a runtime `value<Core>` (an `int`,
+  `symbol`, `keyword`, `pair_ref` chain, etc.) back into a `reader::datum_type` node. Sketch: `int` →
+  `datum_integer`; `symbol`/`keyword` → `datum_symbol`/`datum_keyword` (careful with `folded_name` ownership —
+  see the recurring lifetime lesson below); `nil_t` → the bare `NIL` symbol datum (matching how `NIL`
+  round-trips as data elsewhere in this codebase, not a special "empty datum list" kind); `pair_ref` → walk the
+  cons chain via the environment's `pair_heap` and build a `datum_list`, erroring on an improper (non-`nil`-
+  terminated) list since the datum tree has no dotted-pair form (D6); `closure`/`builtin`/`foreign_function` →
+  there is no sensible datum representation for these (a macro should never *return* a function value as
+  literal code) — a diagnosed error is the right behavior, not a crash or silent nonsense.
 
-> Every L11/L12 end-to-end test also passes through `compile_to_closure`.
+**A durable lifetime lesson repeated at every layer so far (L10 for `core_symbol`/`core_keyword`, L11 for
+`closure::symbol`/`closure::keyword`): watch where a reified `datum_symbol`/`datum_keyword`'s `folded_name`
+comes from.** `closure::symbol`/`closure::keyword` hold a bare `std::string_view name`, not an owned spelling
+(L11's handoff section explains why this was deliberately deferred). Building a `reader::folded_name` for a
+reified datum node from that view is safe (folded_name owns its own storage — copying a view into it is fine),
+but only if the `string_view` itself is still valid at the moment of the copy; if a macro's compiled closure
+returns a symbol/keyword value whose `string_view` traces back to something that could have gone out of scope
+(the same class of bug L10/L11 hit and fixed), the reification step needs to be the one that's careful, since
+nothing upstream of it enforces this anymore.
 
-This is a broad criterion, not a single expression: it means the CPS/closure backend needs enough coverage to
-re-run (or equivalently re-express) L11's and L12's existing `eval_direct.test.cpp`/`elaborate.test.cpp`
-scenarios through whatever `compile_to_closure`-equivalent entry point this step builds, not just add one new
-narrow test. Read `src/smd/smdscheme/closure/{cps_code.hpp,closure_program.hpp}`
-(the Scheme CL-pivot's own already-landed CPS backend, frozen but readable) before designing `smdlisp`'s
-version — the plan explicitly says "adapted from the Scheme CPS backend per the architecture in
-`docs/cps-direction.md`."
-
-### Standing constraints for L13
+## Standing constraints for L19
 
 - `src/smd/smdscheme/**` is frozen for semantic changes (D1). Read-only reference, never edit.
-- New/changed files land in `src/smd/smdlisp/closure/` (new `cps_code.hpp`/`closure_program.hpp` + tests,
-  possibly further `eval_direct.hpp`/`env.hpp` touch-ups if a genuine bug is found, matching L11's and L12's
-  own precedent of touching pre-existing closure/ files when a step's own new code needs it). Do not touch
-  `src/smd/smdlisp/reader/` or `src/smd/smdlisp/macroexpand/` (the latter is Track C's lane; L18 is running
-  there, possibly concurrently).
+- New/changed files land primarily in `src/smd/smdlisp/macroexpand/` (the `defmacro` registration mechanism,
+  the datum⇄value reification pair, wiring into `expand()`/`expand_and_elaborate`) and likely
+  `src/smd/smdlisp/closure/` (if the datum→value half needs a helper alongside `eval_direct.hpp`/`pairs.hpp`
+  rather than being purely local to `macroexpand/`). Check whether L13 has landed before editing `closure/`;
+  if it has, read its handoff section first so a new small helper doesn't collide with L13's own additions.
+  Avoid touching `src/smd/smdlisp/elaborator/` unless something in `defmacro`'s design genuinely forces it —
+  L17 and L18 both needed zero elaborator changes, and the plan's phrasing ("compile-time evaluator," "reified
+  back into the datum arena") suggests L19 shouldn't either, but confirm rather than assume.
 - Keep C++26/GCC16 baseline; tests use Catch2; mirror file prolog / include guard / canonical-include
   conventions already used throughout `src/smd/smdlisp/`.
 - File a divergence doc under `docs/divergences/` (`TEMPLATE.md` skeleton) for anything done differently than
-  the plan specifies, or any knowing ANSI CL deviation. **Next free number is DIV-0007** — re-check
-  `docs/divergences/` immediately before filing; if L18 (or anyone) landed a number first, renumber to stay
-  unique.
-- **This step has a blog deliverable: phase 18**, per the plan's phase table. Follow L6/L10/L11's precedent
-  for authoring `#+transclude:` orgit links against this step's own worktree path (see the "Standing
-  constraints" section below and `docs/divergences/DIV-0004-orgit-transclusion-worktree-path.md`'s now-standing
-  convention) — the orchestrator repoints them to `main` after merge.
-- Before handoff: `make compile`, `make test`, `make lint`, and (since this step has a blog deliverable)
-  `make blog-md`, checking that only phase 18's `.md` and `index.md`/`index.org` show real content diffs (see
-  the org-markup footguns noted below).
-- Do not continue past L13 into L14 (`block`/`return-from`) unless blocked; if blocked, document the blocker
-  here instead.
-
----
-
-# Part 2 — Step L18: backquote (Track C)
-
-### What L17 landed, that L18 builds on
-
-Read `handoff.md`'s "Step L17" section in full before starting. The essentials:
-
-- **Pipeline shape:** `src/smd/smdlisp/macroexpand/expander.hpp` is a datum-to-datum pass between the reader
-  and the elaborator (decision D9). `expand_and_elaborate<MaxNodes, MaxList>(pd, datum_arena, core_arena,
-  table, max_expansions) -> result<core_type>` is the pipeline entry point: `expand()` (whole-tree macro walk)
-  then `elaborator::elaborate()`. `expand()` writes every new node into the *same* datum arena the reader
-  already populated — no second arena. This is almost certainly the integration point L18's backquote
-  expansion should also go through, or at minimum should be consistent with: backquote's job (per the plan)
-  is "lowering to datum template nodes, and an expansion of templates into `cons`/`list`/`append` builds
-  during macro expansion" — i.e. backquote expansion is itself a form of datum-to-datum rewriting that
-  presumably belongs in this same pass, or a closely related one that runs at the same pipeline stage.
-- **Macro registry API, already built and exercised by six macros:** `host_macro<MaxNodes, MaxList>{name,
-  expand_fn}` where `expand_fn` is a real function pointer `macro_fn<MaxNodes, MaxList>` (call-form datum in,
-  replacement datum out, writing into the shared arena), collected in a `macro_table<MaxNodes,
-  MaxList>` (`static_vector`, capacity `max_host_macros = 16`, currently holding 6 entries via
-  `default_macro_table<MaxNodes, MaxList>()`). `macroexpand_1`/`macroexpand` operate at one expression's head
-  position only (matching ANSI CL's own `macroexpand-1`/`macroexpand` exactly); `expand()` is the whole-tree
-  recursive walk that actually makes macros fire everywhere they're used, not just at the top level.
-- **`expand()`'s one special case is `QUOTE`:** a list headed by the symbol `QUOTE` is never walked into (its
-  argument is literal data). **Backquote needs the equivalent treatment done *correctly*, which is the whole
-  point of L18:** unlike `quote`, backquote's body is *mostly* literal data but selectively re-admits code at
-  `,`/`,@` positions. If L18 adds new datum kinds for backquote/unquote/unquote-splicing (the plan says
-  "Reader support for `` ` ``, `,`, `,@` lowering to datum template nodes" — this sounds like new
-  `reader::datum_*` kinds, i.e. a **reader-layer change**, not purely a macroexpand-layer one), `expand()`'s
-  walk will need to know how to handle those new kinds too: walking into `,`/`,@` positions (code) while
-  leaving the surrounding backquote template alone (data), analogous to how it already handles `QUOTE`
-  specially but with finer granularity.
-- **DIV-0005 is filed** (`docs/divergences/DIV-0005-macroexpand-not-hygienic-or-form-aware.md`) for two scope
-  cuts from L17, both potentially relevant to L18/L19:
-  1. **No gensym.** `or`/`case`'s host-macro expansions use fixed, ordinary (interned) temp-variable spellings
-     (`%OR-TMP`, `%CASE-KEY`), not hygienic fresh names, because there is no uninterned-symbol machinery yet.
-     **The plan explicitly schedules gensym-equivalent machinery for L18/L19** (backquote/`defmacro`) — if you
-     build any kind of fresh-symbol generator as part of L18, DIV-0005's revisit condition says to reconsider
-     whether `or_expand`/`case_expand` in `expander.hpp` should switch to it. Not required for L18's own merge
-     criteria, but worth a look since the machinery would be sitting right there.
-  2. **`expand()`'s whole-tree walk is special-form-agnostic** (recognizes only `QUOTE`, nothing else) — see
-     above; this is the mechanism you'll likely need to extend or parallel for backquote's data/code boundary.
-- **Symbol matching pattern, reused throughout `expander.hpp`:** compare `reader::folded_name::view()` (or a
-  `datum_symbol`'s `.name.view()`) against a `std::string_view` literal, e.g. `sym.name.view() == "QUOTE"`.
-  Reuse this, don't invent a new comparison mechanism, matching what L17 did and what the elaborator already
-  does.
-- **Building new datum/list structure from scratch:** `expander.hpp`'s `detail::make_symbol`/
-  `detail::make_symbol_box` helpers (build a fresh `datum_symbol` node from a string literal, folding via
-  `reader::detail::fold`, and allocate it into the arena) are a reusable pattern if L18 needs to synthesize
-  `CONS`/`LIST`/`APPEND` call forms the way L17's macros synthesize `IF`/`PROGN`/`LET` calls. Worth reading
-  `cond_expand`/`or_expand`/`case_expand` in `expander.hpp` as worked examples of "build a new list datum by
-  hand, reusing existing `arena_box` handles where possible instead of copying subexpressions."
-
-### What L18 needs to build (plan section 9, step L18)
-
-> Reader support for `` ` ``, `,`, `,@` lowering to datum template nodes, and an expansion of templates into
-> `cons`/`list`/`append` builds during macro expansion. `append` joins the builtin set.
-> Merge criteria: `` `(a ,x ,@ys) `` expansion tests at both datum and value level.
-> Dependencies: L17.
-
-Read this literally: it names **two** pipeline stages, not one — "reader support ... lowering to datum
-template nodes" (new reader-level datum kinds recognizing `` ` ``/`,`/`,@` syntax) and "an expansion of
-templates into `cons`/`list`/`append` builds during macro expansion" (the actual backquote-to-code lowering,
-which sounds like it belongs in or alongside `src/smd/smdlisp/macroexpand/`, per this step's constraint list
-below). This is very likely a two-file-or-more step touching **both** `src/smd/smdlisp/reader/` (new datum
-kind(s) for backquote/unquote/unquote-splicing, mirroring how L6 added `datum_quote`/`datum_function` for
-`'`/`#'`) and `src/smd/smdlisp/macroexpand/` (the template-to-`cons`/`list`/`append` expansion, alongside or
-integrated with L17's `expand()`). Check whether this is better modeled as new `datum_*` node kinds (like
-`datum_quote`) or whether backquote can be read as ordinary lists headed by synthetic markers — the plan's own
-phrasing ("lowering to datum template nodes") suggests genuine new node kinds, analogous to L6's
-`datum_function` for `#'`.
-
-**`append` joins the builtin set** — this is a `closure`/`elaborator`-layer change (a new `builtin_op` in
-`value.hpp`, a new `list_op` case in `pairs.hpp`, matching L9's pattern for how `cons`/`car`/`cdr`/`list` etc.
-were installed). **Coordination note:** `src/smd/smdlisp/closure/` is also L13's lane (spine), which may be
-running concurrently. `append` only *adds* a new builtin — it does not change any existing `closure/`
-declaration — so a conflict with L13 is unlikely, but branch off current `main` (which includes L12's
-`closure/` state) and expect a possible small merge at integration if both steps touch `value.hpp`/`env.hpp`'s
-`default_env`. Read L9's/L11's handoff sections for exactly how a new builtin gets wired in (`builtin_op` enum
-entry, `list_op` enum entry, `detail::to_list_op` bridge in `eval_direct.hpp`, `default_env` installing it into
-the FUNCTION namespace).
-
-**Merge criteria is explicit about testing at two levels:** "expansion tests at both datum and value level" —
-i.e. both a shape test (like L17's expansion-shape tests, checking the constructed datum/core structure
-directly) and an end-to-end evaluated-value test (like L17's `CondEndToEnd`), for `` `(a ,x ,@ys) ``.
-
-### Standing constraints for L18
-
-- `src/smd/smdscheme/**` is frozen for semantic changes (D1). Read-only reference, never edit.
-- This step **does** need reader-layer changes (`src/smd/smdlisp/reader/`), unlike L17, which was scoped to
-  avoid touching the reader entirely. That is expected and consistent with the plan's own wording for this
-  step ("reader support for `` ` ``, `,`, `,@`") — do not treat a reader change here as something requiring a
-  divergence doc; it is the step's explicit job, not a deviation from it.
-- New/changed files land in `src/smd/smdlisp/reader/` (new datum kinds) and `src/smd/smdlisp/macroexpand/`
-  (template expansion) at minimum; `append` as a new builtin also touches `src/smd/smdlisp/closure/`
-  (`value.hpp`, `pairs.hpp`, `eval_direct.hpp`, `env.hpp`'s `default_env`). See the L13 coordination note above
-  before editing `closure/`.
-- Keep C++26/GCC16 baseline; tests use Catch2; mirror file prolog / include guard / canonical-include
-  conventions already used throughout `src/smd/smdlisp/`.
-- File a divergence doc under `docs/divergences/` (`TEMPLATE.md` skeleton) for anything done differently than
-  the plan specifies, or any knowing ANSI CL deviation. **Next free number is DIV-0007** — re-check
-  `docs/divergences/` immediately before filing in case L13 (if running concurrently) claimed a number first.
-- Before handoff: `make compile`, `make test`, `make lint`. L18 has **no** blog deliverable (phase 20 arrives
-  at L19, `defmacro`, per the plan's phase table) — don't draft one.
-- Do not continue past L18 into L19 (`defmacro`) unless blocked; if blocked, document the blocker here
+  the plan specifies, or any knowing ANSI CL deviation (e.g. if gensym/hygiene is deferred again, or if
+  `defmacro`'s argument-destructuring lambda-list is narrower than ANSI's full macro lambda-list syntax — very
+  likely, given `elaborate_lambda`'s own existing "flat list of symbols" restriction). **Next free number is
+  DIV-0008** — re-check `docs/divergences/` immediately before filing.
+- Before handoff: `make compile`, `make test`, `make lint`. **This step has a blog deliverable: phase 20**, per
+  the plan's phase table — follow L6/L10/L11/L13's precedent for authoring `#+transclude:` orgit links against
+  this step's own worktree path (`docs/divergences/DIV-0004-orgit-transclusion-worktree-path.md`'s now-standing
+  convention); the orchestrator repoints them to `main` after merge. Also run `make blog-md` and confirm only
+  phase 20's `.md` and `index.md`/`index.org` show real content diffs (revert any incidental org-export
+  id-churn in unrelated phases, same check every prior blog-deliverable step has done).
+- Do not continue past L19 into L20 (multiple values) unless blocked; if blocked, document the blocker here
   instead.
 
 ---
 
-## Standing constraints (apply to both L13 and L18, and everything after)
+## Standing constraints (apply to L19 and everything after)
 
 - `src/smd/smdscheme/**` is frozen for semantic changes (D1); blog phases 5-12 transclude live code from it by
   UUID anchor. Read-only reference, never edit.
@@ -230,13 +145,12 @@ directly) and an end-to-end evaluated-value test (like L17's `CondEndToEnd`), fo
   conventions already used throughout `src/smd/smdlisp/`.
 - Per `docs/divergences/DIV-0004-orgit-transclusion-worktree-path.md`'s now-standing convention (resolved
   2026-07-19): if your step has a blog deliverable, author its `#+transclude:` orgit links against your own
-  worktree path (e.g. `orgit:~/src/compile-time-scheme/wt-l13::...`), not `main` — the orchestrator repoints
-  them to `main` after merge. No fresh divergence doc needed per occurrence. Watch for two org-markup
-  footguns L11 hit while drafting phase 17 (see `handoff.md`'s L11 entry for the full explanation): adjacent
+  worktree path (e.g. `orgit:~/src/compile-time-scheme/wt-l19::...`), not `main` — the orchestrator repoints
+  them to `main` after merge. No fresh divergence doc needed per occurrence. Watch for two org-markup footguns
+  L11 hit while drafting phase 17 (see `handoff.md`'s L11 entry for the full explanation): adjacent
   `~verbatim~/~verbatim~` spans with no space between them merge into one giant span in GFM export, and a
   `~word~` immediately followed by a bare letter (e.g. `~static_assert~s`) has the same problem — always leave
-  a space, or plain punctuation, immediately after a closing `~`. (Of the two next steps, only L13 has a blog
-  deliverable, phase 18; L18 does not.)
+  a space, or plain punctuation, immediately after a closing `~`.
 - Before handing off any step, verify `make blog-md` (if the step has a blog deliverable) leaves every *other*
   phase's `.md` unchanged — `git status --short docs/blog/` after the render should show only your new/updated
   phase and `index.md`/`index.org`. If other `.md` files show diffs, `git diff` them first: if it's just

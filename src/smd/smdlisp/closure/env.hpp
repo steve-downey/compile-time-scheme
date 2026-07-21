@@ -357,7 +357,8 @@ namespace detail {
 /// Installs the same set of default builtins into @p e, regardless of
 /// which @ref default_env overload constructed it. Factored out so the
 /// four @ref default_env overloads (no-store/store x no-pairs/pairs) do not
-/// each repeat the same twelve `define_function` calls.
+/// each repeat the same `define_function` calls (thirteen as of step L18's
+/// `append`).
 template <typename Core, int MaxBindings>
 constexpr auto install_default_builtins(env<Core, MaxBindings> &e) -> void {
     e.define_function(symbol{"+"}, value<Core>{builtin{builtin_op::add}});
@@ -370,6 +371,8 @@ constexpr auto install_default_builtins(env<Core, MaxBindings> &e) -> void {
     e.define_function(symbol{"EQ"}, value<Core>{builtin{builtin_op::eq}});
     e.define_function(symbol{"EQL"}, value<Core>{builtin{builtin_op::eql}});
     e.define_function(symbol{"ATOM"}, value<Core>{builtin{builtin_op::atom}});
+    e.define_function(symbol{"APPEND"},
+                      value<Core>{builtin{builtin_op::append}});
     e.define_function(symbol{"FUNCALL"},
                       value<Core>{builtin{builtin_op::funcall}});
     e.define_function(symbol{"APPLY"}, value<Core>{builtin{builtin_op::apply}});
@@ -379,7 +382,8 @@ constexpr auto install_default_builtins(env<Core, MaxBindings> &e) -> void {
 
 /// Returns an environment pre-populated with the default builtins,
 /// installed in the *function* namespace per step L9: `+`, `*`, `cons`,
-/// `car`, `cdr`, `list`, `null`, `eq`, `eql`, `atom`, `funcall`, `apply`.
+/// `car`, `cdr`, `list`, `null`, `eq`, `eql`, `atom`, `append` (step L18),
+/// `funcall`, `apply`.
 /// Functional mode (no @ref store): does not support @ref set_value
 /// (`setq`) or `defun` self-recursion (see @ref patch_function).
 ///

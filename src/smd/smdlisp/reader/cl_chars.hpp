@@ -20,14 +20,19 @@ constexpr auto is_whitespace(char c) -> bool {
 }
 
 /// Returns true if @p c is one of the terminating macro characters this
-/// reader subset recognizes: @c ( @c ) @c ' @c ;.
+/// reader subset recognizes: @c ( @c ) @c ' @c ; @c ` @c ,.
 ///
-/// ANSI CL also assigns terminating-macro-character status to @c " @c ` @c ,
-/// and @c #, but those arrive with later steps (string/backquote/sharpsign
-/// support, docs/cl-pivot-plan.md steps L6/L18); this predicate covers only
-/// what the reader understands today.
+/// @c ` and @c , (backquote and comma) joined this set in step L18
+/// (docs/cl-pivot-plan.md): like every other terminating macro character,
+/// they always end the current token wherever they appear, not merely at
+/// token start. ANSI CL also assigns terminating-macro-character status to
+/// @c " and @c #, but those still arrive with later steps (string support is
+/// out of scope per decision D10; @c # is handled as a direct dispatch
+/// character in @c read_datum_node rather than through this predicate); this
+/// predicate covers only what the reader understands today.
 constexpr auto is_terminating_macro_char(char c) -> bool {
-    return c == '(' || c == ')' || c == '\'' || c == ';';
+    return c == '(' || c == ')' || c == '\'' || c == ';' || c == '`' ||
+           c == ',';
 }
 
 /// Returns true if @p c is a constituent character: one that may appear in a

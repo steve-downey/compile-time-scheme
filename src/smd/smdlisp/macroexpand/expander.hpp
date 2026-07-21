@@ -643,6 +643,172 @@ constexpr auto default_macro_table() -> macro_table<MaxNodes, MaxList> {
     return table;
 }
 
+// -- backquote: template expansion into cons/list/append builds -----------
+//
+// docs/cl-pivot-plan.md step L18: a backquote template's *meaning* -- e.g.
+// `` `(a ,x ,@ys) `` evaluating to a fresh list whose first element is the
+// literal symbol `A`, whose second is whatever `x` evaluates to, and whose
+// remaining elements are whatever `ys` evaluates to, spliced in -- is
+// realized by lowering the whole template to an ordinary CONS/APPEND/QUOTE
+// call form during this pass, rather than inventing a new evaluator-level
+// construct: `` `(a ,x ,@ys) `` lowers to
+// `(CONS (QUOTE A) (CONS X (APPEND YS NIL)))`.
+
+/// Forward declaration: @ref expand_backquote_template and
+/// @c detail::expand_backquote_element are mutually recursive (an ordinary
+/// template element recurses back into template expansion; a `,x` unquote
+/// element yields its target as code directly, ending the recursion for
+/// that element).
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+template <int MaxNodes, int MaxList>
+constexpr auto
+expand_backquote_template(reader::datum_type<MaxNodes, MaxList> const &tmpl,
+                          arena_type<MaxNodes, MaxList> &arena)
+    -> smdscheme::foundation::result<reader::datum_type<MaxNodes, MaxList>>;
+
+namespace detail {
+
+/// Wraps @p d_box in a fresh `(QUOTE d)` call form -- the literal-data case
+/// of backquote template expansion (an atom, or a nested
+/// @ref reader::datum_quote / @ref reader::datum_function /
+/// @ref reader::datum_backquote datum, none of which are re-processed for
+/// unquotes: nested backquote is a documented scope cut, see
+/// docs/divergences).
+template <int MaxNodes, int MaxList>
+constexpr auto make_quote_form(arena_type<MaxNodes, MaxList> &arena,
+                               handle_type<MaxNodes, MaxList> d_box)
+    -> reader::datum_type<MaxNodes, MaxList> {
+    using DatumT = reader::datum_type<MaxNodes, MaxList>;
+    using datum_f =
+        typename reader::datum_f_factory<MaxNodes,
+                                         MaxList>::template type<DatumT>;
+    using DatumList = reader::datum_list<DatumT, MaxNodes, MaxList>;
+    DatumList quoted{};
+    quoted.elements.push_back(
+        make_symbol_box<MaxNodes, MaxList>(arena, "QUOTE"));
+    quoted.elements.push_back(d_box);
+    return DatumT{datum_f{std::move(quoted)}};
+}
+
+/// Expands one backquote-template LIST ELEMENT into code: a `,x` unquote
+/// element yields its target datum as-is (already code); anything else
+/// recurses into @ref expand_backquote_template (an ordinary sub-template,
+/// possibly containing further unquotes at a deeper level).
+///
+/// `,@x` (splice) never reaches this function: it is handled by the
+/// caller (@ref expand_backquote_template's list-folding loop), because a
+/// splice changes how the surrounding cons/append chain is built, not just
+/// what one element expands to.
+template <int MaxNodes, int MaxList>
+constexpr auto
+expand_backquote_element(reader::datum_type<MaxNodes, MaxList> const &elem,
+                         arena_type<MaxNodes, MaxList> &arena)
+    -> smdscheme::foundation::result<reader::datum_type<MaxNodes, MaxList>> {
+    using DatumT = reader::datum_type<MaxNodes, MaxList>;
+    using DatumUnquote = reader::datum_unquote<DatumT, MaxNodes>;
+
+    if (std::holds_alternative<DatumUnquote>(elem.inner)) {
+        auto const &u = std::get<DatumUnquote>(elem.inner);
+        return arena.get(u.target);
+    }
+    return expand_backquote_template<MaxNodes, MaxList>(elem, arena);
+}
+
+} // namespace detail
+
+/// Lowers a backquote template @p tmpl into an ordinary code form built of
+/// `CONS`/`APPEND`/`QUOTE` calls.
+///
+/// - A `,x` unquote AT THE TEMPLATE'S OWN TOP LEVEL (`` `,x ``, a backquote
+///   whose whole template is an unquote) is just `x`: no cons/quote
+///   wrapping at all.
+/// - A `,@x` unquote-splice at the template's own top level is always a
+///   diagnosed error (splicing only makes sense as a list element).
+/// - Anything that is not a list (an atom, or a nested
+///   @ref reader::datum_quote / @ref reader::datum_function /
+///   @ref reader::datum_backquote datum) is literal data: wrapped in
+///   `(QUOTE tmpl)` (@ref detail::make_quote_form). Nested backquote is
+///   therefore never re-expanded at a deeper comma level -- a documented
+///   scope cut, see docs/divergences.
+/// - A list template folds its elements right-to-left into a
+///   `CONS`/`APPEND` chain bottoming out in the bare `NIL` symbol
+///   (self-evaluating per D3 -- no quoting needed, matching how the six
+///   host macros above already emit a bare `NIL`/`T` datum directly): an
+///   ordinary element becomes `(CONS <element-expansion> <rest>)`; a `,@x`
+///   element becomes `(APPEND x <rest>)`.
+///
+/// The lowered result is still just an ordinary datum tree built of
+/// `CONS`/`APPEND`/`QUOTE` call forms -- @ref expand is responsible for
+/// recursing into it afterward (so any macro calls inside an unquoted
+/// position still get expanded, and the synthesized `(QUOTE ...)` sub-forms
+/// hit @ref expand's existing quote-skip rule like any other `QUOTE`).
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+/// @param  tmpl  The (unexpanded) template datum -- the target of a
+///               @ref reader::datum_backquote node.
+/// @param  arena Arena backing @p tmpl and receiving every newly
+///               constructed node.
+template <int MaxNodes, int MaxList>
+constexpr auto
+expand_backquote_template(reader::datum_type<MaxNodes, MaxList> const &tmpl,
+                          arena_type<MaxNodes, MaxList> &arena)
+    -> smdscheme::foundation::result<reader::datum_type<MaxNodes, MaxList>> {
+    using DatumT = reader::datum_type<MaxNodes, MaxList>;
+    using datum_f =
+        typename reader::datum_f_factory<MaxNodes,
+                                         MaxList>::template type<DatumT>;
+    using DatumList = reader::datum_list<DatumT, MaxNodes, MaxList>;
+    using DatumUnquote = reader::datum_unquote<DatumT, MaxNodes>;
+    using DatumUnquoteSplice = reader::datum_unquote_splice<DatumT, MaxNodes>;
+
+    if (std::holds_alternative<DatumUnquote>(tmpl.inner)) {
+        auto const &u = std::get<DatumUnquote>(tmpl.inner);
+        return arena.get(u.target);
+    }
+    if (std::holds_alternative<DatumUnquoteSplice>(tmpl.inner)) {
+        return smdscheme::foundation::parse_error{
+            {}, "backquote: ,@ is not valid outside a list"};
+    }
+    if (!std::holds_alternative<DatumList>(tmpl.inner)) {
+        auto tmpl_box = smdscheme::foundation::make_arena_box(arena, tmpl);
+        return detail::make_quote_form<MaxNodes, MaxList>(arena, tmpl_box);
+    }
+
+    auto const &lst = std::get<DatumList>(tmpl.inner);
+    DatumT result = detail::make_symbol<MaxNodes, MaxList>("NIL");
+    for (int i = lst.elements.size() - 1; i >= 0; --i) {
+        auto const &elem = arena.get(lst.elements[i]);
+        if (std::holds_alternative<DatumUnquoteSplice>(elem.inner)) {
+            auto const &sp = std::get<DatumUnquoteSplice>(elem.inner);
+            DatumList append_call{};
+            append_call.elements.push_back(
+                detail::make_symbol_box<MaxNodes, MaxList>(arena, "APPEND"));
+            append_call.elements.push_back(sp.target);
+            append_call.elements.push_back(
+                smdscheme::foundation::make_arena_box(arena,
+                                                      std::move(result)));
+            result = DatumT{datum_f{std::move(append_call)}};
+            continue;
+        }
+        auto elem_r =
+            detail::expand_backquote_element<MaxNodes, MaxList>(elem, arena);
+        if (!elem_r.has_value())
+            return elem_r.error();
+        DatumList cons_call{};
+        cons_call.elements.push_back(
+            detail::make_symbol_box<MaxNodes, MaxList>(arena, "CONS"));
+        cons_call.elements.push_back(smdscheme::foundation::make_arena_box(
+            arena, std::move(elem_r.value())));
+        cons_call.elements.push_back(
+            smdscheme::foundation::make_arena_box(arena, std::move(result)));
+        result = DatumT{datum_f{std::move(cons_call)}};
+    }
+    return result;
+}
+
 /// Recursively macro-expands every code position within @p d, writing any
 /// newly constructed nodes into @p arena -- the same arena @p d's own
 /// structure already lives in. Reusing the reader's datum arena (rather
@@ -662,7 +828,13 @@ constexpr auto default_macro_table() -> macro_table<MaxNodes, MaxList> {
 /// ...)` node (@ref reader::datum_function) is walked into its embedded
 /// lambda body when its target is a `(lambda ...)` form (code), and left
 /// untouched when its target is a bare function-name symbol (nothing to
-/// walk).
+/// walk). A @ref reader::datum_backquote node (step L18) is lowered by
+/// @ref expand_backquote_template into an ordinary `CONS`/`APPEND`/`QUOTE`
+/// code form first, then that lowered form is walked by this same
+/// function -- the finer-grained analogue of the `QUOTE` treatment above:
+/// a backquote template is mostly literal data, but its `,`/`,@` positions
+/// are code that must still be walked. A bare `,`/`,@` datum reaching this
+/// function with no enclosing backquote is a diagnosed error.
 ///
 /// This is a generic, special-form-agnostic walk: it does not know the
 /// argument shapes of `if`/`let`/`lambda`/etc. the way the elaborator does
@@ -694,6 +866,37 @@ constexpr auto expand(reader::datum_type<MaxNodes, MaxList> const &d,
                                          MaxList>::template type<DatumT>;
     using DatumList = reader::datum_list<DatumT, MaxNodes, MaxList>;
     using DatumFunction = reader::datum_function<DatumT, MaxNodes>;
+    using DatumBackquote = reader::datum_backquote<DatumT, MaxNodes>;
+    using DatumUnquote = reader::datum_unquote<DatumT, MaxNodes>;
+    using DatumUnquoteSplice = reader::datum_unquote_splice<DatumT, MaxNodes>;
+
+    // Step L18: a backquote node lowers to a CONS/APPEND/QUOTE code form
+    // (@ref expand_backquote_template), then that lowered form is walked
+    // by this same function -- exactly like any other code -- so macro
+    // calls inside an unquoted position still get expanded, and the
+    // lowered form's own `(QUOTE ...)` sub-forms hit the quote-skip rule
+    // below like any other QUOTE.
+    if (std::holds_alternative<DatumBackquote>(d.inner)) {
+        auto const &bq = std::get<DatumBackquote>(d.inner);
+        auto const &tmpl = arena.get(bq.templ);
+        auto lowered_r =
+            expand_backquote_template<MaxNodes, MaxList>(tmpl, arena);
+        if (!lowered_r.has_value())
+            return lowered_r.error();
+        return expand<MaxNodes, MaxList>(lowered_r.value(), arena, table,
+                                         max_expansions);
+    }
+
+    // A bare `,`/`,@` with no enclosing backquote template reaching this
+    // point is malformed input; diagnose it here rather than letting it
+    // fall through to the elaborator's generic "unsupported node type"
+    // error (the reader does not track backquote nesting, so this is the
+    // first pass that can recognize the mistake).
+    if (std::holds_alternative<DatumUnquote>(d.inner) ||
+        std::holds_alternative<DatumUnquoteSplice>(d.inner)) {
+        return smdscheme::foundation::parse_error{
+            {}, "backquote: , or ,@ used outside a backquote template"};
+    }
 
     if (std::holds_alternative<DatumFunction>(d.inner)) {
         auto const &fq = std::get<DatumFunction>(d.inner);

@@ -17,8 +17,40 @@ namespace smd::smdlisp::closure {
 /// `smd::smdscheme::closure::apply_prim` (PR #26), narrowed to the CL
 /// builtin set named in step L8 of docs/cl-pivot-plan.md: `cons`, `car`,
 /// `cdr`, `list`, `null`, `eq`, `eql`, `atom` (CL names, no `?`/`!` suffixes;
-/// `set-car!`/`set-cdr!`/`pair?`/`equal?` are not part of this step).
-enum class list_op { cons, car, cdr, list, null, eq, eql, atom };
+/// `set-car!`/`set-cdr!`/`pair?`/`equal?` are not part of this step). `append`
+/// joins the set in step L18, needed to lower a backquote template's `,@`
+/// unquote-splicing.
+enum class list_op { cons, car, cdr, list, null, eq, eql, atom, append };
+
+namespace detail {
+
+/// Recursive helper behind @c append: copies @p lst's spine (each cell
+/// freshly allocated, per ordinary CL `append` semantics -- the argument
+/// list is never mutated or shared into the result) onto @p tail. Bottoms
+/// out by returning @p tail once @p lst is exhausted (`nil`).
+///
+/// @tparam Core     The core AST type.
+/// @tparam MaxPairs Heap capacity (deduced from @p heap).
+template <typename Core, int MaxPairs>
+[[nodiscard]] constexpr auto append_impl(value<Core> const &lst,
+                                         value<Core> const &tail,
+                                         pair_heap<Core, MaxPairs> *heap)
+    -> smd::smdscheme::foundation::result<value<Core>> {
+    using smd::smdscheme::foundation::parse_error;
+
+    if (std::holds_alternative<nil_t>(lst))
+        return tail;
+    if (!std::holds_alternative<pair_ref>(lst))
+        return parse_error{{}, "append: first argument must be a proper list"};
+    auto const &cell = heap->get(std::get<pair_ref>(lst).loc);
+    auto rest_r = append_impl<Core, MaxPairs>(cell.cdr, tail, heap);
+    if (!rest_r.has_value())
+        return rest_r;
+    return value<Core>{
+        pair_ref{heap->alloc(pair_cell<Core>{cell.car, rest_r.value()})}};
+}
+
+} // namespace detail
 
 /// Applies a @ref list_op primitive to already-evaluated arguments.
 ///
@@ -123,6 +155,17 @@ template <typename Core, int MaxPairs>
         // Everything that is not a cons cell is an atom, including nil.
         return std::holds_alternative<pair_ref>(args[0]) ? false_value
                                                          : true_value;
+
+    case append:
+        // (append lst tail): lst must be a proper list (or nil); its
+        // spine is copied into fresh cells ending in tail, per ordinary
+        // CL append semantics. Step L18: needed to lower a backquote
+        // template's `,@` unquote-splicing.
+        if (args.size() != 2)
+            return parse_error{{}, "append: expected 2 arguments"};
+        if (heap == nullptr)
+            return parse_error{{}, "append: environment has no pair heap"};
+        return detail::append_impl<Core, MaxPairs>(args[0], args[1], heap);
     }
     return parse_error{{}, "unknown list primitive"};
 }
