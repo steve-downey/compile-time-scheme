@@ -210,7 +210,8 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
                 case builtin_op::null:
                 case builtin_op::eq:
                 case builtin_op::eql:
-                case builtin_op::atom: {
+                case builtin_op::atom:
+                case builtin_op::append: {
                     auto pr = apply_prim<Core, default_max_pairs>(
                         to_list_op(bi.op), args, environment.pairs());
                     if (!pr.has_value())

@@ -128,6 +128,32 @@ static_assert([] {
            std::holds_alternative<lisp::closure::nil_t>(cell.cdr);
 }());
 
+// -- append (step L18 builtin) routes through the CPS backend -------------
+// The L18 `append` builtin landed after L13's CPS backend; this pins that
+// `append` is handled in cps_apply's list-op dispatch (via to_list_op), not
+// just in eval_direct.  `(append '(1) '(2))` => (1 2).
+static_assert([] {
+    DatumArena da;
+    Heap heap;
+    Envs envs;
+    auto pr = lisp::closure::compile_to_closure<MaxNodes, MaxList>(
+        "(append '(1) '(2))"sv, da);
+    if (!pr.has_value())
+        return false;
+    auto vr = eval(pr.value(), heap, envs);
+    if (!vr.has_value() ||
+        !std::holds_alternative<lisp::closure::pair_ref>(vr.value()))
+        return false;
+    auto const &c0 =
+        heap.get(std::get<lisp::closure::pair_ref>(vr.value()).loc);
+    if (!std::holds_alternative<int>(c0.car) || std::get<int>(c0.car) != 1 ||
+        !std::holds_alternative<lisp::closure::pair_ref>(c0.cdr))
+        return false;
+    auto const &c1 = heap.get(std::get<lisp::closure::pair_ref>(c0.cdr).loc);
+    return std::holds_alternative<int>(c1.car) && std::get<int>(c1.car) == 2 &&
+           std::holds_alternative<lisp::closure::nil_t>(c1.cdr);
+}());
+
 // -- merge criterion (docs/cl-pivot-plan.md, step L12), through
 // -- compile_to_closure ----------------------------------------------------
 
