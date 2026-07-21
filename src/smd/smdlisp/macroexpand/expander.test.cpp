@@ -413,3 +413,209 @@ TEST_CASE("ExpanderTest - CaseFallsThroughToOtherwise") {
     REQUIRE(std::holds_alternative<lisp::closure::keyword>(vr.value()));
     CHECK(std::get<lisp::closure::keyword>(vr.value()).name == "OTHER");
 }
+
+// -- backquote (step L18): datum-level shape ---------------------------------
+
+using Backquote = lisp::reader::datum_backquote<Datum, MaxNodes>;
+using Unquote = lisp::reader::datum_unquote<Datum, MaxNodes>;
+using UnquoteSplice = lisp::reader::datum_unquote_splice<Datum, MaxNodes>;
+
+TEST_CASE("ExpanderTest - BackquoteTemplateLowersToConsAppendQuote (merge "
+          "criterion, datum level)") {
+    // `(a ,x ,@ys) -> (CONS (QUOTE A) (CONS X (APPEND YS NIL)))
+    DatumArena arena;
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"`(a ,x ,@ys)"sv}, arena);
+    REQUIRE(dr.has_value());
+    REQUIRE(std::holds_alternative<Backquote>(dr.value().value.inner));
+    auto const &bq = std::get<Backquote>(dr.value().value.inner);
+    auto const &tmpl = arena.get(bq.templ);
+
+    auto lowered_r =
+        lisp::macroexpand::expand_backquote_template<MaxNodes, MaxList>(tmpl,
+                                                                        arena);
+    REQUIRE(lowered_r.has_value());
+
+    auto const &cons1 = std::get<DatumList>(lowered_r.value().inner);
+    REQUIRE(cons1.elements.size() == 3);
+    CHECK(symbol_name(arena.get(cons1.elements[0])) == "CONS");
+
+    auto const &quote_a =
+        std::get<DatumList>(arena.get(cons1.elements[1]).inner);
+    REQUIRE(quote_a.elements.size() == 2);
+    CHECK(symbol_name(arena.get(quote_a.elements[0])) == "QUOTE");
+    CHECK(symbol_name(arena.get(quote_a.elements[1])) == "A");
+
+    auto const &cons2 = std::get<DatumList>(arena.get(cons1.elements[2]).inner);
+    REQUIRE(cons2.elements.size() == 3);
+    CHECK(symbol_name(arena.get(cons2.elements[0])) == "CONS");
+    CHECK(symbol_name(arena.get(cons2.elements[1])) == "X");
+
+    auto const &append_call =
+        std::get<DatumList>(arena.get(cons2.elements[2]).inner);
+    REQUIRE(append_call.elements.size() == 3);
+    CHECK(symbol_name(arena.get(append_call.elements[0])) == "APPEND");
+    CHECK(symbol_name(arena.get(append_call.elements[1])) == "YS");
+    CHECK(symbol_name(arena.get(append_call.elements[2])) == "NIL");
+}
+
+TEST_CASE("ExpanderTest - BackquoteOfPlainAtomIsEquivalentToQuote") {
+    // `x -> (QUOTE x): the template's own top level is neither a list nor
+    // an unquote, so it is literal data.
+    DatumArena arena;
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"`x"sv}, arena);
+    REQUIRE(dr.has_value());
+    auto const &bq = std::get<Backquote>(dr.value().value.inner);
+    auto lowered_r =
+        lisp::macroexpand::expand_backquote_template<MaxNodes, MaxList>(
+            arena.get(bq.templ), arena);
+    REQUIRE(lowered_r.has_value());
+    auto const &quote_form = std::get<DatumList>(lowered_r.value().inner);
+    REQUIRE(quote_form.elements.size() == 2);
+    CHECK(symbol_name(arena.get(quote_form.elements[0])) == "QUOTE");
+    CHECK(symbol_name(arena.get(quote_form.elements[1])) == "X");
+}
+
+TEST_CASE("ExpanderTest - BackquoteOfPlainUnquoteIsJustTheTarget") {
+    // `,x -> x (no cons/quote wrapping at all).
+    DatumArena arena;
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"`,x"sv}, arena);
+    REQUIRE(dr.has_value());
+    auto const &bq = std::get<Backquote>(dr.value().value.inner);
+    auto lowered_r =
+        lisp::macroexpand::expand_backquote_template<MaxNodes, MaxList>(
+            arena.get(bq.templ), arena);
+    REQUIRE(lowered_r.has_value());
+    CHECK(symbol_name(lowered_r.value()) == "X");
+}
+
+TEST_CASE("ExpanderTest - BackquoteOfPlainSpliceAtTopLevelIsDiagnosedError") {
+    // `,@xs at the template's own top level: splicing only makes sense as
+    // a list element.
+    DatumArena arena;
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"`,@xs"sv}, arena);
+    REQUIRE(dr.has_value());
+    auto const &bq = std::get<Backquote>(dr.value().value.inner);
+    auto lowered_r =
+        lisp::macroexpand::expand_backquote_template<MaxNodes, MaxList>(
+            arena.get(bq.templ), arena);
+    REQUIRE_FALSE(lowered_r.has_value());
+}
+
+// -- backquote (step L18): whole-tree wiring ---------------------------------
+
+TEST_CASE("ExpanderTest - ExpandLowersBackquoteAndRecursesIntoUnquotedCode") {
+    // `(a ,(when t 1)) : expand() must both lower the backquote AND expand
+    // the macro call sitting in the unquoted position.
+    DatumArena arena;
+    auto table = lisp::macroexpand::default_macro_table<MaxNodes, MaxList>();
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"`(a ,(when t 1))"sv}, arena);
+    REQUIRE(dr.has_value());
+    auto r = lisp::macroexpand::expand<MaxNodes, MaxList>(dr.value().value,
+                                                          arena, table);
+    REQUIRE(r.has_value());
+    REQUIRE_FALSE(std::holds_alternative<Backquote>(r.value().inner));
+
+    // (CONS (QUOTE A) (CONS <expanded-when> NIL))
+    auto const &cons1 = std::get<DatumList>(r.value().inner);
+    auto const &cons2 = std::get<DatumList>(arena.get(cons1.elements[2]).inner);
+    // The unquoted `(when t 1)` must have been expanded away into an `if`.
+    auto const &expanded_when =
+        std::get<DatumList>(arena.get(cons2.elements[1]).inner);
+    CHECK(symbol_name(arena.get(expanded_when.elements[0])) == "IF");
+}
+
+TEST_CASE("ExpanderTest - StrayUnquoteOutsideBackquoteIsDiagnosedError") {
+    DatumArena arena;
+    auto table = lisp::macroexpand::default_macro_table<MaxNodes, MaxList>();
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(a ,x)"sv}, arena);
+    REQUIRE(dr.has_value());
+    auto r = lisp::macroexpand::expand<MaxNodes, MaxList>(dr.value().value,
+                                                          arena, table);
+    REQUIRE_FALSE(r.has_value());
+}
+
+// -- merge criterion (docs/cl-pivot-plan.md, step L18): value level ----------
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Core root;
+    Heap heap;
+    Envs envs;
+    auto vr = run("(let ((x 5) (ys (list 6 7))) `(a ,x ,@ys))", da, ca, root,
+                  heap, envs);
+    if (!vr.has_value() ||
+        !std::holds_alternative<lisp::closure::pair_ref>(vr.value()))
+        return false;
+    auto const &c1 =
+        heap.get(std::get<lisp::closure::pair_ref>(vr.value()).loc);
+    if (!std::holds_alternative<lisp::closure::symbol>(c1.car) ||
+        std::get<lisp::closure::symbol>(c1.car).name != "A")
+        return false;
+    auto const &c2 = heap.get(std::get<lisp::closure::pair_ref>(c1.cdr).loc);
+    if (!std::holds_alternative<int>(c2.car) || std::get<int>(c2.car) != 5)
+        return false;
+    auto const &c3 = heap.get(std::get<lisp::closure::pair_ref>(c2.cdr).loc);
+    if (!std::holds_alternative<int>(c3.car) || std::get<int>(c3.car) != 6)
+        return false;
+    auto const &c4 = heap.get(std::get<lisp::closure::pair_ref>(c3.cdr).loc);
+    if (!std::holds_alternative<int>(c4.car) || std::get<int>(c4.car) != 7)
+        return false;
+    return std::holds_alternative<lisp::closure::nil_t>(c4.cdr);
+}());
+
+TEST_CASE("ExpanderTest - BackquoteAtomUnquoteAndSpliceEndToEnd (merge "
+          "criterion, value level)") {
+    // `(a ,x ,@ys) with x = 5, ys = (6 7): the literal symbol A, x's value,
+    // and ys's elements spliced in => (A 5 6 7).
+    DatumArena da;
+    CoreArena ca;
+    Core root;
+    Heap heap;
+    Envs envs;
+    auto vr = run("(let ((x 5) (ys (list 6 7))) `(a ,x ,@ys))", da, ca, root,
+                  heap, envs);
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::pair_ref>(vr.value()));
+
+    auto const &c1 =
+        heap.get(std::get<lisp::closure::pair_ref>(vr.value()).loc);
+    REQUIRE(std::holds_alternative<lisp::closure::symbol>(c1.car));
+    CHECK(std::get<lisp::closure::symbol>(c1.car).name == "A");
+
+    REQUIRE(std::holds_alternative<lisp::closure::pair_ref>(c1.cdr));
+    auto const &c2 = heap.get(std::get<lisp::closure::pair_ref>(c1.cdr).loc);
+    REQUIRE(std::holds_alternative<int>(c2.car));
+    CHECK(std::get<int>(c2.car) == 5);
+
+    REQUIRE(std::holds_alternative<lisp::closure::pair_ref>(c2.cdr));
+    auto const &c3 = heap.get(std::get<lisp::closure::pair_ref>(c2.cdr).loc);
+    REQUIRE(std::holds_alternative<int>(c3.car));
+    CHECK(std::get<int>(c3.car) == 6);
+
+    REQUIRE(std::holds_alternative<lisp::closure::pair_ref>(c3.cdr));
+    auto const &c4 = heap.get(std::get<lisp::closure::pair_ref>(c3.cdr).loc);
+    REQUIRE(std::holds_alternative<int>(c4.car));
+    CHECK(std::get<int>(c4.car) == 7);
+
+    CHECK(std::holds_alternative<lisp::closure::nil_t>(c4.cdr));
+}
+
+TEST_CASE("ExpanderTest - BackquoteWithNoUnquotesIsJustAQuotedList") {
+    auto r = [] {
+        DatumArena da;
+        CoreArena ca;
+        Core root;
+        Heap heap;
+        Envs envs;
+        return run("`(1 2 3)", da, ca, root, heap, envs);
+    }();
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::pair_ref>(r.value()));
+}

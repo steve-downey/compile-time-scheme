@@ -18,12 +18,16 @@ namespace detail {
 /// Recursively reads a single datum node from @p cur, allocating sub-nodes
 /// into @p arena.
 ///
-/// Grammar: @c datum := atom | list | 'datum | #'datum (decision D6: no
-/// dotted pairs). Dispatches on the first non-intertoken-space character:
+/// Grammar: @c datum := atom | list | 'datum | #'datum | \`datum | ,datum |
+/// ,\@datum (decision D6: no dotted pairs). Dispatches on the first
+/// non-intertoken-space character:
 /// - @c ' — quote shorthand, lowers to @ref datum_quote
 /// - @c # — must be followed by @c ', sharpsign-quote shorthand, lowers to
 ///   @ref datum_function (see that type's docs for why this is a distinct
 ///   kind rather than a @c (function x) list)
+/// - @c \` — backquote, lowers to @ref datum_backquote (step L18)
+/// - @c , — unquote, or (if followed by @c \@) unquote-splicing; lowers to
+///   @ref datum_unquote / @ref datum_unquote_splice (step L18)
 /// - @c ( — list, lowers to @ref datum_list
 /// - @c ) — a stray close paren is always an error here; a well-formed list
 ///   consumes its own closing @c ) internally
@@ -87,6 +91,41 @@ read_datum_node(smdscheme::parser::cursor cur,
         return smdscheme::parser::parse_state<datum>{d, inner.value().rest};
     }
     // 6bda5219-9ebb-4595-88ec-a863f20325f1 end
+
+    // Step L18 (docs/cl-pivot-plan.md): backquote/unquote/unquote-splice
+    // lower to their own dedicated datum kinds, mirroring the quote /
+    // sharpsign-quote treatment above. What a backquote template *means*
+    // (expansion into cons/list/append builds) is decided downstream, in
+    // smd::smdlisp::macroexpand; the reader only records the syntax.
+    if (c == '`') {
+        smdscheme::parser::cursor after = cur.bump();
+        auto inner = read_datum_node<MaxNodes, MaxList>(after, arena);
+        if (!inner.has_value())
+            return inner;
+        datum d{datum_f{datum_backquote<datum, MaxNodes>{
+            smdscheme::foundation::make_arena_box(arena,
+                                                  inner.value().value)}}};
+        return smdscheme::parser::parse_state<datum>{d, inner.value().rest};
+    }
+
+    if (c == ',') {
+        smdscheme::parser::cursor after = cur.bump();
+        bool splice = !after.empty() && after.peek() == '@';
+        smdscheme::parser::cursor after_marker = splice ? after.bump() : after;
+        auto inner = read_datum_node<MaxNodes, MaxList>(after_marker, arena);
+        if (!inner.has_value())
+            return inner;
+        if (splice) {
+            datum d{datum_f{datum_unquote_splice<datum, MaxNodes>{
+                smdscheme::foundation::make_arena_box(arena,
+                                                      inner.value().value)}}};
+            return smdscheme::parser::parse_state<datum>{d, inner.value().rest};
+        }
+        datum d{datum_f{datum_unquote<datum, MaxNodes>{
+            smdscheme::foundation::make_arena_box(arena,
+                                                  inner.value().value)}}};
+        return smdscheme::parser::parse_state<datum>{d, inner.value().rest};
+    }
 
     if (c == '(') {
         smdscheme::parser::cursor after = cur.bump();
