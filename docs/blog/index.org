@@ -84,6 +84,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ The direct evaluator: one ~is_true~ function instead of Scheme's per-site ~#f~ encoding, a Lisp-2 environment where variable and function lookup never touch, ~funcall~ and ~#'~ as real call semantics, and the closure-capture-ownership question resolved with an arena instead of an owning pointer.
 
+** [[file:phase-18-setq-defun-progn.org][Phase 18 — setq, defun, progn: A Programmable Core]]
+
+/DRAFT — pending author revision./ The CPS/closure backend: ~progn~ compiling to continuation chaining, why the frozen Scheme original's refusal to support ~define~ in expression position meant ~setq~/~defun~ were a real design question rather than a port, the reserve-then-patch trick for self-recursive ~defun~ worked out again for continuation-passing code, and a caller-owned-datum-arena lifetime bug the merge-criterion tests found along the way.
+
 * Table of Contents
 
 #+toc: headlines 1
