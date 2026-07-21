@@ -48,7 +48,7 @@ using Envs = lisp::closure::env_arena<Core, MaxBindings, MaxEnvs>;
 /// stack-use-after-return lesson): this function never returns a value
 /// derived from them, only a plain @c bool.
 constexpr auto elaborate_into(std::string_view src, DatumArena &datum_arena,
-                    CoreArena &core_arena, Core &root) -> bool {
+                              CoreArena &core_arena, Core &root) -> bool {
     auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
         scm::parser::cursor{src}, datum_arena);
     if (!dr.has_value())
@@ -92,7 +92,8 @@ static_assert([] {
     root = er.value();
     auto code = lisp::closure::compile_cps<MaxNodes, MaxList>(root, ca);
     auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
-    auto vr = code(environment, envs, lisp::closure::detail::identity_k<Core>{});
+    auto vr =
+        code(environment, envs, lisp::closure::detail::identity_k<Core>{});
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 42;
 }());
@@ -117,7 +118,8 @@ static_assert([] {
     auto code = lisp::closure::cps_of<MaxNodes, MaxList>(
         root, ca, lisp::closure::detail::identity_k<Core>{});
     auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
-    auto vr = code(environment, envs, lisp::closure::detail::identity_k<Core>{});
+    auto vr =
+        code(environment, envs, lisp::closure::detail::identity_k<Core>{});
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 5;
 }());

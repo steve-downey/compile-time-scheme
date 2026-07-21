@@ -119,13 +119,13 @@ struct closure_program {
 template <int MaxNodes = 128, int MaxList = 16>
 [[nodiscard]] constexpr auto compile_to_closure(
     std::string_view src,
-    smd::smdscheme::foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
-                                           MaxNodes> &datum_arena) {
+    smd::smdscheme::foundation::tree_arena<
+        reader::datum_type<MaxNodes, MaxList>, MaxNodes> &datum_arena) {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
     using CpsCodeT = decltype(compile_cps<MaxNodes, MaxList>(
         std::declval<Core const &>(),
-        std::declval<smd::smdscheme::foundation::tree_arena<
-            Core, MaxNodes> const &>()));
+        std::declval<
+            smd::smdscheme::foundation::tree_arena<Core, MaxNodes> const &>()));
     using ProgramT = closure_program<MaxNodes, MaxList, CpsCodeT>;
 
     auto dr = reader::read_datum<MaxNodes, MaxList>(

@@ -1,4 +1,4 @@
-# DIV-0007: compile_to_closure needs a caller-owned datum arena parameter
+# DIV-0008: compile_to_closure needs a caller-owned datum arena parameter
 
 - **Status:** accepted-permanent
 - **Date:** 2026-07-21

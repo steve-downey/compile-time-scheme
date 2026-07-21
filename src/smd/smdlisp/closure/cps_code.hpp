@@ -194,9 +194,8 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
                     for (auto const &a : args) {
                         if (!std::holds_alternative<int>(a))
                             return parse_error{{}, "type error"};
-                        acc = bi.op == builtin_op::add
-                                  ? acc + std::get<int>(a)
-                                  : acc * std::get<int>(a);
+                        acc = bi.op == builtin_op::add ? acc + std::get<int>(a)
+                                                       : acc * std::get<int>(a);
                     }
                     Val v{acc};
                     auto r = cont(v);
@@ -510,8 +509,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
                     smd::fixpoint::overloaded{
                         [&](std::string_view name) -> Res {
                             // FUNCTION namespace only, per D4.
-                            auto lr =
-                                environment.lookup_function(symbol{name});
+                            auto lr = environment.lookup_function(symbol{name});
                             if (!lr.has_value())
                                 return Res{lr.error()};
                             auto r = cont(lr.value());
@@ -602,8 +600,8 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
                     return k(r.value());
                 }
                 auto val_r = cps_dispatch<MaxNodes, MaxList>(
-                    arena.get(cdv.value), arena, identity_k<Core>{}, environment,
-                    envs, identity_k<Core>{});
+                    arena.get(cdv.value), arena, identity_k<Core>{},
+                    environment, envs, identity_k<Core>{});
                 if (!val_r.has_value())
                     return val_r;
                 environment.define_value(symbol{cdv.name}, val_r.value());
@@ -619,8 +617,8 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
                 // always (re)evaluates and (re)binds.
                 environment.declare_special(symbol{cdp.name});
                 auto val_r = cps_dispatch<MaxNodes, MaxList>(
-                    arena.get(cdp.value), arena, identity_k<Core>{}, environment,
-                    envs, identity_k<Core>{});
+                    arena.get(cdp.value), arena, identity_k<Core>{},
+                    environment, envs, identity_k<Core>{});
                 if (!val_r.has_value())
                     return val_r;
                 environment.define_value(symbol{cdp.name}, val_r.value());
@@ -653,17 +651,17 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
 /// @tparam MaxList  Maximum argument/list/body length.
 /// @tparam Cont     Intermediate continuation type.
 template <int MaxNodes, int MaxList, class Cont>
-[[nodiscard]] constexpr auto cps_of(
-    elaborator::core_type<MaxNodes, MaxList> const &node,
-    smd::smdscheme::foundation::tree_arena<
-        elaborator::core_type<MaxNodes, MaxList>, MaxNodes>
-        arena,
-    Cont cont) {
-    return cps_code{
-        [node, arena, cont](auto &environment, auto &envs, auto k) constexpr {
-            return detail::cps_dispatch<MaxNodes, MaxList>(
-                node, arena, cont, environment, envs, k);
-        }};
+[[nodiscard]] constexpr auto
+cps_of(elaborator::core_type<MaxNodes, MaxList> const &node,
+       smd::smdscheme::foundation::tree_arena<
+           elaborator::core_type<MaxNodes, MaxList>, MaxNodes>
+           arena,
+       Cont cont) {
+    return cps_code{[node, arena, cont](auto &environment, auto &envs,
+                                        auto k) constexpr {
+        return detail::cps_dispatch<MaxNodes, MaxList>(node, arena, cont,
+                                                       environment, envs, k);
+    }};
 }
 
 /// Compiles a core node to a @ref cps_code using the identity as the
@@ -675,11 +673,11 @@ template <int MaxNodes, int MaxList, class Cont>
 /// @tparam MaxNodes Arena capacity.
 /// @tparam MaxList  Maximum argument/list/body length.
 template <int MaxNodes, int MaxList>
-[[nodiscard]] constexpr auto compile_cps(
-    elaborator::core_type<MaxNodes, MaxList> const &node,
-    smd::smdscheme::foundation::tree_arena<
-        elaborator::core_type<MaxNodes, MaxList>, MaxNodes>
-        arena) {
+[[nodiscard]] constexpr auto
+compile_cps(elaborator::core_type<MaxNodes, MaxList> const &node,
+            smd::smdscheme::foundation::tree_arena<
+                elaborator::core_type<MaxNodes, MaxList>, MaxNodes>
+                arena) {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
     return cps_of<MaxNodes, MaxList>(node, arena, detail::identity_k<Core>{});
 }

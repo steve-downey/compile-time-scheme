@@ -71,7 +71,8 @@ constexpr auto eval(Program &program, Heap &heap, Envs &envs) -> Res {
 template <class Program>
 constexpr auto eval_mut(Program &program, Store &store, Heap &heap, Envs &envs)
     -> Res {
-    auto environment = lisp::closure::default_env<Core, MaxBindings>(store, heap);
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(store, heap);
     return program(environment, envs);
 }
 
@@ -154,7 +155,8 @@ TEST_CASE("ClosureProgramTest - KeywordSelfEvaluates") {
     DatumArena da;
     Heap heap;
     Envs envs;
-    auto pr = lisp::closure::compile_to_closure<MaxNodes, MaxList>(":foo"sv, da);
+    auto pr =
+        lisp::closure::compile_to_closure<MaxNodes, MaxList>(":foo"sv, da);
     REQUIRE(pr.has_value());
     auto r = eval(pr.value(), heap, envs);
     REQUIRE(r.has_value());
@@ -168,8 +170,8 @@ TEST_CASE("ClosureProgramTest - NilIsFalse") {
     DatumArena da;
     Heap heap;
     Envs envs;
-    auto pr =
-        lisp::closure::compile_to_closure<MaxNodes, MaxList>("(if nil 1 2)"sv, da);
+    auto pr = lisp::closure::compile_to_closure<MaxNodes, MaxList>(
+        "(if nil 1 2)"sv, da);
     REQUIRE(pr.has_value());
     auto r = eval(pr.value(), heap, envs);
     REQUIRE(r.has_value());
@@ -180,8 +182,8 @@ TEST_CASE("ClosureProgramTest - ZeroIsTrue") {
     DatumArena da;
     Heap heap;
     Envs envs;
-    auto pr =
-        lisp::closure::compile_to_closure<MaxNodes, MaxList>("(if 0 1 2)"sv, da);
+    auto pr = lisp::closure::compile_to_closure<MaxNodes, MaxList>(
+        "(if 0 1 2)"sv, da);
     REQUIRE(pr.has_value());
     auto r = eval(pr.value(), heap, envs);
     REQUIRE(r.has_value());
@@ -301,7 +303,8 @@ TEST_CASE("ClosureProgramTest - UnboundVariableIsError") {
     DatumArena da;
     Heap heap;
     Envs envs;
-    auto pr = lisp::closure::compile_to_closure<MaxNodes, MaxList>("nope"sv, da);
+    auto pr =
+        lisp::closure::compile_to_closure<MaxNodes, MaxList>("nope"sv, da);
     REQUIRE(pr.has_value());
     auto r = eval(pr.value(), heap, envs);
     REQUIRE_FALSE(r.has_value());
@@ -312,8 +315,8 @@ TEST_CASE("ClosureProgramTest - UndefinedFunctionIsError") {
     DatumArena da;
     Heap heap;
     Envs envs;
-    auto pr =
-        lisp::closure::compile_to_closure<MaxNodes, MaxList>("(nope 1 2)"sv, da);
+    auto pr = lisp::closure::compile_to_closure<MaxNodes, MaxList>(
+        "(nope 1 2)"sv, da);
     REQUIRE(pr.has_value());
     auto r = eval(pr.value(), heap, envs);
     REQUIRE_FALSE(r.has_value());
@@ -324,8 +327,8 @@ TEST_CASE("ClosureProgramTest - CallingNonFunctionIsError") {
     DatumArena da;
     Heap heap;
     Envs envs;
-    auto pr =
-        lisp::closure::compile_to_closure<MaxNodes, MaxList>("(funcall 5)"sv, da);
+    auto pr = lisp::closure::compile_to_closure<MaxNodes, MaxList>(
+        "(funcall 5)"sv, da);
     REQUIRE(pr.has_value());
     auto r = eval(pr.value(), heap, envs);
     REQUIRE_FALSE(r.has_value());
@@ -402,8 +405,8 @@ TEST_CASE("ClosureProgramTest - SetqOnUnboundVariableIsError") {
     Store store;
     Heap heap;
     Envs envs;
-    auto pr =
-        lisp::closure::compile_to_closure<MaxNodes, MaxList>("(setq nope 1)"sv, da);
+    auto pr = lisp::closure::compile_to_closure<MaxNodes, MaxList>(
+        "(setq nope 1)"sv, da);
     REQUIRE(pr.has_value());
     auto r = eval_mut(pr.value(), store, heap, envs);
     REQUIRE_FALSE(r.has_value());
