@@ -1,15 +1,16 @@
-# Next steps: Common Lisp pivot, Step L12 (spine) and Step L17 (macros, Track C)
+# Next steps: Common Lisp pivot, Step L12 (spine) and Step L18 (backquote, Track C)
 
-> **2026-07-20 update:** L11 (this worktree, `cl-pivot/l11-eval-direct`) is done — see `handoff.md`'s
+> **2026-07-22 update:** L17 (macro expander with host macros) is done — see `handoff.md`'s "Step L17: macro
+> expander with host macros landed" section. Part 2 below now covers **L18 (backquote)**, the next Track C
+> step, instead of L17. Part 1 (L12) is **carried forward unchanged from the previous revision of this file**:
+> this L17 worker did not check whether L12 has merged to `main` yet (L12 runs in a separate, concurrent
+> worktree per the plan's parallelism summary), so treat Part 1 as still-current unless `checklist.md` on
+> `main` already shows L12 checked off, in which case skip straight to Part 2.
+
+> **2026-07-20 note (retained):** L11 (worktree `cl-pivot/l11-eval-direct`) is done — see `handoff.md`'s
 > "Step L11: direct evaluator landed (+ phase 17 draft)" section. Per `docs/cl-pivot-plan.md` section 9,
-> **Step L12 depends on L11**, which is now satisfied once this branch merges to `main`. L12 is the next
-> unchecked step in `checklist.md`'s spine (Track A). **Step L17 (macro expander, Track C) also depends on
-> L11** (specifically on the pipeline being read → elaborate → eval, which L11 completed) and, per the plan's
-> parallelism summary, "may run in parallel" with L12 through L16 — it lives in `src/smd/smdlisp/macroexpand/`,
-> a directory neither L12 nor anything through L16 touches, so a second worker can pick up L17 concurrently
-> with whoever takes L12, in a separate worktree, once both branches are off `main` post-merge. This file
-> covers both, in that order; whoever's continuing should read only their own section plus "Standing
-> constraints" below.
+> **Step L12 depends on L11**, which is satisfied once that branch merges to `main`. L12 is the next unchecked
+> step in `checklist.md`'s spine (Track A).
 
 ---
 
@@ -140,101 +141,102 @@ value.
 
 ---
 
-## Part 2 — Step L17: macro expander with host macros (Track C, parallel-eligible)
+## Part 2 — Step L18: backquote (Track C)
 
-### Why this can run in parallel with L12-L16
+### L17 is done — what it left behind
 
-Per `docs/cl-pivot-plan.md`'s parallelism summary: "Track C (macros): L17 → L18 → L19 runs parallel to L14–L16
-after L11." L17's own dependency line in section 9 says "Dependencies: L10 (pipeline), independent of L14–L16
-— may run in parallel with them." L11 (this step) completed the read → elaborate → eval pipeline L17 needs to
-insert into (read → **expand** → elaborate → eval); L17 does not depend on `setq`/`defun` (L12), `block`
-(L14), or `catch`/`throw` (L15) existing first. It lives entirely under a **new** directory,
-`src/smd/smdlisp/macroexpand/`, which no other in-flight step touches — a genuinely separate lane, safe to
-run as a second concurrent worktree once `main` has this branch's L11 work merged in.
+`src/smd/smdlisp/macroexpand/{expander.hpp,expander.test.cpp,CMakeLists.txt}` landed (Track C, `docs/cl-pivot-plan.md`
+step L17). Read `handoff.md`'s "Step L17: macro expander with host macros landed" section in full before
+starting; the essentials L18 will build directly on top of:
 
-### What L17 needs to build
+- **The pipeline is now read → expand → elaborate → eval.** `lisp::macroexpand::expand_and_elaborate<MaxNodes,MaxList>(datum,
+  datum_arena, core_arena) -> result<core_type<MaxNodes,MaxList>>` is the entry point every later step should
+  call instead of a bare `elaborator::elaborate(...)` — it runs `expand_datum` first (macro expansion, including
+  backquote once L18 lands) and then calls `elaborate` unchanged on the result. `elaborate.hpp`/`eval_direct.hpp`
+  were not touched by L17 and should not need to be touched by L18 either: backquote, like `cond`/`when`/etc.,
+  is a datum-to-datum transform, not a new core kind or evaluator case.
+- **`expand_datum<MaxNodes,MaxList>(datum, arena) -> result<datum>`** is the whole-tree recursive expander:
+  it macro-expands the head of every list position to fixpoint (`macroexpand`), then recurses into whatever
+  list results, **except** through `reader::datum_quote` (the reader's `'x`) and an ordinary list headed by
+  the symbol `QUOTE` (the equivalent long spelling, detected by `detail::is_quote_form`) — both are treated as
+  literal data and never macro-expanded or recursed into. **Backquote needs the analogous, but inverted, rule:**
+  a `` `template `` form (however L18 represents it — plan section 9 says "reader support for `` ` ``, `,`, `,@`
+  lowering to datum template nodes") is mostly-literal but has escape points (`,`/`,@`) that ARE code and must
+  still be macro-expanded. Decide up front whether backquote gets a new datum kind (mirroring how `datum_quote`/
+  `datum_function` are dedicated reader-level nodes, per L6's "the reader preserves source reality" convention)
+  or is lowered eagerly to `cons`/`list`/`append` calls at read time; the plan's own wording ("lowering to datum
+  template nodes... during macro expansion") suggests the former — a dedicated template node the *expander*
+  (not the reader) lowers to `cons`/`list`/`append` builds, which would make backquote itself a new
+  `expand_datum` case, not a `host_macro` entry (its unquote-escape structure isn't a plain call-form the
+  `host_macro` registry's `(call-form, arena) -> datum` shape fits) — read `docs/cl-pivot-plan.md` step L18
+  again before committing to a shape.
+- **`append` joins the builtin set** per the plan (currently `+`/`*`/`cons`/`car`/`cdr`/`list`/`null`/`eq`/`eql`/`atom`/
+  `funcall`/`apply`, all in `closure::builtin_op`, `src/smd/smdlisp/closure/value.hpp`, installed into the
+  FUNCTION namespace by `closure::default_env`, `src/smd/smdlisp/closure/env.hpp`). This is `closure/`-lane
+  work (L9/L11's territory), not `macroexpand/`-lane work — if L18 needs `append` to *build* backquote's
+  expansions at compile time (not just as a builtin the compiled program can call), check whether `pairs.hpp`'s
+  `apply_prim`/`list_op` needs a new `append` case, or whether backquote's expansion can just emit a call to
+  the FUNCTION-namespace `append` builtin exactly the way `case`'s expansion emits calls to `eql`/`or` (L17's
+  approach — building *code* that calls existing builtins, not building *values* directly) — the latter is
+  almost certainly the right pattern to reuse, since it needed no elaborator/evaluator changes at all.
+- **The `host_macro` dispatch pattern** (`src/smd/smdlisp/macroexpand/expander.hpp`): if any part of backquote's
+  implementation genuinely fits the "symbol-headed call form → replacement datum" shape (unlikely for the
+  `` ` `` reader syntax itself, but maybe for a `(backquote ...)`-spelled long form, mirroring how `(quote ...)`
+  is the long spelling `expand_datum` already special-cases alongside `'x`), reuse `host_macro`/`default_macro_table`
+  rather than inventing a second registry.
+- **A build-chain gotcha to avoid re-discovering:** do not split a "look up a function pointer, then compare it
+  to `nullptr`" pattern across two steps inside code that will be evaluated in a `constexpr`/`static_assert`
+  context — GCC16 rejects that specific comparison as non-constant even when the pointer is perfectly
+  well-defined at runtime (see `handoff.md`'s L17 section for the exact error and the fix: find-and-call inside
+  one loop iteration, never store a "found or not" pointer and compare it to null afterward).
+- **DIV-0006** (`docs/divergences/DIV-0006-macro-temp-name-capture.md`) documents that `or`/`cond`/`case` use
+  fixed reserved binding names (`%OR-TEMP`/`%COND-TMP`/`%CASE-TMP`) instead of `gensym`, because there is no
+  `gensym`/backquote machinery yet. **L18 does not close this divergence** (backquote alone doesn't provide
+  `gensym`; that needs `defmacro`'s compile-time evaluator, L19) but should not make it worse — any macro
+  helper `expand_datum`/backquote-lowering machinery introduces should not add a fourth ad-hoc reserved name
+  without checking whether backquote's own template-substitution machinery could serve double duty.
 
-`src/smd/smdlisp/macroexpand/expander.hpp` (+ tests): a **datum-to-datum** pass that runs between the reader
-and the elaborator — i.e. it operates on `smd::smdlisp::reader::datum_type<MaxNodes, MaxList>` trees (L6),
-*before* anything becomes a `core_type` node (L10). This is a new architectural layer; nothing in L4-L11
-built any datum-transforming code, only datum-*producing* (reader) or datum-*consuming* (elaborator, evaluator)
-code. Read `src/smd/smdlisp/reader/datum_type.hpp` (L6) fully before starting — the six datum kinds
-(`datum_integer`, `datum_symbol`, `datum_keyword`, `datum_list`, `datum_quote`, `datum_function`) and the
-arena/`arena_box` shape are exactly what expander code will construct and consume.
+### What L18 needs to build (plan section 9, step L18)
 
-Per the plan's sketch:
+Reader support for `` ` ``, `,`, `,@` lowering to datum template nodes, and an expansion of templates into
+`cons`/`list`/`append` builds during macro expansion. `append` joins the builtin set.
 
-```cpp
-// Host macro: C++ function from a call-form datum to a replacement datum,
-// writing into the same arena.  Registry is a static_vector keyed by symbol.
-struct host_macro {
-    symbol name{};
-    // (tree, call-node) -> new node id, or error
-    macro_fn expand{};
-};
-// macroexpand-1 applies one step at the head position;
-// macroexpand iterates to fixpoint under a MaxExpansions budget
-// (budget exhaustion is a diagnosed error, not a hang).
-```
+**Note the plan lists this as reader-layer work** ("Reader support for `` ` ``, `,`, `,@`") — unlike L17, which
+was told "do not touch `src/smd/smdlisp/reader/` ... stable since L6," L18 is explicitly expected to touch the
+reader (new lexical syntax for backquote/unquote/unquote-splicing, presumably a new datum kind analogous to
+`datum_quote`/`datum_function`). This is a real difference from L17's constraints — read `docs/cl-pivot-plan.md`
+step L18 and decide the datum-kind shape before writing code; do not assume L17's "the expander never touches
+the reader" precedent applies here.
 
-Note: the plan's sketch uses a bare `symbol` type — `smd::smdlisp`'s reader layer doesn't have a `symbol`
-type of its own (that's `closure::symbol`, a *value*-layer type from L7, used post-evaluation). For a
-datum-to-datum pass, matching by spelling likely means comparing `reader::folded_name` or its `.view()`
-against a `std::string_view` key, the same way the elaborator's special-form dispatch already does
-(`detail::elaborate_list` in `elaborate.hpp` compares `sym.name.view() == "IF"` etc.) — reuse that pattern,
-don't invent a new symbol-comparison mechanism.
+### Merge criteria (plan section 9, step L18)
 
-**Implement `cond`, `when`, `unless`, `and`, `or`, `case` as host macros** expanding to `if`/`progn`/`let` —
-matching their actual macro status in ANSI CL (these are never special operators in real Common Lisp,
-always macros defined in terms of `if`/`progn`/etc.). This is a good test of whether the expander's shape is
-right: if implementing these six requires ad-hoc special-casing rather than each being an ordinary
-`host_macro` entry, the expander's API probably needs adjusting before more macros get added in L18/L19.
+`` `(a ,x ,@ys) `` expansion tests at both datum and value level.
 
-**Wire the pass into the pipeline:** read → expand → elaborate. This likely means a new top-level entry point
-(analogous to `elab()`'s test helper, or a real `expand_and_elaborate()` public function) that threads a
-*third* arena or reuses the datum arena for macro-expansion output — check whether expansion can write its
-replacement nodes into the *same* datum arena the reader already populated (simplest, and consistent with
-"the expander speaks the reader's datum language") or needs its own. `elaborate()`'s existing signature takes
-`(datum, datum_arena, core_arena)` — the natural integration point is probably a new function with the same
-shape that runs expansion first, `(datum, datum_arena, core_arena) -> result<core_type>`, calling `elaborate`
-internally on the expanded datum tree rather than the raw one.
+### Standing constraints for L18
 
-### Merge criteria (plan section 9, step L17)
-
-Expansion-shape tests (each of the six macros expands to the expected `if`/`progn`/`let` shape) plus an
-end-to-end test: `(cond (nil 1) (t 2))` ⇒ `2` — read, expand, elaborate, evaluate, matching L11's evaluator's
-existing `nil`/`t` truthiness and `if` semantics with no evaluator changes required (the macro expander's
-whole point is that `cond` never needs its own core kind or its own evaluator case).
-
-### Standing constraints for L17
-
-- `src/smd/smdscheme/**` is frozen for semantic changes (D1). Read-only reference (though there is likely
-  nothing analogous to adapt-by-copy here — `smdscheme` has no macro layer at all, per the plan's gap
-  analysis table: "Macros ... Absent (no macro layer at all)"). This is new machinery, not an adaptation.
-- New files land in `src/smd/smdlisp/macroexpand/` only. Do not touch `src/smd/smdlisp/elaborator/` or
-  `src/smd/smdlisp/closure/` (L12's lane, if running concurrently) or `src/smd/smdlisp/reader/` (stable since
-  L6; the expander consumes `datum_type` but should not need to change its shape — if it turns out to need a
-  reader-layer change, that is worth a divergence doc, since it means the plan's "datum-to-datum pass with no
-  reader involvement" premise didn't survive contact with the implementation).
-- `src/smd/smdlisp/CMakeLists.txt` will need a new `add_subdirectory(macroexpand)` plus a new
-  `src/smd/smdlisp/macroexpand/CMakeLists.txt` (mirror `reader/`'s or `elaborator/`'s — STATIC library target
-  named `smdlisp.macroexpand`, `FILE_SET` for the header(s), linking whatever of `smdlisp.reader`/
-  `smdlisp.elaborator`/`smdscheme.foundation` it actually needs). If L12 is running concurrently in a sibling
-  worktree and also touches the top-level `src/smd/smdlisp/CMakeLists.txt`, expect a merge conflict at
-  integration time on that one file — not on anything else, since the two steps' new files don't overlap.
+- `src/smd/smdscheme/**` is frozen for semantic changes (D1). Read-only reference, never edit.
+- Reader-layer changes for `` ` ``/`,`/`,@` land in `src/smd/smdlisp/reader/` (a deliberate exception to L17's
+  "reader is stable" note, per the plan's own wording for this step — see above). Expansion-time lowering
+  (template → `cons`/`list`/`append` builds) lands in `src/smd/smdlisp/macroexpand/`. If `append` needs a new
+  `list_op`/`apply_prim` case, that lands in `src/smd/smdlisp/closure/pairs.hpp`; if it only needs a new
+  `builtin_op` tag routed to an existing/new `apply_prim` case, that also touches `src/smd/smdlisp/closure/env.hpp`
+  (default builtin installation) and `src/smd/smdlisp/closure/eval_direct.hpp` (`detail::to_list_op`'s bridge
+  table). Do not touch `src/smd/smdlisp/elaborator/` — nothing about backquote should need a new core kind or
+  special form; if it turns out to, that is worth a divergence doc, since the plan frames backquote as
+  expansion-time lowering, not an elaborator feature.
 - Keep C++26/GCC16 baseline; tests use Catch2; mirror file prolog / include guard / canonical-include
-  conventions.
-- File a divergence doc under `docs/divergences/` for anything done differently than the plan specifies.
-  **Next free number is DIV-0005** (shared counter with L12 — whichever step's worker gets there first claims
-  it; check `docs/divergences/` for the latest `DIV-NNNN` before filing, don't assume the number in this
-  document is still accurate if L12 landed first).
-- Before handoff: `make compile`, `make test`, `make lint`. L17 has **no** blog deliverable (phase 20 arrives
+  conventions already used throughout `src/smd/smdlisp/`.
+- File a divergence doc under `docs/divergences/` for anything done differently than the plan specifies, or any
+  knowing ANSI CL deviation. **Next free number is DIV-0007** — check `docs/divergences/` for the actual latest
+  `DIV-NNNN` before filing; L12 (if it landed first) may have already claimed DIV-0005, and this document's
+  number may be stale by the time you read it.
+- Before handoff: `make compile`, `make test`, `make lint`. L18 has **no** blog deliverable (phase 20 arrives
   at L19, `defmacro`, per the plan's phase table) — don't draft one.
-- Do not continue past L17 into L18 (backquote) unless blocked; if blocked, document the blocker here instead.
+- Do not continue past L18 into L19 (`defmacro`) unless blocked; if blocked, document the blocker here instead.
 
 ---
 
-## Standing constraints (apply to both L12 and L17, and everything after)
+## Standing constraints (apply to both L12 and L18, and everything after)
 
 - `src/smd/smdscheme/**` is frozen for semantic changes (D1); blog phases 5-12 transclude live code from it by
   UUID anchor. Read-only reference, never edit.
