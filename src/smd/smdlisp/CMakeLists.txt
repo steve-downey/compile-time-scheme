@@ -4,6 +4,7 @@
 add_subdirectory(reader)
 add_subdirectory(elaborator)
 add_subdirectory(closure)
+add_subdirectory(macroexpand)
 
 add_library(smdlisp.smdlisp STATIC "")
 target_sources(
@@ -23,6 +24,7 @@ target_link_libraries(
         smdlisp.reader
         smdlisp.closure
         smdlisp.elaborator
+        smdlisp.macroexpand
 )
 
 find_package(Catch2 REQUIRED)
