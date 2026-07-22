@@ -182,6 +182,51 @@ template <typename Core>
 using value = std::variant<nil_t, int, symbol, keyword, builtin, closure<Core>,
                            foreign_function<Core>, pair_ref>;
 
+/// Fixed capacity of the mutable variable @ref store shared by an @ref env.
+inline constexpr int default_max_store = 256;
+
+/// A flat, constexpr, allocation-free store of mutable value cells,
+/// addressed by stable integer locations.
+///
+/// Adapted by copy from `smd::smdscheme::closure::store` (PR #23, the
+/// landed `set!` step) as the basis for `setq` (step L12, decision:
+/// `docs/cl-pivot-plan.md` step L12 explicitly names this class as the
+/// machinery to adapt). @ref smd::smdscheme::foundation::static_vector is
+/// array-backed, so a location never moves once allocated: an @ref env
+/// binding can hold a bare stable index instead of a pointer. A @ref store
+/// is shared (by non-owning pointer) across every @ref env copy --
+/// including closure captures made through @ref env_arena -- so `setq` on
+/// a variable is visible to every closure sharing that binding, not just
+/// whichever copy performed the mutation. The store must outlive every
+/// environment that names a location in it (it lives for one program
+/// evaluation, exactly like @ref pair_heap).
+///
+/// @tparam Core     The core AST type.
+/// @tparam MaxStore Maximum number of mutable cells.
+template <typename Core, int MaxStore>
+class store {
+  public:
+    /// Appends @p v and returns its stable location.
+    constexpr auto alloc(value<Core> v) -> int {
+        int loc = cells_.size();
+        cells_.push_back(std::move(v));
+        return loc;
+    }
+
+    /// Returns the value at @p loc.
+    [[nodiscard]] constexpr auto get(int loc) const -> value<Core> const & {
+        return cells_[loc];
+    }
+
+    /// Overwrites the cell at @p loc with @p v (the `setq` primitive).
+    constexpr auto set(int loc, value<Core> v) -> void {
+        cells_[loc] = std::move(v);
+    }
+
+  private:
+    smd::smdscheme::foundation::static_vector<value<Core>, MaxStore> cells_{};
+};
+
 /// Fixed capacity of the @ref pair_heap shared by an environment.
 inline constexpr int default_max_pairs = 256;
 

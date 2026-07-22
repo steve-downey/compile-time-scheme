@@ -170,23 +170,40 @@ constexpr auto elaborate_function_position(
     char const *error_message)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>>;
 
-/// Elaborates the formals and body of a @c lambda form.
+/// Elaborates a formals list and a body-expression range into a
+/// @ref core_lambda.
 ///
-/// @p lst is the whole `(LAMBDA (params...) body...)` datum list, including
-/// the leading `LAMBDA` symbol; this is shared by the standalone @c lambda
-/// special form and by @ref elaborate_function_position's `(function
-/// (lambda ...))` / `#'(lambda ...)` case, so both spellings of an embedded
-/// lambda expression go through one implementation. The body is elaborated
-/// as an EXPRESSION SEQUENCE with implicit progn: at least one body
-/// expression is required (a zero-form body, though legal in full ANSI CL,
-/// is out of scope for this baseline elaborator).
+/// This is the shared implementation behind @ref elaborate_lambda (the
+/// standalone `lambda` special form, and `#'(lambda ...)`/`(function
+/// (lambda ...))`) and `defun`'s elaboration (step L12): both forms need
+/// "a formals list, then one or more body expressions", differing only in
+/// *where* those two pieces sit inside their enclosing datum list --
+/// `(LAMBDA (params...) body...)` has formals at index 1 and body starting
+/// at index 2, while `(DEFUN name (params...) body...)` has formals at
+/// index 2 and body starting at index 3. Factoring this out lets `defun`
+/// reuse the exact same formals/body elaboration `lambda` uses, rather than
+/// duplicating it, by passing the formals handle and body-start index
+/// explicitly instead of assuming fixed positions in @p lst.
+///
+/// The body is elaborated as an EXPRESSION SEQUENCE with implicit progn:
+/// at least one body expression is required (a zero-form body, though
+/// legal in full ANSI CL, is out of scope for this baseline elaborator).
 ///
 /// @tparam MaxNodes Arena capacity.
 /// @tparam MaxList  Maximum list length.
+/// @param  formals_id  Handle to the formals-list datum.
+/// @param  lst         The enclosing datum list (`lambda` or `defun` form);
+///                     only elements at and after @p body_start are read.
+/// @param  body_start  Index into @p lst.elements of the first body
+///                     expression.
 template <int MaxNodes, int MaxList>
-constexpr auto elaborate_lambda(
+constexpr auto elaborate_lambda_body(
+    smdscheme::foundation::arena_box<reader::datum_type<MaxNodes, MaxList>,
+                                     MaxNodes>
+        formals_id,
     reader::datum_list<reader::datum_type<MaxNodes, MaxList>, MaxNodes,
                        MaxList> const &lst,
+    int body_start,
     smdscheme::foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
                                       MaxNodes> const &datum_arena,
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
@@ -198,11 +215,11 @@ constexpr auto elaborate_lambda(
     using DatumList = reader::datum_list<reader::datum_type<MaxNodes, MaxList>,
                                          MaxNodes, MaxList>;
 
-    if (lst.elements.size() < 3)
+    if (body_start >= lst.elements.size())
         return smdscheme::foundation::parse_error{
             {}, "lambda: expected formals and at least one body expression"};
 
-    auto const &formals_node = datum_arena.get(lst.elements[1]);
+    auto const &formals_node = datum_arena.get(formals_id);
     if (!std::holds_alternative<DatumList>(formals_node.inner))
         return smdscheme::foundation::parse_error{{},
                                                   "lambda: formals must be a "
@@ -224,7 +241,7 @@ constexpr auto elaborate_lambda(
         lam.params.push_back(p_name);
     }
 
-    for (int i = 2; i < lst.elements.size(); ++i) {
+    for (int i = body_start; i < lst.elements.size(); ++i) {
         auto body_r = elaborate_node<MaxNodes, MaxList>(
             datum_arena.get(lst.elements[i]), datum_arena, core_arena);
         if (!body_r.has_value())
@@ -234,6 +251,34 @@ constexpr auto elaborate_lambda(
     }
 
     return core{core_f{std::move(lam)}};
+}
+
+/// Elaborates the formals and body of a @c lambda form.
+///
+/// @p lst is the whole `(LAMBDA (params...) body...)` datum list, including
+/// the leading `LAMBDA` symbol; this is shared by the standalone @c lambda
+/// special form and by @ref elaborate_function_position's `(function
+/// (lambda ...))` / `#'(lambda ...)` case, so both spellings of an embedded
+/// lambda expression go through one implementation. Delegates the actual
+/// formals/body elaboration to @ref elaborate_lambda_body (shared with
+/// `defun`'s elaboration, step L12).
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+template <int MaxNodes, int MaxList>
+constexpr auto elaborate_lambda(
+    reader::datum_list<reader::datum_type<MaxNodes, MaxList>, MaxNodes,
+                       MaxList> const &lst,
+    smdscheme::foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
+                                      MaxNodes> const &datum_arena,
+    smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
+        &core_arena)
+    -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>> {
+    if (lst.elements.size() < 3)
+        return smdscheme::foundation::parse_error{
+            {}, "lambda: expected formals and at least one body expression"};
+    return elaborate_lambda_body<MaxNodes, MaxList>(lst.elements[1], lst, 2,
+                                                    datum_arena, core_arena);
 }
 
 /// Elaborates a datum in FUNCTION position (decision D4): the operand of
@@ -406,6 +451,109 @@ constexpr auto elaborate_list(
             return elaborate_function_position<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[1]), datum_arena, core_arena,
                 "function: expected a function name or a lambda expression");
+        }
+
+        if (name == "SETQ") {
+            // (setq name1 expr1 name2 expr2 ...) -- ANSI CL allows any
+            // number of name/value pairs (at least one), assigning each in
+            // turn and yielding the value of the last (evaluator's job;
+            // see core_setq's docs). Adapted from the landed Scheme
+            // `set!`/`core_set` machinery (PR #23), generalized from one
+            // pair to CL's variadic pairs.
+            if (lst.elements.size() < 3 || (lst.elements.size() % 2) != 1)
+                return smdscheme::foundation::parse_error{
+                    {},
+                    "setq: expected an even number of name/value "
+                    "arguments"};
+
+            core_setq<core, MaxNodes, MaxList> sq{};
+            for (int i = 1; i < lst.elements.size(); i += 2) {
+                auto const &name_node = datum_arena.get(lst.elements[i]);
+                if (!std::holds_alternative<reader::datum_symbol>(
+                        name_node.inner))
+                    return smdscheme::foundation::parse_error{
+                        {}, "setq: target must be a symbol"};
+                auto var_name =
+                    std::get<reader::datum_symbol>(name_node.inner).name.view();
+
+                auto expr_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[i + 1]), datum_arena,
+                    core_arena);
+                if (!expr_r.has_value())
+                    return expr_r;
+
+                sq.names.push_back(var_name);
+                sq.exprs.push_back(smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(expr_r.value())));
+            }
+            return core{core_f{std::move(sq)}};
+        }
+
+        if (name == "DEFUN") {
+            // (defun name (params...) body...) -- defines `name` in the
+            // FUNCTION namespace (decision D4) as a closure. Reuses the
+            // exact same formals/body elaboration as an ordinary `lambda`
+            // (elaborate_lambda_body), offset by one element to skip the
+            // function name.
+            if (lst.elements.size() < 4)
+                return smdscheme::foundation::parse_error{
+                    {},
+                    "defun: expected a name, formals, and at least one "
+                    "body expression"};
+
+            auto const &name_node = datum_arena.get(lst.elements[1]);
+            if (!std::holds_alternative<reader::datum_symbol>(name_node.inner))
+                return smdscheme::foundation::parse_error{
+                    {}, "defun: name must be a symbol"};
+            auto fn_name =
+                std::get<reader::datum_symbol>(name_node.inner).name.view();
+
+            auto lam_r = elaborate_lambda_body<MaxNodes, MaxList>(
+                lst.elements[2], lst, 3, datum_arena, core_arena);
+            if (!lam_r.has_value())
+                return lam_r;
+
+            return core{core_f{core_defun<core, MaxNodes>{
+                fn_name, smdscheme::foundation::make_arena_box(
+                             core_arena, std::move(lam_r.value()))}}};
+        }
+
+        if (name == "DEFVAR" || name == "DEFPARAMETER") {
+            // (defvar name [init-form])
+            // (defparameter name init-form)
+            // Both define `name` in the VARIABLE namespace (decision D4)
+            // and mark it special; special-variable dynamic-binding
+            // *behavior* arrives in step L16, this step only records the
+            // mark (evaluator's job -- see core_defvar's docs).
+            bool const is_parameter = name == "DEFPARAMETER";
+            if (is_parameter && lst.elements.size() != 3)
+                return smdscheme::foundation::parse_error{
+                    {}, "defparameter: expected a name and an init form"};
+            if (!is_parameter &&
+                (lst.elements.size() < 2 || lst.elements.size() > 3))
+                return smdscheme::foundation::parse_error{
+                    {}, "defvar: expected a name and an optional init form"};
+
+            auto const &name_node = datum_arena.get(lst.elements[1]);
+            if (!std::holds_alternative<reader::datum_symbol>(name_node.inner))
+                return smdscheme::foundation::parse_error{
+                    {}, "defvar: name must be a symbol"};
+            auto var_name =
+                std::get<reader::datum_symbol>(name_node.inner).name.view();
+
+            core_defvar<core, MaxNodes> dv{};
+            dv.name = var_name;
+            dv.is_parameter = is_parameter;
+            if (lst.elements.size() == 3) {
+                auto init_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[2]), datum_arena, core_arena);
+                if (!init_r.has_value())
+                    return init_r;
+                dv.init = smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(init_r.value()));
+                dv.has_init = true;
+            }
+            return core{core_f{std::move(dv)}};
         }
 
         if (name == "LET") {

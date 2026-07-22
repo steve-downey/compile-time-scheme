@@ -490,3 +490,115 @@ TEST_CASE("ElaborateTest - ReaderLevelErrorsCarryRealPositions") {
     REQUIRE(!er.has_value());
     REQUIRE(er.error().where != smd::smdscheme::foundation::source_pos{});
 }
+
+// -- setq / defun / defvar / defparameter (step L12) -----------------------
+
+TEST_CASE("ElaborateTest - SetqOnePairElaboratesToCoreSetq") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(setq x 1)", da, ca);
+    REQUIRE(er.has_value());
+    using Setq = lisp::elaborator::core_setq<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<Setq>(er.value().inner));
+    auto const &sq = std::get<Setq>(er.value().inner);
+    REQUIRE(sq.names.size() == 1);
+    REQUIRE(sq.names[0] == "X");
+    REQUIRE(sq.exprs.size() == 1);
+}
+
+TEST_CASE("ElaborateTest - SetqMultiplePairsElaboratesInOrder") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(setq x 1 y 2)", da, ca);
+    REQUIRE(er.has_value());
+    using Setq = lisp::elaborator::core_setq<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<Setq>(er.value().inner));
+    auto const &sq = std::get<Setq>(er.value().inner);
+    REQUIRE(sq.names.size() == 2);
+    REQUIRE(sq.names[0] == "X");
+    REQUIRE(sq.names[1] == "Y");
+    REQUIRE(sq.exprs.size() == 2);
+}
+
+TEST_CASE("ElaborateTest - SetqOddArgumentCountIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(setq x 1 y)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - SetqTargetMustBeSymbol") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(setq 1 2)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DefunElaboratesToCoreDefunWithLambda") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(defun twice (x) (+ x x))", da, ca);
+    REQUIRE(er.has_value());
+    using Defun = lisp::elaborator::core_defun<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Defun>(er.value().inner));
+    auto const &df = std::get<Defun>(er.value().inner);
+    REQUIRE(df.name == "TWICE");
+    using Lam = lisp::elaborator::core_lambda<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<Lam>(ca.get(df.lambda_node).inner));
+    auto const &lam = std::get<Lam>(ca.get(df.lambda_node).inner);
+    REQUIRE(lam.params.size() == 1);
+    REQUIRE(lam.params[0] == "X");
+    REQUIRE(lam.body.size() == 1);
+}
+
+TEST_CASE("ElaborateTest - DefunNameMustBeSymbol") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(defun 1 (x) x)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DefunTooFewArgumentsIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(defun twice (x))", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DefvarWithInitElaboratesToCoreDefvar") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(defvar *x* 1)", da, ca);
+    REQUIRE(er.has_value());
+    using Defvar = lisp::elaborator::core_defvar<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Defvar>(er.value().inner));
+    auto const &dv = std::get<Defvar>(er.value().inner);
+    REQUIRE(dv.name == "*X*");
+    REQUIRE(dv.has_init);
+    REQUIRE_FALSE(dv.is_parameter);
+}
+
+TEST_CASE("ElaborateTest - DefvarWithoutInitOnlyMarksSpecial") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(defvar *x*)", da, ca);
+    REQUIRE(er.has_value());
+    using Defvar = lisp::elaborator::core_defvar<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Defvar>(er.value().inner));
+    REQUIRE_FALSE(std::get<Defvar>(er.value().inner).has_init);
+}
+
+TEST_CASE("ElaborateTest - DefparameterAlwaysRequiresInit") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(defparameter *x*)", da, ca).has_value());
+    auto er = elab("(defparameter *x* 1)", da, ca);
+    REQUIRE(er.has_value());
+    using Defvar = lisp::elaborator::core_defvar<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Defvar>(er.value().inner));
+    auto const &dv = std::get<Defvar>(er.value().inner);
+    REQUIRE(dv.has_init);
+    REQUIRE(dv.is_parameter);
+}
+
+TEST_CASE("ElaborateTest - DefvarNameMustBeSymbol") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(defvar 1 2)", da, ca).has_value());
+}

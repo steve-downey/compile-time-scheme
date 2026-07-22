@@ -1,143 +1,158 @@
-# Next steps: Common Lisp pivot, Step L12 (spine) and Step L18 (backquote, Track C)
+# Next steps: Common Lisp pivot — Step L13 (spine, Track A) and Step L18 (backquote, Track C)
 
-> **2026-07-22 update:** L17 (macro expander with host macros) is done — see `handoff.md`'s "Step L17: macro
-> expander with host macros landed" section. Part 2 below now covers **L18 (backquote)**, the next Track C
-> step, instead of L17. Part 1 (L12) is **carried forward unchanged from the previous revision of this file**:
-> this L17 worker did not check whether L12 has merged to `main` yet (L12 runs in a separate, concurrent
-> worktree per the plan's parallelism summary), so treat Part 1 as still-current unless `checklist.md` on
-> `main` already shows L12 checked off, in which case skip straight to Part 2.
+> **2026-07-22 update (orchestrator merge):** Both **L12** (spine) and **L17** (macro expander, Track C)
+> are done and merged to `main` — see `handoff.md`'s "Step L12: setq, defun, defvar, defparameter landed"
+> and "Step L17: macro expander with host macros landed" sections, and `checklist.md`. The two
+> next-available steps are **L13 (CPS closure backend)**, which depends on L12 (satisfied), and **L18
+> (backquote)**, which depends on L17 (satisfied). Per `docs/cl-pivot-plan.md`'s parallelism summary they
+> live in non-overlapping lanes — `src/smd/smdlisp/closure/` for L13, `src/smd/smdlisp/reader/` +
+> `src/smd/smdlisp/macroexpand/` for L18 — and may run concurrently in separate worktrees. Part 1 below is
+> L13; Part 2 is L18; whoever continues should read only their own Part plus the shared "Standing
+> constraints" at the end. The only likely integration conflict between the two lanes is the tracking docs
+> (`checklist.md`, `handoff.md`, this file) and the top-level `src/smd/smdlisp/CMakeLists.txt`.
 
-> **2026-07-20 note (retained):** L11 (worktree `cl-pivot/l11-eval-direct`) is done — see `handoff.md`'s
-> "Step L11: direct evaluator landed (+ phase 17 draft)" section. Per `docs/cl-pivot-plan.md` section 9,
-> **Step L12 depends on L11**, which is satisfied once that branch merges to `main`. L12 is the next unchecked
-> step in `checklist.md`'s spine (Track A).
+## Part 1 — Step L13: CPS closure backend (spine, Track A)
 
----
+## What L13 needs from L12 (this step)
 
-## Part 1 — Step L12: `setq`, `defun`, `defvar`, `defparameter` (spine, Track A)
+L12 landed `setq`/`defun`/`defvar`/`defparameter` on top of L11's direct evaluator. Read `handoff.md`'s
+"Step L12" section in full before starting; the essentials L13 will lean on directly:
 
-### What L12 needs from L11 (this step)
+- **Fifteen core kinds now exist** in `elaborated_core.hpp`'s `core_f_factory` variant: the twelve from
+  L10 (`core_integer`, `core_symbol`, `core_keyword`, `core_nil`, `core_true`, `core_quote`,
+  `core_cons`, `core_if`, `core_progn`, `core_lambda`, `core_function`, `core_application`) plus three
+  new ones from L12 (`core_setq`, `core_defun`, `core_defvar`). **The CPS backend must cover all
+  fifteen** — the plan's own merge criterion says "every L11/L12 end-to-end test also passes through
+  `compile_to_closure`," so `core_setq`/`core_defun`/`core_defvar` are in scope for L13, not deferred.
+- **`environment` is now a mutable reference (`env<Core, MaxBindings> &`), not `const &`,** throughout
+  `eval_direct.hpp` — this is what lets `defun`/`defvar`/`defparameter`/`setq` mutate the environment in
+  place and have *later* sibling expressions (evaluated with the same threaded environment reference,
+  e.g. `core_progn`'s and a lambda body's sequential loops) observe the mutation. **Any CPS/continuation
+  threading L13 builds needs to preserve this same property**: whatever plays the role of "the
+  environment" in the CPS backend must be mutated in place and shared across a `progn`/lambda-body
+  sequence's continuation chain, not copied fresh per step, or `(progn (defun f ...) (f ...))` and
+  `((lambda (x) (setq x 2) x) 1)` will regress under CPS even though they work under `eval_direct`. The
+  Scheme original's landed `begin`/`core_begin` CPS wiring (`smd::smdscheme::closure::cps_code.hpp`) is
+  the plan's named pattern for `progn`'s continuation-chaining shape — read it before designing this,
+  since `smdscheme`'s CPS backend evidently already solved (or sidestepped) the equivalent problem for
+  `set!`, which is the same class of issue.
+- **`setq` returns the assigned value, not `void`** (`env::set_value(symbol, value<Core>) const ->
+  foundation::result<value<Core>>`) — a CPS `core_setq` continuation must pass that value forward, not a
+  Scheme-style `unspecified` marker (there is no `unspecified` kind in `smdlisp`'s `value<Core>` at all;
+  don't introduce one).
+- **`store<Core, MaxStore>` (`value.hpp`, adapted from `smd::smdscheme::closure::store`) backs `setq`.**
+  `env<Core, MaxBindings>` operates in one of two modes: functional (no store, `setq` is a diagnosed
+  error) or mutable (constructed with a `store<Core, default_max_store>*`, shared across every `env`
+  copy including closure captures, so `setq` on a captured variable is visible to every closure sharing
+  the binding — see `EvalDirectTest - SetqIsVisibleAcrossClosuresSharingTheBinding` in
+  `eval_direct.test.cpp` for the shared-mutable-closure idiom this makes correct). **The CPS backend's
+  environment representation needs an equivalent mutable-mode story**, or `setq` will only be
+  observable within a single call frame rather than across closures that share a binding — get this
+  right by construction (mirror the store-pointer-sharing approach) rather than discovering the gap via
+  a failing shared-closure test the way L9/L11 discovered their own architecture gaps.
+- **`env` gained `mark_special(symbol) -> void` / `is_special(symbol) const -> bool`**
+  (`static_vector<symbol, MaxBindings> special_`, independent of `values_`/`functions_`/the store).
+  These currently have zero runtime effect beyond being queryable — L16 is where dynamic (re)binding
+  behavior for special variables actually arrives. **L13 does not need to build any dynamic-binding
+  machinery**; it only needs `core_defvar`'s CPS lowering to call the CPS-backend equivalent of
+  `mark_special`/optionally-`define_value`, exactly mirroring `eval_direct`'s `core_defvar` case (see
+  below).
+- **`defun`/`defvar`/`defparameter` all return `value<Core>{symbol{name}}`** (the function/variable
+  name), never the closure/init value — this is ANSI CL's actual return-value contract for these forms,
+  not an incidental choice; a CPS lowering that returns something else would be observably wrong (e.g.
+  `(print (defun f (x) x))` should print `F`, not a closure).
+- **`elaborate_lambda_body` (`elaborate.hpp`) is now the single shared formals/body-elaboration
+  function** behind both `lambda` and `defun` — `core_defun.lambda_node` is a genuine `core_lambda` node
+  in the arena (same shape `#'(lambda ...)` produces), so **`defun`'s CPS lowering can and should reuse
+  whatever CPS lowering L13 builds for `core_lambda`/closure-materialization**, then additionally emit
+  the function-namespace-definition side effect and the name-as-return-value. Do not build a second,
+  parallel "compile a lambda under CPS" path for `defun`.
+- **Top-level sequencing needs no new machinery, confirmed this step.** A program wrapped in one
+  top-level `progn` (the plan's own merge-criterion shape, e.g.
+  `(progn (defun twice (x) (+ x x)) (twice 4))`) elaborates to one `core_progn` node and Just Works once
+  environment mutation is threaded correctly — no separate "run N top-level forms" driver exists or was
+  needed. A genuine multi-datum program with **no** enclosing `progn` is still unsupported by anything in
+  the codebase (Scheme or Lisp side) — `read_datum` reads exactly one datum and stops. This is very
+  unlikely to be L13's problem (L13 compiles a single elaborated `core_type` tree, same as `eval_direct`
+  does), but if `compile_to_closure`'s test harness wants to exercise multiple top-level forms, wrap them
+  in an explicit `progn` exactly the way L12's own tests do, rather than inventing a multi-form reader
+  entry point (that is out of scope here and belongs to a later step, plausibly L22's public API).
 
-L11 built `src/smd/smdlisp/closure/eval_direct.hpp` (+ tests): the structural-recursive evaluator. Read
-`handoff.md`'s "Step L11" section in full before starting; the essentials L12 will lean on directly:
+## What L13 needs from L11/L10/L9 (unchanged this step, background only)
 
-- **Evaluator API:** `eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(node, arena, environment, envs) ->
-  foundation::result<value<Core>>`. `MaxBindings` must be `16` (`static_assert`ed — `value<Core>`'s
-  `closure<Core>` alternative is still hard-wired to `MaxBindings == 16` in the `value.hpp` alias; this wart
-  is still open, worker discretion whether to fix it in passing). `MaxEnvs` is the capacity of the new
-  `env_arena` (below).
-- **`apply_function_value<MaxNodes, MaxList, MaxBindings, MaxEnvs>(func_val, args, arena, heap, envs) ->
-  foundation::result<value<Core>>`** is the single call-dispatch point — `core_application`, `funcall`, and
-  `apply` all go through it. If `defun`'s call semantics need anything beyond what ordinary application
-  already does (they shouldn't — `defun` only changes *how a function gets bound*, not how it's called),
-  extend this function rather than adding a second dispatch path.
-- **Lisp-2 lookup (D4) is fully wired**: `core_symbol` → `env::lookup_value` only; `core_function` (an
-  application head, `#'name`, `(function name)`, or an embedded `(lambda ...)`) → `env::lookup_function` only,
-  or a direct recursive evaluation for the embedded-lambda case. Neither path falls back to the other, ever.
-  `setq`/`defun`/`defvar`/`defparameter` must preserve this: `defun` defines in the function namespace,
-  `defvar`/`defparameter`/`setq` (of a lexical) define/mutate in the variable namespace, and nothing should
-  need to search both.
-- **`env<Core, MaxBindings>` (`env.hpp`) is still read-only once bound** — `define_value`/`define_function`
-  exist, but there is no `set_value`/mutate-in-place operation yet. **This is explicitly L12's job.** L9's
-  `env` has no backing `store` (unlike the Scheme original, which grew one for `set!` — see
-  `smd::smdscheme::closure::store`/`env::assign` in `src/smd/smdscheme/closure/value.hpp` for the pattern to
-  adapt). The plan's own guidance (`docs/cl-pivot-plan.md` step L12): adapt the *landed* `set!` machinery —
-  `core_set`, the `store` class of mutable binding cells, and its wiring through `smdscheme`'s evaluator — as
-  the basis for `setq`. Concretely this likely means: `env.hpp` gains a `store<Core, MaxStore>`-shaped
-  companion (or `smdlisp` adapts `smdscheme::closure::store` by copy, matching L7-L10's "adapt by copy, then
-  diverge" pattern), `env::define_value` grows a mode where a binding names a store location rather than
-  holding its value inline (exactly `smdscheme::closure::env`'s "functional vs. mutable" dual-mode design,
-  already summarized in `handoff.md`'s L9 section), and a new `env::set_value(symbol, value) -> result<value>`
-  (or similar name — the plan sketch in section 9 literally writes `set_value(symbol, value) -> result<void>`,
-  but note `setq` **returns the assigned value per CL, not Scheme's `unspecified`** — the plan says so
-  explicitly: "`setq` returns the assigned value per CL, not the Scheme `unspecified`" — so the return type
-  should probably be `result<value<Core>>` echoing the assigned value, not `result<void>`; make the call and
-  write down which one you picked and why, the same way L11 had to make the `core_true` representation call).
-- **`env_arena<Core, MaxBindings, MaxEnvs>` (`env.hpp`, new this step)** owns every captured environment; a
-  closure's `captured` pointer is a stable pointer into it, never a stack-local. If `defun`/`defvar`
-  materialize any new closures or capture any new environments (they shouldn't need to at the top level, but
-  double-check), route through the same arena, don't invent a second ownership mechanism.
-- **`env::pairs() -> pair_heap<Core, default_max_pairs>*`** (new this step, mirrors
-  `smd::smdscheme::closure::env`'s `pairs_`/`pairs()`) is how `cons`/`car`/`cdr`/`list` and `core_cons`
-  construction reach the shared heap. If `setq`'s `store` needs similar threading, follow this exact pattern:
-  a constructor parameter and an accessor added to `env`, plumbed through `default_env`'s overloads, not a
-  redesign of how state gets shared.
-- **A durable lifetime lesson, read before writing any new evaluator code that returns a `value<Core>` out of
-  a helper function:** `value<Core>`'s `symbol`/`keyword` (`value.hpp`, unchanged since L7) hold a bare
-  `std::string_view`, not an owned spelling — unlike `core_symbol`/`core_keyword` (elaborator layer, L10
-  fixed these to own a `folded_name` after an AddressSanitizer catch). This means a `value<Core>` returned
-  from `eval_direct` can view into whatever `Core` node (root or arena-resident) produced it. **The caller
-  must keep the exact `node` argument passed to `eval_direct` alive for as long as the resulting
-  `value<Core>` might be inspected** — L11 hit this exact bug in its own test helper (see `handoff.md`'s L11
-  section, "A second stack-use-after-return bug") and fixed it by making the elaborated root a caller-owned
-  out-parameter, mirroring how `core_arena` must already be caller-owned. Any `setq`/`defun` test helper
-  should follow the same pattern (`elab()`'s and L11's `run()`'s shape: arenas and the elaborated root are
-  reference parameters from the `TEST_CASE`, never function-locals a helper returns past).
-- **Builtins are `closure::builtin_op` tags dispatched in `apply_function_value`'s `builtin` case**
-  (`eval_direct.hpp`); the bridge from `builtin_op` to `pairs.hpp::list_op` is `detail::to_list_op` in that
-  same file. `add`/`multiply` are **variadic** (`(+)` ⇒ `0`, `(*)` ⇒ `1`), not fixed 2-arg like the Scheme
-  original — don't assume the old restriction if porting any more Scheme evaluator code forward.
-- **`funcall`/`apply` have real call semantics**, not `apply_prim` cases — see `handoff.md`'s L11 section for
-  the exact mechanics if `defun`-defined functions need to interact with either (they should just work,
-  since a `defun`-bound function is an ordinary function-namespace value like any builtin/closure, but this
-  is worth a test).
+Not re-explained here — read `handoff.md`'s "Step L9", "Step L10", and "Step L11" sections for the full
+architecture (Lisp-2 lookup with no cross-namespace fallback, `nil`/`t` truthiness via one `is_true`
+function, closures capturing both namespaces via a raw pointer into an `env_arena`, `funcall`/`apply`
+real call semantics through the single `apply_function_value` dispatch point, the `MaxBindings == 16`
+`static_assert` wart still open). All of this is architecture the CPS backend needs to reproduce (or
+explicitly and knowingly diverge from, with a divergence doc), not just "not break."
 
-### What L12 needs from L10 (baseline elaborator, unchanged this step)
+## What L13 needs to build
 
-Not re-explained here — read `handoff.md`'s "Step L10" section — but headline facts: the elaborator recognizes
-exactly `quote`, `if`, `progn`, `let`, `let*`, `lambda`, `function` as special operators (folded-spelling
-comparison). **`setq`/`defun`/`defvar`/`defparameter` are not recognized yet** — elaborating any of them today
-falls through to "ordinary application," which will either misbehave or error depending on whether `SETQ`
-etc. happen to be bound in the function namespace (they are not). L12 needs new core kinds and new elaborator
-special-form cases for at least `setq` (assignment: `(setq name expr)` → mutate `name`'s nearest lexical
-binding, error if unbound) and `defun` (top-level function definition: `(defun name (params...) body...)` →
-define `name` in the function namespace as a closure/lambda). `defvar`/`defparameter` mark a symbol special
-(the mark is stored now per the plan, used in L16 for dynamic binding — no special-variable *behavior* is
-needed yet, just recording that the symbol is special).
+Per `docs/cl-pivot-plan.md` step L13:
 
-**Top-level sequencing, per the plan:** "the program is an implicit progn of top-level forms." Check whether
-`elaborate()`'s current entry point (`smd::smdlisp::elaborator::elaborate`, `elaborate.hpp`) already handles a
-sequence of top-level forms, or only ever elaborates one datum — L10's `elab()` test helper reads and
-elaborates a single datum per call, and nothing in L4-L11 exercised multiple top-level forms sharing one
-top-level environment. This is likely new plumbing L12 needs: either the reader needs to hand back multiple
-top-level datums (check `read_datum`'s current contract — does it read one form and stop, or the whole input?),
-or `elaborate`/`eval_direct` need a "run a sequence of top-level forms in one environment, threading definitions
-forward" entry point that doesn't exist yet. The merge-criteria example makes this concrete:
-`(progn (defun twice (x) (+ x x)) (twice 4))` ⇒ `8` — note this is phrased as a single `progn` wrapping both
-forms, which may be the intended way to sidestep the "how do multiple top-level forms share state" question
-entirely for this step (elaborate `progn` once, `defun` inside it defines into the *same* environment
-`(twice 4)` then looks up) — worth checking whether that sidesteps needing new top-level-sequencing machinery
-at all, or whether real multi-form top-level input (no wrapping `progn`) is also expected.
+`src/smd/smdlisp/closure/{cps_code.hpp,closure_program.hpp}` (+ tests), adapted from the Scheme CPS
+backend (`smd::smdscheme::closure::cps_code`/`closure_program`) per the architecture decision recorded
+in `docs/cps-direction.md`: **structural recursion over the flat arena** (Option A), not `fix<F>`-based
+folding (Option B, rejected because `fix<F>` is not a literal type — a `cps_of`-style function dispatches
+on the node variant, recurses by `node_id`/`arena_box`, and threads the continuation as a template
+parameter or similar compile-time-native-continuation mechanism). Read `docs/cps-direction.md` in full
+before starting; it is short and explains exactly why Option A was chosen over Option B for this
+project, a decision this step inherits rather than re-litigates.
 
-### Merge criteria (plan section 9, step L12)
+Read `smd::smdscheme::closure::cps_code.hpp` and `closure_program.hpp` in full before starting — this is
+the "adapt by copy, then diverge" component (per D1 / the plan's reuse inventory), so the Scheme
+original's shape is the starting point, not a reference to glance at. Pay particular attention to how it
+threads `begin`/`core_begin` (the closest existing analogue to `smdlisp`'s `core_progn`) through
+continuation chaining — the plan explicitly names this as the pattern `core_progn` compilation should
+follow, and per the note above, it is also the closest existing precedent for "does the Scheme CPS
+backend already solve environment-mutation-visibility-across-a-sequence the way L12 needed `eval_direct`
+to."
 
-```lisp
-(progn (defun twice (x) (+ x x)) (twice 4))  ; => 8, at compile time
-```
+**Merge criterion** (plan section 9, step L13): every L11/L12 end-to-end test also passes through
+`compile_to_closure` (or whatever the `smdlisp` equivalent entry point ends up named — check what
+`smdscheme::closure::closure_program.hpp` calls its own public compile entry point and mirror that
+naming unless there's a concrete reason not to). Concretely this means the L11 merge-criteria three
+(`(if nil 1 2)` ⇒ `2`; `((lambda (x) (car (cdr x))) '(1 2 3))` ⇒ `2`; `(funcall #'cons 1 nil)` ⇒ a
+`pair_ref` cell) and the L12 merge criterion (`(progn (defun twice (x) (+ x x)) (twice 4))` ⇒ `8`) all
+need to produce the same results when run through the CPS/closure-program path as they do through
+`eval_direct` — plus, per the plan's phrasing "every L11/L12 end-to-end test," it is worth deliberately
+re-running (not just the three/one merge criteria but) a representative sample of the fuller L11/L12
+`eval_direct.test.cpp` test suite (closures capturing both namespaces, `apply`/`funcall` real call
+semantics, `setq`'s shared-store-across-closures idiom, `defvar`/`defparameter`'s init-vs-no-reinit
+rules) through the CPS path, since those are exactly the cases most likely to expose an environment-
+threading regression under continuation-passing style that a narrower "just the merge criteria" test
+set would miss.
 
-Plus, per the gap analysis and D4: `setq` mutates the nearest **lexical** variable binding (special-variable
-interaction is explicitly deferred to L16 — don't build dynamic binding now, just get lexical `setq` and
-`defun`/`defvar`/`defparameter` working), error if the target is unbound, and `setq` returns the assigned
-value.
+**Deliverable: blog phase 18 draft** (`docs/blog/phase-18-setq-defun-progn.org`, working title "`setq`,
+`defun`, `progn`: a programmable core" per the plan's phase table) — this step's blog post covers L12's
+material (this is a docs-lags-code-by-one-step pattern already established: L11's phase-17 draft covered
+L9/L10's Lisp-2/nil-t material once the evaluator made it end-to-end testable; L13's phase-18 draft
+should cover `setq`/`defun`/`progn`'s *semantics*, using L13's CPS test suite as the source of live
+UUID-anchored code, now that CPS compilation makes `(progn (defun twice (x) (+ x x)) (twice 4))` an
+actual compile-time-computed demo rather than just a direct-evaluator fact). Follow DIV-0004's
+now-standing convention: author `#+transclude:` links against this step's own worktree path, not `main`;
+the orchestrator repoints them after merge. Watch for the two org-markup footguns L11's phase-17 draft
+hit (documented in `handoff.md`'s L11 section): adjacent `~verbatim~` spans need a space or punctuation
+between them, and a `~word~` immediately followed by a bare letter has the same problem.
 
-### Standing constraints for L12
+## Standing constraints for L13
 
-- `src/smd/smdscheme/**` is frozen for semantic changes (D1). Read-only reference, never edit.
-- New/changed files land in `src/smd/smdlisp/elaborator/` (new core kinds, new special-form cases) and
-  `src/smd/smdlisp/closure/` (`env.hpp`'s new mutable-binding machinery, `eval_direct.hpp`'s new core-kind
-  cases). Do not touch `src/smd/smdlisp/reader/` or `src/smd/smdlisp/macroexpand/` (the latter doesn't exist
-  yet — that's L17's lane, see Part 2).
+- `src/smd/smdscheme/**` is frozen for semantic changes (D1). Read-only reference — this step reads
+  `smdscheme::closure::cps_code.hpp`/`closure_program.hpp` closely but does not edit them.
+- New/changed files land in `src/smd/smdlisp/closure/` only (the two new files plus their tests). Do not
+  touch `src/smd/smdlisp/reader/`, `src/smd/smdlisp/elaborator/`, or `src/smd/smdlisp/macroexpand/`
+  (L17's lane, if still in flight — see the status note at the top of this file).
 - Keep C++26/GCC16 baseline; tests use Catch2; mirror file prolog / include guard / canonical-include
   conventions already used throughout `src/smd/smdlisp/`.
-- File a divergence doc under `docs/divergences/` (`TEMPLATE.md` skeleton) for anything done differently than
-  the plan specifies, or any knowing ANSI CL deviation. **Next free number is DIV-0005** (neither L10 nor L11
-  needed one — every deviation discussed in their handoff entries was an internal C++ architecture decision
-  the plan explicitly invited, not an ANSI semantics cut or a plan-contradicting step; L12 may be the step
-  that finally needs DIV-0005, e.g. if the top-level-sequencing question above forces a real scope cut).
-- Before handoff: `make compile`, `make test`, `make lint`. L12 has **no** blog deliverable (phase 18 arrives
-  at L13, the CPS closure backend, per the plan's phase table) — don't draft one.
-- Do not continue past L12 into L13 (CPS closure backend) unless blocked; if blocked, document the blocker
-  here instead.
+- File a divergence doc under `docs/divergences/` (`TEMPLATE.md` skeleton) for anything done differently
+  than the plan specifies, or any knowing ANSI CL deviation. **Next free number is DIV-0005** — L17 landed
+  DIV-0006, so DIV-0005 is the next free number; check `docs/divergences/` before filing in case another
+  step lands first.
+- Before handoff: `make compile`, `make test`, `make lint`. Draft blog phase 18 per the plan's phase
+  table (this step, unlike L12, does have a documentation deliverable).
+- Do not continue past L13 into L14 (`block`/`return-from`) unless blocked; if blocked, document the
+  blocker here instead.
 
 ---
 
@@ -236,7 +251,7 @@ the reader" precedent applies here.
 
 ---
 
-## Standing constraints (apply to both L12 and L18, and everything after)
+## Standing constraints (apply to both L13 and L18, and everything after)
 
 - `src/smd/smdscheme/**` is frozen for semantic changes (D1); blog phases 5-12 transclude live code from it by
   UUID anchor. Read-only reference, never edit.

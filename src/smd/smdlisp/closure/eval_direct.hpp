@@ -70,8 +70,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
     elaborator::core_type<MaxNodes, MaxList> const &node,
     smd::smdscheme::foundation::tree_arena<
         elaborator::core_type<MaxNodes, MaxList>, MaxNodes> const &arena,
-    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> const
-        &environment,
+    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> &environment,
     env_arena<elaborator::core_type<MaxNodes, MaxList>, MaxBindings, MaxEnvs>
         &envs)
     -> smd::smdscheme::foundation::result<
@@ -281,6 +280,20 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
 ///    variable and function binding lists — one capture, two namespaces.
 ///  - **`funcall`/`apply` have call semantics**, not `apply_prim` cases;
 ///    see @ref apply_function_value.
+///  - **`environment` is a mutable reference (step L12), not `const`.**
+///    `setq`/`defun`/`defvar`/`defparameter` all need to mutate the
+///    ambient environment in place (a new function/variable binding, a new
+///    special mark, or -- for `setq` -- a write through the shared
+///    @ref store) such that *later* expressions evaluated with the same
+///    threaded environment observe the change. `core_progn`'s and a
+///    closure body's sequential evaluation loops already pass the exact
+///    same `environment` object across iterations (never a copy per
+///    iteration), so this is the only change needed to make
+///    `(progn (defun f ...) (f ...))` and `((lambda (x) (setq x 2) x) 1)`
+///    both see their own earlier side effects. Evaluating sibling
+///    subexpressions (e.g. `if`'s branches, or one application's
+///    arguments) still shares this same reference, matching ANSI CL's
+///    "side effects are visible in evaluation order" model.
 ///
 /// @tparam MaxNodes    Arena capacity; bounds tree depth.
 /// @tparam MaxList     Maximum argument/body/list length.
@@ -301,7 +314,10 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
 ///                      resolved).
 /// @param  node        The core node to evaluate.
 /// @param  arena       Core arena; must outlive the evaluation.
-/// @param  environment Current variable/function bindings and pair heap.
+/// @param  environment Current variable/function bindings and pair heap;
+///                      mutated in place by `setq`/`defun`/`defvar`/
+///                      `defparameter` (see the mutable-reference note
+///                      above).
 /// @param  envs        Shared, caller-owned storage for captured
 ///                      environments; must outlive every closure this
 ///                      call (or anything it returns) might produce.
@@ -313,8 +329,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
     elaborator::core_type<MaxNodes, MaxList> const &node,
     smd::smdscheme::foundation::tree_arena<
         elaborator::core_type<MaxNodes, MaxList>, MaxNodes> const &arena,
-    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> const
-        &environment,
+    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> &environment,
     env_arena<elaborator::core_type<MaxNodes, MaxList>, MaxBindings, MaxEnvs>
         &envs)
     -> smd::smdscheme::foundation::result<
@@ -453,7 +468,65 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                     std::span<Val const>(evaluated_args.begin(),
                                          evaluated_args.end()),
                     arena, environment.pairs(), envs);
+            },
+            // e6a2c1de-3b2a-4c8d-9c6f-1a7e5b9d2f30
+            [&](elaborator::core_setq<Core, MaxNodes, MaxList> const &sq)
+                -> Res {
+                // ANSI CL: assign each name/value pair left to right,
+                // yielding the value of the LAST assignment -- never
+                // Scheme's `unspecified` (see this function's own doc
+                // comment / handoff for the return-type rationale).
+                Res last{parse_error{{}, "setq: no assignments"}};
+                for (int i = 0; i < sq.names.size(); ++i) {
+                    auto val_r =
+                        eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                            arena.get(sq.exprs[i]), arena, environment, envs);
+                    if (!val_r.has_value())
+                        return val_r.error();
+                    auto set_r = environment.set_value(symbol{sq.names[i]},
+                                                       val_r.value());
+                    if (!set_r.has_value())
+                        return set_r.error();
+                    last = set_r;
+                }
+                return last;
+            },
+            [&](elaborator::core_defun<Core, MaxNodes> const &cd) -> Res {
+                // The embedded lambda captures the environment in force
+                // right now -- the same mechanism an ordinary `(lambda
+                // ...)` expression uses (see the core_lambda case above).
+                auto clo_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(cd.lambda_node), arena, environment, envs);
+                if (!clo_r.has_value())
+                    return clo_r.error();
+                environment.define_function(symbol{cd.name}, clo_r.value());
+                // ANSI CL: `defun` returns the function name, not the
+                // closure value.
+                return Val{symbol{cd.name}};
+            },
+            [&](elaborator::core_defvar<Core, MaxNodes> const &dv) -> Res {
+                environment.mark_special(symbol{dv.name});
+                if (dv.has_init) {
+                    bool const already_bound =
+                        environment.lookup_value(symbol{dv.name}).has_value();
+                    // `defparameter` always (re)initializes; `defvar` only
+                    // if `name` is not already bound.
+                    if (dv.is_parameter || !already_bound) {
+                        auto init_r = eval_direct<MaxNodes, MaxList,
+                                                  MaxBindings, MaxEnvs>(
+                            arena.get(dv.init), arena, environment, envs);
+                        if (!init_r.has_value())
+                            return init_r.error();
+                        environment.define_value(symbol{dv.name},
+                                                 init_r.value());
+                    }
+                }
+                // ANSI CL: `defvar`/`defparameter` return the variable
+                // name.
+                return Val{symbol{dv.name}};
             }},
+        // e6a2c1de-3b2a-4c8d-9c6f-1a7e5b9d2f30 end
         node.inner);
 }
 
