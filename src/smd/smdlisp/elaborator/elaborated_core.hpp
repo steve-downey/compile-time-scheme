@@ -230,6 +230,97 @@ struct core_application {
         args; ///< Argument expressions (VARIABLE-namespace context).
 };
 
+/// A `setq` assignment: `(setq name1 expr1 name2 expr2 ...)`.
+///
+/// Adapted from the landed Scheme `core_set`/`set!` machinery (PR #23) as
+/// the basis for `setq` (step L12, per `docs/cl-pivot-plan.md`). Unlike
+/// Scheme's `set!` (a single name/value pair), ANSI CL's `setq` accepts any
+/// number of name/value pairs, assigning each in turn, left to right, and
+/// yielding the value of the *last* assignment -- @ref names and
+/// @ref exprs are therefore parallel sequences rather than a single pair.
+/// Each name always names a VARIABLE-namespace binding (decision D4);
+/// `setq` never touches the function namespace. `setq` mutates the
+/// nearest *lexical* binding only -- special-variable dynamic-rebinding
+/// interaction is deferred to step L16, so a `setq` of a name marked
+/// special by `defvar`/`defparameter` behaves identically to any other
+/// lexical `setq` at this step (an evaluator-level error if the name is
+/// not currently lexically bound, regardless of specialness).
+///
+/// @ref names holds plain @c string_view (not an owned @ref
+/// reader::folded_name): every name here is a list element, never the
+/// elaboration root, so it is always arena-backed -- the same reasoning
+/// already applied to @ref core_lambda::params and @ref core_function's
+/// symbol-name alternative (see those types' docs).
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum number of name/value pairs.
+template <typename R, int MaxNodes, int MaxList>
+struct core_setq {
+    smdscheme::foundation::static_vector<std::string_view, MaxList>
+        names; ///< VARIABLE-namespace targets, in assignment order.
+    smdscheme::foundation::static_vector<
+        smdscheme::foundation::arena_box<R, MaxNodes>, MaxList>
+        exprs; ///< Value expressions, parallel to @ref names.
+};
+
+/// A top-level `defun` function definition: `(defun name (params...)
+/// body...)`.
+///
+/// Defines @ref name in the FUNCTION namespace (decision D4) as a closure
+/// over the environment in force when the `defun` form is evaluated.
+/// @ref lambda_node holds the elaborated lambda -- built by the same
+/// formals/body elaboration @ref detail::elaborate_lambda uses for an
+/// ordinary `(lambda ...)` form (see @ref detail::elaborate_lambda_body),
+/// so `defun` differs from `(function (lambda (params...) body...))` only
+/// in that *evaluating* it also performs the FUNCTION-namespace definition
+/// side effect (and, per ANSI CL, yields @ref name itself rather than the
+/// closure value).
+///
+/// @ref name is a plain @c string_view: it is always a list element (the
+/// second element of the `defun` form), never the elaboration root, so it
+/// is always arena-backed (see @ref core_setq's docs for the identical
+/// reasoning).
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_defun {
+    std::string_view name; ///< FUNCTION-namespace name being defined.
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        lambda_node; ///< The elaborated `(lambda (params...) body...)`.
+};
+
+/// A `defvar`/`defparameter` special-variable declaration.
+///
+/// Defines @ref name in the VARIABLE namespace (decision D4) and marks it
+/// special (the mark is recorded now, per step L12's scope; dynamic-binding
+/// *behavior* for special variables arrives in step L16 -- no such behavior
+/// exists yet). @ref is_parameter distinguishes the two ANSI CL forms:
+///
+///  - `defvar`: initializes @ref name from @ref init only if @ref name is
+///    not already bound in the VARIABLE namespace (a bare `(defvar name)`
+///    with no init form, @ref has_init false, only marks @ref name special
+///    without binding it).
+///  - `defparameter`: always requires @ref init and always (re)initializes
+///    unconditionally, even if @ref name is already bound.
+///
+/// @ref name is a plain @c string_view for the same reason as
+/// @ref core_setq's @c names (always a list element, never the elaboration
+/// root).
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_defvar {
+    std::string_view name; ///< VARIABLE-namespace name being declared.
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        init; ///< The initial-value expression; valid iff @ref has_init.
+    bool has_init = false;     ///< False only for a bare `(defvar name)`.
+    bool is_parameter = false; ///< True for `defparameter`, false for
+                               ///< `defvar`.
+};
+
 /// Factory template that produces the open-recursive variant layer for the
 /// core AST.
 ///
@@ -243,7 +334,9 @@ struct core_f_factory {
         core_integer, core_symbol, core_keyword, core_nil, core_true,
         core_quote, core_cons<R, MaxNodes>, core_if<R, MaxNodes>,
         core_progn<R, MaxNodes, MaxList>, core_lambda<R, MaxNodes, MaxList>,
-        core_function<R, MaxNodes>, core_application<R, MaxNodes, MaxList>>;
+        core_function<R, MaxNodes>, core_application<R, MaxNodes, MaxList>,
+        core_setq<R, MaxNodes, MaxList>, core_defun<R, MaxNodes>,
+        core_defvar<R, MaxNodes>>;
 };
 
 /// The concrete recursive core AST type, formed as the fixed point of

@@ -18,17 +18,25 @@ namespace smd::smdlisp::closure {
 /// Adapted by copy from `smd::smdscheme::closure::env`'s architecture
 /// (`foundation::static_vector`-backed, linear search from the newest
 /// binding toward the oldest, so a later `define_value`/`define_function`
-/// shadows an earlier one for the same name).  Two deltas from the Scheme
-/// original, both intentional for this step:
+/// shadows an earlier one for the same name).  Deltas from the Scheme
+/// original:
 ///
 ///  - There are *two* binding lists instead of one.  `(f x)` resolves `f`
 ///    in the function namespace and `x` in the variable namespace, so the
 ///    same name can name a variable and a function at once without either
 ///    shadowing the other — that is the whole point of a Lisp-2.
-///  - Every binding is a plain inline value (the Scheme original's
-///    "functional" mode, with no backing `store`).  `setq` (step L12) is
-///    what turns a variable binding mutable; until then there is nothing
-///    to mutate, so no `store` indirection is needed yet.
+///  - Only the *variable* namespace ever needs mutation (`setq`, step
+///    L12); the function namespace never grows a `store` -- redefining a
+///    function (`defun` again with the same name) is already handled by
+///    ordinary most-recent-first shadowing via @ref define_function, with
+///    no indirection required.
+///  - Like `smd::smdscheme::closure::env`, an `env` operates in one of two
+///    modes for its variable namespace: *functional* (no backing
+///    @ref store; each binding holds its value inline, `setq` is a
+///    diagnosed error) or *mutable* (constructed with a @ref store; each
+///    binding names a store location, so `setq` on a captured variable is
+///    visible through every closure that shares the binding, not just a
+///    private copy).  See @ref set_value.
 ///
 /// Like the Scheme original, `env` has no parent-environment link: a
 /// nested lexical scope is a *copy* of the enclosing `env` with additional
@@ -52,6 +60,17 @@ class env {
     /// accessor; @p p must outlive this environment and every environment
     /// copied from it (including closure captures).
     constexpr explicit env(pair_heap<Core, default_max_pairs> *p) : pairs_(p) {}
+
+    /// Constructs a mutable environment backed by variable @ref store @p s
+    /// (step L12: `setq` needs somewhere to mutate).  No pair heap.
+    constexpr explicit env(store<Core, default_max_store> *s) : store_(s) {}
+
+    /// Constructs an environment sharing pair heap @p p and backed by
+    /// variable @ref store @p s.  Both must outlive this environment and
+    /// every environment copied from it (including closure captures).
+    constexpr env(pair_heap<Core, default_max_pairs> *p,
+                  store<Core, default_max_store> *s)
+        : pairs_(p), store_(s) {}
 
     /// Returns the shared pair heap (non-owning; null if this environment
     /// has none).  List primitives and @c core_cons construction allocate
@@ -88,40 +107,81 @@ class env {
     [[nodiscard]] constexpr auto lookup_function(symbol name) const
         -> smd::smdscheme::foundation::result<value<Core>>;
 
-    // set_value (the `setq` primitive) arrives in step L12; this
-    // environment is intentionally immutable-once-defined until then.
+    /// Assigns @p val to the nearest existing VARIABLE-namespace binding
+    /// for @p name (the `setq` primitive, step L12), returning the
+    /// *assigned value* per ANSI CL (unlike Scheme's `set!`, which returns
+    /// the unspecified value -- see this function's out-of-line docs for
+    /// the full return-type rationale).
+    ///
+    /// Errors if this environment has no backing @ref store (functional
+    /// mode -- mirrors `smd::smdscheme::closure::env::assign`'s identical
+    /// check) or if @p name has no VARIABLE-namespace binding.
+    /// Special-variable dynamic rebinding is deferred to step L16; this
+    /// function only ever mutates the nearest *lexical* binding, per the
+    /// plan's explicit scope cut for this step.
+    [[nodiscard]] constexpr auto set_value(symbol name, value<Core> val) const
+        -> smd::smdscheme::foundation::result<value<Core>>;
+
+    /// Marks @p name as a special variable (`defvar`/`defparameter`, step
+    /// L12).  Recorded now; dynamic-binding *behavior* for special
+    /// variables arrives in step L16 -- this step only stores the mark.
+    /// Idempotent: marking an already-special name does not duplicate the
+    /// entry.
+    constexpr auto mark_special(symbol name) -> void;
+
+    /// Returns whether @p name has been marked special by
+    /// @ref mark_special.
+    [[nodiscard]] constexpr auto is_special(symbol name) const -> bool;
 
   private:
     struct binding {
         symbol name{};
-        value<Core> val{};
+        value<Core> val{}; ///< Inline value in functional mode; unused
+                           ///< (see @ref loc) in mutable mode.
+        int loc = -1;      ///< VARIABLE-namespace @ref store location in
+                           ///< mutable mode; -1 otherwise.  Never set for
+                           ///< @ref functions_ bindings (the function namespace
+                           ///< has no mutable mode; see the class docs).
     };
 
     pair_heap<Core, default_max_pairs> *pairs_ =
         nullptr; ///< Non-owning; may be null (see @ref pairs).
+    store<Core, default_max_store> *store_ =
+        nullptr; ///< Non-owning; may be null (functional mode; see the
+                 ///< class docs and @ref set_value).
     smd::smdscheme::foundation::static_vector<binding, MaxBindings> values_{};
     smd::smdscheme::foundation::static_vector<binding, MaxBindings>
         functions_{};
+    smd::smdscheme::foundation::static_vector<symbol, MaxBindings> special_{};
 };
 
 template <typename Core, int MaxBindings>
 constexpr auto env<Core, MaxBindings>::define_value(symbol name,
                                                     value<Core> val) -> void {
-    values_.push_back(binding{name, std::move(val)});
+    if (store_ != nullptr) {
+        int loc = store_->alloc(std::move(val));
+        values_.push_back(binding{name, {}, loc});
+    } else {
+        values_.push_back(binding{name, std::move(val), -1});
+    }
 }
 
 template <typename Core, int MaxBindings>
 constexpr auto env<Core, MaxBindings>::define_function(symbol name,
                                                        value<Core> fn) -> void {
-    functions_.push_back(binding{name, std::move(fn)});
+    functions_.push_back(binding{name, std::move(fn), -1});
 }
 
 template <typename Core, int MaxBindings>
 constexpr auto env<Core, MaxBindings>::lookup_value(symbol name) const
     -> smd::smdscheme::foundation::result<value<Core>> {
-    for (int i = values_.size() - 1; i >= 0; --i)
-        if (values_[i].name == name)
+    for (int i = values_.size() - 1; i >= 0; --i) {
+        if (values_[i].name == name) {
+            if (store_ != nullptr)
+                return store_->get(values_[i].loc);
             return values_[i].val;
+        }
+    }
     return smd::smdscheme::foundation::parse_error{{}, "unbound variable"};
 }
 
@@ -132,6 +192,41 @@ constexpr auto env<Core, MaxBindings>::lookup_function(symbol name) const
         if (functions_[i].name == name)
             return functions_[i].val;
     return smd::smdscheme::foundation::parse_error{{}, "undefined function"};
+}
+
+// 2d0e5b9a-4f4d-4b1a-9a4e-2b6a2e6c9a41
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::set_value(symbol name,
+                                                 value<Core> val) const
+    -> smd::smdscheme::foundation::result<value<Core>> {
+    if (store_ == nullptr)
+        return smd::smdscheme::foundation::parse_error{
+            {}, "setq: environment has no mutable store"};
+    for (int i = values_.size() - 1; i >= 0; --i) {
+        if (values_[i].name == name) {
+            store_->set(values_[i].loc, val);
+            return val;
+        }
+    }
+    return smd::smdscheme::foundation::parse_error{{},
+                                                   "setq: unbound variable"};
+}
+// 2d0e5b9a-4f4d-4b1a-9a4e-2b6a2e6c9a41 end
+
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::mark_special(symbol name) -> void {
+    for (auto const &s : special_)
+        if (s == name)
+            return;
+    special_.push_back(name);
+}
+
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::is_special(symbol name) const -> bool {
+    for (auto const &s : special_)
+        if (s == name)
+            return true;
+    return false;
 }
 
 /// Returns an environment pre-populated with the default builtins,
@@ -178,6 +273,39 @@ template <typename Core, int MaxBindings>
 [[nodiscard]] constexpr auto default_env(pair_heap<Core, default_max_pairs> &p)
     -> env<Core, MaxBindings> {
     env<Core, MaxBindings> e{&p};
+    e.define_function(symbol{"+"}, value<Core>{builtin{builtin_op::add}});
+    e.define_function(symbol{"*"}, value<Core>{builtin{builtin_op::multiply}});
+    e.define_function(symbol{"CONS"}, value<Core>{builtin{builtin_op::cons}});
+    e.define_function(symbol{"CAR"}, value<Core>{builtin{builtin_op::car}});
+    e.define_function(symbol{"CDR"}, value<Core>{builtin{builtin_op::cdr}});
+    e.define_function(symbol{"LIST"}, value<Core>{builtin{builtin_op::list}});
+    e.define_function(symbol{"NULL"}, value<Core>{builtin{builtin_op::null}});
+    e.define_function(symbol{"EQ"}, value<Core>{builtin{builtin_op::eq}});
+    e.define_function(symbol{"EQL"}, value<Core>{builtin{builtin_op::eql}});
+    e.define_function(symbol{"ATOM"}, value<Core>{builtin{builtin_op::atom}});
+    e.define_function(symbol{"FUNCALL"},
+                      value<Core>{builtin{builtin_op::funcall}});
+    e.define_function(symbol{"APPLY"}, value<Core>{builtin{builtin_op::apply}});
+    return e;
+}
+
+/// Returns an environment sharing pair heap @p p and variable @ref store
+/// @p s, pre-populated with the same default builtins as the other
+/// overloads.  This is the *mutable* overload (step L12): `setq` on a
+/// variable bound through the returned environment (or any environment
+/// copied from it, including closure captures) succeeds, because
+/// @ref env::define_value threads new bindings through @p s.
+///
+/// @p p and @p s must outlive the returned environment and every
+/// environment copied from it.
+///
+/// @tparam Core        The core AST type.
+/// @tparam MaxBindings Environment capacity.
+template <typename Core, int MaxBindings>
+[[nodiscard]] constexpr auto default_env(pair_heap<Core, default_max_pairs> &p,
+                                         store<Core, default_max_store> &s)
+    -> env<Core, MaxBindings> {
+    env<Core, MaxBindings> e{&p, &s};
     e.define_function(symbol{"+"}, value<Core>{builtin{builtin_op::add}});
     e.define_function(symbol{"*"}, value<Core>{builtin{builtin_op::multiply}});
     e.define_function(symbol{"CONS"}, value<Core>{builtin{builtin_op::cons}});

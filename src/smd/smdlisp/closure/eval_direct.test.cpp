@@ -61,6 +61,29 @@ auto run(std::string_view src, DatumArena &datum_arena, CoreArena &core_arena,
         root, core_arena, environment, envs);
 }
 
+using Store = lisp::closure::store<Core, lisp::closure::default_max_store>;
+
+/// Like @ref run, but builds a *mutable* environment (a shared @ref Store,
+/// step L12) so `setq`/`defun`/`defvar`/`defparameter` can be exercised.
+/// Follows the identical caller-owns-the-root discipline @ref run does.
+auto run_mut(std::string_view src, DatumArena &datum_arena,
+             CoreArena &core_arena, Core &root, Heap &heap, Store &store,
+             Envs &envs) -> Res {
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{src}, datum_arena);
+    if (!dr.has_value())
+        return Res{dr.error()};
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(
+        dr.value().value, datum_arena, core_arena);
+    if (!er.has_value())
+        return Res{er.error()};
+    root = er.value();
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    return lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+        root, core_arena, environment, envs);
+}
+
 } // namespace
 
 TEST_CASE("EvalDirectTest - HeaderIsIdempotent") { REQUIRE(true); }
@@ -352,4 +375,240 @@ TEST_CASE("EvalDirectTest - FuncallOfLambdaExpression") {
     auto r = run("(funcall (lambda (x) (* x x)) 5)", da, ca, root, heap, envs);
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 25);
+}
+
+// -- merge criteria (docs/cl-pivot-plan.md, step L12) ----------------------
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(progn (defun twice (x) (+ x x)) (twice 4))"sv},
+        da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 8;
+}());
+
+TEST_CASE("EvalDirectTest - DefunThenCallInSameProgn") {
+    // Runtime twin of the merge-criteria static_assert above.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defun twice (x) (+ x x)) (twice 4))", da, ca,
+                     root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 8);
+}
+
+TEST_CASE("EvalDirectTest - DefunReturnsTheFunctionName") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(defun f (x) x)", da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::symbol>(r.value()));
+    REQUIRE(std::get<lisp::closure::symbol>(r.value()).name == "F");
+}
+
+TEST_CASE("EvalDirectTest - DefunDefinedFunctionIsCallableViaFuncallAndApply") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defun sq (x) (* x x)) (funcall #'sq 5))", da, ca,
+                     root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 25);
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Store store2;
+    Core root2;
+    Envs envs2;
+    auto r2 = run_mut("(progn (defun sq (x) (* x x)) (apply #'sq (list 6)))",
+                      da2, ca2, root2, heap2, store2, envs2);
+    REQUIRE(r2.has_value());
+    REQUIRE(std::get<int>(r2.value()) == 36);
+}
+
+// -- setq -------------------------------------------------------------------
+
+TEST_CASE("EvalDirectTest - SetqMutatesNearestLexicalBindingAndReturnsValue") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("((lambda (x) (setq x 2) x) 1)", da, ca, root, heap, store,
+                     envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 2);
+}
+
+TEST_CASE("EvalDirectTest - SetqExpressionValueIsTheAssignedValue") {
+    // ANSI CL: setq's own value is the assigned value, not an unspecified
+    // marker (the Scheme `set!` convention this step's machinery was
+    // adapted from).
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("((lambda (x) (setq x 42)) 1)", da, ca, root, heap, store,
+                     envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 42);
+}
+
+TEST_CASE("EvalDirectTest - SetqOfUnboundIsDiagnosedError") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(setq nope 1)", da, ca, root, heap, store, envs);
+    REQUIRE_FALSE(r.has_value());
+}
+
+TEST_CASE("EvalDirectTest - SetqWithoutStoreIsDiagnosedError") {
+    // The plain (store-less) default_env overload is functional-mode:
+    // setq is a diagnosed error rather than a silent no-op.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("((lambda (x) (setq x 2) x) 1)", da, ca, root, heap, envs);
+    REQUIRE_FALSE(r.has_value());
+}
+
+TEST_CASE("EvalDirectTest - SetqMultiplePairsAssignsLeftToRightReturnsLast") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("((lambda (x y) (setq x 10 y 20) (+ x y)) 1 2)", da, ca,
+                     root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 30);
+}
+
+TEST_CASE("EvalDirectTest - SetqIsVisibleAcrossClosuresSharingTheBinding") {
+    // The classic shared-mutable-closure idiom: a `store` is shared across
+    // every env copy, including closure captures, so `setq` inside one
+    // closure call is visible to a *later* call of a (different) closure
+    // sharing the same binding -- not just within a single call's own
+    // sequential evaluation. This is exactly why L12 adapts a store rather
+    // than mutating a per-copy inline value: `inc`'s two calls must
+    // observe each other's mutation of the shared `x`.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r =
+        run_mut("(let ((x 1)) (progn (defun inc () (setq x (+ x 1))) (funcall "
+                "#'inc) (funcall #'inc) x))",
+                da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+// -- defvar / defparameter ---------------------------------------------------
+
+TEST_CASE("EvalDirectTest - DefvarInitializesAndMarksSpecial") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r =
+        run_mut("(progn (defvar *x* 1) *x*)", da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+}
+
+TEST_CASE("EvalDirectTest - DefvarDoesNotReinitializeIfAlreadyBound") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defvar *x* 1) (setq *x* 2) (defvar *x* 99) *x*)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 2);
+}
+
+TEST_CASE("EvalDirectTest - DefparameterAlwaysReinitializes") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut(
+        "(progn (defparameter *x* 1) (setq *x* 2) (defparameter *x* 99) "
+        "*x*)",
+        da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 99);
+}
+
+TEST_CASE("EvalDirectTest - DefvarReturnsTheVariableName") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(defvar *x* 1)", da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::symbol>(r.value()));
+    REQUIRE(std::get<lisp::closure::symbol>(r.value()).name == "*X*");
+}
+
+TEST_CASE("EvalDirectTest - DefvarWithoutInitOnlyMarksSpecial") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    // No init form: *x* stays unbound; referencing it is still an error.
+    auto r =
+        run_mut("(progn (defvar *x*) *x*)", da, ca, root, heap, store, envs);
+    REQUIRE_FALSE(r.has_value());
 }

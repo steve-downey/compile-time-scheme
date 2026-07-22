@@ -20,8 +20,88 @@ using val = smd::smdlisp::closure::value<dummy_core>;
 using smd::smdlisp::closure::builtin;
 using smd::smdlisp::closure::builtin_op;
 using smd::smdlisp::closure::default_env;
+using smd::smdlisp::closure::default_max_store;
 using smd::smdlisp::closure::env;
+using smd::smdlisp::closure::store;
 using smd::smdlisp::closure::symbol;
+
+// Merge criteria (docs/cl-pivot-plan.md, step L12): `setq` mutates the
+// nearest lexical variable binding through a shared @ref store, returns
+// the assigned value (not Scheme's unspecified), and is a diagnosed error
+// both when the environment has no store (functional mode) and when the
+// target is unbound.
+
+static_assert([] {
+    // Functional mode (no store): setq is a diagnosed error, never a
+    // silent no-op.
+    env<dummy_core, 4> e;
+    e.define_value(symbol{"X"}, val{1});
+    auto r = e.set_value(symbol{"X"}, val{2});
+    return !r.has_value();
+}());
+
+static_assert([] {
+    store<dummy_core, default_max_store> st;
+    env<dummy_core, 4> e{&st};
+    e.define_value(symbol{"X"}, val{1});
+    auto r = e.set_value(symbol{"X"}, val{2});
+    // setq returns the ASSIGNED value per ANSI CL.
+    if (!r.has_value() || std::get<int>(r.value()) != 2)
+        return false;
+    auto v = e.lookup_value(symbol{"X"});
+    return v.has_value() && std::get<int>(v.value()) == 2;
+}());
+
+static_assert([] {
+    // setq of an unbound target is a diagnosed error, even with a store.
+    store<dummy_core, default_max_store> st;
+    env<dummy_core, 4> e{&st};
+    auto r = e.set_value(symbol{"NOPE"}, val{1});
+    return !r.has_value();
+}());
+
+static_assert([] {
+    // setq never touches the FUNCTION namespace: a name bound only as a
+    // function is still "unbound" from setq's point of view.
+    store<dummy_core, default_max_store> st;
+    env<dummy_core, 4> e{&st};
+    e.define_function(symbol{"F"}, val{builtin{builtin_op::add}});
+    auto r = e.set_value(symbol{"F"}, val{1});
+    return !r.has_value();
+}());
+
+static_assert([] {
+    // A store is shared across env copies, so setq on a variable is
+    // visible through every copy that shares the binding -- the same
+    // reference-semantics guarantee `smd::smdscheme::closure::store`
+    // gives `set!`, adapted for `setq`.
+    store<dummy_core, default_max_store> st;
+    env<dummy_core, 4> e{&st};
+    e.define_value(symbol{"X"}, val{1});
+    env<dummy_core, 4> copy = e;
+    auto r = copy.set_value(symbol{"X"}, val{2});
+    if (!r.has_value())
+        return false;
+    auto v = e.lookup_value(symbol{"X"});
+    return v.has_value() && std::get<int>(v.value()) == 2;
+}());
+
+// Merge criteria (docs/cl-pivot-plan.md, step L12): `defvar`/`defparameter`
+// mark a symbol special; the mark is recorded now, used in step L16.
+
+static_assert([] {
+    env<dummy_core, 4> e;
+    e.mark_special(symbol{"*X*"});
+    return e.is_special(symbol{"*X*"}) && !e.is_special(symbol{"*Y*"});
+}());
+
+static_assert([] {
+    // Idempotent: marking twice does not error or duplicate.
+    env<dummy_core, 4> e;
+    e.mark_special(symbol{"*X*"});
+    e.mark_special(symbol{"*X*"});
+    return e.is_special(symbol{"*X*"});
+}());
 
 // Merge criteria (docs/cl-pivot-plan.md, step L9): `f` as a variable and
 // `f` as a function coexist without shadowing each other; lookups fail
@@ -170,6 +250,35 @@ TEST_CASE("EnvTest - DefaultEnvInstallsBuiltinsInFunctionNamespace") {
 
     // None of the builtins leak into the variable namespace.
     REQUIRE_FALSE(e.lookup_value(symbol{"CONS"}).has_value());
+}
+
+TEST_CASE("EnvTest - SetValueMutatesStoreBackedBinding") {
+    store<dummy_core, default_max_store> st;
+    env<dummy_core, 4> e{&st};
+    e.define_value(symbol{"X"}, val{1});
+    auto r = e.set_value(symbol{"X"}, val{99});
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 99);
+    REQUIRE(std::get<int>(e.lookup_value(symbol{"X"}).value()) == 99);
+}
+
+TEST_CASE("EnvTest - SetValueWithoutStoreIsError") {
+    env<dummy_core, 4> e;
+    e.define_value(symbol{"X"}, val{1});
+    REQUIRE_FALSE(e.set_value(symbol{"X"}, val{2}).has_value());
+}
+
+TEST_CASE("EnvTest - SetValueOfUnboundIsError") {
+    store<dummy_core, default_max_store> st;
+    env<dummy_core, 4> e{&st};
+    REQUIRE_FALSE(e.set_value(symbol{"NOPE"}, val{1}).has_value());
+}
+
+TEST_CASE("EnvTest - MarkSpecialAndIsSpecial") {
+    env<dummy_core, 4> e;
+    REQUIRE_FALSE(e.is_special(symbol{"*X*"}));
+    e.mark_special(symbol{"*X*"});
+    REQUIRE(e.is_special(symbol{"*X*"}));
 }
 
 TEST_CASE("EnvTest - CopyingEnvCopiesBothNamespaces") {
