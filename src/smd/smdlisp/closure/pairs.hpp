@@ -18,7 +18,54 @@ namespace smd::smdlisp::closure {
 /// builtin set named in step L8 of docs/cl-pivot-plan.md: `cons`, `car`,
 /// `cdr`, `list`, `null`, `eq`, `eql`, `atom` (CL names, no `?`/`!` suffixes;
 /// `set-car!`/`set-cdr!`/`pair?`/`equal?` are not part of this step).
-enum class list_op { cons, car, cdr, list, null, eq, eql, atom };
+/// `append` joins the set in step L18: the backquote expander's `,@x`
+/// (unquote-splicing) lowering needs it to join a spliced sub-list onto the
+/// rest of the enclosing template without an extra wrapping cons cell.
+enum class list_op { cons, car, cdr, list, null, eq, eql, atom, append };
+
+namespace detail {
+
+/// Copies the proper list @p a onto the front of @p b, sharing @p b's
+/// structure rather than copying it (the ANSI CL `append` contract: every
+/// argument but the last is copied; the last is used as-is).
+///
+/// A direct recursive descent over @p a's cons structure -- the natural
+/// shape of `append`'s own textbook definition (`(append (cons x xs) b) =
+/// (cons x (append xs b))`, `(append nil b) = b`) -- rather than an
+/// intermediate buffer: @p a's length is bounded by @p heap's capacity, and
+/// this project already accepts unbounded-by-a-template-parameter recursion
+/// elsewhere in this exact style (e.g. this file's own `car`/`cdr` chains
+/// walked by callers).
+///
+/// @tparam Core     The core AST type.
+/// @tparam MaxPairs Heap capacity (deduced from @p heap).
+/// @param  a    The list to copy; must be a proper list ending in @ref
+///              nil_t (or @ref nil_t itself).
+/// @param  b    The list (or any value) appended after @p a's elements.
+/// @param  heap The shared pair heap; must be non-null if @p a is not nil.
+template <typename Core, int MaxPairs>
+[[nodiscard]] constexpr auto append_two(value<Core> const &a,
+                                        value<Core> const &b,
+                                        pair_heap<Core, MaxPairs> *heap)
+    -> smd::smdscheme::foundation::result<value<Core>> {
+    using Val = value<Core>;
+    using smd::smdscheme::foundation::parse_error;
+
+    if (std::holds_alternative<nil_t>(a))
+        return b;
+    if (!std::holds_alternative<pair_ref>(a))
+        return parse_error{{}, "append: not a list"};
+    if (heap == nullptr)
+        return parse_error{{}, "append: environment has no pair heap"};
+    auto const &cell = heap->get(std::get<pair_ref>(a).loc);
+    auto rest_r = append_two<Core, MaxPairs>(cell.cdr, b, heap);
+    if (!rest_r.has_value())
+        return rest_r;
+    return Val{
+        pair_ref{heap->alloc(pair_cell<Core>{cell.car, rest_r.value()})}};
+}
+
+} // namespace detail
 
 /// Applies a @ref list_op primitive to already-evaluated arguments.
 ///
@@ -123,6 +170,23 @@ template <typename Core, int MaxPairs>
         // Everything that is not a cons cell is an atom, including nil.
         return std::holds_alternative<pair_ref>(args[0]) ? false_value
                                                          : true_value;
+
+    case append:
+        // (append) = nil; every argument but the last is copied (@ref
+        // detail::append_two), the last is used as-is (ANSI CL contract;
+        // step L18 needs this for `,@x` unquote-splicing).
+        if (args.empty())
+            return false_value;
+        {
+            Val acc = args[args.size() - 1];
+            for (int i = static_cast<int>(args.size()) - 2; i >= 0; --i) {
+                auto r = detail::append_two<Core, MaxPairs>(args[i], acc, heap);
+                if (!r.has_value())
+                    return r;
+                acc = r.value();
+            }
+            return acc;
+        }
     }
     return parse_error{{}, "unknown list primitive"};
 }

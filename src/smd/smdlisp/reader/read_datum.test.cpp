@@ -22,6 +22,9 @@ using arena_t = smdscheme::foundation::tree_arena<datum, MaxNodes>;
 using list_t = datum_list<datum, MaxNodes, MaxList>;
 using quote_t = datum_quote<datum, MaxNodes>;
 using function_t = datum_function<datum, MaxNodes>;
+using backquote_t = datum_backquote<datum, MaxNodes>;
+using unquote_t = datum_unquote<datum, MaxNodes>;
+using unquote_splice_t = datum_unquote_splice<datum, MaxNodes>;
 
 /// Reads one datum from @p src for tests.
 auto read(std::string_view src, arena_t &arena)
@@ -157,6 +160,59 @@ TEST_CASE("ReadDatumTest - a lone # at end of input is an error") {
     arena_t arena;
     auto r = read("#", arena);
     REQUIRE(!r.has_value());
+}
+
+// -- backquote / unquote / unquote-splicing (step L18) ----------------------
+
+TEST_CASE("ReadDatumTest - `x lowers to a backquote node") {
+    arena_t arena;
+    auto r = read("`x", arena);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<backquote_t>(r.value().value.inner));
+    auto const &bq = std::get<backquote_t>(r.value().value.inner);
+    REQUIRE(std::holds_alternative<datum_symbol>(arena.get(bq.templ).inner));
+    REQUIRE(std::get<datum_symbol>(arena.get(bq.templ).inner).name.view() ==
+            "X");
+}
+
+TEST_CASE("ReadDatumTest - ,x lowers to an unquote node") {
+    arena_t arena;
+    auto r = read(",x", arena);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<unquote_t>(r.value().value.inner));
+    auto const &uq = std::get<unquote_t>(r.value().value.inner);
+    REQUIRE(std::holds_alternative<datum_symbol>(arena.get(uq.target).inner));
+    REQUIRE(std::get<datum_symbol>(arena.get(uq.target).inner).name.view() ==
+            "X");
+}
+
+TEST_CASE("ReadDatumTest - ,@ys lowers to an unquote-splicing node") {
+    arena_t arena;
+    auto r = read(",@ys", arena);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<unquote_splice_t>(r.value().value.inner));
+    auto const &us = std::get<unquote_splice_t>(r.value().value.inner);
+    REQUIRE(std::holds_alternative<datum_symbol>(arena.get(us.target).inner));
+    REQUIRE(std::get<datum_symbol>(arena.get(us.target).inner).name.view() ==
+            "YS");
+}
+
+TEST_CASE("ReadDatumTest - `(a ,x ,@ys) reads a template with both escapes") {
+    arena_t arena;
+    auto r = read("`(a ,x ,@ys)", arena);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<backquote_t>(r.value().value.inner));
+    auto const &bq = std::get<backquote_t>(r.value().value.inner);
+    auto const &templ = arena.get(bq.templ);
+    REQUIRE(std::holds_alternative<list_t>(templ.inner));
+    auto const &lst = std::get<list_t>(templ.inner);
+    REQUIRE(lst.elements.size() == 3);
+    REQUIRE(
+        std::holds_alternative<datum_symbol>(arena.get(lst.elements[0]).inner));
+    REQUIRE(
+        std::holds_alternative<unquote_t>(arena.get(lst.elements[1]).inner));
+    REQUIRE(std::holds_alternative<unquote_splice_t>(
+        arena.get(lst.elements[2]).inner));
 }
 
 // -- the merge-criteria round trip: (defun f (x) (if x 1 2)) ---------------

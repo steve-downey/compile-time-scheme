@@ -18,12 +18,20 @@ namespace detail {
 /// Recursively reads a single datum node from @p cur, allocating sub-nodes
 /// into @p arena.
 ///
-/// Grammar: @c datum := atom | list | 'datum | #'datum (decision D6: no
-/// dotted pairs). Dispatches on the first non-intertoken-space character:
+/// Grammar: @c datum := atom | list | 'datum | #'datum | `datum | ,datum |
+/// ,@datum (decision D6: no dotted pairs). Dispatches on the first
+/// non-intertoken-space character:
 /// - @c ' — quote shorthand, lowers to @ref datum_quote
 /// - @c # — must be followed by @c ', sharpsign-quote shorthand, lowers to
 ///   @ref datum_function (see that type's docs for why this is a distinct
 ///   kind rather than a @c (function x) list)
+/// - @c ` — backquote shorthand, lowers to @ref datum_backquote (step L18)
+/// - @c , — unquote shorthand; if immediately followed by @c @, unquote
+///   -splicing, lowering to @ref datum_unquote_splice, otherwise ordinary
+///   unquote, lowering to @ref datum_unquote (step L18); the reader accepts
+///   both unconditionally, the same permissive split @ref datum_quote and
+///   @ref datum_function already use -- whether the placement makes sense
+///   (inside a backquote template) is the expander's job, not the reader's
 /// - @c ( — list, lowers to @ref datum_list
 /// - @c ) — a stray close paren is always an error here; a well-formed list
 ///   consumes its own closing @c ) internally
@@ -57,6 +65,36 @@ read_datum_node(smdscheme::parser::cursor cur,
     if (c == ')') {
         return smdscheme::foundation::parse_error{cur.position(),
                                                   "unexpected ')'"};
+    }
+
+    if (c == '`') {
+        smdscheme::parser::cursor after = cur.bump();
+        auto inner = read_datum_node<MaxNodes, MaxList>(after, arena);
+        if (!inner.has_value())
+            return inner;
+        datum d{datum_f{datum_backquote<datum, MaxNodes>{
+            smdscheme::foundation::make_arena_box(arena,
+                                                  inner.value().value)}}};
+        return smdscheme::parser::parse_state<datum>{d, inner.value().rest};
+    }
+
+    if (c == ',') {
+        smdscheme::parser::cursor after = cur.bump();
+        bool splice = false;
+        if (!after.empty() && after.peek() == '@') {
+            splice = true;
+            after = after.bump();
+        }
+        auto inner = read_datum_node<MaxNodes, MaxList>(after, arena);
+        if (!inner.has_value())
+            return inner;
+        datum d = splice ? datum{datum_f{datum_unquote_splice<datum, MaxNodes>{
+                               smdscheme::foundation::make_arena_box(
+                                   arena, inner.value().value)}}}
+                         : datum{datum_f{datum_unquote<datum, MaxNodes>{
+                               smdscheme::foundation::make_arena_box(
+                                   arena, inner.value().value)}}};
+        return smdscheme::parser::parse_state<datum>{d, inner.value().rest};
     }
 
     // 6bda5219-9ebb-4595-88ec-a863f20325f1

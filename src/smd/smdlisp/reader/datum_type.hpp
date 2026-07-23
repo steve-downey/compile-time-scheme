@@ -86,6 +86,57 @@ struct datum_function {
 };
 // d0fdf4c8-643f-44a6-8587-0f0c6d90d8c8 end
 
+/// A Common Lisp backquote template, e.g. @c `(a ,x ,@ys), stored as a
+/// handle to the templated datum.
+///
+/// Per docs/cl-pivot-plan.md step L18, @c `template lowers to this
+/// dedicated datum kind rather than being interpreted at read time,
+/// mirroring how @ref datum_quote and @ref datum_function defer all
+/// interpretation to later passes. The macro expander (see
+/// @c smd::smdlisp::macroexpand::expander.hpp) is what turns the referenced
+/// template into `cons`/`list`/`append` construction code; the reader only
+/// records that the source spelled a backquote.
+///
+/// @tparam R        The recursive element type.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct datum_backquote {
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        templ{}; ///< Handle to the templated datum.
+};
+
+/// A Common Lisp unquote escape, e.g. @c ,x, stored as a handle to the
+/// unquoted datum.
+///
+/// Only meaningful inside a @ref datum_backquote template; the reader
+/// nonetheless parses @c ,x unconditionally wherever a datum is expected,
+/// the same permissive split @ref datum_quote and @ref datum_function
+/// already use (reader records the shorthand, a later pass -- the expander,
+/// step L18 -- decides whether the placement makes sense).
+///
+/// @tparam R        The recursive element type.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct datum_unquote {
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        target{}; ///< Handle to the unquoted datum.
+};
+
+/// A Common Lisp unquote-splicing escape, e.g. @c ,@ys, stored as a handle
+/// to the spliced datum.
+///
+/// Only meaningful as a list element inside a @ref datum_backquote template
+/// (see @ref datum_unquote for the reader/expander split rationale, which
+/// applies identically here).
+///
+/// @tparam R        The recursive element type.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct datum_unquote_splice {
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        target{}; ///< Handle to the spliced datum.
+};
+
 /// Factory template that produces the open-recursive functor used by
 /// @ref datum_type.
 ///
@@ -101,7 +152,9 @@ struct datum_f_factory {
     using type =
         std::variant<datum_integer, datum_symbol, datum_keyword,
                      datum_list<R, MaxNodes, MaxList>, datum_quote<R, MaxNodes>,
-                     datum_function<R, MaxNodes>>;
+                     datum_function<R, MaxNodes>, datum_backquote<R, MaxNodes>,
+                     datum_unquote<R, MaxNodes>,
+                     datum_unquote_splice<R, MaxNodes>>;
 };
 
 /// The concrete recursive Common Lisp datum type, formed as the fixed point
