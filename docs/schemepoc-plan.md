@@ -1,4 +1,13 @@
-# SchemePoC Agent Execution Plan
+# SchemePoC Agent Execution Plan — SUPERSEDED (historical)
+
+> **Superseded by the Common Lisp pivot (`docs/cl-pivot-plan.md`).** This is the
+> original Scheme-PoC plan, retained for history. It is **not** an agent read path and
+> its internal instructions predate the current governance: they reference the retired
+> cumulative `handoff.md`/`handoff-next.md` model, which has been replaced by the
+> three-tier reading contract in `AGENTS.md` (rules pack + per-lane
+> `step-brief-<lane>.md` + on-demand `docs/compiler_architecture.org`). Read
+> `AGENTS.md` and `docs/cl-pivot-plan.md` for current rules; treat everything below as
+> a record of how the PoC was built, not as instructions to follow.
 
 This is the operational plan for building `smd/schemepoc`, a Scheme-light compile-time compiler proof of concept in C++26 on GCC16.
 

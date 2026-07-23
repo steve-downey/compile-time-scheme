@@ -45,17 +45,19 @@ The thesis of the pivot: **Common Lisp's control operators are the largest contr
 
 # 1. Rule and style precedence
 
-Agents must read these files first, in order:
+> **This is an orchestrator/design document. Step worker agents do NOT read it.**
+> It carries the dependency DAG and per-step specifications the orchestrator draws
+> from when dispatching a worker; the worker's own runtime reading contract lives in
+> `AGENTS.md`. (`docs/schemepoc-plan.md` is the superseded pre-pivot plan, historical
+> only; `docs/history/handoff-archive.md` is the retired cumulative handoff log.)
+
+A worker agent reads a bounded, three-tier set — nothing that grows per step:
 
 ```txt
-docs/codestyle.org
-AGENTS.md
-docs/CODING_RULES.md
-CLAUDE.md
-docs/cl-pivot-plan.md   (this file)
-handoff.md
-handoff-next.md
-checklist.md
+Tier 1 — always (rules pack): docs/codestyle.org, AGENTS.md, docs/CODING_RULES.md, CLAUDE.md
+Tier 2 — this step only:      your lane's step-brief-<lane>.md, checklist.md
+Tier 3 — on demand, by anchor/section only, never wholesale:
+         docs/compiler_architecture.org, this plan (orchestrator DAG), git log
 ```
 
 Rule precedence is unchanged:
@@ -83,13 +85,13 @@ The plan is executed by an **orchestrator** agent managing **worker** sub-agents
   - Run `make compile`, `make test`, `make lint` in the worker's tree.
   - Review the diff; changes must be confined to the files the step declares plus its tests and CMake.
   - Confirm the frozen-tree rule: no semantic edits inside `src/smd/smdscheme/**` UUID anchor blocks (check with `git diff -- src/smd/smdscheme` — anchor-block edits require a divergence doc and orchestrator sign-off).
-  - Confirm `checklist.md` was ticked, `handoff.md` updated with durable facts only, `handoff-next.md` rewritten for the next worker.
+  - Confirm `checklist.md` was ticked, durable cross-step facts recorded in `docs/compiler_architecture.org` (in place, by anchor), and the lane's step brief rewritten per the step-brief contract (forward-only, bounded, no log).
   - Confirm any deviation from this plan or from ANSI CL semantics has a divergence doc (section 3).
 - Merge to main with `--no-ff` only when all checks pass.
 - **Branch policy:** all compiler work happens on feature branches, never directly on main.
   Main is always a complete set of work: a branch merges only when it finishes a feature goal (a step, or a coherent group of steps for one feature).
   Formatting-only and lint-only fixes are the exception: commit them by themselves, directly on main, before starting feature work, so feature diffs stay semantic.
-- If a worker is blocked, capture the blocker in `handoff-next.md` and either re-scope the step or file a divergence doc and move on.
+- If a worker is blocked, capture the blocker in the lane's step brief and either re-scope the step or file a divergence doc and move on.
 
 ## Worker duties
 
@@ -97,7 +99,7 @@ The plan is executed by an **orchestrator** agent managing **worker** sub-agents
 - Keep the step small and mergeable; do not continue into later steps.
 - Do not leave vague TODOs.
 - Run `make compile`, `make test`, `make lint` before declaring completion.
-- Update `checklist.md`, `handoff.md`, `handoff-next.md`.
+- Update `checklist.md`; record durable cross-step facts in `docs/compiler_architecture.org` (in place, by anchor); rewrite the lane's step brief per the step-brief contract in `AGENTS.md`.
 - File divergence docs for anything done differently than this plan specifies, and for any knowing deviation from ANSI CL semantics.
 
 ---
@@ -294,8 +296,10 @@ For adapted components, follow the corresponding `smdscheme` file's architecture
 
 Append the "Common Lisp pivot" section (section 10 below) to `checklist.md`.
 Confirm `docs/divergences/TEMPLATE.md` and `DIV-0001` exist.
-Update `handoff.md` with the pivot facts: frozen `smdscheme` tree, `smdlisp` layout, decision records D1–D10 by reference.
-Rewrite `handoff-next.md` for L1.
+Place the pivot invariants (frozen `smdscheme` tree, `smdlisp` layout, decision
+records D1–D10 by reference) into the stable read tier
+(`docs/compiler_architecture.org`), not a growing log.
+Write `step-brief-<lane>.md` for L1.
 Dependencies: none.
 
 ## Step L1 — `smdlisp` skeleton
@@ -541,7 +545,7 @@ Dependencies: L15.
 
 ## Step L24 — Documentation consolidation
 
-Blog phase 22 (limitations per D10 and what they mean), a `docs/cl-limitations.md` recording every ANSI divergence in one place (rolling up the divergence docs), updates to `docs/compiler_architecture.org` for the two-language layout, and a final `handoff.md` rewrite describing the finished state.
+Blog phase 22 (limitations per D10 and what they mean), a `docs/cl-limitations.md` recording every ANSI divergence in one place (rolling up the divergence docs), and a final `docs/compiler_architecture.org` pass for the two-language layout and finished state.
 Merge criteria: `make blog-md` clean; all divergence docs referenced from the limitations doc.
 Dependencies: everything else.
 
@@ -589,9 +593,11 @@ Dependencies: everything else.
 
 ---
 
-# 11. `handoff.md` additions (Step L0 installs)
+# 11. Durable invariants (stable tier — never a growing log)
 
-Durable facts to record:
+These are project invariants, not step history. They belong in the stable read tier
+(`AGENTS.md` / `docs/compiler_architecture.org`) and are referenced by anchor, never
+re-narrated per step and never appended to a cumulative handoff:
 
 ```txt
 The project pivoted from Scheme-light to Common Lisp-light semantics; rationale in docs/cl-pivot-plan.md section 0.
@@ -608,9 +614,15 @@ All nonlocal control is one-shot and dynamic-extent; a dead exit is a diagnosed 
 # 12. Canonical clean-agent instruction
 
 ```txt
-Please read AGENTS.md, docs/codestyle.org, docs/CODING_RULES.md, CLAUDE.md, docs/cl-pivot-plan.md, handoff.md, handoff-next.md, and checklist.md.
+Read only your bounded reading set — nothing that grows per step:
+  Tier 1 (rules pack): docs/codestyle.org, AGENTS.md, docs/CODING_RULES.md, CLAUDE.md
+  Tier 2 (this step):  your lane's step-brief-<lane>.md, checklist.md
+Then read the step section pasted below (the orchestrator pastes it; do not open the full plan).
+Do NOT read docs/history/handoff-archive.md, docs/schemepoc-plan.md, or the full plan front to back.
+Consult docs/compiler_architecture.org only by the anchor your step brief names. If you need a
+fact you do not have, that is a defect in your step brief — report it; do not go spelunking.
 
-Proceed to the next unchecked step in the "Common Lisp pivot" section of checklist.md, using the matching step section of docs/cl-pivot-plan.md as the specification.
+Proceed to the next unchecked step in the "Common Lisp pivot" section of checklist.md, using the matching step section of docs/cl-pivot-plan.md (pasted by the orchestrator) as the specification.
 
 Finish only that step.
 Do not edit src/smd/smdscheme except where the step explicitly says so; never edit inside its UUID anchor blocks.
@@ -621,7 +633,7 @@ make compile
 make test
 make lint
 
-When everything is green, update checklist.md, update handoff.md with durable facts, rewrite handoff-next.md for the next agent, and file docs/divergences/DIV-NNNN docs for anything done differently than the plan or ANSI CL specifies.
+When everything is green: update checklist.md; record any durable cross-step fact in docs/compiler_architecture.org (in place, by anchor), not in a log; rewrite your lane's step brief for the next agent per the step-brief contract in AGENTS.md (forward-only, bounded, no history); and file docs/divergences/DIV-NNNN docs for anything done differently than the plan or ANSI CL specifies.
 
 Do not continue into the following step unless the current step is blocked and you document the blocker.
 ```

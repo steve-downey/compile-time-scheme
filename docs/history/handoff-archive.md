@@ -1,4 +1,14 @@
-# SchemePoC handoff
+# SchemePoC handoff — ARCHIVED (retired 2026-07-22, not on any agent read path)
+
+> **This is the retired cumulative handoff log.** It was demoted because it grew with
+> every step and was re-read in full by every worker, dominating context cost. Agents
+> no longer read this file. The runtime reading contract is the three-tier model in
+> `AGENTS.md`; durable cross-step invariants now live in
+> `docs/compiler_architecture.org` (in place, by anchor); the per-step handoff is a
+> per-lane `step-brief-<lane>.md` (forward-only, bounded). This file is kept only as
+> historical reference; the same narrative is recoverable from `git log` and the
+> per-step `--no-ff` merge commits. **Do not append to it and do not read it as part
+> of a step.**
 
 ## Project
 
