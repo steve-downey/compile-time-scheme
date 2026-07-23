@@ -80,8 +80,11 @@ them, and `~word~` immediately followed by a bare letter has the same problem.
 - C++26/GCC16 baseline; Catch2; mirror file prolog / include-guard / canonical-include
   conventions used throughout `src/smd/smdlisp/`.
 - File a DIV under `docs/divergences/` for anything done differently or any knowing
-  ANSI CL deviation — **check `docs/divergences/` for the actual next free number**
-  before filing (the two lanes may claim numbers concurrently).
+  ANSI CL deviation. **This lane (L13) is reserved DIV-0007** — use it, and increment
+  from there (DIV-0009, DIV-0011, …) if L13 needs more than one, to stay clear of the
+  L18 lane. Do **not** grab "the next free number" ad hoc: L18 runs concurrently and
+  is reserved the even slots (see its brief). (Numbering note: DIV-0005 is an existing
+  gap and DIV-0006 is L17's; do not reuse either without checking `git log`.)
 - Before handoff: `make compile`, `make test`, `make lint`; draft blog phase 18; if it
   has a blog deliverable, verify `make blog-md` leaves every *other* phase's `.md`
   unchanged (revert `id="orgXXXX"` churn per L6/L11 precedent). Do not continue past

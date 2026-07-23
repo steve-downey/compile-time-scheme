@@ -87,6 +87,7 @@ The plan is executed by an **orchestrator** agent managing **worker** sub-agents
   - Confirm the frozen-tree rule: no semantic edits inside `src/smd/smdscheme/**` UUID anchor blocks (check with `git diff -- src/smd/smdscheme` — anchor-block edits require a divergence doc and orchestrator sign-off).
   - Confirm `checklist.md` was ticked, durable cross-step facts recorded in `docs/compiler_architecture.org` (in place, by anchor), and the lane's step brief rewritten per the step-brief contract (forward-only, bounded, no log).
   - Confirm any deviation from this plan or from ANSI CL semantics has a divergence doc (section 3).
+  - Confirm `docs/compiler_architecture.org` transclusions still resolve: every `#+transclude:` target file exists and contains its UUID `start` and `<uuid> end` anchors. A file rename/move silently orphans a transclude, turning the living doc into dead narrative (this is exactly how the pre-pivot `schemepoc/*.hpp` anchors rotted). Quick check: `grep -oE 'file:[^:]+::[0-9a-f-]{36}' docs/compiler_architecture.org` and verify each target (relative to `docs/`) exists and contains the uuid twice.
 - Merge to main with `--no-ff` only when all checks pass.
 - **Branch policy:** all compiler work happens on feature branches, never directly on main.
   Main is always a complete set of work: a branch merges only when it finishes a feature goal (a step, or a coherent group of steps for one feature).

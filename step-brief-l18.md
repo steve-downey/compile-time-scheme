@@ -72,8 +72,12 @@ L17's "expander never touches the reader" precedent applies.
 - C++26/GCC16 baseline; Catch2; mirror file prolog / include-guard / canonical-include
   conventions used throughout `src/smd/smdlisp/`.
 - File a DIV under `docs/divergences/` for anything done differently or any knowing
-  ANSI CL deviation — **check `docs/divergences/` for the actual next free number**
-  (the two lanes may claim numbers concurrently).
+  ANSI CL deviation. **This lane (L18) is reserved DIV-0008** — use it, and increment
+  from there (DIV-0010, DIV-0012, …) if L18 needs more than one, to stay clear of the
+  L13 lane (reserved the odd slots from DIV-0007; see its brief). Do **not** grab "the
+  next free number" ad hoc while both lanes run concurrently. (Numbering note:
+  DIV-0005 is an existing gap and DIV-0006 is L17's; do not reuse either without
+  checking `git log`.)
 - L18 has **no** blog deliverable (phase 20 arrives at L19). Before handoff:
   `make compile`, `make test`, `make lint`. Do not continue past L18 into L19 unless
   blocked; if blocked, document it here.
