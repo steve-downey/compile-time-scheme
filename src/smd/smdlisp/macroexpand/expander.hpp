@@ -482,6 +482,119 @@ expand_case(datum_list<MaxNodes, MaxList> const &call,
         arena, make_symbol<MaxNodes, MaxList>("LET"), bindings, cond_call);
 }
 
+// -- BACKQUOTE (step L18) -----------------------------------------------
+
+/// Forward declaration: @ref expand_backquote_template and
+/// @ref expand_backquote_list_elems recurse into each other (a template
+/// list element may itself hold a nested sub-template requiring the whole
+/// lowering machinery again).
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto
+expand_backquote_template(datum<MaxNodes, MaxList> const &t,
+                          datum_arena<MaxNodes, MaxList> &arena)
+    -> smdscheme::foundation::result<datum<MaxNodes, MaxList>>;
+
+/// Lowers the elements of a backquote template list, from @p idx onward,
+/// into a `cons`/`append` construction chain.
+///
+/// Builds right-to-left: an ordinary element at @p idx lowers to
+/// `(CONS <lowered element> <lowered rest>)`; an unquote-splicing element
+/// (`,@x`, @ref reader::datum_unquote_splice) lowers to
+/// `(APPEND x <lowered rest>)` instead, splicing `x`'s value (which must
+/// itself be a list) onto the rest without an extra wrapping cons cell --
+/// the whole reason `append` joins the builtin set in this step (plan
+/// §9, L18). The base case (@p idx past the end of @p lst) is the literal
+/// `NIL` symbol, the canonical empty list (decision D3).
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+/// @param  lst  The template list being lowered.
+/// @param  idx  Index of the next element to process.
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto
+expand_backquote_list_elems(datum_list<MaxNodes, MaxList> const &lst, int idx,
+                            datum_arena<MaxNodes, MaxList> &arena)
+    -> smdscheme::foundation::result<datum<MaxNodes, MaxList>> {
+    using D = datum<MaxNodes, MaxList>;
+    using DatumUnquoteSplice = reader::datum_unquote_splice<D, MaxNodes>;
+
+    if (idx >= lst.elements.size())
+        return nil_symbol<MaxNodes, MaxList>();
+
+    auto const &elem = arena.get(lst.elements[idx]);
+
+    auto rest_r =
+        expand_backquote_list_elems<MaxNodes, MaxList>(lst, idx + 1, arena);
+    if (!rest_r.has_value())
+        return rest_r;
+    auto const &rest = rest_r.value();
+
+    if (std::holds_alternative<DatumUnquoteSplice>(elem.inner)) {
+        auto const &us = std::get<DatumUnquoteSplice>(elem.inner);
+        auto spliced = arena.get(us.target); // Code: evaluates to a list.
+        return make_list_v<MaxNodes, MaxList>(
+            arena, make_symbol<MaxNodes, MaxList>("APPEND"), spliced, rest);
+    }
+
+    auto elem_r = expand_backquote_template<MaxNodes, MaxList>(elem, arena);
+    if (!elem_r.has_value())
+        return elem_r;
+    return make_list_v<MaxNodes, MaxList>(
+        arena, make_symbol<MaxNodes, MaxList>("CONS"), elem_r.value(), rest);
+}
+
+/// Lowers one backquote template position @p t into code that constructs
+/// the template's value.
+///
+/// - `,x` (@ref reader::datum_unquote) lowers to `x` itself: an unquote
+///   escape names ordinary code, evaluated in place (this function only
+///   strips the escape; @ref expand_datum's caller still recursively
+///   expands `x` for any macro calls it contains).
+/// - `,@x` (@ref reader::datum_unquote_splice) is an error here: splicing
+///   is only meaningful as a list element (@ref
+///   expand_backquote_list_elems handles that case directly, without
+///   calling this function on the splice node itself), never as a whole
+///   template or a non-list sub-template position.
+/// - A list template lowers via @ref expand_backquote_list_elems.
+/// - Anything else (an atom, a nested `` ` `` template, a `'x`/`#'x`
+///   sub-datum) is literal data, wrapped in a native @ref
+///   reader::datum_quote node via @ref make_quote exactly as written.
+///   **Known simplification, see the DIV this step files:** a nested
+///   backquote template is not itself lowered here -- ANSI CL's
+///   nested-depth unquote tracking is out of scope for this step, so a
+///   `` ` `` inside another `` ` `` is treated as opaque literal data
+///   (its own `,`/`,@` escapes, if any, are quoted along with it, not
+///   evaluated).
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto
+expand_backquote_template(datum<MaxNodes, MaxList> const &t,
+                          datum_arena<MaxNodes, MaxList> &arena)
+    -> smdscheme::foundation::result<datum<MaxNodes, MaxList>> {
+    using D = datum<MaxNodes, MaxList>;
+    using DatumList = datum_list<MaxNodes, MaxList>;
+    using DatumUnquote = reader::datum_unquote<D, MaxNodes>;
+    using DatumUnquoteSplice = reader::datum_unquote_splice<D, MaxNodes>;
+
+    if (std::holds_alternative<DatumUnquote>(t.inner))
+        return arena.get(std::get<DatumUnquote>(t.inner).target);
+
+    if (std::holds_alternative<DatumUnquoteSplice>(t.inner))
+        return smdscheme::foundation::parse_error{
+            {}, "backquote: ,@ is only valid as a list element"};
+
+    if (std::holds_alternative<DatumList>(t.inner))
+        return expand_backquote_list_elems<MaxNodes, MaxList>(
+            std::get<DatumList>(t.inner), 0, arena);
+
+    return make_quote<MaxNodes, MaxList>(arena, t);
+}
+
 } // namespace detail
 
 /// Maximum number of entries @ref default_macro_table holds (the six ANSI
@@ -656,7 +769,11 @@ is_quote_form(datum_list<MaxNodes, MaxList> const &lst,
 /// reader::datum_quote, or the equivalent `(quote ...)` list form, see
 /// @ref detail::is_quote_form), which ANSI CL treats as literal and exempt
 /// from macroexpansion. `#'` (@ref reader::datum_function) targets ARE
-/// recursed into, since a `#'(lambda ...)` target is code.
+/// recursed into, since a `#'(lambda ...)` target is code. `` ` `` (@ref
+/// reader::datum_backquote) templates are lowered to `cons`/`list`/`append`
+/// construction code (@ref detail::expand_backquote_template, step L18)
+/// before being recursed into, so the code embedded via `,`/`,@` escapes is
+/// still fully expanded.
 ///
 /// At each list position, the head is expanded to fixpoint first (@ref
 /// macroexpand); the algorithm never re-applies @ref macroexpand to the
@@ -677,6 +794,7 @@ template <int MaxNodes, int MaxList>
     using DatumList = datum_list<MaxNodes, MaxList>;
     using DatumQuote = reader::datum_quote<D, MaxNodes>;
     using DatumFunction = reader::datum_function<D, MaxNodes>;
+    using DatumBackquote = reader::datum_backquote<D, MaxNodes>;
 
     if (std::holds_alternative<DatumQuote>(d.inner))
         return d;
@@ -689,6 +807,22 @@ template <int MaxNodes, int MaxList>
             return inner_r;
         return D{datum_f{DatumFunction{
             smdscheme::foundation::make_arena_box(arena, inner_r.value())}}};
+    }
+
+    if (std::holds_alternative<DatumBackquote>(d.inner)) {
+        // A dedicated template-datum case (plan §9, L18), not a host_macro
+        // entry: `` ` `` is reader syntax, never a symbol-headed call form
+        // a host_macro could match. Lower the template to `cons`/`list`/
+        // `append` construction code (@ref detail::expand_backquote_template),
+        // then recurse so any code embedded via `,`/`,@` escapes -- and any
+        // macro calls it contains -- is still fully expanded, exactly like
+        // every other macro expansion's replacement datum.
+        auto const &bq = std::get<DatumBackquote>(d.inner);
+        auto lowered_r = detail::expand_backquote_template<MaxNodes, MaxList>(
+            arena.get(bq.templ), arena);
+        if (!lowered_r.has_value())
+            return lowered_r;
+        return expand_datum<MaxNodes, MaxList>(lowered_r.value(), arena);
     }
 
     if (!std::holds_alternative<DatumList>(d.inner))

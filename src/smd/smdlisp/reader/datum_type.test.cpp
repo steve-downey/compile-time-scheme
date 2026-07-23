@@ -20,14 +20,18 @@ using datum_f =
 using list_t = datum_list<datum, MaxNodes, MaxList>;
 using quote_t = datum_quote<datum, MaxNodes>;
 using function_t = datum_function<datum, MaxNodes>;
+using backquote_t = datum_backquote<datum, MaxNodes>;
+using unquote_t = datum_unquote<datum, MaxNodes>;
+using unquote_splice_t = datum_unquote_splice<datum, MaxNodes>;
 
 } // namespace
 
 TEST_CASE("DatumTypeTest - HeaderIsIdempotent") { REQUIRE(true); }
 
-// -- shape: six kinds (integer, symbol, keyword, list, quote, function) ----
+// -- shape: nine kinds (integer, symbol, keyword, list, quote, function,
+//    backquote, unquote, unquote-splice; the last three added step L18) ----
 
-static_assert(std::variant_size_v<datum_f> == 6);
+static_assert(std::variant_size_v<datum_f> == 9);
 
 static_assert([] {
     datum d{datum_f{datum_integer{42}}};
@@ -92,6 +96,24 @@ TEST_CASE("DatumTypeTest - function-quote wraps a handle, distinct from "
     REQUIRE(std::holds_alternative<function_t>(d.inner));
     REQUIRE_FALSE(std::holds_alternative<quote_t>(d.inner));
     REQUIRE_FALSE(std::holds_alternative<list_t>(d.inner));
+}
+
+// -- backquote/unquote/unquote-splice are distinct kinds (step L18) --------
+
+TEST_CASE("DatumTypeTest - backquote/unquote/unquote-splice wrap a handle, "
+          "distinct from each other and from quote") {
+    smdscheme::foundation::tree_arena<datum, MaxNodes> arena;
+    auto box = smdscheme::foundation::make_arena_box(
+        arena, datum{datum_f{datum_symbol{}}});
+    datum bq{datum_f{backquote_t{box}}};
+    datum uq{datum_f{unquote_t{box}}};
+    datum us{datum_f{unquote_splice_t{box}}};
+    REQUIRE(std::holds_alternative<backquote_t>(bq.inner));
+    REQUIRE(std::holds_alternative<unquote_t>(uq.inner));
+    REQUIRE(std::holds_alternative<unquote_splice_t>(us.inner));
+    REQUIRE(bq.inner.index() != uq.inner.index());
+    REQUIRE(uq.inner.index() != us.inner.index());
+    REQUIRE_FALSE(std::holds_alternative<quote_t>(bq.inner));
 }
 
 } // namespace smd::smdlisp::reader

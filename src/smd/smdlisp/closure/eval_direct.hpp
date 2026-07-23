@@ -22,14 +22,14 @@ namespace smd::smdlisp::closure {
 
 namespace detail {
 
-/// Bridges a @ref builtin_op naming one of the eight list primitives onto
+/// Bridges a @ref builtin_op naming one of the nine list primitives onto
 /// the @ref list_op enum @ref pairs.hpp::apply_prim actually consumes.
 ///
 /// The two enums are deliberately kept separate types (see @ref builtin_op's
 /// docs: `pairs.hpp` includes `value.hpp`, so `value.hpp` cannot name
 /// `pairs.hpp`'s `list_op` back without a header cycle), but they share the
-/// same eight names by construction, so the bridge is a same-name lookup,
-/// not a semantic mapping.  Only called for the eight @p op values listed
+/// same nine names by construction, so the bridge is a same-name lookup,
+/// not a semantic mapping.  Only called for the nine @p op values listed
 /// below; @c add/@c multiply/@c funcall/@c apply are handled directly by
 /// @ref apply_function_value and never reach this function.
 [[nodiscard]] constexpr auto to_list_op(builtin_op op) -> list_op {
@@ -50,6 +50,8 @@ namespace detail {
         return list_op::eql;
     case builtin_op::atom:
         return list_op::atom;
+    case builtin_op::append:
+        return list_op::append;
     case builtin_op::add:
     case builtin_op::multiply:
     case builtin_op::funcall:
@@ -149,6 +151,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 case builtin_op::eq:
                 case builtin_op::eql:
                 case builtin_op::atom:
+                case builtin_op::append:
                     return apply_prim<Core, default_max_pairs>(
                         detail::to_list_op(bi.op), args, heap);
                 case builtin_op::funcall: {

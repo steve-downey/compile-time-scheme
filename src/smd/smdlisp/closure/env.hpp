@@ -231,7 +231,8 @@ constexpr auto env<Core, MaxBindings>::is_special(symbol name) const -> bool {
 
 /// Returns an environment pre-populated with the default builtins,
 /// installed in the *function* namespace per step L9: `+`, `*`, `cons`,
-/// `car`, `cdr`, `list`, `null`, `eq`, `eql`, `atom`, `funcall`, `apply`.
+/// `car`, `cdr`, `list`, `null`, `eq`, `eql`, `atom`, `funcall`, `apply`,
+/// `append` (the last added in step L18, for backquote's `,@x` lowering).
 ///
 /// Symbol names are spelled uppercase to match what the reader (steps
 /// L4-L6) produces after case folding (decision D2); `+` and `*` are
@@ -255,6 +256,8 @@ template <typename Core, int MaxBindings>
     e.define_function(symbol{"FUNCALL"},
                       value<Core>{builtin{builtin_op::funcall}});
     e.define_function(symbol{"APPLY"}, value<Core>{builtin{builtin_op::apply}});
+    e.define_function(symbol{"APPEND"},
+                      value<Core>{builtin{builtin_op::append}});
     return e;
 }
 
@@ -286,6 +289,8 @@ template <typename Core, int MaxBindings>
     e.define_function(symbol{"FUNCALL"},
                       value<Core>{builtin{builtin_op::funcall}});
     e.define_function(symbol{"APPLY"}, value<Core>{builtin{builtin_op::apply}});
+    e.define_function(symbol{"APPEND"},
+                      value<Core>{builtin{builtin_op::append}});
     return e;
 }
 
@@ -319,6 +324,8 @@ template <typename Core, int MaxBindings>
     e.define_function(symbol{"FUNCALL"},
                       value<Core>{builtin{builtin_op::funcall}});
     e.define_function(symbol{"APPLY"}, value<Core>{builtin{builtin_op::apply}});
+    e.define_function(symbol{"APPEND"},
+                      value<Core>{builtin{builtin_op::append}});
     return e;
 }
 

@@ -27,6 +27,9 @@ namespace smd::smdlisp::closure {
 /// evaluator step (L10/L11) bridges the two over their shared names.
 /// `funcall` and `apply` have no `apply_prim` case: invoking a closure
 /// value needs the evaluator itself, not just value-level plumbing.
+/// `append` joins the set in step L18: the backquote expander lowers
+/// `,@x` (unquote-splicing) to a call against this builtin, again named
+/// identically to `pairs.hpp::list_op::append`.
 enum class builtin_op {
     add,
     multiply,
@@ -39,7 +42,8 @@ enum class builtin_op {
     eql,
     atom,
     funcall,
-    apply
+    apply,
+    append
 };
 
 /// A built-in operator value (holds the operation kind).

@@ -32,6 +32,8 @@ static_assert(is_terminating_macro_char('('));
 static_assert(is_terminating_macro_char(')'));
 static_assert(is_terminating_macro_char('\''));
 static_assert(is_terminating_macro_char(';'));
+static_assert(is_terminating_macro_char('`')); // step L18: backquote.
+static_assert(is_terminating_macro_char(',')); // step L18: unquote/,@.
 static_assert(!is_terminating_macro_char('a'));
 static_assert(!is_terminating_macro_char('+'));
 
@@ -104,6 +106,8 @@ TEST_CASE("ClCharsTest - IsTerminatingMacroChar") {
     CHECK(is_terminating_macro_char(')'));
     CHECK(is_terminating_macro_char('\''));
     CHECK(is_terminating_macro_char(';'));
+    CHECK(is_terminating_macro_char('`'));
+    CHECK(is_terminating_macro_char(','));
     CHECK_FALSE(is_terminating_macro_char('x'));
 }
 

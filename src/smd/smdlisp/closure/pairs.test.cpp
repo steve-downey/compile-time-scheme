@@ -325,3 +325,87 @@ TEST_CASE("PairsTest - ConsWithoutHeapIsError") {
         list_op::cons, args, static_cast<pair_heap<dummy_core, 4> *>(nullptr));
     REQUIRE_FALSE(r.has_value());
 }
+
+// -- append (step L18: backquote's ,@ unquote-splicing lowering) ------------
+
+TEST_CASE("PairsTest - AppendJoinsTwoLists") {
+    pair_heap<dummy_core, 8> heap;
+    std::array<val, 3> l1_args{val{1}, val{2}, val{3}};
+    auto l1 = apply_prim<dummy_core>(list_op::list, l1_args, &heap).value();
+    std::array<val, 2> l2_args{val{4}, val{5}};
+    auto l2 = apply_prim<dummy_core>(list_op::list, l2_args, &heap).value();
+
+    std::array<val, 2> append_args{l1, l2};
+    auto r = apply_prim<dummy_core>(list_op::append, append_args, &heap);
+    REQUIRE(r.has_value());
+
+    std::array<val, 1> a1{r.value()};
+    auto car1 = apply_prim<dummy_core>(list_op::car, a1, &heap).value();
+    auto cdr1 = apply_prim<dummy_core>(list_op::cdr, a1, &heap).value();
+    std::array<val, 1> a2{cdr1};
+    auto car2 = apply_prim<dummy_core>(list_op::car, a2, &heap).value();
+    auto cdr2 = apply_prim<dummy_core>(list_op::cdr, a2, &heap).value();
+    std::array<val, 1> a3{cdr2};
+    auto car3 = apply_prim<dummy_core>(list_op::car, a3, &heap).value();
+    auto cdr3 = apply_prim<dummy_core>(list_op::cdr, a3, &heap).value();
+    std::array<val, 1> a4{cdr3};
+    auto car4 = apply_prim<dummy_core>(list_op::car, a4, &heap).value();
+    auto cdr4 = apply_prim<dummy_core>(list_op::cdr, a4, &heap).value();
+    std::array<val, 1> a5{cdr4};
+    auto car5 = apply_prim<dummy_core>(list_op::car, a5, &heap).value();
+    auto cdr5 = apply_prim<dummy_core>(list_op::cdr, a5, &heap).value();
+
+    REQUIRE(std::get<int>(car1) == 1);
+    REQUIRE(std::get<int>(car2) == 2);
+    REQUIRE(std::get<int>(car3) == 3);
+    REQUIRE(std::get<int>(car4) == 4);
+    REQUIRE(std::get<int>(car5) == 5);
+    REQUIRE(std::holds_alternative<nil_t>(cdr5));
+}
+
+TEST_CASE("PairsTest - AppendWithNilFirstArgIsSecondArg") {
+    pair_heap<dummy_core, 4> heap;
+    std::array<val, 2> l_args{val{1}, val{2}};
+    auto l = apply_prim<dummy_core>(list_op::list, l_args, &heap).value();
+    std::array<val, 2> args{val{nil_t{}}, l};
+    auto r = apply_prim<dummy_core>(list_op::append, args, &heap);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<pair_ref>(r.value()));
+    REQUIRE(std::get<pair_ref>(r.value()).loc == std::get<pair_ref>(l).loc);
+}
+
+TEST_CASE("PairsTest - AppendWithNoArgsIsNil") {
+    std::array<val, 0> args{};
+    auto r = apply_prim<dummy_core>(
+        list_op::append, args,
+        static_cast<pair_heap<dummy_core, 4> *>(nullptr));
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<nil_t>(r.value()));
+}
+
+TEST_CASE("PairsTest - AppendLastArgSharedNotCopied") {
+    // Appending onto a shared tail returns the SAME cell for the tail's
+    // first pair (identity, not a structural copy) -- only every argument
+    // but the last is copied.
+    pair_heap<dummy_core, 4> heap;
+    std::array<val, 2> tail_args{val{9}, val{nil_t{}}};
+    auto tail = apply_prim<dummy_core>(list_op::cons, tail_args, &heap).value();
+    std::array<val, 1> single{val{1}};
+    auto l1 = apply_prim<dummy_core>(list_op::list, single, &heap).value();
+
+    std::array<val, 2> args{l1, tail};
+    auto r = apply_prim<dummy_core>(list_op::append, args, &heap);
+    REQUIRE(r.has_value());
+    auto cdr1 = apply_prim<dummy_core>(list_op::cdr,
+                                       std::array<val, 1>{r.value()}, &heap)
+                    .value();
+    REQUIRE(std::holds_alternative<pair_ref>(cdr1));
+    REQUIRE(std::get<pair_ref>(cdr1).loc == std::get<pair_ref>(tail).loc);
+}
+
+TEST_CASE("PairsTest - AppendOnNonListIsError") {
+    pair_heap<dummy_core, 4> heap;
+    std::array<val, 2> args{val{42}, val{nil_t{}}};
+    auto r = apply_prim<dummy_core>(list_op::append, args, &heap);
+    REQUIRE_FALSE(r.has_value());
+}
