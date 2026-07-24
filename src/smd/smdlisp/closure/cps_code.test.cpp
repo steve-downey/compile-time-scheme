@@ -25,7 +25,9 @@ constexpr int MaxEnvs = 32;
 using Core = lisp::elaborator::core_type<MaxNodes, MaxList>;
 using Val = lisp::closure::value<Core>;
 using Res = scm::foundation::result<Val>;
-using DatumArena = scm::foundation::tree_arena<lisp::reader::datum_type<MaxNodes, MaxList>, MaxNodes>;
+using DatumArena =
+    scm::foundation::tree_arena<lisp::reader::datum_type<MaxNodes, MaxList>,
+                                MaxNodes>;
 using CoreArena = scm::foundation::tree_arena<Core, MaxNodes>;
 using Heap = lisp::closure::pair_heap<Core, lisp::closure::default_max_pairs>;
 using Store = lisp::closure::store<Core, lisp::closure::default_max_store>;
@@ -38,33 +40,43 @@ using Envs = lisp::closure::env_arena<Core, MaxBindings, MaxEnvs>;
 /// instead of @ref lisp::closure::eval_direct -- this is the L13 merge
 /// criterion made concrete: the same source, the same arenas-owned-by-the-
 /// caller discipline, a different evaluator.
-auto run(std::string_view src, DatumArena &datum_arena, CoreArena &core_arena, Core &root, Heap &heap, Envs &envs)
-    -> Res {
-    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(scm::parser::cursor{src}, datum_arena);
+auto run(std::string_view src, DatumArena &datum_arena, CoreArena &core_arena,
+         Core &root, Heap &heap, Envs &envs) -> Res {
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{src}, datum_arena);
     if (!dr.has_value())
         return Res{dr.error()};
-    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value, datum_arena, core_arena);
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(
+        dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return Res{er.error()};
     root = er.value();
     auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
-    auto code = lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(root, core_arena);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            root, core_arena);
     return code(environment, envs, [](Val v) -> Res { return v; });
 }
 
 /// Like @ref run, but builds a *mutable* environment (a shared @ref Store,
 /// step L12) so `setq`/`defun`/`defvar`/`defparameter` can be exercised.
-auto run_mut(std::string_view src, DatumArena &datum_arena, CoreArena &core_arena, Core &root, Heap &heap,
-            Store &store, Envs &envs) -> Res {
-    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(scm::parser::cursor{src}, datum_arena);
+auto run_mut(std::string_view src, DatumArena &datum_arena,
+             CoreArena &core_arena, Core &root, Heap &heap, Store &store,
+             Envs &envs) -> Res {
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{src}, datum_arena);
     if (!dr.has_value())
         return Res{dr.error()};
-    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value, datum_arena, core_arena);
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(
+        dr.value().value, datum_arena, core_arena);
     if (!er.has_value())
         return Res{er.error()};
     root = er.value();
-    auto environment = lisp::closure::default_env<Core, MaxBindings>(heap, store);
-    auto code = lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(root, core_arena);
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            root, core_arena);
     return code(environment, envs, [](Val v) -> Res { return v; });
 }
 
@@ -82,16 +94,21 @@ static_assert([] {
     Heap heap;
     Envs envs;
 
-    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(scm::parser::cursor{"(if nil 1 2)"sv}, da);
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(if nil 1 2)"sv}, da);
     if (!dr.has_value())
         return false;
-    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value, da, ca);
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
     if (!er.has_value())
         return false;
     auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
-    auto code = lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(er.value(), ca);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
     auto vr = code(environment, envs, [](Val v) -> Res { return v; });
-    return vr.has_value() && std::holds_alternative<int>(vr.value()) && std::get<int>(vr.value()) == 2;
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 2;
 }());
 
 static_assert([] {
@@ -100,17 +117,21 @@ static_assert([] {
     Heap heap;
     Envs envs;
 
-    auto dr =
-        lisp::reader::read_datum<MaxNodes, MaxList>(scm::parser::cursor{"((lambda (x) (car (cdr x))) '(1 2 3))"sv}, da);
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"((lambda (x) (car (cdr x))) '(1 2 3))"sv}, da);
     if (!dr.has_value())
         return false;
-    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value, da, ca);
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
     if (!er.has_value())
         return false;
     auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
-    auto code = lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(er.value(), ca);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
     auto vr = code(environment, envs, [](Val v) -> Res { return v; });
-    return vr.has_value() && std::holds_alternative<int>(vr.value()) && std::get<int>(vr.value()) == 2;
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 2;
 }());
 
 static_assert([] {
@@ -119,19 +140,26 @@ static_assert([] {
     Heap heap;
     Envs envs;
 
-    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(scm::parser::cursor{"(funcall #'cons 1 nil)"sv}, da);
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(funcall #'cons 1 nil)"sv}, da);
     if (!dr.has_value())
         return false;
-    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value, da, ca);
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
     if (!er.has_value())
         return false;
     auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
-    auto code = lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(er.value(), ca);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
     auto vr = code(environment, envs, [](Val v) -> Res { return v; });
-    if (!vr.has_value() || !std::holds_alternative<lisp::closure::pair_ref>(vr.value()))
+    if (!vr.has_value() ||
+        !std::holds_alternative<lisp::closure::pair_ref>(vr.value()))
         return false;
-    auto const &cell = heap.get(std::get<lisp::closure::pair_ref>(vr.value()).loc);
-    return std::holds_alternative<int>(cell.car) && std::get<int>(cell.car) == 1 &&
+    auto const &cell =
+        heap.get(std::get<lisp::closure::pair_ref>(vr.value()).loc);
+    return std::holds_alternative<int>(cell.car) &&
+           std::get<int>(cell.car) == 1 &&
            std::holds_alternative<lisp::closure::nil_t>(cell.cdr);
 }());
 
@@ -143,16 +171,22 @@ static_assert([] {
     Envs envs;
 
     auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
-        scm::parser::cursor{"(progn (defun twice (x) (+ x x)) (twice 4))"sv}, da);
+        scm::parser::cursor{"(progn (defun twice (x) (+ x x)) (twice 4))"sv},
+        da);
     if (!dr.has_value())
         return false;
-    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value, da, ca);
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
     if (!er.has_value())
         return false;
-    auto environment = lisp::closure::default_env<Core, MaxBindings>(heap, store);
-    auto code = lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(er.value(), ca);
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
     auto vr = code(environment, envs, [](Val v) -> Res { return v; });
-    return vr.has_value() && std::holds_alternative<int>(vr.value()) && std::get<int>(vr.value()) == 8;
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 8;
 }());
 
 // -- runtime twins of the merge criteria ---------------------------------
@@ -174,7 +208,8 @@ TEST_CASE("CpsCodeTest - LambdaApplicationWithCarCdr") {
     Heap heap;
     Core root;
     Envs envs;
-    auto r = run("((lambda (x) (car (cdr x))) '(1 2 3))", da, ca, root, heap, envs);
+    auto r =
+        run("((lambda (x) (car (cdr x))) '(1 2 3))", da, ca, root, heap, envs);
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 2);
 }
@@ -186,7 +221,8 @@ TEST_CASE("CpsCodeTest - DefunThenCallInSameProgn") {
     Store store;
     Core root;
     Envs envs;
-    auto r = run_mut("(progn (defun twice (x) (+ x x)) (twice 4))", da, ca, root, heap, store, envs);
+    auto r = run_mut("(progn (defun twice (x) (+ x x)) (twice 4))", da, ca,
+                     root, heap, store, envs);
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 8);
 }
@@ -199,7 +235,8 @@ TEST_CASE("CpsCodeTest - ClosureCapturesVariableNamespace") {
     Heap heap;
     Core root;
     Envs envs;
-    auto r = run("(let ((x 10)) ((lambda (y) (+ x y)) 5))", da, ca, root, heap, envs);
+    auto r = run("(let ((x 10)) ((lambda (y) (+ x y)) 5))", da, ca, root, heap,
+                 envs);
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 15);
 }
@@ -210,10 +247,12 @@ TEST_CASE("CpsCodeTest - ClosureCapturesFunctionNamespace") {
     Heap heap;
     Core root;
     Envs envs;
-    auto r = run("(let ((x 1)) ((lambda () (cons x nil))))", da, ca, root, heap, envs);
+    auto r = run("(let ((x 1)) ((lambda () (cons x nil))))", da, ca, root, heap,
+                 envs);
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<lisp::closure::pair_ref>(r.value()));
-    auto const &cell = heap.get(std::get<lisp::closure::pair_ref>(r.value()).loc);
+    auto const &cell =
+        heap.get(std::get<lisp::closure::pair_ref>(r.value()).loc);
     REQUIRE(std::get<int>(cell.car) == 1);
 }
 
@@ -261,10 +300,10 @@ TEST_CASE("CpsCodeTest - SetqIsVisibleAcrossClosuresSharingTheBinding") {
     Store store;
     Core root;
     Envs envs;
-    auto r = run_mut(
-        "(let ((x 1)) (progn (defun inc () (setq x (+ x 1))) (funcall "
-        "#'inc) (funcall #'inc) x))",
-        da, ca, root, heap, store, envs);
+    auto r =
+        run_mut("(let ((x 1)) (progn (defun inc () (setq x (+ x 1))) (funcall "
+                "#'inc) (funcall #'inc) x))",
+                da, ca, root, heap, store, envs);
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 3);
 }
@@ -276,7 +315,8 @@ TEST_CASE("CpsCodeTest - SetqExpressionValueIsTheAssignedValue") {
     Store store;
     Core root;
     Envs envs;
-    auto r = run_mut("((lambda (x) (setq x 42)) 1)", da, ca, root, heap, store, envs);
+    auto r = run_mut("((lambda (x) (setq x 42)) 1)", da, ca, root, heap, store,
+                     envs);
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 42);
 }
@@ -300,7 +340,8 @@ TEST_CASE("CpsCodeTest - DefvarDoesNotReinitializeIfAlreadyBound") {
     Store store;
     Core root;
     Envs envs;
-    auto r = run_mut("(progn (defvar *x* 1) (setq *x* 2) (defvar *x* 99) *x*)", da, ca, root, heap, store, envs);
+    auto r = run_mut("(progn (defvar *x* 1) (setq *x* 2) (defvar *x* 99) *x*)",
+                     da, ca, root, heap, store, envs);
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 2);
 }

@@ -20,8 +20,8 @@ using Core = lisp::elaborator::core_type<MaxNodes, MaxList>;
 using Val = lisp::closure::value<Core>;
 using Heap = lisp::closure::pair_heap<Core, lisp::closure::default_max_pairs>;
 using Envs = lisp::closure::env_arena<Core, 16, 32>;
-using DatumArena =
-    smd::smdscheme::foundation::tree_arena<lisp::reader::datum_type<MaxNodes, MaxList>, MaxNodes>;
+using DatumArena = smd::smdscheme::foundation::tree_arena<
+    lisp::reader::datum_type<MaxNodes, MaxList>, MaxNodes>;
 
 } // namespace
 
@@ -41,19 +41,22 @@ static_assert([] {
     auto environment = lisp::closure::default_env<Core, 16>();
     Envs envs;
     auto vr = r.value()(environment, envs);
-    return vr.has_value() && std::holds_alternative<int>(vr.value()) && std::get<int>(vr.value()) == 2;
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 2;
 }());
 
 static_assert([] {
     DatumArena datum_arena;
-    auto r = lisp::closure::compile_to_closure("((lambda (x) (car (cdr x))) '(1 2 3))"sv, datum_arena);
+    auto r = lisp::closure::compile_to_closure(
+        "((lambda (x) (car (cdr x))) '(1 2 3))"sv, datum_arena);
     if (!r.has_value())
         return false;
     Heap heap;
     auto environment = lisp::closure::default_env<Core, 16>(heap);
     Envs envs;
     auto vr = r.value()(environment, envs);
-    return vr.has_value() && std::holds_alternative<int>(vr.value()) && std::get<int>(vr.value()) == 2;
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 2;
 }());
 
 // foundation::bad source -> compile_to_closure returns a runtime error
@@ -83,7 +86,8 @@ TEST_CASE("ClosureProgramTest - IfNilTakesFalseBranch") {
 
 TEST_CASE("ClosureProgramTest - LambdaApplicationWithCarCdr") {
     DatumArena datum_arena;
-    auto r = lisp::closure::compile_to_closure("((lambda (x) (car (cdr x))) '(1 2 3))"sv, datum_arena);
+    auto r = lisp::closure::compile_to_closure(
+        "((lambda (x) (car (cdr x))) '(1 2 3))"sv, datum_arena);
     REQUIRE(r.has_value());
     Heap heap;
     auto environment = lisp::closure::default_env<Core, 16>(heap);
@@ -96,7 +100,8 @@ TEST_CASE("ClosureProgramTest - LambdaApplicationWithCarCdr") {
 
 TEST_CASE("ClosureProgramTest - FuncallOfConsBuildsAPair") {
     DatumArena datum_arena;
-    auto r = lisp::closure::compile_to_closure("(funcall #'cons 1 nil)"sv, datum_arena);
+    auto r = lisp::closure::compile_to_closure("(funcall #'cons 1 nil)"sv,
+                                               datum_arena);
     REQUIRE(r.has_value());
     Heap heap;
     auto environment = lisp::closure::default_env<Core, 16>(heap);
@@ -106,7 +111,8 @@ TEST_CASE("ClosureProgramTest - FuncallOfConsBuildsAPair") {
     REQUIRE(std::holds_alternative<lisp::closure::pair_ref>(vr.value()));
 }
 
-TEST_CASE("ClosureProgramTest - CanBeCalledMultipleTimesWithFreshEnvironments") {
+TEST_CASE(
+    "ClosureProgramTest - CanBeCalledMultipleTimesWithFreshEnvironments") {
     // The returned program is a value that can be reused; each call gets
     // its own environment/env_arena, per this type's own doc comment.
     DatumArena datum_arena;

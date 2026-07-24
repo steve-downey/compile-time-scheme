@@ -35,7 +35,8 @@ namespace smd::smdlisp::closure {
 /// @tparam MaxEnvs     Capacity of the closure-capture env_arena.
 /// @tparam CpsCode     The concrete CPS code type produced by
 ///                      @ref compile_cps.
-template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class CpsCode>
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs,
+          class CpsCode>
 struct closure_program {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
 
@@ -50,7 +51,8 @@ struct closure_program {
     /// @param  envs        Caller-owned storage for captured environments;
     ///                      must outlive every closure this call (or
     ///                      anything it returns) might produce.
-    /// @return The final value or a @ref smd::smdscheme::foundation::parse_error.
+    /// @return The final value or a @ref
+    /// smd::smdscheme::foundation::parse_error.
     constexpr auto operator()(env<Core, MaxBindings> &environment,
                               env_arena<Core, MaxBindings, MaxEnvs> &envs) const
         -> smd::smdscheme::foundation::result<value<Core>> {
@@ -114,26 +116,34 @@ struct closure_program {
 ///                      above).
 /// @return A @c result<closure_program<...>> holding the callable on
 ///         success.
-template <int MaxNodes = 128, int MaxList = 16, int MaxBindings = 16, int MaxEnvs = 32>
+template <int MaxNodes = 128, int MaxList = 16, int MaxBindings = 16,
+          int MaxEnvs = 32>
 [[nodiscard]] constexpr auto compile_to_closure(
     std::string_view src,
-    smd::smdscheme::foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>, MaxNodes> &datum_arena) {
+    smd::smdscheme::foundation::tree_arena<
+        reader::datum_type<MaxNodes, MaxList>, MaxNodes> &datum_arena) {
     using Core = elaborator::core_type<MaxNodes, MaxList>;
-    using CpsCodeT = decltype(compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
-        std::declval<Core const &>(),
-        std::declval<smd::smdscheme::foundation::tree_arena<Core, MaxNodes> const &>()));
-    using ProgramT = closure_program<MaxNodes, MaxList, MaxBindings, MaxEnvs, CpsCodeT>;
+    using CpsCodeT =
+        decltype(compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            std::declval<Core const &>(),
+            std::declval<smd::smdscheme::foundation::tree_arena<
+                Core, MaxNodes> const &>()));
+    using ProgramT =
+        closure_program<MaxNodes, MaxList, MaxBindings, MaxEnvs, CpsCodeT>;
 
-    auto dr = reader::read_datum<MaxNodes, MaxList>(smd::smdscheme::parser::cursor{src}, datum_arena);
+    auto dr = reader::read_datum<MaxNodes, MaxList>(
+        smd::smdscheme::parser::cursor{src}, datum_arena);
     if (!dr.has_value())
         return smd::smdscheme::foundation::result<ProgramT>{dr.error()};
     smd::smdscheme::foundation::tree_arena<Core, MaxNodes> core_arena;
-    auto er = elaborator::elaborate<MaxNodes, MaxList>(dr.value().value, datum_arena, core_arena);
+    auto er = elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                       datum_arena, core_arena);
     if (!er.has_value())
         return smd::smdscheme::foundation::result<ProgramT>{er.error()};
     auto const &ct_root = er.value();
     return smd::smdscheme::foundation::result<ProgramT>{
-        ProgramT{compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(ct_root, core_arena)}};
+        ProgramT{compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            ct_root, core_arena)}};
 }
 
 } // namespace smd::smdlisp::closure
