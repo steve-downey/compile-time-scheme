@@ -18,6 +18,7 @@
   - [[Phase 15 — Why Not call/cc: From Scheme to Common Lisp](phase-15-why-common-lisp.md)](#orgbc6dba0)
   - [[Phase 16 — Reading Common Lisp: Case, Keywords, and #'](phase-16-reading-common-lisp.md)](#org5a566b9)
   - [[Phase 17 — nil, t, and Living in a Lisp-2](phase-17-nil-t-lisp2.md)](#org1048d97)
+  - [[Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)](#org180a37f4)
 - [Table of Contents](#org7118c4c)
 
 
@@ -158,6 +159,13 @@ Come back down from the summit for `set!`: a shared store of mutable cells, an e
 ## [Phase 17 — nil, t, and Living in a Lisp-2](phase-17-nil-t-lisp2.md)
 
 *DRAFT — pending author revision.* The direct evaluator: one `is_true` function instead of Scheme's per-site `#f` encoding, a Lisp-2 environment where variable and function lookup never touch, `funcall` and `#'` as real call semantics, and the closure-capture-ownership question resolved with an arena instead of an owning pointer.
+
+
+<a id="org180a37f4"></a>
+
+## [Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)
+
+*DRAFT — pending author revision.* `setq` returns the assigned value and `defun`/`defvar`/`defparameter` return the bound name, both departures from Scheme; the store from Phase 14 adapted for ANSI CL's return conventions; a mutable environment reference threaded through both the direct evaluator and a new continuation-passing backend; and a datum-arena lifetime bug caught at compile time while building a one-argument `compile_to_closure`.
 
 
 <a id="org7118c4c"></a>

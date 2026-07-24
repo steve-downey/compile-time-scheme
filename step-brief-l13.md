@@ -1,88 +1,86 @@
-# step-brief-l13.md — Step L13: CPS closure backend (Track A)
+# step-brief-l13.md — Step L14: block / return-from (Track A)
 
 Forward-only brief for the next clean agent on **Track A**. Bounded; not a log.
-Prior-step narrative lives in `git log` / `docs/history/handoff-archive.md`;
-architecture lives in `docs/compiler_architecture.org`. Read the L13 section of
-`docs/cl-pivot-plan.md` for the authoritative spec (orchestrator pastes it).
+This file is still named `step-brief-l13.md` (Track A's lane-brief filename); it
+now describes **L14**, per the step-brief contract in `AGENTS.md`. Prior-step
+narrative lives in `git log`; architecture lives in
+`docs/compiler_architecture.org`.
 
-**Status:** L12 (spine) is merged; L13 depends on L12 (satisfied). L18 (backquote,
-Track C) runs concurrently in a non-overlapping lane — see `step-brief-l18.md`. Likely
-integration conflict between lanes: tracking docs (`checklist.md`, this file) and
-`src/smd/smdlisp/CMakeLists.txt`.
+**Status:** L13 (CPS closure backend) is merged; L14 depends on L13
+(satisfied). L18 (backquote, Track C) runs concurrently in a non-overlapping
+lane — see `step-brief-l18.md`. Likely integration conflict surfaces are still
+`checklist.md` and `src/smd/smdlisp/CMakeLists.txt`, shared with the L18 lane.
 
-## Goal
+## Missing input: get the L14 section of docs/cl-pivot-plan.md
 
-Build `src/smd/smdlisp/closure/{cps_code.hpp,closure_program.hpp}` (+ tests), adapted
-by copy from the Scheme CPS backend `smd::smdscheme::closure::cps_code`/
-`closure_program`, per `docs/cps-direction.md`: **structural recursion over the flat
-arena (Option A)**, not `fix<F>` folding (Option B, rejected — `fix<F>` is not a
-literal type). Read `docs/cps-direction.md` and the Scheme originals in full first;
-this is "adapt then diverge," so the Scheme shape is the starting point. Name the
-public compile entry point to mirror `smdscheme::closure::closure_program`'s.
+Unlike L13's brief, this one does **not** have the orchestrator's pasted L14
+step section to work from — this handoff is being written between orchestrator
+turns. `checklist.md` names the step only as "Step L14: block / return-from";
+that is everything this brief can certify first-hand. Before starting, get the
+actual L14 step section (plan §9) — either from the orchestrator's prompt, or,
+if working un-orchestrated, by opening `docs/cl-pivot-plan.md` **at the L14
+section only, by anchor/heading, not front-to-back** (the reading-contract
+exception for "on demand, by anchor/named section only, never wholesale" is
+exactly for this situation). Do not guess the merge criterion or the exact
+file list from the one-line checklist description.
 
-## Merge criterion (plan §9, L13)
+## What L13 landed, and what L14 can now rely on
 
-Every L11/L12 end-to-end test also passes through the CPS/closure path. Concretely:
-- `(if nil 1 2)` ⇒ `2`
-- `((lambda (x) (car (cdr x))) '(1 2 3))` ⇒ `2`
-- `(funcall #'cons 1 nil)` ⇒ a `pair_ref` cell
-- `(progn (defun twice (x) (+ x x)) (twice 4))` ⇒ `8`
+- `src/smd/smdlisp/closure/cps_code.hpp` and `closure_program.hpp` (+ tests):
+  a CPS-style evaluator for all fifteen `smdlisp` core node kinds, a drop-in
+  alternative to `eval_direct.hpp` — every L11/L12 end-to-end program produces
+  the same answer on both. `cps_dispatch`'s two-continuation (`cont`/`k`)
+  shape is adapted from `smd::smdscheme::cps::detail::cps_dispatch`; see the
+  doc comments on `cps_dispatch`/`cps_apply_function_value` in `cps_code.hpp`
+  for the non-tail-position idiom (recurse with `identity_k<Core>{}` for both
+  continuations) versus tail position (thread `cont`/`k` onward) — L14 will
+  need the identical idiom for whatever new core node(s) it adds, in both
+  `eval_direct.hpp` and `cps_code.hpp`.
+- **The environment-mutation-across-a-sequence invariant now has two
+  witnesses, not one.** `environment` (`env<Core,MaxBindings>&`) is threaded
+  as the same mutable reference through every recursive call in *both*
+  evaluators — never copied mid-sequence. Whatever L14 adds (a lexical
+  `block`/`return-from` non-local exit, most likely a distinguished
+  error/control value threaded up through the existing
+  `result<value<Core>>` return channel rather than a new parameter) must
+  preserve this in both places, or the merge criterion (parity between the
+  two evaluators) breaks silently on exactly the kind of program that mixes a
+  `progn`/lambda-body sequence with the new control form.
+- **DIV-0007**
+  (`docs/divergences/DIV-0007-closure-program-datum-arena-caller-owned.md`):
+  `smd::smdlisp::closure::compile_to_closure` takes the *datum* arena as a
+  caller-owned reference parameter — it is **not** signature-compatible with
+  `smd::smdscheme::closure::compile_to_closure`'s single-string-argument form.
+  Root cause: `smdlisp`'s elaborated core nodes hold `std::string_view`s into
+  the datum arena for every list-element name (lambda params, `setq`/`defun`/
+  `defvar` names); that view is safe only as long as the datum arena outlives
+  the program. If L14 (or any later step) calls `compile_to_closure`, pass a
+  caller-owned `tree_arena<reader::datum_type<...>, MaxNodes>` alongside the
+  source string and keep it alive as long as the program is called — see
+  `closure_program.hpp`'s doc comment on `compile_to_closure` for the full
+  mechanism.
+- `docs/blog/phase-18-setq-defun-progn.org` (+ `.md`) drafted, covering L12's
+  material via L13's CPS tests, per the docs-lag-code-by-one-step pattern —
+  L14's own blog deliverable (if it has one; the checklist line above doesn't
+  say) will cover *L13's* material the same way, one step later.
 
-Plus a representative sample of the fuller `eval_direct.test.cpp` suite (closures
-capturing both namespaces; `apply`/`funcall`; `setq` shared-store-across-closures;
-`defvar`/`defparameter` init-vs-no-reinit) — those expose CPS environment-threading
-regressions a narrow "just the merge criteria" set would miss.
+## Standing constraints (unchanged from L13's brief)
 
-## What L13 must get right (from L12; detail in eval_direct.hpp / arch doc)
-
-The CPS backend must **cover all fifteen** core kinds — the twelve from L10 plus
-`core_setq`/`core_defun`/`core_defvar` (in scope, not deferred). The subtle,
-forward-looking constraints:
-
-- **Environment is a mutable reference** (`env<Core,MaxBindings>&`) threaded through
-  `eval_direct`; `defun`/`defvar`/`setq` mutate it in place and later siblings in a
-  `progn`/lambda-body sequence observe the mutation. The CPS threading must preserve
-  this — mutate in place and share across the continuation chain, not copy fresh per
-  step, or `(progn (defun f ...) (f ...))` regresses under CPS. **Read
-  `smd::smdscheme::closure::cps_code.hpp`'s `begin`/`core_begin` wiring** — the plan's
-  named pattern for `core_progn`, and the precedent for whether Scheme's CPS already
-  solved mutation-visibility-across-a-sequence (it did for `set!`, the same problem).
-- **`setq` returns the assigned value** (not `void`, no `unspecified` kind exists in
-  `smdlisp` — don't add one); the `core_setq` continuation passes that value forward.
-- **`store<Core,MaxStore>` backs `setq`** (mutable mode = shared store pointer across
-  every `env` copy incl. closure captures). The CPS env representation needs the
-  equivalent mutable-mode story, or `setq` is only visible within one call frame.
-  Mirror the store-pointer-sharing by construction; don't rediscover via a failing
-  shared-closure test.
-- **`defun`/`defvar`/`defparameter` return the name symbol**, never the closure/init
-  value (ANSI contract). `core_defvar` CPS only mirrors `eval_direct`'s
-  `mark_special`/optional-`define_value`; **no dynamic-binding machinery** (that's
-  L16).
-- **`defun` reuses the lambda CPS lowering** — `core_defun.lambda_node` is a real
-  `core_lambda`; don't build a second lambda-under-CPS path. Add only the
-  function-namespace-definition side effect + name-as-return-value.
-
-## Deliverable: blog phase 18 draft
-
-`docs/blog/phase-18-setq-defun-progn.org` (working title "`setq`, `defun`, `progn`: a
-programmable core") — covers **L12's** material (docs-lags-code-by-one-step), using
-L13's CPS tests as live UUID-anchored code. Follow DIV-0004: author `#+transclude:`
-links against your own worktree path; the orchestrator repoints after merge. Two
-org-markup footguns: adjacent `~verbatim~` spans need a space/punctuation between
-them, and `~word~` immediately followed by a bare letter has the same problem.
-
-## Standing constraints
-
-- `src/smd/smdscheme/**` is frozen for semantic changes (D1) — read-only reference,
-  never edit; blog phases 5–12 transclude it live by UUID anchor.
-- New/changed files land in `src/smd/smdlisp/closure/` only (two new files + tests).
-  Do not touch `reader/`, `elaborator/`, or `macroexpand/` (L18's lane).
-- C++26/GCC16 baseline; Catch2; mirror file prolog / include-guard / canonical-include
-  conventions used throughout `src/smd/smdlisp/`.
-- File a DIV under `docs/divergences/` for anything done differently or any knowing
-  ANSI CL deviation — **check `docs/divergences/` for the actual next free number**
-  before filing (the two lanes may claim numbers concurrently).
-- Before handoff: `make compile`, `make test`, `make lint`; draft blog phase 18; if it
-  has a blog deliverable, verify `make blog-md` leaves every *other* phase's `.md`
-  unchanged (revert `id="orgXXXX"` churn per L6/L11 precedent). Do not continue past
-  L13 into L14 unless blocked; if blocked, document it here.
+- `src/smd/smdscheme/**` is frozen for semantic changes (D1) — read-only
+  reference, never edit.
+- C++26/GCC16 baseline; Catch2; mirror file prolog / include-guard /
+  canonical-include conventions used throughout `src/smd/smdlisp/`.
+- File a DIV under `docs/divergences/` for anything done differently or any
+  knowing ANSI CL deviation — check `docs/divergences/` for the actual next
+  free number first (both DIV-0007 and L18's concurrently-claimed DIV-0008 are
+  now taken; the next Track-A DIV is **DIV-0009 or higher**, but re-check
+  before filing since L18 may have claimed more in the meantime).
+- Before handoff: `make compile`, `make test`, `make lint`; if the step has a
+  blog deliverable, verify `make blog-md` leaves every *other* phase's `.md`
+  unchanged. Regenerating `index.md` re-randomizes every heading's
+  `orgXXXXXXX` anchor id on each Emacs export run — don't let that churn land;
+  edit `docs/blog/index.md`/`index.org` by hand to add just the new entry
+  instead of committing whatever `make blog-md` regenerates for that file,
+  exactly as this step's own handoff had to do for the Phase 18 entry.
+- Do not continue past L14 into L15 unless blocked; if blocked, document it
+  here.

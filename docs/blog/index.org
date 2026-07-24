@@ -84,6 +84,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ The direct evaluator: one ~is_true~ function instead of Scheme's per-site ~#f~ encoding, a Lisp-2 environment where variable and function lookup never touch, ~funcall~ and ~#'~ as real call semantics, and the closure-capture-ownership question resolved with an arena instead of an owning pointer.
 
+** [[file:phase-18-setq-defun-progn.org][Phase 18 — setq, defun, progn: a Programmable Core]]
+
+/DRAFT — pending author revision./ ~setq~ returns the assigned value and ~defun~/~defvar~/~defparameter~ return the bound name, both departures from Scheme; the store from Phase 14 adapted for ANSI CL's return conventions; a mutable environment reference threaded through both the direct evaluator and a new continuation-passing backend; and a datum-arena lifetime bug caught at compile time while building a one-argument ~compile_to_closure~.
+
 * Table of Contents
 
 #+toc: headlines 1
