@@ -101,15 +101,15 @@ constexpr auto env<Core, MaxBindings>::lookup(std::string_view name) const
 }
 #+end_src
 
-Searching newest-first means a later ~define~ call naturally shadows an
+Searching newest-first means a later ~define~ call shadows an
 earlier one with the same name. This implements Scheme's lexical scoping
 semantics: bindings introduced inside a lambda shadow outer bindings for the
 duration of the call. The ~foundation::result~ return type carries either a
 value or an ~"unbound variable"~ error that propagates up through the
 evaluator.
 
-The ~static_vector~ keeps everything on the stack — no heap allocation, no
-dynamic growth, fully ~constexpr~. The ~MaxBindings~ parameter sets a
+The ~static_vector~ keeps everything on the stack — no heap allocation,
+fully ~constexpr~. The ~MaxBindings~ parameter sets a
 compile-time ceiling on environment size.
 
 ** Closures
@@ -182,8 +182,8 @@ template <typename Core, int MaxBindings>
 #+end_src
 
 Every program starts with ~+~ and ~*~ in scope. Calling a builtin evaluates its
-two arguments, checks that both are integers, and computes the result inline —
-the dispatch is a direct switch on the ~builtin_op~ enum. (The
+two arguments and computes the result inline — the dispatch is a direct
+switch on the ~builtin_op~ enum. (The
 collect-arguments-into-a-span calling convention belongs to foreign functions,
 covered next, not to builtins.)
 
@@ -250,8 +250,8 @@ still destroying via ~delete~. It appears here for the same reason ~Box~
 appears in ~comp_f_factory~: breaking a recursive type relationship that the
 C++ type system cannot yet express with a standard vocabulary type. ~std::indirect~ [cite:@p3019indirect] would replace both, but its explicit
 default constructor blocks aggregate initialization inside ~static_vector~,
-and full ~constexpr~ support is not yet available in GCC 16 — so the raw
-pointer workaround is the mountain path I walk.
+and full ~constexpr~ support is not yet available in GCC 16 — so I fall
+back to the raw pointer workaround.
 
 * What Comes Next
 

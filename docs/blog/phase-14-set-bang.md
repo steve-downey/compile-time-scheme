@@ -120,7 +120,7 @@ using value = std::variant<int, bool, builtin, closure<Core>, symbol,
                            foreign_function<Core>, unspecified>;
 ```
 
-The value variant grew a seventh alternative, and that is where the compiler earns its keep. Every `std::visit` over `value` that enumerated the non-callable cases &#x2014; the "attempted to call a non-function" arms in each evaluator &#x2014; stopped compiling until it grew an `unspecified` arm. The exhaustiveness of `overloaded` turns "did I update every backend?" from a question into a build error. I did not have to remember the list. The type checker kept it.
+The value variant grew a seventh alternative, and every `std::visit` over `value` that enumerated the non-callable cases &#x2014; the "attempted to call a non-function" arms in each evaluator &#x2014; stopped compiling until it grew an `unspecified` arm. The exhaustiveness of `overloaded` turns "did I update every backend?" from a question into a build error. I did not have to remember the list. The type checker kept it.
 
 
 # One change, six evaluators

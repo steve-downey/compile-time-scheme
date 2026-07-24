@@ -85,9 +85,9 @@ constexpr auto env<Core, MaxBindings>::lookup(std::string_view name) const
 }
 ```
 
-Searching newest-first means a later `define` call naturally shadows an earlier one with the same name. This implements Scheme's lexical scoping semantics: bindings introduced inside a lambda shadow outer bindings for the duration of the call. The `foundation::result` return type carries either a value or an `"unbound variable"` error that propagates up through the evaluator.
+Searching newest-first means a later `define` call shadows an earlier one with the same name. This implements Scheme's lexical scoping semantics: bindings introduced inside a lambda shadow outer bindings for the duration of the call. The `foundation::result` return type carries either a value or an `"unbound variable"` error that propagates up through the evaluator.
 
-The `static_vector` keeps everything on the stack — no heap allocation, no dynamic growth, fully `constexpr`. The `MaxBindings` parameter sets a compile-time ceiling on environment size.
+The `static_vector` keeps everything on the stack — no heap allocation, fully `constexpr`. The `MaxBindings` parameter sets a compile-time ceiling on environment size.
 
 
 ## Closures
@@ -144,7 +144,7 @@ template <typename Core, int MaxBindings>
 }
 ```
 
-Every program starts with `+` and `*` in scope. Calling a builtin evaluates its two arguments, checks that both are integers, and computes the result inline — the dispatch is a direct switch on the `builtin_op` enum. (The collect-arguments-into-a-span calling convention belongs to foreign functions, covered next, not to builtins.)
+Every program starts with `+` and `*` in scope. Calling a builtin evaluates its two arguments and computes the result inline — the dispatch is a direct switch on the `builtin_op` enum. (The collect-arguments-into-a-span calling convention belongs to foreign functions, covered next, not to builtins.)
 
 
 ## Foreign Functions
@@ -194,7 +194,7 @@ struct constexpr_box {
 };
 ```
 
-`std::unique_ptr` cannot be used in `constexpr` because its copy constructor is deleted. `constexpr_box` provides the necessary deep-copy semantics while still destroying via `delete`. It appears here for the same reason `Box` appears in `comp_f_factory`: breaking a recursive type relationship that the C++ type system cannot yet express with a standard vocabulary type. `std::indirect` (Coe, Jonathan and others, 2024) would replace both, but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support is not yet available in GCC 16 — so the raw pointer workaround is the mountain path I walk.
+`std::unique_ptr` cannot be used in `constexpr` because its copy constructor is deleted. `constexpr_box` provides the necessary deep-copy semantics while still destroying via `delete`. It appears here for the same reason `Box` appears in `comp_f_factory`: breaking a recursive type relationship that the C++ type system cannot yet express with a standard vocabulary type. `std::indirect` (Coe, Jonathan and others, 2024) would replace both, but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support is not yet available in GCC 16 — so I fall back to the raw pointer workaround.
 
 
 # What Comes Next

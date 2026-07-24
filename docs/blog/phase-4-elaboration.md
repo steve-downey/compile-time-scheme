@@ -20,7 +20,7 @@ lists into semantic program nodes.
 
 The reader produces a tree of data. It does not know that `(if #t 1 2)` is a conditional — it sees a four-element list. The elaborator is where that distinction is finally made. I walk the datum tree, inspect the shapes of lists, and emit a strongly-typed core AST whose node types encode the semantics of the program.
 
-This separation is not accidental (Abelson, Harold and Sussman, Gerald Jay, 1996). A reader that understands keywords would couple syntax and semantics in ways that make the reader harder to reuse and the language harder to extend. Keeping them apart means the reader never needs to change when the language gains new special forms.
+This separation is not accidental (Abelson, Harold and Sussman, Gerald Jay, 1996). A reader that understands keywords couples syntax to semantics. Every new special form would mean changing the reader too. Keeping them apart means the reader never needs to change when the language gains new special forms.
 
 
 # The Core AST Types

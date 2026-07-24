@@ -34,7 +34,7 @@ struct datum_symbol  { std::string_view name{}; };
 struct datum_boolean { bool value{}; };
 ```
 
-The recursive cases — list and quote — need to refer to child datums. This is where the open-recursive fixpoint pattern earns its keep.
+The recursive cases — list and quote — need to refer to child datums. The open-recursive fixpoint pattern does the work here.
 
 A `datum_list` holds a `static_vector` of `arena_box` handles:
 
@@ -138,7 +138,7 @@ The leaf parsers are built from the combinator library introduced in Phase 2. `i
 
 ## The Recursive Descent
 
-`read_datum_node` is the heart of the reader. It dispatches on the first non-whitespace character and recursively builds the datum tree into the arena:
+`read_datum_node` does the recursive descent: it dispatches on the first non-whitespace character and recursively builds the datum tree into the arena:
 
 ```c++
 // src/smd/smdscheme/reader/read_datum.hpp

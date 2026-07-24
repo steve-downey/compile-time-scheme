@@ -9,8 +9,8 @@
 #+DATE: 2026-06-01
 
 #+begin_abstract
-After journeying through the lexer, elaborating core forms, establishing CPS, and mapping DOT pipelines, the question remains: what does it look like to use these structures inside a practical C++26 program?
-This phase focuses on invoking a Scheme script from C++, passing parameters, and interacting with the physical execution environment.
+The lexer, elaborator, CPS pass, and DOT output all work now. What does it look like to actually call this from a C++26 program?
+This phase focuses on invoking a Scheme script from C++, passing parameters, and running it.
 #+end_abstract
 
 #+MACRO: TEASER_END
@@ -22,18 +22,18 @@ This phase focuses on invoking a Scheme script from C++, passing parameters, and
 
 * Execution Frontends
 
-Throughout this project, the implementation has enforced a strict boundary between compile-time evaluation and runtime environment mapping.
+I've kept a strict boundary between compile-time evaluation and the runtime environment.
 Because the compiler validates, elaborates, and lowers the abstract syntax tree entirely during ~constexpr~ calculation, the runtime executor takes the statically generated C++ execution pipeline and drives data through it sequentially.
 
 ** Standard Closure Evaluation
 
-The standard methodology for embedding the Scheme compiler into a runtime process involves pre-compiling a script via ~scm::compiled_closure~ — the closure backend from Phase 6, wrapped in a convenient variable template.
+To embed the compiler in a runtime process, pre-compile a script with ~scm::compiled_closure~.
 
 #+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/godbolt_ffi.cpp::2f7b4590-ca62-426d-a66f-2e9ace961764]] :lines 2- :src cpp :end "2f7b4590-ca62-426d-a66f-2e9ace961764 end"
 
 Here, the template string ~(print-and-add current-year 10)~ is fully elaborated and safely evaluated down to the lowest CPS core at compile-time.
 
-The returned variable is a callable program object — a ~closure::closure_program~ functor — that represents the entry point to the pre-constructed AST sequence. At runtime, the caller initializes a dynamic variable environment and passes it into this entry point.
+The returned variable is a callable program object --- a ~closure::closure_program~ functor --- that represents the entry point to the pre-constructed AST sequence. At runtime, the caller initializes a dynamic variable environment and passes it into this entry point.
 
 #+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/godbolt_ffi.cpp::27260b5f-089c-4210-bc68-5f5b25b2a025]] :lines 2- :src cpp :end "27260b5f-089c-4210-bc68-5f5b25b2a025 end"
 
@@ -41,18 +41,18 @@ The execution requires registering variables natively. A ~current-year~ variable
 
 * FFI Abstractions
 
-To bridge the C++ type system with the generic value wrappers utilized internally, the architecture utilizes a ~std::span~ structure over dynamically generated ~scm::closure::value<Core>~ abstractions — the same ~value<Core>~ variant type that ~cps_dispatch~ (Phase 12) produces and the closure backend (Phase 6) defines.
+I bridge the C++ type system to the value wrappers with a ~std::span~ over ~scm::closure::value<Core>~ --- the same ~value<Core>~ variant type that ~cps_dispatch~ (Phase 12) produces and the closure backend (Phase 6) defines.
 
 #+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/godbolt_ffi.cpp::2a057d0f-ec4f-4c3f-9c0f-7147a3675b6a]] :lines 2- :src cpp :end "2a057d0f-ec4f-4c3f-9c0f-7147a3675b6a end"
 
-The execution mechanism ensures that native C++ callbacks receive an accurate memory window (~std::span~) into the evaluated variable pool.
-Values are subsequently unpacked utilizing standard native C++ variants (~std::holds_alternative<int>~) before native invocation proceeds.
+Native callbacks get a ~std::span~ into the evaluated variable pool.
+The callback then unpacks values with ~std::holds_alternative<int>~ before calling through.
 
 * Integrating the Sender Backend
 
-While the standard closure backend relies on standard C++ stack evaluation by wrapping tail-calls, the ~beman::execution~ Sender backend introduces a more sophisticated integration state. By observing how the sender graph evaluates Fibonacci equations, we can look at the requisite changes.
+While the standard closure backend relies on standard C++ stack evaluation by wrapping tail-calls, the ~beman::execution~ sender backend needs a bit more setup. Here's what changes.
 
-First, standard instantiation requires ~compile_to_sender~ rather than the simplified ~compiled_closure~ variant — switching from the closure backend (Phase 6) to the sender backend (Phase 8).
+First, standard instantiation requires ~compile_to_sender~ rather than the simplified ~compiled_closure~ variant --- switching from the closure backend (Phase 6) to the sender backend (Phase 8).
 
 #+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/advanced_sender_ffi.cpp::034f2f75-e8af-4228-bcbb-d2edd3dfd2d2]] :lines 2- :src cpp :end "034f2f75-e8af-4228-bcbb-d2edd3dfd2d2 end"
 
@@ -60,7 +60,7 @@ Second, the returned program object is still invoked synchronously as ~program(e
 
 #+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/advanced_sender_ffi.cpp::906360cf-7ab2-4c5c-b0f1-b136104cee4b]] :lines 2- :src cpp :end "906360cf-7ab2-4c5c-b0f1-b136104cee4b end"
 
-The call returns a ~foundation::result<closure::value<Core>>~ — the same result type the closure backend yields. The caller checks ~result.has_value()~ and extracts the payload with ~std::get<int>(result.value())~ (reporting ~result.error().message~ on failure); the ~sync_wait~ that drives the sender graph runs internally and never appears at the call site.
+The call returns a ~foundation::result<closure::value<Core>>~ --- the same result type the closure backend yields. The caller checks ~result.has_value()~ and extracts the payload with ~std::get<int>(result.value())~ (reporting ~result.error().message~ on failure); the ~sync_wait~ that drives the sender graph runs internally and never appears at the call site.
 
 * Reflection-Reified Environments
 
@@ -76,7 +76,7 @@ C++26 Reflection offers a more ambitious alternative: let the compiler *generate
 
 ~reified_environment<Tag>~ starts as a declared-but-undefined struct template.
 ~compile_environment<Tag>~ calls ~std::meta::define_aggregate~ at ~consteval~ time, which *injects data members* into that template specialization.
-After ~compile_environment<Tag>~ runs, ~reified_environment<Tag>~ becomes a complete aggregate type whose fields correspond exactly to the supplied ~(type, name)~ pairs — ordinary members, accessible by name, fully typed.
+After ~compile_environment<Tag>~ runs, ~reified_environment<Tag>~ becomes a complete aggregate type whose fields correspond exactly to the supplied ~(type, name)~ pairs --- ordinary members, accessible by name, fully typed.
 
 This is distinct from the read-only introspection in Phase 8.
 There, reflection *read* information from existing types.
@@ -84,7 +84,7 @@ Here, reflection *writes* a new type into existence.
 
 ** A ~consteval {}~ Block
 
-The mechanism is invoked via a C++26 standalone ~consteval~ block — a block-level statement that executes unconditionally at compile time, with no enclosing function:
+The mechanism is invoked via a C++26 standalone ~consteval~ block --- a block-level statement that executes unconditionally at compile time, with no enclosing function:
 
 #+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/advanced_reflection_ffi.cpp::e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6071]] :lines 2- :src cpp :end "e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6071 end"
 
@@ -99,7 +99,7 @@ struct reified_environment<RuntimeStateTag> {
 
 ** Using the Reified Struct
 
-At runtime, the struct is used exactly like any other aggregate — by field name, with native C++ types:
+At runtime, the struct is used exactly like any other aggregate --- by field name, with native C++ types:
 
 #+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/advanced_reflection_ffi.cpp::f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f607182]] :lines 2- :src cpp :end "f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f607182 end"
 
@@ -110,14 +110,12 @@ The struct is a plain aggregate and can be passed by value, stored in arrays, or
 ** What This Enables
 
 The practical motivation is decoupling the shape of the runtime environment from the point in the code where the struct is written.
-In a more complete system, ~compile_environment~ could be driven by the Scheme program itself — the elaborator could extract the free variables of a Scheme expression and produce the corresponding ~capture_desc~ list at ~consteval~ time, generating a precisely-shaped C++ aggregate to hold exactly the variables that Scheme program needs.
+In a more complete system, ~compile_environment~ could be driven by the Scheme program itself --- the elaborator could extract the free variables of a Scheme expression and produce the corresponding ~capture_desc~ list at ~consteval~ time, generating a precisely-shaped C++ aggregate to hold exactly the variables that Scheme program needs.
 That would close the loop between compile-time Scheme evaluation and statically typed C++ data, without any runtime type erasure.
 
 * Conclusion
 
-The isolated compile-time Scheme compiler can merge back into conventional C++ software logic smoothly when mapped cleanly.
-
-Execution graphs establish bindings safely and securely. You can compile scripting sequences straight into local variables and correctly pipe their state transitions out to standard C++ callbacks via explicit Sender receivers safely.
+The compile-time Scheme compiler merges cleanly back into ordinary C++: senders establish bindings, and state moves out through explicit Sender receivers with no runtime type erasure.
 
 
 #+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">

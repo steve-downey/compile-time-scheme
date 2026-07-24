@@ -21,18 +21,18 @@ evaluation — all inside the C++ constant evaluator.
 
 > "Nobody climbs mountains for scientific reasons. Science is used to raise money for the expeditions, but you really climb for the hell of it." — Edmund Hillary
 
-This project is a proof of concept targeting C++26 on GCC16. It implements a fully staged compiler pipeline entirely inside the C++ compile-time evaluation engine. I transform a source text string into a syntax tree, elaborate it into an abstract semantic core, build a fixpoint computation tree, and evaluate it — all strictly before the compiler ever emits a single byte of executable machine code.
+This project is a proof of concept targeting C++26 on GCC16. It implements a fully staged compiler pipeline inside the C++ compile-time evaluation engine. I transform a source text string into a syntax tree, elaborate it into an abstract semantic core, build a fixpoint computation tree, and evaluate it — all strictly before the compiler ever emits a single byte of executable machine code.
 
-Why? The connection between functional compilation and machine execution is deep (Steele, Guy L., 1977). Scheme's lambda calculus maps cleanly onto the abstract machines that execute it. I am not building this because the software industry desperately needs a compile-time Scheme embedded in C++. I am building this to expand my own understanding of modern C++ metaprogramming and to find out exactly where the language's boundaries lie.
+Why? The connection between functional compilation and machine execution is deep (Steele, Guy L., 1977). Scheme's lambda calculus maps cleanly onto the abstract machines that execute it. Nobody needs a compile-time Scheme embedded in C++. I want to find out where C++'s boundaries actually are.
 
 
 # Exploring `constexpr` Boundaries
 
-Modern C++ has steadily expanded what can be accomplished at compile time. What started as simple constant variable expressions in C++11 has grown into a nearly Turing-complete sub-language. By C++26, the `constexpr` environment is capable of remarkably non-trivial computation.
+C++11 `constexpr` handled simple constant expressions. C++26 `constexpr` is nearly Turing-complete.
 
 I am testing the absolute limits of this environment. Building a functional Scheme compiler forces me to confront and solve the severe restrictions of compile-time C++: no persistent heap allocation that outlives a constant evaluation, no virtual dispatch, limited recursion depth, and no casting tricks.
 
-To survive this, I model zero-allocation combinator parsers using immutable cursors. I represent complex recursive abstract syntax trees using flat memory arenas and handle-based indirection. I orchestrate open recursion and fixpoint combinators to represent heterogeneous computation trees. Each restriction becomes a design problem worth solving.
+To survive this: zero-allocation combinator parsers, built on immutable cursors. Flat memory arenas and handle-based indirection for the trees. Open recursion and fixpoint combinators for the computation tree. Each restriction becomes a design problem worth solving.
 
 
 # The Pipeline

@@ -10,7 +10,7 @@ Multishot <code>call/cc</code> needs to run a captured continuation more than on
 Independently of the sender problem, Oleg Kiselyov already made the case that <code>call/cc</code> is a bad idea on its own merits, and I agree with him.
 Common Lisp never had <code>call/cc</code> to begin with.
 Its nonlocal exits &#x2014; <code>block/return-from</code>, <code>catch/throw</code>, <code>tagbody/go</code>, <code>unwind-protect</code> &#x2014; are one-shot and dynamic-extent by design.
-That turns out to be exactly the discipline a sender already enforces.
+That turns out to be the discipline a sender already enforces.
 So the project is pivoting from Scheme-light to Common-Lisp-light, and this is the rationale before the code.
 </p>
 
@@ -37,12 +37,12 @@ The sender backend, since Phase 8, is built on Beman Execution's sender/receiver
 
 # What multishot call/cc would need from a sender
 
-`call/cc` reifies the current continuation as a first-class value. You can invoke that value zero times, once, or many times, and you can invoke it after the code that captured it has already returned. That is the whole feature, and it is also exactly the thing a completed operation state cannot do. Invoking a captured continuation a second time means resuming a computation whose operation state already fired `set_value` once &#x2014; re-running it, or restoring it from some checkpoint taken before completion. The sender contract forbids both. There is no "resume from here again" channel to call. A sender backend can express at most a one-shot, upward-only escape: leave early, leave once, and do not come back. That is not a corner case I could shim around with an adapter. It is the definition of the interface I am building on.
+`call/cc` reifies the current continuation as a first-class value. You can invoke that value zero times, once, or many times, and you can invoke it after the code that captured it has already returned. That is the whole feature. It is also what a completed operation state cannot do. Invoking a captured continuation a second time means resuming a computation whose operation state already fired `set_value` once &#x2014; re-running it, or restoring it from some checkpoint taken before completion. The sender contract forbids both. There is no "resume from here again" channel to call. A sender backend can express at most a one-shot, upward-only escape: leave early, leave once, and do not come back. That is not a corner case I could shim around with an adapter. It is the definition of the interface I am building on.
 
 
 # An argument against call/cc that doesn't need senders
 
-Set the sender problem aside and `call/cc` is still a bad idea, and I did not have to invent this argument &#x2014; Oleg Kiselyov made it in "An argument against call/cc," and the project adopts his position outright (Kiselyov, Oleg, 2005). The sharpest case is `dynamic-wind` and resource cleanup. `dynamic-wind` pairs an entry thunk and an exit thunk around a body, the way `unwind-protect` pairs a cleanup form around one &#x2014; the pattern this project has leaned on since `Box`'s constexpr destructors in Phase 1 and the arena scoping in Phase 5. Re-entering a captured continuation re-runs the entry thunk against resources the matching exit thunk already released. The RAII correspondence &#x2014; acquire once, release once, in order &#x2014; breaks the moment a continuation can jump back into a scope whose cleanup already ran. The second problem is smaller to state and just as corrosive: once any function call can be a re-entry point into a past control state, you cannot read a function and know how many times its caller's frame runs. Local reasoning about linear resource use is gone, not degraded. `call/cc` is the most expressive control operator there is; that is exactly the problem, not a redeeming feature of it.
+Set the sender problem aside and `call/cc` is still a bad idea, and I did not have to invent this argument &#x2014; Oleg Kiselyov made it in "An argument against call/cc," and the project adopts his position outright (Kiselyov, Oleg, 2005). The sharpest case is `dynamic-wind` and resource cleanup. `dynamic-wind` pairs an entry thunk and an exit thunk around a body, the way `unwind-protect` pairs a cleanup form around one &#x2014; the pattern this project has leaned on since `Box`'s constexpr destructors in Phase 1 and the arena scoping in Phase 5. Re-entering a captured continuation re-runs the entry thunk against resources the matching exit thunk already released. The RAII correspondence &#x2014; acquire once, release once, in order &#x2014; breaks the moment a continuation can jump back into a scope whose cleanup already ran. The second problem is smaller to state and just as corrosive: once any function call can be a re-entry point into a past control state, you cannot read a function and know how many times its caller's frame runs. Local reasoning about linear resource use is gone, not degraded. `call/cc` is the most expressive control operator there is; that is the problem, not a redeeming feature of it.
 
 
 # What Common Lisp already had
@@ -52,7 +52,7 @@ Common Lisp never added `call/cc`. It has four nonlocal control operators instea
 
 # The thesis
 
-Common Lisp's control operators are the largest control vocabulary a structured-concurrency backend can express soundly, and this project sets out to demonstrate that correspondence directly, not just assert it. `block/return-from` maps to early completion on a scope's own continuation. `catch/throw` maps to a dynamic search over live completion targets. `unwind-protect` maps to cleanup that runs on `set_value`, `set_error`, and `set_stopped` alike, because on a sender, "the exit path" is not one path, it is three. None of that needs a continuation that outlives its capture. All of it needs exactly the one-shot discipline senders already have.
+Common Lisp's control operators are the largest control vocabulary a structured-concurrency backend can express soundly, and this project sets out to demonstrate that correspondence directly, not just assert it. `block/return-from` maps to early completion on a scope's own continuation. `catch/throw` maps to a dynamic search over live completion targets. `unwind-protect` maps to cleanup that runs on `set_value`, `set_error`, and `set_stopped` alike, because on a sender, "the exit path" is not one path, it is three. None of that needs a continuation that outlives its capture. All of it needs the one-shot discipline senders already have.
 
 
 # What doesn't change

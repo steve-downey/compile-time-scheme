@@ -22,41 +22,41 @@ to recurse into, and with what context.
 
 The previous phase assembled all the runtime machinery: `Comp<MaxList>` trees as the interpreter input, `closure::value` as the output, and `env` as the threading context. Now I write the interpreter itself.
 
-The natural tool for evaluating a `Fix<F>` tree is a catamorphism — a structural fold that peels off one layer, recursively folds all children, and passes the results to an algebra. But Scheme resists this approach. This phase explains why, and how Mendler's generalization escapes the trap.
+The natural tool for evaluating a `Fix<F>` tree is a fold that peels off one layer, recursively folds all children, and passes the results to an algebra. But Scheme resists this approach.
 
 
-## F-Algebras and Catamorphisms
+## F-Algebras and Folds
 
-An F-algebra for a functor `F` and a carrier type `A` is a function `alg : F<A> → A`. A catamorphism over `Fix<F>` is mechanically derived from any such algebra:
+An F-algebra for a functor `F` and a carrier type `A` is a function `alg : F<A> → A`. A fold over `Fix<F>` is mechanically derived from any such algebra:
 
 1.  Unwrap one layer: `Fix<F>` → `F<Fix<F>>`
-2.  `fmap` the catamorphism over all recursive children: `F<Fix<F>>` → `F<A>`
+2.  `fmap` the fold over all recursive children: `F<Fix<F>>` → `F<A>`
 3.  Apply the algebra: `F<A>` → `A`
 
 The key word is **all**. `fmap` transforms every child before the algebra sees any of them. The algebra receives fully-evaluated children; it has no say in the order, and it cannot skip any (Bird, Richard S. and de Moor, Oege, 1997).
 
-This is the right tool for evaluating arithmetic expressions. Given a tree representing `(+ (* 3 4) 2)`, a catamorphism evaluates `(* 3 4)` to `12`, evaluates `2` to `2`, and then passes both results to the `+` algebra. The algebra has nothing more to do; all the work happened in the fold.
+This is the right tool for evaluating arithmetic expressions. Given a tree representing `(+ (* 3 4) 2)`, a fold evaluates `(* 3 4)` to `12`, evaluates `2` to `2`, and then passes both results to the `+` algebra. The algebra has nothing more to do; all the work happened in the fold.
 
 For Scheme, this does not work.
 
 
-## Why Catamorphisms Fail for Scheme
+## Why Folds Fail for Scheme
 
 
 ### Conditional Branching
 
-Consider `(if #f (error!) 42)`. The correct result is `42`. A catamorphism evaluates both `(error!)` and `42` before the algebra for `if` gets to run. There is no way to short-circuit. The branch not taken is evaluated unconditionally.
+Consider `(if #f (error!) 42)`. The correct result is `42`. A fold evaluates both `(error!)` and `42` before the algebra for `if` gets to run. There is no way to short-circuit. The branch not taken is evaluated unconditionally.
 
-Lazy evaluation — deciding based on the condition, then evaluating only the chosen branch — cannot be expressed as a catamorphism. The fold structure commits to evaluating every child.
+Lazy evaluation — deciding based on the condition, then evaluating only the chosen branch — cannot be expressed as a fold. The fold structure commits to evaluating every child.
 
 
 ### Lambda Application
 
-Consider `(let ((x 10)) x)`, which desugars to `((lambda (x) x) 10)`. The body `x` must be evaluated in an environment where `x` is bound to `10`. But the catamorphism evaluates the body **before** the algebra runs, in whatever environment the fold was started with. The argument `10` is also evaluated before the algebra runs.
+Consider `(let ((x 10)) x)`, which desugars to `((lambda (x) x) 10)`. The body `x` must be evaluated in an environment where `x` is bound to `10`. But the fold evaluates the body **before** the algebra runs, in whatever environment the fold was started with. The argument `10` is also evaluated before the algebra runs.
 
 When the algebra for `comp_apply` finally executes, it has pre-evaluated children — a closure and an integer — but it cannot go back and re-evaluate the body in the extended environment. The evaluation order is fixed by the fold.
 
-The same problem appears with the lambda itself: a catamorphism would try to recurse into the body immediately. But a lambda should not evaluate its body; it should capture the current environment and defer body evaluation until the lambda is applied.
+The same problem appears with the lambda itself: a fold would try to recurse into the body immediately. But a lambda should not evaluate its body; it should capture the current environment and defer body evaluation until the lambda is applied.
 
 
 ## Mendler's Approach
@@ -75,12 +75,12 @@ alg : (∀ B. (B → A) → F<B> → A)
 
 In practice this means the algebra receives a `recurse` function alongside each layer. It can call `recurse` on any child, in any order, with any arguments it chooses. It can decline to call `recurse` on a child at all.
 
-This breaks the uniformity constraint that makes catamorphisms tractable — and breaks it in exactly the right direction for an interpreter that needs environment threading and lazy branching.
+This breaks the uniformity constraint that makes folds tractable — and breaks it in exactly the right direction for an interpreter that needs environment threading and lazy branching.
 
 
 ## The Generic Combinators
 
-Before building the interpreter algebra, I define two generic Mendler-style recursion combinators in `src/smd/fixpoint/recursion_schemes.hpp`, alongside the existing `fold_fix` catamorphism.
+Before building the interpreter algebra, I define two generic Mendler-style recursion combinators in `src/smd/fixpoint/recursion_schemes.hpp`, alongside the existing `fold_fix`.
 
 `mendler_fold` is the basic Mendler catamorphism with context threading:
 
@@ -121,7 +121,7 @@ Both combinators are `constexpr`, enabling compile-time evaluation.
 
 ## `mendler_run`: The Interpreter as an Algebra
 
-The Mendler-style interpreter for `Comp` trees is `mendler_run` in `src/smd/smdscheme/sender/fixpoint_eval.hpp`. It is a genuine Mendler-style paramorphism: the interpreter logic is an algebra passed to `mendler_para`, and the `recurse` function is received as an argument rather than called by name. Each case of the algebra controls whether, in what order, and with what environment its children are evaluated.
+The Mendler-style interpreter for `Comp` trees is `mendler_run` in `src/smd/smdscheme/sender/fixpoint_eval.hpp`. It is a genuine Mendler-style paramorphism: the interpreter logic is an algebra passed to `mendler_para`, and the `recurse` function is received as an argument rather than called by name. Each case of the algebra decides whether to evaluate its children, and in what environment.
 
 The interpreter uses `mendler_para` (not plain `mendler_fold`) because the `comp_lambda` case needs the original `Fix<CompF>` node: closures store a non-owning pointer to the lambda node in the computation tree.
 
@@ -182,7 +182,7 @@ Variable lookup delegates entirely to `env`. If the name is unbound, `env.lookup
 },
 ```
 
-This is where the Mendler structure pays off. The algebra calls `recurse` on the condition first. Then exactly one of `cons` or `alt` is recursed into — the other is never touched. Any catamorphism over this node would force both branches first.
+This is where the Mendler structure pays off. The algebra calls `recurse` on the condition first. Then exactly one of `cons` or `alt` is recursed into — the other is never touched. Any fold over this node would force both branches first.
 
 The truthiness rule follows Scheme: anything other than `#f` is truthy.
 

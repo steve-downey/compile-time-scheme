@@ -1,9 +1,9 @@
 <div class="abstract" id="orgc5dfc87">
 <p>
 By lowering my Scheme AST into heavily typed <code>std::execution</code> Senders, I gained improved performance.
-But I also created an introspective nightmare.
+Debugging it means reading thousands of lines of template backtraces.
 The resulting Sender AST is a large set of deeply nested template permutations.
-How do I prove what the C++ compiler is actually building without deciphering thousands of lines of compiler error backtraces?
+I project that compile-time topology out through C++26 reflection and render it as a Graphviz graph.
 </p>
 
 </div>
@@ -19,9 +19,9 @@ How do I prove what the C++ compiler is actually building without deciphering th
 
 # The Reflection Bridge
 
-In this phase, I utilize C++26 Reflection (`std::meta::info`) alongside a custom `string_writer` Applicative (McBride, Conor and Paterson, Ross, 2008) to project the generated execution typings into the Graphviz (Graphviz, 2024) dot-language for visual rendering.
+In this phase, I use C++26 Reflection (`std::meta::info`) alongside a custom `string_writer` Applicative (McBride, Conor and Paterson, Ross, 2008) to project the generated execution typings into the Graphviz (Graphviz, 2024) dot-language for visual rendering.
 
-C++26 Reflection (P2996) allows C++ programs to imperatively query the structural definitions of types during constant evaluation. Instead of writing recursive template metaprogramming tricks with partial specializations, I write a straightforward loop that interacts via `<meta>` using the `^^Sender` reflection syntax.
+C++26 Reflection (P2996) allows C++ programs to imperatively query the structural definitions of types during constant evaluation. Instead of writing recursive template metaprogramming tricks with partial specializations, I write a plain loop that interacts via `<meta>` using the `^^Sender` reflection syntax.
 
 
 # The Intermediate Representation: `scheme_tree`
@@ -162,7 +162,7 @@ Classification has a parallel subtlety. The tag at `args[0]` may itself be a cla
 
 Once I possess a homogeneous C++ tree, I turn once again to Category Theory to render the Graphviz dot-language diagram.
 
-Using the `Applicative` typeclass from the foundation—the same typeclass that drives the `lift2` and sequencing combinators in Phase 2's parser library—I constructed a `string_writer` Applicative. The applicative and alternative interfaces allow me to map functionally over the returned string values. While the Graphviz mapping is currently driven through a straightforward indexing iteration, the types align nicely allowing pure state accumulation.
+Using the `Applicative` typeclass from the foundation—the same typeclass that drives the `lift2` and sequencing combinators in Phase 2's parser library—I constructed a `string_writer` Applicative. The applicative and alternative interfaces allow me to map functionally over the returned string values. While the Graphviz mapping is currently driven through a simple indexing iteration, the types align allowing pure state accumulation.
 
 ```cpp
 /// Renders a @ref scheme_tree as a complete Graphviz DOT graph string.
@@ -267,9 +267,7 @@ Here the nested `when_all` makes the recursive structure visible: the left branc
 
 # Conclusion
 
-Using the reflection bridge to populate my runtime topology completely removes the black-box nature of compile-time meta-programming. The C++26 reflection framework allows me to natively render the exact asynchronous execution pipeline (`std::execution`) constructed for any Scheme program.
-
-Running the output directly through `dot -Tpng -o plan.png` grants immediate, visual feedback of how functional continuations map to low-level native scheduling operations.
+Piping `dump_scheme_plan`'s output through `dot -Tpng -o plan.png` turns the sender tree into a picture instead of a stack of template names.
 
 <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
 

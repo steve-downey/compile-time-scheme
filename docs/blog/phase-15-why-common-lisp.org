@@ -19,7 +19,7 @@ Multishot ~call/cc~ needs to run a captured continuation more than once, includi
 Independently of the sender problem, Oleg Kiselyov already made the case that ~call/cc~ is a bad idea on its own merits, and I agree with him.
 Common Lisp never had ~call/cc~ to begin with.
 Its nonlocal exits --- ~block/return-from~, ~catch/throw~, ~tagbody/go~, ~unwind-protect~ --- are one-shot and dynamic-extent by design.
-That turns out to be exactly the discipline a sender already enforces.
+That turns out to be the discipline a sender already enforces.
 So the project is pivoting from Scheme-light to Common-Lisp-light, and this is the rationale before the code.
 #+end_abstract
 
@@ -52,7 +52,7 @@ It came with the vocabulary the moment I picked senders, three phases before I n
 
 ~call/cc~ reifies the current continuation as a first-class value.
 You can invoke that value zero times, once, or many times, and you can invoke it after the code that captured it has already returned.
-That is the whole feature, and it is also exactly the thing a completed operation state cannot do.
+That is the whole feature. It is also what a completed operation state cannot do.
 Invoking a captured continuation a second time means resuming a computation whose operation state already fired ~set_value~ once --- re-running it, or restoring it from some checkpoint taken before completion.
 The sender contract forbids both.
 There is no "resume from here again" channel to call.
@@ -69,7 +69,7 @@ Re-entering a captured continuation re-runs the entry thunk against resources th
 The RAII correspondence --- acquire once, release once, in order --- breaks the moment a continuation can jump back into a scope whose cleanup already ran.
 The second problem is smaller to state and just as corrosive: once any function call can be a re-entry point into a past control state, you cannot read a function and know how many times its caller's frame runs.
 Local reasoning about linear resource use is gone, not degraded.
-~call/cc~ is the most expressive control operator there is; that is exactly the problem, not a redeeming feature of it.
+~call/cc~ is the most expressive control operator there is; that is the problem, not a redeeming feature of it.
 
 * What Common Lisp already had
 
@@ -88,7 +88,7 @@ Common Lisp's control operators are the largest control vocabulary a structured-
 ~catch/throw~ maps to a dynamic search over live completion targets.
 ~unwind-protect~ maps to cleanup that runs on ~set_value~, ~set_error~, and ~set_stopped~ alike, because on a sender, "the exit path" is not one path, it is three.
 None of that needs a continuation that outlives its capture.
-All of it needs exactly the one-shot discipline senders already have.
+All of it needs the one-shot discipline senders already have.
 
 * What doesn't change
 
