@@ -321,6 +321,78 @@ struct core_defvar {
                                ///< `defvar`.
 };
 
+/// A Common Lisp `block` form: `(block name body...)`.
+///
+/// Establishes a lexical, one-shot, non-local exit point named @ref name
+/// (decision D5, step L14): a `return-from` textually and lexically inside
+/// @ref body -- including inside a nested `lambda`, since CL's `block`
+/// scope is an ordinary lexical scope, not reset by an intervening `lambda`
+/// -- can transfer control directly to the end of this block, skipping any
+/// intervening evaluation. Block/tag names are their own namespace
+/// (decision D4): a `block` named the same as an in-scope variable or
+/// function does not shadow, or get shadowed by, either.
+///
+/// A zero-form `(block name)` is legal per ANSI CL and evaluates to `nil`;
+/// @ref detail::elaborate_list synthesizes a single @ref core_nil body
+/// element in that case, so @ref body always holds at least one expression,
+/// matching @ref core_lambda's and @ref core_progn's identical invariant.
+///
+/// `defun` bodies get an implicit `(block function-name ...)` per ANSI CL
+/// (@ref detail::elaborate_list's `DEFUN` case) -- @ref core_defun's own
+/// docs describe how that wrapping is built.
+///
+/// The runtime side of `block` -- allocating a fresh, live exit record per
+/// dynamic activation, and killing it whether the block falls off the end
+/// or is the target of a matching `return-from` -- lives in the evaluators
+/// (`eval_direct.hpp`/`cps_code.hpp`), not here: elaboration only resolves
+/// *which* block a `return-from` refers to (a lexical question); whether
+/// that block's dynamic extent is still active is a runtime one (see
+/// @ref core_return_from's docs).
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum number of body expressions.
+template <typename R, int MaxNodes, int MaxList>
+struct core_block {
+    std::string_view name; ///< Block-namespace tag (decision D4); always a
+                           ///< list element, never the elaboration root,
+                           ///< so always arena-backed (see @ref
+                           ///< core_setq's docs for the identical
+                           ///< reasoning).
+    smdscheme::foundation::static_vector<
+        smdscheme::foundation::arena_box<R, MaxNodes>, MaxList>
+        body; ///< Body expressions, implicit progn (at least one; see
+              ///< above).
+};
+
+/// A Common Lisp `return-from` form: `(return-from name [value])`.
+///
+/// Transfers control to the end of the lexically enclosing @ref core_block
+/// named @ref name, which @ref detail::elaborate_list has already validated
+/// exists (an unresolvable @ref name is an elaboration-time error, decision
+/// D5) -- resolving *which* block a given `return-from` targets is a purely
+/// lexical (compile-time) question. Whether that block's *dynamic extent*
+/// is still active when this node actually evaluates is not: a
+/// `return-from` reached only via a closure invoked after its target
+/// block's evaluation has already completed (the closure smuggled the
+/// `return-from` out of the block's extent) is a diagnosed runtime error,
+/// never UB -- see the evaluators' (`eval_direct.hpp`/`cps_code.hpp`)
+/// `exit_record::live` check (`env.hpp`).
+///
+/// A bare `(return-from name)` (no value form) elaborates with an implicit
+/// @ref core_nil value, mirroring @ref core_if's implicit-`nil`-alternative
+/// synthesis.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_return_from {
+    std::string_view name; ///< Target block-namespace tag; always a list
+                           ///< element (see @ref core_block::name).
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        expr; ///< The value expression (implicit `nil` if omitted).
+};
+
 /// Factory template that produces the open-recursive variant layer for the
 /// core AST.
 ///
@@ -336,7 +408,8 @@ struct core_f_factory {
         core_progn<R, MaxNodes, MaxList>, core_lambda<R, MaxNodes, MaxList>,
         core_function<R, MaxNodes>, core_application<R, MaxNodes, MaxList>,
         core_setq<R, MaxNodes, MaxList>, core_defun<R, MaxNodes>,
-        core_defvar<R, MaxNodes>>;
+        core_defvar<R, MaxNodes>, core_block<R, MaxNodes, MaxList>,
+        core_return_from<R, MaxNodes>>;
 };
 
 /// The concrete recursive core AST type, formed as the fixed point of

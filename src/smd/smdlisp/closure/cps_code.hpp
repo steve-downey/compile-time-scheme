@@ -647,6 +647,62 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
                 if (!r.has_value())
                     return r;
                 return k(r.value());
+            },
+            [&](elaborator::core_block<Core, MaxNodes, MaxList> const &cb)
+                -> Res {
+                // A block is a continuation barrier: every body statement,
+                // including the last, is dispatched with identity_k/
+                // identity_k (never the caller's cont/k directly) so this
+                // frame gets a chance to intercept a return-from targeting
+                // its own exit_record before cont/k ever run -- see
+                // eval_direct.hpp's identical core_block handling and
+                // env.hpp's exit_record docs for the full mechanism this
+                // mirrors exactly, just phrased in continuation-passing
+                // terms.
+                auto *rec = envs.alloc_exit(symbol{cb.name});
+                environment.define_block(symbol{cb.name}, rec);
+
+                Res last{parse_error{{}, "block: empty body"}};
+                for (int i = 0; i < cb.body.size(); ++i) {
+                    last =
+                        cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                            arena.get(cb.body[i]), arena, environment, envs,
+                            identity_k<Core>{}, identity_k<Core>{});
+                    if (!last.has_value()) {
+                        if (last.error().message == block_unwind_marker &&
+                            !rec->live) {
+                            auto r = cont(rec->payload);
+                            if (!r.has_value())
+                                return r;
+                            return k(r.value());
+                        }
+                        rec->live = false;
+                        return last;
+                    }
+                }
+                rec->live = false;
+                auto r = cont(last.value());
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
+            },
+            [&](elaborator::core_return_from<Core, MaxNodes> const &rf) -> Res {
+                auto val_r =
+                    cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(rf.expr), arena, environment, envs,
+                        identity_k<Core>{}, identity_k<Core>{});
+                if (!val_r.has_value())
+                    return val_r;
+                auto rec_r = environment.lookup_block(symbol{rf.name});
+                if (!rec_r.has_value())
+                    return Res{rec_r.error()};
+                auto *rec = rec_r.value();
+                if (!rec->live)
+                    return parse_error{{},
+                                       "return-from: block has already exited"};
+                rec->payload = val_r.value();
+                rec->live = false;
+                return parse_error{{}, block_unwind_marker};
             }},
         // 180a37f4-6ab1-4657-a7c7-35bac23d150e end
         node.inner);

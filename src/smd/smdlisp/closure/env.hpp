@@ -11,9 +11,102 @@
 
 namespace smd::smdlisp::closure {
 
+/// Identifies one dynamic activation of a `block` form (decision D5, step
+/// L14). A fresh id (and a fresh @ref exit_record) is allocated every time
+/// a `block` form is *evaluated*, not once per static `(block name ...)`
+/// occurrence -- a recursive function re-entering its own `block` allocates
+/// a distinct record, and therefore a distinct id, on each call.
+using exit_id = int;
+
+/// The "no exit in flight" / "not yet allocated" sentinel for @ref exit_id.
+inline constexpr exit_id invalid_exit = -1;
+
+/// The shared, static, identity-compared marker used for a `return-from`
+/// unwind travelling through @ref smd::smdscheme::foundation::result's
+/// error channel (`eval_direct.hpp`/`cps_code.hpp`).
+///
+/// `result<value<Core>>` is a frozen two-alternative type (a value or a
+/// @ref smd::smdscheme::foundation::parse_error -- `smd::smdscheme` is
+/// frozen for semantic changes, decision D1), so a `return-from` unwind
+/// cannot add a third alternative to the return channel or carry its
+/// payload there directly. It travels instead as an ordinary
+/// @c parse_error whose @c message is this single, static, program-wide
+/// pointer -- every call site that already checks `!has_value()` before
+/// invoking a continuation (`eval_direct`'s propagation pattern,
+/// `cps_dispatch`/`cps_apply_function_value`'s continuation-guard pattern)
+/// therefore already "skips intervening frames" for a `return-from`
+/// exactly as it does for a genuine error, with no changes needed at any
+/// site except @c core_block's and @c core_return_from's own handling.
+/// Only pointer identity is compared (never string content), so this must
+/// stay the single shared object every unwind uses -- see
+/// @ref exit_record for where the actual target/payload information
+/// travels instead (a stable, arena-owned pointer reachable through the
+/// environment's block namespace, not through the error value itself).
+///
+/// The marker is backed by a *named* `inline constexpr` array
+/// (@ref block_unwind_marker_storage), not a bare string literal, precisely
+/// so that pointer identity is well-defined at run time as well as during
+/// constant evaluation. A `constexpr char const *` initialized directly from
+/// an anonymous string literal is constant-folded to the literal's address
+/// at each use site; with string-literal merging disabled (as under the Asan
+/// build) those sites get *distinct* addresses for equal content, so the
+/// `message == block_unwind_marker` identity check would silently fail at run
+/// time (it held only in constexpr) and a `return-from` unwind would escape
+/// its own `block`. A single named object has exactly one address, so every
+/// use resolves to the same pointer regardless of merging.
+inline constexpr char block_unwind_marker_storage[] =
+    "smdlisp: block/return-from unwind";
+inline constexpr char const *block_unwind_marker = block_unwind_marker_storage;
+
+/// One-shot lexical exit bookkeeping for one dynamic activation of a
+/// `block` form (decision D5, step L14).
+///
+/// `block` allocates a fresh, live @ref exit_record every time its form is
+/// evaluated (see @ref exit_id's docs) and installs a pointer to it under
+/// its name in the *block* namespace of the environment used to evaluate
+/// its body (@ref env::define_block) -- the same environment a nested
+/// `lambda` captures by value, so a closure created inside the block's
+/// dynamic extent carries this same stable pointer forward, even after the
+/// block's own evaluation has returned. `return-from` resolves its target
+/// block by name through @ref env::lookup_block, then:
+///  - if @ref live is already false, the block's dynamic extent has
+///    already ended (the closure-smuggling case) -- a diagnosed runtime
+///    error, never UB;
+///  - otherwise, it stores the return value in @ref payload, clears
+///    @ref live, and signals the unwind via @ref block_unwind_marker.
+///
+/// `block`'s own evaluation, on regaining control (whether by falling off
+/// the end normally or by observing a propagating unwind), checks whether
+/// @ref live has gone false on *its own* record: if so, the unwind was
+/// aimed at it specifically, and it resolves to @ref payload; otherwise it
+/// marks its own record dead (its extent is ending too, non-locally) and
+/// propagates whatever it received unchanged. See `eval_direct.hpp`'s and
+/// `cps_code.hpp`'s `core_block`/`core_return_from` handling for the exact
+/// sequencing.
+///
+/// Instances live in an @ref env_arena (@ref env_arena::alloc_exit), the
+/// same stable, non-relocating storage @ref env instances themselves use,
+/// for the identical reason: a captured closure's pointer to a record must
+/// stay valid for as long as that closure might still be called, which can
+/// outlast the C++ call stack frame that allocated the record.
+///
+/// @tparam Core The core AST type (used to type @ref payload).
+template <typename Core>
+struct exit_record {
+    symbol name{};             ///< Block-namespace tag.
+    exit_id id = invalid_exit; ///< Unique per dynamic activation.
+    bool live = false;         ///< False once return-from has fired
+                               ///< against this record, or the block's
+                               ///< own evaluation has completed.
+    value<Core> payload{};     ///< The value being returned; only
+                               ///< meaningful while an unwind targeting
+                               ///< this record is in flight.
+};
+
 /// A Lisp-2 lexical environment: two independent, linear,
 /// most-recent-first binding lists, one per namespace (decision D4,
-/// docs/cl-pivot-plan.md).
+/// docs/cl-pivot-plan.md), plus a third, equally independent list for
+/// `block`/`return-from` tags (decision D5, step L14).
 ///
 /// Adapted by copy from `smd::smdscheme::closure::env`'s architecture
 /// (`foundation::static_vector`-backed, linear search from the newest
@@ -37,6 +130,20 @@ namespace smd::smdlisp::closure {
 ///    binding names a store location, so `setq` on a captured variable is
 ///    visible through every closure that shares the binding, not just a
 ///    private copy).  See @ref set_value.
+///  - **The block namespace (step L14).** `block` installs a name ->
+///    @ref exit_record pointer binding here (@ref define_block) directly
+///    into the *ambient*, mutably-referenced environment threaded through
+///    a body sequence -- the same object a sibling `progn`/lambda-body
+///    expression's `setq`/`defun`/`defvar` mutates in place -- rather than
+///    into a fresh copy, so that mutation-across-a-sequence works
+///    identically whether or not a `block` sits in the middle of the
+///    sequence. A `lambda` created inside a `block`'s dynamic extent
+///    captures this same environment (and therefore the same
+///    @ref exit_record pointer) by value when it copies its captured
+///    environment, which is exactly how a `return-from` inside a later-
+///    invoked closure can still find (and diagnose staleness against) the
+///    record that same-named `block` allocated -- see @ref exit_record's
+///    docs for the full mechanism.
 ///
 /// Like the Scheme original, `env` has no parent-environment link: a
 /// nested lexical scope is a *copy* of the enclosing `env` with additional
@@ -44,10 +151,10 @@ namespace smd::smdlisp::closure {
 /// of environments searched outward.  That copy-and-extend approach is
 /// exactly what makes an eventual owning capture (see `value.hpp`'s
 /// `closure` documentation) reproduce lexical scoping correctly: copying
-/// an `env` copies its two `static_vector`s by value.
+/// an `env` copies its three `static_vector`s by value.
 ///
 /// @tparam Core        The core AST type (see @ref value).
-/// @tparam MaxBindings Capacity of each of the two binding lists.
+/// @tparam MaxBindings Capacity of each of the three binding lists.
 template <typename Core, int MaxBindings>
 class env {
   public:
@@ -133,6 +240,27 @@ class env {
     /// @ref mark_special.
     [[nodiscard]] constexpr auto is_special(symbol name) const -> bool;
 
+    /// Adds a new block-namespace binding for @p name -> @p record (the
+    /// `block` primitive, step L14).  A later binding for the same
+    /// @p name (a sibling or re-entrant `block` with the same tag) shadows
+    /// this one, matching @ref define_value/@ref define_function's
+    /// most-recent-first shadowing.  Entirely independent of the other two
+    /// namespaces (decision D4): a `block` named the same as an in-scope
+    /// variable or function neither shadows nor is shadowed by it.
+    constexpr auto define_block(symbol name, exit_record<Core> *record) -> void;
+
+    /// Looks up @p name in the block namespace, most-recent binding first
+    /// (the `return-from` primitive, step L14).
+    /// @return The bound @ref exit_record pointer, or an "undefined block"
+    ///         error if @p name has no block binding.  Reaching this error
+    ///         at runtime should not happen for a `return-from` the
+    ///         elaborator accepted (decision D5: block-name resolution is
+    ///         lexical, done at elaboration time) -- see
+    ///         @ref exit_record::live for the runtime check that *does*
+    ///         apply to an elaborator-accepted `return-from`.
+    [[nodiscard]] constexpr auto lookup_block(symbol name) const
+        -> smd::smdscheme::foundation::result<exit_record<Core> *>;
+
   private:
     struct binding {
         symbol name{};
@@ -144,6 +272,14 @@ class env {
                            ///< has no mutable mode; see the class docs).
     };
 
+    struct block_binding {
+        symbol name{};
+        exit_record<Core> *record = nullptr; ///< Non-owning; stable for the
+                                             ///< lifetime of the owning
+                                             ///< @ref env_arena (see
+                                             ///< @ref exit_record's docs).
+    };
+
     pair_heap<Core, default_max_pairs> *pairs_ =
         nullptr; ///< Non-owning; may be null (see @ref pairs).
     store<Core, default_max_store> *store_ =
@@ -153,6 +289,8 @@ class env {
     smd::smdscheme::foundation::static_vector<binding, MaxBindings>
         functions_{};
     smd::smdscheme::foundation::static_vector<symbol, MaxBindings> special_{};
+    smd::smdscheme::foundation::static_vector<block_binding, MaxBindings>
+        blocks_{};
 };
 
 template <typename Core, int MaxBindings>
@@ -227,6 +365,22 @@ constexpr auto env<Core, MaxBindings>::is_special(symbol name) const -> bool {
         if (s == name)
             return true;
     return false;
+}
+
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::define_block(symbol name,
+                                                    exit_record<Core> *record)
+    -> void {
+    blocks_.push_back(block_binding{name, record});
+}
+
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::lookup_block(symbol name) const
+    -> smd::smdscheme::foundation::result<exit_record<Core> *> {
+    for (int i = blocks_.size() - 1; i >= 0; --i)
+        if (blocks_[i].name == name)
+            return blocks_[i].record;
+    return smd::smdscheme::foundation::parse_error{{}, "undefined block"};
 }
 
 /// Returns an environment pre-populated with the default builtins,
@@ -366,6 +520,10 @@ inline constexpr int default_max_envs = 128;
 /// gets `delete`d before that same constant evaluation finishes (the
 /// concern `constexpr_box` exists to solve for the `smdscheme` design).
 ///
+/// Fixed default capacity of the @ref exit_record storage an @ref env_arena
+/// also owns (step L14).
+inline constexpr int default_max_exits = 128;
+
 /// @tparam Core        The core AST type.
 /// @tparam MaxBindings Capacity of each captured @ref env (must match the
 ///                      @ref env this arena's caller is evaluating with).
@@ -373,7 +531,11 @@ inline constexpr int default_max_envs = 128;
 ///                      evaluation (one per closure materialized, i.e. one
 ///                      per evaluated `lambda`/`function` form, including
 ///                      repeated evaluations of the same source `lambda`).
-template <typename Core, int MaxBindings, int MaxEnvs = default_max_envs>
+/// @tparam MaxExits     Maximum number of `block` activations (one
+///                      @ref exit_record each) live at once over one
+///                      evaluation (step L14; see @ref alloc_exit).
+template <typename Core, int MaxBindings, int MaxEnvs = default_max_envs,
+          int MaxExits = default_max_exits>
 class env_arena {
   public:
     constexpr env_arena() = default;
@@ -390,9 +552,27 @@ class env_arena {
     }
     // a73f8d39-7455-4ddc-a541-7424ab1d3a35 end
 
+    /// Allocates a fresh, live @ref exit_record for one dynamic activation
+    /// of a `block` named @p name (step L14) and returns a stable,
+    /// arena-owned pointer to it -- the same non-relocating-storage
+    /// guarantee @ref alloc gives captured environments, and for the
+    /// identical reason: a closure created inside the block's dynamic
+    /// extent may capture this pointer (via @ref env::define_block) and
+    /// outlive the block's own evaluation.  Each call gets a distinct
+    /// @ref exit_id, even for repeated activations of the same static
+    /// `(block name ...)` occurrence (e.g. one per recursive call).
+    constexpr auto alloc_exit(symbol name) -> exit_record<Core> * {
+        exit_id const id = next_exit_id_++;
+        exits_.push_back(exit_record<Core>{name, id, true, value<Core>{}});
+        return &exits_[exits_.size() - 1];
+    }
+
   private:
     smd::smdscheme::foundation::static_vector<env<Core, MaxBindings>, MaxEnvs>
         envs_{};
+    smd::smdscheme::foundation::static_vector<exit_record<Core>, MaxExits>
+        exits_{};
+    exit_id next_exit_id_ = 0;
 };
 
 } // namespace smd::smdlisp::closure

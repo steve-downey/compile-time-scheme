@@ -533,6 +533,10 @@ TEST_CASE("ElaborateTest - SetqTargetMustBeSymbol") {
 }
 
 TEST_CASE("ElaborateTest - DefunElaboratesToCoreDefunWithLambda") {
+    // Step L14: a defun body is implicitly wrapped in (block name ...), so
+    // the lambda's own body is a single core_block node named after the
+    // function, and *that* block's body holds the original expression(s) --
+    // see core_block's and core_defun's docs.
     DatumArena da;
     CoreArena ca;
     auto er = elab("(defun twice (x) (+ x x))", da, ca);
@@ -547,6 +551,14 @@ TEST_CASE("ElaborateTest - DefunElaboratesToCoreDefunWithLambda") {
     REQUIRE(lam.params.size() == 1);
     REQUIRE(lam.params[0] == "X");
     REQUIRE(lam.body.size() == 1);
+
+    using Block = lisp::elaborator::core_block<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<Block>(ca.get(lam.body[0]).inner));
+    auto const &blk = std::get<Block>(ca.get(lam.body[0]).inner);
+    REQUIRE(blk.name == "TWICE");
+    REQUIRE(blk.body.size() == 1);
+    using App = lisp::elaborator::core_application<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<App>(ca.get(blk.body[0]).inner));
 }
 
 TEST_CASE("ElaborateTest - DefunNameMustBeSymbol") {
@@ -601,4 +613,120 @@ TEST_CASE("ElaborateTest - DefvarNameMustBeSymbol") {
     DatumArena da;
     CoreArena ca;
     REQUIRE(!elab("(defvar 1 2)", da, ca).has_value());
+}
+
+// -- block / return-from (step L14) -----------------------------------------
+
+TEST_CASE("ElaborateTest - BlockElaboratesToCoreBlockWithName") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(block b 1 2 3)", da, ca);
+    REQUIRE(er.has_value());
+    using Block = lisp::elaborator::core_block<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<Block>(er.value().inner));
+    auto const &blk = std::get<Block>(er.value().inner);
+    REQUIRE(blk.name == "B");
+    REQUIRE(blk.body.size() == 3);
+}
+
+TEST_CASE("ElaborateTest - BlockNameMustBeSymbol") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(block 1 2)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - BlockWithNoFormsIsImplicitNilBody") {
+    // ANSI CL: body is &rest, zero or more forms; zero forms evaluates to
+    // nil (the evaluator's job) -- but the elaborated node still carries
+    // exactly one (synthesized) body expression, matching core_lambda's and
+    // core_progn's "at least one" invariant.
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(block b)", da, ca);
+    REQUIRE(er.has_value());
+    using Block = lisp::elaborator::core_block<Core, MaxNodes, MaxList>;
+    auto const &blk = std::get<Block>(er.value().inner);
+    REQUIRE(blk.body.size() == 1);
+    REQUIRE(std::holds_alternative<lisp::elaborator::core_nil>(
+        ca.get(blk.body[0]).inner));
+}
+
+TEST_CASE("ElaborateTest - ReturnFromElaboratesToCoreReturnFrom") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(block b (return-from b 42))", da, ca);
+    REQUIRE(er.has_value());
+    using Block = lisp::elaborator::core_block<Core, MaxNodes, MaxList>;
+    auto const &blk = std::get<Block>(er.value().inner);
+    using ReturnFrom = lisp::elaborator::core_return_from<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<ReturnFrom>(ca.get(blk.body[0]).inner));
+    auto const &rf = std::get<ReturnFrom>(ca.get(blk.body[0]).inner);
+    REQUIRE(rf.name == "B");
+    REQUIRE(
+        std::get<lisp::elaborator::core_integer>(ca.get(rf.expr).inner).value ==
+        42);
+}
+
+TEST_CASE("ElaborateTest - ReturnFromWithoutValueIsImplicitNil") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(block b (return-from b))", da, ca);
+    REQUIRE(er.has_value());
+    using Block = lisp::elaborator::core_block<Core, MaxNodes, MaxList>;
+    auto const &blk = std::get<Block>(er.value().inner);
+    using ReturnFrom = lisp::elaborator::core_return_from<Core, MaxNodes>;
+    auto const &rf = std::get<ReturnFrom>(ca.get(blk.body[0]).inner);
+    REQUIRE(std::holds_alternative<lisp::elaborator::core_nil>(
+        ca.get(rf.expr).inner));
+}
+
+TEST_CASE("ElaborateTest - ReturnFromUndefinedBlockIsError") {
+    // Decision D5: block-name resolution is purely lexical, done at
+    // elaboration time -- an unresolvable name is a compile-time error, not
+    // deferred to the evaluator.
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(return-from b 1)", da, ca).has_value());
+    REQUIRE(!elab("(block a (return-from b 1))", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - ReturnFromSeesEnclosingBlockThroughNestedLambda") {
+    // CL's block scope is an ordinary lexical scope: it is not reset by an
+    // intervening lambda, which is exactly what makes the closure-smuggling
+    // runtime diagnosis (eval_direct.test.cpp / cps_code.test.cpp) possible
+    // in the first place -- this only pins the *elaboration-time* half:
+    // the reference is legal here.
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(block b (lambda () (return-from b 1)))", da, ca);
+    REQUIRE(er.has_value());
+}
+
+TEST_CASE("ElaborateTest - ReturnFromNameMustBeSymbol") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(block b (return-from 1 2))", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - ReturnFromWrongArityIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(block b (return-from))", da, ca).has_value());
+    REQUIRE(!elab("(block b (return-from b 1 2))", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DefunBodyIsImplicitlyWrappedInBlockNamedForIt") {
+    // ANSI CL: a defun body gets an implicit (block name ...), so
+    // return-from to the function's own name is valid inside its body,
+    // including inside a nested lambda (same lexical-scope point as
+    // ReturnFromSeesEnclosingBlockThroughNestedLambda above).
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(defun f (x) (if x (return-from f 0) 1))", da, ca);
+    REQUIRE(er.has_value());
+
+    DatumArena da2;
+    CoreArena ca2;
+    auto er2 = elab("(defun f () (lambda () (return-from f 1)))", da2, ca2);
+    REQUIRE(er2.has_value());
 }

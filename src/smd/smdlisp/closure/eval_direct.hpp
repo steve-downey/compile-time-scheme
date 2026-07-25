@@ -528,6 +528,56 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 // ANSI CL: `defvar`/`defparameter` return the variable
                 // name.
                 return Val{symbol{dv.name}};
+            },
+            [&](elaborator::core_block<Core, MaxNodes, MaxList> const &cb)
+                -> Res {
+                // One fresh, live exit record per dynamic activation (see
+                // env.hpp's exit_record docs) -- installed directly into
+                // the *ambient* `environment` (never a copy) so a sibling
+                // setq/defun/defvar elsewhere in this same body sequence
+                // still mutates the one object every statement shares,
+                // exactly as core_progn already relies on.
+                auto *rec = envs.alloc_exit(symbol{cb.name});
+                environment.define_block(symbol{cb.name}, rec);
+
+                Res last{parse_error{{}, "block: empty body"}};
+                for (int i = 0; i < cb.body.size(); ++i) {
+                    last = eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(cb.body[i]), arena, environment, envs);
+                    if (!last.has_value()) {
+                        if (last.error().message == block_unwind_marker &&
+                            !rec->live) {
+                            // The unwind that just propagated up killed
+                            // THIS record: it targets this activation.
+                            return Res{rec->payload};
+                        }
+                        // Either an ordinary error, or an unwind aimed at
+                        // some other (enclosing) block: this activation's
+                        // extent is ending non-locally either way.
+                        rec->live = false;
+                        return last;
+                    }
+                }
+                // Falling off the end also ends the extent (D5).
+                rec->live = false;
+                return last;
+            },
+            [&](elaborator::core_return_from<Core, MaxNodes> const &rf) -> Res {
+                auto val_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(rf.expr), arena, environment, envs);
+                if (!val_r.has_value())
+                    return val_r.error();
+                auto rec_r = environment.lookup_block(symbol{rf.name});
+                if (!rec_r.has_value())
+                    return rec_r.error();
+                auto *rec = rec_r.value();
+                if (!rec->live)
+                    return parse_error{{},
+                                       "return-from: block has already exited"};
+                rec->payload = val_r.value();
+                rec->live = false;
+                return parse_error{{}, block_unwind_marker};
             }},
         // e6a2c1de-3b2a-4c8d-9c6f-1a7e5b9d2f30 end
         node.inner);
