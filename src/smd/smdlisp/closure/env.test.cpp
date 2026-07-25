@@ -153,6 +153,54 @@ static_assert([] {
     return v.has_value() && std::get<int>(v.value()) == 2;
 }());
 
+// Merge criteria (docs/cl-pivot-plan.md, step L14): `block` installs a
+// name -> exit_record binding in its own namespace, independent of
+// variables and functions (decision D4); most-recent-first shadowing
+// applies to it exactly as it does to the other two namespaces.
+
+static_assert([] {
+    using smd::smdlisp::closure::exit_record;
+    env<dummy_core, 4> e;
+    exit_record<dummy_core> rec{symbol{"B"}, 0, true, val{}};
+    e.define_block(symbol{"B"}, &rec);
+    auto r = e.lookup_block(symbol{"B"});
+    return r.has_value() && r.value() == &rec;
+}());
+
+static_assert([] {
+    // Unbound in the block namespace on an empty environment.
+    env<dummy_core, 4> e;
+    return !e.lookup_block(symbol{"B"}).has_value();
+}());
+
+static_assert([] {
+    // Most-recent-first shadowing within the block namespace.
+    using smd::smdlisp::closure::exit_record;
+    env<dummy_core, 4> e;
+    exit_record<dummy_core> rec1{symbol{"B"}, 0, true, val{}};
+    exit_record<dummy_core> rec2{symbol{"B"}, 1, true, val{}};
+    e.define_block(symbol{"B"}, &rec1);
+    e.define_block(symbol{"B"}, &rec2);
+    auto r = e.lookup_block(symbol{"B"});
+    return r.has_value() && r.value() == &rec2;
+}());
+
+static_assert([] {
+    // Decision D4: a block named the same as a variable/function neither
+    // shadows nor is shadowed by it.
+    using smd::smdlisp::closure::exit_record;
+    env<dummy_core, 4> e;
+    exit_record<dummy_core> rec{symbol{"F"}, 0, true, val{}};
+    e.define_value(symbol{"F"}, val{1});
+    e.define_function(symbol{"F"}, val{2});
+    e.define_block(symbol{"F"}, &rec);
+    auto v = e.lookup_value(symbol{"F"});
+    auto f = e.lookup_function(symbol{"F"});
+    auto b = e.lookup_block(symbol{"F"});
+    return v.has_value() && std::get<int>(v.value()) == 1 && f.has_value() &&
+           std::get<int>(f.value()) == 2 && b.has_value() && b.value() == &rec;
+}());
+
 static_assert([] {
     // default_env installs the builtins in the function namespace only.
     auto e = default_env<dummy_core, 16>();
@@ -294,4 +342,58 @@ TEST_CASE("EnvTest - CopyingEnvCopiesBothNamespaces") {
     REQUIRE(copy.lookup_function(symbol{"F"}).has_value());
     // The original is unaffected by the copy's extension.
     REQUIRE_FALSE(e.lookup_value(symbol{"Y"}).has_value());
+}
+
+// -- block namespace / exit_record (step L14) --------------------------
+
+TEST_CASE("EnvTest - DefineBlockAndLookupBlock") {
+    using smd::smdlisp::closure::exit_record;
+    env<dummy_core, 4> e;
+    exit_record<dummy_core> rec{symbol{"B"}, 0, true, val{}};
+    e.define_block(symbol{"B"}, &rec);
+    auto r = e.lookup_block(symbol{"B"});
+    REQUIRE(r.has_value());
+    REQUIRE(r.value() == &rec);
+}
+
+TEST_CASE("EnvTest - LookupBlockOfUndefinedNameIsError") {
+    env<dummy_core, 4> e;
+    REQUIRE_FALSE(e.lookup_block(symbol{"B"}).has_value());
+}
+
+TEST_CASE("EnvTest - CopyingEnvCopiesTheBlockNamespaceToo") {
+    // A block-namespace binding survives the same copy-and-extend scoping
+    // model as the other two namespaces -- exactly what lets a lambda
+    // created inside a block's dynamic extent (a copy of `environment`)
+    // carry the block's exit_record pointer forward (see exit_record's
+    // docs).
+    using smd::smdlisp::closure::exit_record;
+    env<dummy_core, 4> e;
+    exit_record<dummy_core> rec{symbol{"B"}, 0, true, val{}};
+    e.define_block(symbol{"B"}, &rec);
+
+    env<dummy_core, 4> copy = e;
+    auto r = copy.lookup_block(symbol{"B"});
+    REQUIRE(r.has_value());
+    REQUIRE(r.value() == &rec);
+}
+
+TEST_CASE("EnvTest - AllocExitReturnsStablePointersWithDistinctIds") {
+    using smd::smdlisp::closure::env_arena;
+    env_arena<dummy_core, 4> arena;
+    auto *r1 = arena.alloc_exit(symbol{"B"});
+    auto *r2 = arena.alloc_exit(symbol{"B"});
+    REQUIRE(r1 != r2);
+    REQUIRE(r1->id != r2->id);
+    REQUIRE(r1->live);
+    REQUIRE(r2->live);
+    REQUIRE(r1->name == symbol{"B"});
+
+    // The pointer stays valid (and the record unchanged) across further
+    // allocations -- the same non-relocating-storage guarantee alloc()
+    // gives captured environments.
+    r1->live = false;
+    arena.alloc_exit(symbol{"C"});
+    REQUIRE_FALSE(r1->live);
+    REQUIRE(r2->live);
 }

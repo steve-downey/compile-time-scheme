@@ -1,86 +1,103 @@
-# step-brief-l13.md — Step L14: block / return-from (Track A)
+# step-brief-l13.md — Step L15: catch / throw / unwind-protect (Track A)
 
 Forward-only brief for the next clean agent on **Track A**. Bounded; not a log.
-This file is still named `step-brief-l13.md` (Track A's lane-brief filename); it
-now describes **L14**, per the step-brief contract in `AGENTS.md`. Prior-step
+This file keeps Track A's lane-brief filename (`step-brief-l13.md`); it now
+describes **L15**, per the step-brief contract in `AGENTS.md`. Prior-step
 narrative lives in `git log`; architecture lives in
-`docs/compiler_architecture.org`.
+`docs/compiler_architecture.org`; deliberate deviations live in
+`docs/divergences/`.
 
-**Status:** L13 (CPS closure backend) is merged; L14 depends on L13
-(satisfied). L18 (backquote, Track C) runs concurrently in a non-overlapping
-lane — see `step-brief-l18.md`. Likely integration conflict surfaces are still
-`checklist.md` and `src/smd/smdlisp/CMakeLists.txt`, shared with the L18 lane.
+**Status:** L14 (`block`/`return-from`) is merged; L15 depends on L14
+(satisfied). Track C runs concurrently in a non-overlapping lane. Likely
+integration conflict surfaces remain `checklist.md` and
+`src/smd/smdlisp/CMakeLists.txt` (and any per-dir `CMakeLists.txt` you add).
 
-## Missing input: get the L14 section of docs/cl-pivot-plan.md
+## The step (plan §9, L15)
 
-Unlike L13's brief, this one does **not** have the orchestrator's pasted L14
-step section to work from — this handoff is being written between orchestrator
-turns. `checklist.md` names the step only as "Step L14: block / return-from";
-that is everything this brief can certify first-hand. Before starting, get the
-actual L14 step section (plan §9) — either from the orchestrator's prompt, or,
-if working un-orchestrated, by opening `docs/cl-pivot-plan.md` **at the L14
-section only, by anchor/heading, not front-to-back** (the reading-contract
-exception for "on demand, by anchor/named section only, never wholesale" is
-exactly for this situation). Do not guess the merge criterion or the exact
-file list from the one-line checklist description.
+`catch` establishes a **dynamic** exit keyed by an *evaluated* tag value
+(`eq` comparison); `throw` searches the dynamic exit stack innermost-first;
+both share the one-shot exit machinery L14 built (see below). `unwind-protect`
+registers cleanup forms that run on **every** exit path through its extent:
+normal completion, `return-from`, and `throw`; in CPS this must wrap both the
+normal continuation and the escape path.
+**Parity required:** implement in BOTH `eval_direct` and the CPS backend; the
+merge programs must pass on both, exactly as L14 required.
+Merge criteria: cleanup-ordering tests (innermost cleanups first); `throw`
+through nested `unwind-protect`; uncaught `throw` is a diagnosed error.
+Deliverable: blog phase 19 draft (covers L14's material, one step behind, per
+the docs-lag-code-by-one-step pattern).
 
-## What L13 landed, and what L14 can now rely on
+## What L14 built that L15 reuses — and the one gotcha that will bite you
 
-- `src/smd/smdlisp/closure/cps_code.hpp` and `closure_program.hpp` (+ tests):
-  a CPS-style evaluator for all fifteen `smdlisp` core node kinds, a drop-in
-  alternative to `eval_direct.hpp` — every L11/L12 end-to-end program produces
-  the same answer on both. `cps_dispatch`'s two-continuation (`cont`/`k`)
-  shape is adapted from `smd::smdscheme::cps::detail::cps_dispatch`; see the
-  doc comments on `cps_dispatch`/`cps_apply_function_value` in `cps_code.hpp`
-  for the non-tail-position idiom (recurse with `identity_k<Core>{}` for both
-  continuations) versus tail position (thread `cont`/`k` onward) — L14 will
-  need the identical idiom for whatever new core node(s) it adds, in both
-  `eval_direct.hpp` and `cps_code.hpp`.
-- **The environment-mutation-across-a-sequence invariant now has two
-  witnesses, not one.** `environment` (`env<Core,MaxBindings>&`) is threaded
-  as the same mutable reference through every recursive call in *both*
-  evaluators — never copied mid-sequence. Whatever L14 adds (a lexical
-  `block`/`return-from` non-local exit, most likely a distinguished
-  error/control value threaded up through the existing
-  `result<value<Core>>` return channel rather than a new parameter) must
-  preserve this in both places, or the merge criterion (parity between the
-  two evaluators) breaks silently on exactly the kind of program that mixes a
-  `progn`/lambda-body sequence with the new control form.
-- **DIV-0007**
-  (`docs/divergences/DIV-0007-closure-program-datum-arena-caller-owned.md`):
-  `smd::smdlisp::closure::compile_to_closure` takes the *datum* arena as a
-  caller-owned reference parameter — it is **not** signature-compatible with
-  `smd::smdscheme::closure::compile_to_closure`'s single-string-argument form.
-  Root cause: `smdlisp`'s elaborated core nodes hold `std::string_view`s into
-  the datum arena for every list-element name (lambda params, `setq`/`defun`/
-  `defvar` names); that view is safe only as long as the datum arena outlives
-  the program. If L14 (or any later step) calls `compile_to_closure`, pass a
-  caller-owned `tree_arena<reader::datum_type<...>, MaxNodes>` alongside the
-  source string and keep it alive as long as the program is called — see
-  `closure_program.hpp`'s doc comment on `compile_to_closure` for the full
-  mechanism.
-- `docs/blog/phase-18-setq-defun-progn.org` (+ `.md`) drafted, covering L12's
-  material via L13's CPS tests, per the docs-lag-code-by-one-step pattern —
-  L14's own blog deliverable (if it has one; the checklist line above doesn't
-  say) will cover *L13's* material the same way, one step later.
+L14's non-local-exit mechanism lives in `src/smd/smdlisp/closure/env.hpp` and
+is reused verbatim by both evaluators (`eval_direct.hpp`, `cps_code.hpp`,
+`core_block`/`core_return_from` cases):
 
-## Standing constraints (unchanged from L13's brief)
+- **`exit_record<Core>` + `env_arena::alloc_exit`** — one fresh, live record
+  per dynamic activation, arena-owned (stable pointer, survives closure
+  capture). `env::define_block`/`lookup_block` are a third, independent
+  namespace (D4) threaded on the *ambient* env by mutable reference (never a
+  copy), the same discipline `progn`/`setq`/`defun` rely on. `catch`/`throw`
+  want the same shape, but keyed by an evaluated **tag value** (`eq`), not a
+  lexical name — so the tag lives in a *dynamic* stack, not the lexical block
+  namespace. Consider a parallel dynamic exit stack in `env`/`env_arena`
+  rather than overloading the block namespace.
+- **The unwind travels through the frozen `result<value<Core>>` error channel**
+  as a `parse_error` whose `message` is a single sentinel pointer
+  (`block_unwind_marker`); every existing `!has_value()` guard already "skips
+  intervening frames" for free. `throw` will want its own analogous sentinel.
 
-- `src/smd/smdscheme/**` is frozen for semantic changes (D1) — read-only
-  reference, never edit.
-- C++26/GCC16 baseline; Catch2; mirror file prolog / include-guard /
-  canonical-include conventions used throughout `src/smd/smdlisp/`.
-- File a DIV under `docs/divergences/` for anything done differently or any
-  knowing ANSI CL deviation — check `docs/divergences/` for the actual next
-  free number first (both DIV-0007 and L18's concurrently-claimed DIV-0008 are
-  now taken; the next Track-A DIV is **DIV-0009 or higher**, but re-check
-  before filing since L18 may have claimed more in the meantime).
-- Before handoff: `make compile`, `make test`, `make lint`; if the step has a
-  blog deliverable, verify `make blog-md` leaves every *other* phase's `.md`
-  unchanged. Regenerating `index.md` re-randomizes every heading's
-  `orgXXXXXXX` anchor id on each Emacs export run — don't let that churn land;
-  edit `docs/blog/index.md`/`index.org` by hand to add just the new entry
-  instead of committing whatever `make blog-md` regenerates for that file,
-  exactly as this step's own handoff had to do for the Phase 18 entry.
-- Do not continue past L14 into L15 unless blocked; if blocked, document it
-  here.
+- **GOTCHA (this is what silently broke L14 at run time and cost the most
+  time):** the sentinel is compared by **raw pointer identity**
+  (`err.message == block_unwind_marker`). A `constexpr char const *`
+  initialized directly from a *bare string literal* is constant-folded to the
+  literal's address at each use site; with string-literal merging off (Asan
+  build) those sites get **distinct addresses for identical content**, so the
+  identity check passes in `constexpr` (all the merge-criteria `static_assert`s
+  went green) yet **fails at run time**, and the unwind escapes its handler.
+  The fix, already in `env.hpp`: back the sentinel with a **named**
+  `inline constexpr char[] block_unwind_marker_storage` and point the
+  `char const *` at it — one named object has one address. **Any new sentinel
+  L15 adds (e.g. a `throw` marker) MUST use this named-object pattern, not a
+  bare literal.** See `block_unwind_marker`'s doc comment in `env.hpp`.
+
+- `unwind-protect` cleanup must run even while a `block_unwind_marker` /
+  throw-marker error is propagating — i.e. on the `!has_value()` path, not only
+  the value path. In CPS specifically, the cleanup wraps both continuations.
+  Model it on how `core_block` intercepts, runs its own logic, then re-returns
+  the propagating error unchanged when the unwind is not aimed at it.
+
+## Standing constraints (unchanged)
+
+- `src/smd/smdscheme/**` frozen for semantic changes (D1) — reference only.
+- Lane = `elaborator/**` + `closure/{eval_direct,cps_code,closure_program,
+  value,env}.hpp` (+ tests + per-dir `CMakeLists.txt`). Do NOT touch
+  `macroexpand/**` or `reader/**` (Track C).
+- C++26/GCC16; Catch2; header included first and twice; mirror file prolog /
+  include-guard / canonical-angle-include conventions.
+- Every public `constexpr` API gets a `static_assert`/constexpr test. Note the
+  `static_assert` merge-criteria tests are **not sufficient on their own** —
+  L14 proved a constexpr-green mechanism can still fail at run time (the marker
+  gotcha). Always add the runtime `TEST_CASE` twin and run `make test`.
+- File a DIV for any knowing ANSI CL deviation. Next free Track-A number is
+  **DIV-0010 or higher** — but DIV-0010 is claimed by the concurrent Track-C
+  lane, so re-check `docs/divergences/` before filing and take the next unused.
+- Before handoff: `make compile`, `make test`, `make lint` all green. If the
+  blog deliverable lands, verify `make blog-md` leaves every *other* phase's
+  `.md` unchanged and hand-edit `docs/blog/index.{org,md}` for just the new
+  entry (don't commit the regenerated, anchor-churned `index.md`).
+- Do not continue past L15 into L16 unless blocked; document blockers here.
+
+## L14 discoveries L15 must account for
+
+- **Recursive `defun` is unsupported — DIV-0009.** A closure captures a *copy*
+  of the environment before its own name is bound, so a function cannot call
+  itself (`undefined function` at run time); this is independent of
+  block/throw. Do **not** write a merge program that relies on recursion
+  (the predecessor's recursive `block` test was replaced with a non-recursive
+  same-name-nested-block witness for exactly this reason). Iterative / nested
+  formulations only, until a self-reference mechanism is added.
+- L14's own-activation property is witnessed by
+  `SameNameNestedBlockReturnFromTargetsInnermost` (both evaluators):
+  `(block b (+ 100 (block b (return-from b 5)))) => 105`. `catch`/`throw`
+  ordering tests should follow the same non-recursive, lexically-nested style.

@@ -612,3 +612,185 @@ TEST_CASE("EvalDirectTest - DefvarWithoutInitOnlyMarksSpecial") {
         run_mut("(progn (defvar *x*) *x*)", da, ca, root, heap, store, envs);
     REQUIRE_FALSE(r.has_value());
 }
+
+// -- block / return-from (step L14) -----------------------------------------
+// -- merge criteria (docs/cl-pivot-plan.md, step L14) ------------------
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(block b 1 (return-from b 42) 3)"sv}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 42;
+}());
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{
+            "(progn (defun f (x) (if x (return-from f 0) 1)) (f t))"sv},
+        da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 0;
+}());
+
+TEST_CASE("EvalDirectTest - BlockReturnFromSkipsRestOfBody") {
+    // Runtime twin of the first L14 merge-criteria static_assert above.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b 1 (return-from b 42) 3)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 42);
+}
+
+TEST_CASE("EvalDirectTest - BlockFallsOffEndReturnsLastValue") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b 1 2 3)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("EvalDirectTest - BlockWithNoFormsEvaluatesToNil") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
+}
+
+TEST_CASE("EvalDirectTest - DefunImplicitBlockReturnFromExitsFunctionCall") {
+    // Runtime twin of the second L14 merge-criteria static_assert above,
+    // exercising both the true and false arms of (f x).
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defun f (x) (if x (return-from f 0) 1)) (f t))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Store store2;
+    Core root2;
+    Envs envs2;
+    auto r2 =
+        run_mut("(progn (defun f (x) (if x (return-from f 0) 1)) (f nil))", da2,
+                ca2, root2, heap2, store2, envs2);
+    REQUIRE(r2.has_value());
+    REQUIRE(std::get<int>(r2.value()) == 1);
+}
+
+TEST_CASE("EvalDirectTest - NestedBlockReturnFromSkipsInnerBlock") {
+    // return-from targeting the OUTER block transfers control straight past
+    // the still-live inner block, which never falls off its own end.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block outer (block inner (return-from outer 5)) 99)", da, ca,
+                 root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 5);
+}
+
+TEST_CASE("EvalDirectTest - SameNameNestedBlockReturnFromTargetsInnermost") {
+    // Two simultaneously-live activations of the *same* block name `b`, each
+    // with its own exit_record allocated fresh per activation (per env.hpp's
+    // docs): the inner `return-from b` must target the innermost (its own)
+    // activation, so the inner block resolves to 5 and the outer block --
+    // still live -- falls off its end returning (+ 100 5) = 105. Nesting
+    // depth must not confuse one activation's exit_record with another's.
+    //
+    // This is the non-recursive witness of the own-activation property. The
+    // recursive form (a function calling itself across a `block`) is out of
+    // reach because recursive `defun` is unsupported in this baseline
+    // evaluator -- a closure captures a copy of the environment before its
+    // own name is bound in the function namespace (see DIV-0009).
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b (+ 100 (block b (return-from b 5))))", da, ca, root,
+                 heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 105);
+}
+
+TEST_CASE("EvalDirectTest - ReturnFromOfDeadBlockIsDiagnosedError") {
+    // The diagnosed-error merge criterion (docs/cl-pivot-plan.md, step L14):
+    // a closure smuggles a return-from out of its block's dynamic extent.
+    // `make-escaper`'s block B returns the closure itself (its last body
+    // form), so B's own evaluation -- and therefore B's exit_record -- has
+    // already completed by the time the closure is later invoked.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut(
+        "(progn (defun make-escaper () (block b (lambda () (return-from b "
+        "42)))) (funcall (make-escaper)))",
+        da, ca, root, heap, store, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} ==
+            "return-from: block has already exited");
+}
+
+TEST_CASE("EvalDirectTest - ReturnFromWithoutValueReturnsNil") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b (return-from b))", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
+}

@@ -80,7 +80,7 @@
 - [x] Step L11: direct evaluator (+ phase 17 draft)
 - [x] Step L12: setq, defun, defvar, defparameter (adapt landed set! work)
 - [x] Step L13: CPS closure backend (+ phase 18 draft)
-- [ ] Step L14: block / return-from
+- [x] Step L14: block / return-from
 - [ ] Step L15: catch / throw / unwind-protect (+ phase 19 draft)
 - [ ] Step L16: special variables and dynamic binding
 - [x] Step L17: macro expander with host macros

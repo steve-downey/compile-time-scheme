@@ -420,3 +420,164 @@ TEST_CASE("CpsCodeTest - ArityMismatchIsError") {
     auto r = run("((lambda (x y) (+ x y)) 1)", da, ca, root, heap, envs);
     REQUIRE_FALSE(r.has_value());
 }
+
+// -- block / return-from (step L14) -----------------------------------------
+// -- merge criteria (docs/cl-pivot-plan.md, step L14) ------------------
+// Every one of these mirrors an L14 eval_direct merge-criteria
+// static_assert in eval_direct.test.cpp, run through compile_cps instead.
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(block b 1 (return-from b 42) 3)"sv}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 42;
+}());
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{
+            "(progn (defun f (x) (if x (return-from f 0) 1)) (f t))"sv},
+        da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 0;
+}());
+
+TEST_CASE("CpsCodeTest - BlockReturnFromSkipsRestOfBody") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b 1 (return-from b 42) 3)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 42);
+}
+
+TEST_CASE("CpsCodeTest - BlockFallsOffEndReturnsLastValue") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b 1 2 3)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("CpsCodeTest - DefunImplicitBlockReturnFromExitsFunctionCall") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defun f (x) (if x (return-from f 0) 1)) (f t))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Store store2;
+    Core root2;
+    Envs envs2;
+    auto r2 =
+        run_mut("(progn (defun f (x) (if x (return-from f 0) 1)) (f nil))", da2,
+                ca2, root2, heap2, store2, envs2);
+    REQUIRE(r2.has_value());
+    REQUIRE(std::get<int>(r2.value()) == 1);
+}
+
+TEST_CASE("CpsCodeTest - NestedBlockReturnFromSkipsInnerBlock") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block outer (block inner (return-from outer 5)) 99)", da, ca,
+                 root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 5);
+}
+
+TEST_CASE("CpsCodeTest - SameNameNestedBlockReturnFromTargetsInnermost") {
+    // CPS twin of eval_direct.test.cpp's same-named-nested-block test: two
+    // simultaneously-live activations of block name `b`, inner return-from
+    // targets its own (innermost) activation; outer falls off end at
+    // (+ 100 5) = 105. The recursive form is out of reach (recursive defun
+    // unsupported in this baseline evaluator; see DIV-0009).
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b (+ 100 (block b (return-from b 5))))", da, ca, root,
+                 heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 105);
+}
+
+TEST_CASE("CpsCodeTest - ReturnFromOfDeadBlockIsDiagnosedError") {
+    // CPS twin of eval_direct.test.cpp's diagnosed dead-exit merge
+    // criterion: a closure smuggles a return-from out of its block's
+    // dynamic extent.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut(
+        "(progn (defun make-escaper () (block b (lambda () (return-from b "
+        "42)))) (funcall (make-escaper)))",
+        da, ca, root, heap, store, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} ==
+            "return-from: block has already exited");
+}
+
+TEST_CASE("CpsCodeTest - ReturnFromWithoutValueReturnsNil") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b (return-from b))", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
+}
