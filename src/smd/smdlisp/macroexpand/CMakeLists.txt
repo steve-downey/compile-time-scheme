@@ -12,5 +12,10 @@ target_sources(
 )
 target_link_libraries(
     smdlisp.macroexpand
-    PUBLIC smdscheme.foundation smdlisp.reader smdlisp.elaborator
+    PUBLIC
+        smdscheme.foundation
+        smdlisp.reader
+        smdlisp.elaborator
+        smdlisp.closure
+        smd.fixpoint
 )
