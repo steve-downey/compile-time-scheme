@@ -1,0 +1,136 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+bibliography: references.bib
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 20 - defmacro: the Compiler Runs the Language
+#+AUTHOR: Steve Downey
+#+DATE: 2026-07-25
+
+*DRAFT --- pending author revision*
+
+#+begin_abstract
+Every macro up to now was a C++ function: ~when~, ~unless~, ~and~, ~or~, ~cond~, ~case~ were entries in a table, each one a hand-written transformer from datum to datum.
+~defmacro~ is the step where the language starts writing its own macros.
+A ~defmacro~-defined ~my-when~ is Lisp code --- a lambda --- that ~smdlisp~ compiles and runs, during the expansion pass, with the same elaborator and the same evaluator an ordinary program goes through.
+This is the compiler running the language it compiles, at compile time, and the new machinery that makes it possible is a pair of functions that carry data across the datum/value boundary in both directions.
+#+end_abstract
+
+#+MACRO: TEASER_END
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-18-setq-defun-progn.org][Phase 18 - setq, defun, progn ←]]
+#+html: </nav>
+
+
+* A macro is a function, and now it can be a Lisp function
+
+The host macros from the last two steps are ordinary C++ functions.
+Each takes a call form as a datum and returns a datum, and the expander tries them by name at every list head it walks.
+That is fine for the six forms the compiler ships with, but it is not what a Common Lisp programmer means by a macro.
+A real macro is written /in/ the language: ~(defmacro my-when (test &body body) ...)~ defines a transformer whose body is Lisp code, and that code has to run somewhere.
+
+The somewhere is the point of this step.
+The expander already reads, elaborates, and evaluates --- that is the whole pipeline.
+So a ~defmacro~'s expander is compiled by the same ~elaborate~ every program goes through, and run by the same ~eval_direct~, except that it runs /now/, during expansion, instead of being emitted for the program's own later run.
+There is no second interpreter, no macro mini-language.
+The compiler already contains an evaluator; ~defmacro~ just points it at the macro body.
+
+* Two arenas, kept apart
+
+Running the evaluator at expansion time needs the evaluator's plumbing: a pair heap for ~cons~, an environment with the builtins bound, an arena for the environments a closure captures.
+None of that can be the real program's plumbing --- the program has not started running, and its heap and environment belong to /its/ evaluation, not to the macro expander's.
+So the expander carries its own, in a ~macro_context~ threaded through the recursive walk the same way the datum arena already is:
+
+#+transclude: [[orgit:~/src/compile-time-scheme/cl-pivot-l19-defmacro::src/smd/smdlisp/macroexpand/expander.hpp::ee158407-41ed-4add-9a40-3ce719f057e6]] :lines 2- :src cpp :end "ee158407-41ed-4add-9a40-3ce719f057e6 end"
+
+The ~table~ is the registry of user macros; everything else is a private, compile-time-only copy of the machinery ~closure/~ already builds for the real program.
+One ~macro_context~ lives for exactly one top-level form: a ~defmacro~ is visible to the rest of that form's expansion and no further.
+That is narrower than ANSI CL, where a ~defmacro~ is visible to every later form in the file; the pipeline is one datum in, one core tree out, with no session to hang a global macro environment on.
+Recorded as DIV-0010, along with the rest of this step's deliberate simplifications.
+
+* Reification, both directions
+
+The macro body is Lisp code that runs against Lisp /values/ --- ~pair_ref~, ~symbol~, ~int~, ~nil_t~ --- but a macro call's arguments arrive as unevaluated /data/, and its result has to go back into the datum tree to be expanded again.
+The value model and the datum model are different types.
+Crossing between them is the actual new machinery of this step, and it is a matched pair.
+
+~datum_to_value~ turns an argument datum into a value the macro's compiled closure can be bound to: an integer datum becomes an ~int~ value, a symbol becomes a ~symbol~ (with ~NIL~ mapped to the one true ~nil_t~, exactly as quoted data is), a list becomes a chain of pairs on the context's private heap.
+~value_to_datum~ runs the other way over the closure's return value, writing new nodes back into the datum arena so the result is indistinguishable from code the reader produced.
+A pair chain that does not end in ~nil~ is an error going back --- the datum layer has no dotted list --- and a stray backquote datum in argument position is an error coming in.
+Both restrictions match limits that already exist one layer down.
+
+* Compiling and running the expander
+
+With the round trip in place, ~defmacro~ is mechanical.
+Parse the lambda list, build a synthetic ~(lambda (params...) body...)~ out of the macro's own formals and body forms, expand /that/ (so a macro body may itself use backquote or an already-defined macro), elaborate it into the context's private core arena, and evaluate it to get a closure:
+
+#+transclude: [[orgit:~/src/compile-time-scheme/cl-pivot-l19-defmacro::src/smd/smdlisp/macroexpand/expander.hpp::76bd8411-361f-4baa-9464-18aebd4128ce]] :lines 2- :src cpp :end "76bd8411-361f-4baa-9464-18aebd4128ce end"
+
+The two lines that matter are the ~elaborate~ and the ~eval_direct~ near the end.
+That is the milestone stated plainly: the macro's expander is compiled and run by the compiler's own front end and evaluator, during compilation.
+The closure is stashed in the registry, and the ~defmacro~ form itself --- which leaves nothing for the program to run --- is replaced by ~(quote name)~, so it evaluates to the macro's name the way ANSI CL's ~defmacro~ returns it.
+
+Then, at each call site, ~invoke_user_macro~ slices the raw call arguments, reifies them (the ~&body~ rest becomes one list value), applies the stored closure, and reifies the result back to a datum for the expander to keep working on:
+
+#+transclude: [[orgit:~/src/compile-time-scheme/cl-pivot-l19-defmacro::src/smd/smdlisp/macroexpand/expander.hpp::9d3bc54e-ef26-4b12-9471-0ad05344ff20]] :lines 2- :src cpp :end "9d3bc54e-ef26-4b12-9471-0ad05344ff20 end"
+
+The returned datum is not trusted as final: it goes back through the ordinary recursive expansion, so a macro that expands into ~if~ and ~progn~, or into another macro, keeps expanding until it bottoms out in special forms.
+
+* my-when is when
+
+The merge test is that a ~defmacro~-defined ~my-when~ behaves identically to the host ~when~.
+Written the direct way, with ~list~ and ~cons~, it is the textbook expansion:
+
+#+begin_src lisp
+(progn
+  (defmacro my-when (test &body body)
+    (list 'if test (cons 'progn body) nil))
+  (my-when t 1 2))            ; => 2, same as (when t 1 2)
+#+end_src
+
+Written the idiomatic way, with a backquote template in the body --- the form every Common Lisp programmer actually writes --- it is the same macro:
+
+#+begin_src lisp
+(defmacro my-when (test &body body)
+  `(if ,test (progn ,@body) nil))
+#+end_src
+
+Both produce ~(IF T (PROGN 1 2) NIL)~, the exact shape ~when~ produces, and both evaluate to the same answer through the same evaluator.
+The backquote version is worth pausing on: the template inside the macro body is lowered to ~cons~/~append~ code by the backquote work from the last step, then compiled and run at expansion time, with ~,test~ and ~,@body~ filled from the reified arguments.
+Backquote and ~defmacro~ did not need to know about each other; each just does its job on the tree, and the composition is the standard macro-writing idiom falling out for free.
+
+* The budget still bites
+
+A macro that expands into a call to itself never reaches a fixpoint.
+The combined host-and-user expansion loop keeps the same discipline every earlier expansion loop had: a bounded number of steps, and running out is a diagnosed error, not a hang.
+
+#+begin_src lisp
+(defmacro loopy (x) (list 'loopy x))   ; (loopy 1) -> (loopy 1) -> ...
+#+end_src
+
+Registered and then driven at a small budget, ~(loopy 1)~ diagnoses "expansion budget exceeded" rather than spinning.
+It is the same guarantee as the non-terminating /host/ macro test from step L17, now covering user macros too.
+
+* What's still deferred
+
+The macro lambda list is required parameters plus one ~&rest~/~&body~ name --- no ~&optional~, ~&key~, ~&aux~, or destructuring yet.
+A ~defmacro~ is scoped to one top-level form, not the whole session.
+Both are DIV-0010.
+
+And ~gensym~ still does not exist.
+The three host macros that need an uncapturable temporary still use fixed reserved names (~%OR-TEMP~ and friends, DIV-0006), and ~my-when~ happens not to need one.
+This step builds the thing ~gensym~ was waiting for --- an evaluator that runs macro-body code at compile time --- but the builtin itself would have to be added down in the value model and the environment, files this lane does not own, so it waits for a step that does.
+Nested backquote (DIV-0008) is unchanged too: a macro body may use one level of backquote, which is what the idiom needs, but a template nested inside another template is still opaque data.
+
+The compiler now runs the language it compiles.
+What it cannot yet do is hand a macro a fresh name it can be sure no one else will write.
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-18-setq-defun-progn.org][← Phase 18 - setq, defun, progn]]
+#+html: </nav>
+
+* References
+
+#+print_bibliography:

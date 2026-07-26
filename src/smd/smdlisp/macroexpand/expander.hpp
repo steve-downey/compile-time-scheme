@@ -3,6 +3,10 @@
 #ifndef SRC_SMD_SMDLISP_MACROEXPAND_EXPANDER_HPP
 #define SRC_SMD_SMDLISP_MACROEXPAND_EXPANDER_HPP
 
+#include <smd/smdlisp/closure/env.hpp>
+#include <smd/smdlisp/closure/eval_direct.hpp>
+#include <smd/smdlisp/closure/pairs.hpp>
+#include <smd/smdlisp/closure/value.hpp>
 #include <smd/smdlisp/elaborator/elaborate.hpp>
 #include <smd/smdlisp/elaborator/elaborated_core.hpp>
 #include <smd/smdlisp/reader/atom.hpp>
@@ -11,6 +15,8 @@
 #include <smd/smdscheme/foundation/parse_error.hpp>
 #include <smd/smdscheme/foundation/result.hpp>
 #include <smd/smdscheme/foundation/static_vector.hpp>
+
+#include <smd/fixpoint/overloaded.hpp>
 
 #include <array>
 #include <span>
@@ -732,6 +738,655 @@ template <int MaxNodes, int MaxList>
     return macroexpand<MaxNodes, MaxList>(d, arena, table);
 }
 
+// -- DEFMACRO (step L19) -----------------------------------------------
+//
+// A `defmacro`-defined macro is not a C++ function like @ref host_macro:
+// its expander is Lisp code, compiled and run by the SAME evaluator
+// machinery (@ref elaborator::elaborate / @ref closure::eval_direct) an
+// ordinary program runs through -- "the compiler running the language it
+// compiles, at compile time" (plan step L19). Two new pieces of machinery
+// make that possible:
+//
+//  - Reification (`detail::datum_to_value` / `detail::value_to_datum`):
+//    a macro call's raw argument data is a @ref datum (unevaluated code),
+//    but the compile-time evaluator only understands @ref closure::value.
+//    `datum_to_value` converts a call form's argument data into a value
+//    the macro's compiled closure can be applied to; `value_to_datum`
+//    converts the closure's return value (new code, as data) back into a
+//    datum so @ref expand_datum can recursively expand it exactly like
+//    any other macro's replacement code.
+//  - @ref macro_context: the mutable, per-expansion-pass state
+//    (registered macros, plus a private pair heap / env arena / eval
+//    environment) `defmacro` needs, threaded through @ref expand_datum's
+//    recursion the same way @p arena already is.
+
+/// Maximum number of distinct `defmacro` names one @ref macro_context can
+/// register.
+inline constexpr int max_user_macros = 16;
+
+/// One `defmacro`-registered macro: a folded name, the arity/rest shape
+/// @ref invoke_user_macro needs to slice a call form's raw arguments, and
+/// the materialized compile-time closure that implements the expansion.
+///
+/// @ref lambda_node and @ref macro_value are set together, once, when the
+/// `defmacro` form is processed (@ref detail::process_defmacro):
+/// @ref lambda_node holds the elaborated `(lambda (params...) body...)`
+/// node in stable, arena-owned storage (a @ref macro_context's @c table is
+/// a @ref smdscheme::foundation::static_vector, which never reallocates),
+/// and @ref macro_value is a @ref closure::closure value whose @c node
+/// pointer targets @ref lambda_node in that same stable slot -- the same
+/// "closure captures a stable arena address, never a stack local" pattern
+/// @ref closure::env_arena documents.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+template <int MaxNodes, int MaxList>
+struct user_macro {
+    std::string_view name{}; ///< Folded spelling; arena-backed (the
+                             ///< `defmacro` form's own name argument is
+                             ///< always a list element, never an
+                             ///< elaboration root -- see @ref
+                             ///< elaborator::core_defun's identical
+                             ///< reasoning).
+    int required_count = 0;  ///< Number of fixed positional parameters.
+    bool has_rest = false;   ///< True if the lambda list ended in
+                             ///< `&rest`/`&body name`.
+    elaborator::core_type<MaxNodes, MaxList>
+        lambda_node{}; ///< The
+                       ///< elaborated macro-expander lambda; stable storage for
+                       ///< @ref macro_value's closure node pointer.
+    closure::value<elaborator::core_type<MaxNodes, MaxList>> macro_value{};
+    ///< The materialized closure @ref invoke_user_macro applies.
+};
+
+/// Mutable, per-expansion-pass state `defmacro` needs: the registry of
+/// user-defined macros, plus the compile-time evaluator plumbing (a
+/// private @ref closure::pair_heap, @ref closure::env_arena, and a
+/// @ref closure::env sharing that heap and pre-populated with the default
+/// builtins) used to elaborate and run a macro body -- entirely separate
+/// from whatever pair heap / environment the REAL program later runs
+/// under (@ref expand_and_elaborate's caller supplies those independently
+/// for the elaborated, expanded result).
+///
+/// One @ref macro_context is constructed fresh per top-level
+/// @ref expand_and_elaborate (or context-less @ref expand_datum) call:
+/// `defmacro` registrations are visible for the rest of THAT call's
+/// recursive expansion, never across separate top-level forms -- see
+/// docs/divergences/DIV-0010 for why this is a divergence from ANSI CL's
+/// session-global `defmacro`, and why it does not affect this step's
+/// merge criteria (a `defmacro` and its use sites live in one top-level
+/// form in every test this step adds).
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum list length.
+/// @tparam MaxBindings Environment capacity for the compile-time
+///                     evaluator; must be 16 (@ref closure::eval_direct's
+///                     constraint).
+/// @tparam MaxEnvs     Capacity of the compile-time @ref closure::env_arena.
+// ee158407-41ed-4add-9a40-3ce719f057e6
+template <int MaxNodes, int MaxList, int MaxBindings = 16,
+          int MaxEnvs = closure::default_max_envs>
+class macro_context {
+  public:
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
+
+    smdscheme::foundation::static_vector<user_macro<MaxNodes, MaxList>,
+                                         max_user_macros>
+        table{}; ///< Registered `defmacro` macros, in definition order.
+    smdscheme::foundation::tree_arena<Core, MaxNodes>
+        core_arena{}; ///< Compile-time-only core arena for macro bodies;
+                      ///< never the real program's own core arena.
+    closure::pair_heap<Core, closure::default_max_pairs>
+        heap{}; ///< Compile-time-only pair heap (reification and macro
+                ///< body `cons`/`append` evaluation both allocate here).
+    closure::env_arena<Core, MaxBindings, MaxEnvs>
+        envs{}; ///< Owns every environment a macro-body lambda captures.
+    closure::env<Core, MaxBindings> env{
+        closure::default_env<Core, MaxBindings>(heap)}; ///< The
+    ///< compile-time evaluation environment (default builtins only).
+};
+// ee158407-41ed-4add-9a40-3ce719f057e6 end
+
+/// Forward declaration: @ref expand_datum (the @ref macro_context-aware
+/// overload) is defined later in this file, but
+/// @ref detail::process_defmacro needs to recurse into it (a macro body
+/// may itself use backquote, host macros, or a previously-registered
+/// `defmacro`).
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum list length.
+/// @tparam MaxBindings @ref macro_context's environment capacity.
+/// @tparam MaxEnvs     @ref macro_context's env-arena capacity.
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
+[[nodiscard]] constexpr auto
+expand_datum(datum<MaxNodes, MaxList> const &d,
+             datum_arena<MaxNodes, MaxList> &arena,
+             macro_context<MaxNodes, MaxList, MaxBindings, MaxEnvs> &ctx)
+    -> smdscheme::foundation::result<datum<MaxNodes, MaxList>>;
+
+namespace detail {
+
+/// Reifies a raw (unevaluated) datum -- an argument form at a `defmacro`
+/// call site -- into a @ref closure::value the compile-time evaluator can
+/// bind a macro parameter to.
+///
+/// Mirrors @ref elaborator::detail::elaborate_quoted_datum's NIL
+/// special-casing (decision D3), so a macro parameter observes the exact
+/// same `nil` identity ordinary quoted data does; `T` needs no special
+/// case; it is already an ordinary symbol value with that spelling.
+/// `'x` and `#'x` reify as their two-element list spellings (`(QUOTE x)` /
+/// `(FUNCTION x)`) -- the ANSI CL identity between the reader shorthand
+/// and the list form holds at the data level exactly as it does at the
+/// reader level. A raw `` ` ``/`,`/`,@` datum reaching this function (a
+/// macro call argument that is itself unexpanded backquote syntax) is a
+/// diagnosed error rather than a structural reification -- see
+/// docs/divergences/DIV-0010.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+/// @param  d     The argument datum to reify.
+/// @param  arena Read-only datum arena backing @p d.
+/// @param  heap  Compile-time pair heap; list data is allocated here.
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto
+datum_to_value(datum<MaxNodes, MaxList> const &d,
+               datum_arena<MaxNodes, MaxList> const &arena,
+               closure::pair_heap<elaborator::core_type<MaxNodes, MaxList>,
+                                  closure::default_max_pairs> &heap)
+    -> smdscheme::foundation::result<
+        closure::value<elaborator::core_type<MaxNodes, MaxList>>> {
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
+    using Val = closure::value<Core>;
+    using DatumT = datum<MaxNodes, MaxList>;
+    using DList = datum_list<MaxNodes, MaxList>;
+    using DatumQuote = reader::datum_quote<DatumT, MaxNodes>;
+    using DatumFunction = reader::datum_function<DatumT, MaxNodes>;
+    using DatumBackquote = reader::datum_backquote<DatumT, MaxNodes>;
+    using DatumUnquote = reader::datum_unquote<DatumT, MaxNodes>;
+    using DatumUnquoteSplice = reader::datum_unquote_splice<DatumT, MaxNodes>;
+
+    if (std::holds_alternative<reader::datum_integer>(d.inner))
+        return Val{std::get<reader::datum_integer>(d.inner).value};
+
+    if (std::holds_alternative<reader::datum_symbol>(d.inner)) {
+        auto name = std::get<reader::datum_symbol>(d.inner).name.view();
+        if (name == "NIL")
+            return Val{closure::nil_t{}};
+        return Val{closure::symbol{name}};
+    }
+
+    if (std::holds_alternative<reader::datum_keyword>(d.inner))
+        return Val{closure::keyword{
+            std::get<reader::datum_keyword>(d.inner).name.view()}};
+
+    if (std::holds_alternative<DList>(d.inner)) {
+        auto const &lst = std::get<DList>(d.inner);
+        Val acc{closure::nil_t{}};
+        for (int i = lst.elements.size() - 1; i >= 0; --i) {
+            auto elem_r = datum_to_value<MaxNodes, MaxList>(
+                arena.get(lst.elements[i]), arena, heap);
+            if (!elem_r.has_value())
+                return elem_r;
+            acc = Val{closure::pair_ref{
+                heap.alloc(closure::pair_cell<Core>{elem_r.value(), acc})}};
+        }
+        return acc;
+    }
+
+    if (std::holds_alternative<DatumQuote>(d.inner)) {
+        auto const &q = std::get<DatumQuote>(d.inner);
+        auto target_r =
+            datum_to_value<MaxNodes, MaxList>(arena.get(q.quoted), arena, heap);
+        if (!target_r.has_value())
+            return target_r;
+        Val tail{closure::pair_ref{heap.alloc(closure::pair_cell<Core>{
+            target_r.value(), Val{closure::nil_t{}}})}};
+        return Val{closure::pair_ref{heap.alloc(
+            closure::pair_cell<Core>{Val{closure::symbol{"QUOTE"}}, tail})}};
+    }
+
+    if (std::holds_alternative<DatumFunction>(d.inner)) {
+        auto const &fq = std::get<DatumFunction>(d.inner);
+        auto target_r = datum_to_value<MaxNodes, MaxList>(arena.get(fq.target),
+                                                          arena, heap);
+        if (!target_r.has_value())
+            return target_r;
+        Val tail{closure::pair_ref{heap.alloc(closure::pair_cell<Core>{
+            target_r.value(), Val{closure::nil_t{}}})}};
+        return Val{closure::pair_ref{heap.alloc(
+            closure::pair_cell<Core>{Val{closure::symbol{"FUNCTION"}}, tail})}};
+    }
+
+    if (std::holds_alternative<DatumBackquote>(d.inner) ||
+        std::holds_alternative<DatumUnquote>(d.inner) ||
+        std::holds_alternative<DatumUnquoteSplice>(d.inner))
+        return smdscheme::foundation::parse_error{
+            {},
+            "defmacro: raw backquote syntax in macro-argument position "
+            "is not supported"};
+
+    return smdscheme::foundation::parse_error{
+        {}, "defmacro: unsupported argument datum"};
+}
+
+/// Reifies a compile-time-evaluator @ref closure::value -- the result of
+/// applying a `defmacro`'s expander closure -- back into a datum, so
+/// @ref expand_datum can recursively expand it exactly like any other
+/// macro's replacement code (host macro or backquote lowering). New nodes
+/// are written into @p arena, the same reader-populated arena macro
+/// expansion always writes into (decision D9's "datum-to-datum pass").
+///
+/// A pair chain that does not terminate in @ref closure::nil_t is a
+/// diagnosed error: the datum layer has no dotted-list representation
+/// (decision D6), matching the reader's own restriction.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+/// @param  v     The value to reify.
+/// @param  arena Datum arena receiving any new nodes.
+/// @param  heap  Compile-time pair heap backing @p v's pair cells, if any.
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto value_to_datum(
+    closure::value<elaborator::core_type<MaxNodes, MaxList>> const &v,
+    datum_arena<MaxNodes, MaxList> &arena,
+    closure::pair_heap<elaborator::core_type<MaxNodes, MaxList>,
+                       closure::default_max_pairs> const &heap)
+    -> smdscheme::foundation::result<datum<MaxNodes, MaxList>> {
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
+    using D = datum<MaxNodes, MaxList>;
+    using datum_f =
+        typename reader::datum_f_factory<MaxNodes, MaxList>::template type<D>;
+    using DList = datum_list<MaxNodes, MaxList>;
+    using Res = smdscheme::foundation::result<D>;
+
+    return std::visit(
+        smd::fixpoint::overloaded{
+            [&](closure::nil_t const &) -> Res {
+                return nil_symbol<MaxNodes, MaxList>();
+            },
+            [&](int i) -> Res { return D{datum_f{reader::datum_integer{i}}}; },
+            [&](closure::symbol const &s) -> Res {
+                return make_symbol<MaxNodes, MaxList>(s.name);
+            },
+            [&](closure::keyword const &k) -> Res {
+                return D{datum_f{
+                    reader::datum_keyword{reader::detail::fold(k.name)}}};
+            },
+            [&](closure::pair_ref const &p) -> Res {
+                DList lst{};
+                closure::value<Core> cur{p};
+                while (std::holds_alternative<closure::pair_ref>(cur)) {
+                    auto const &cell =
+                        heap.get(std::get<closure::pair_ref>(cur).loc);
+                    auto elem_r = value_to_datum<MaxNodes, MaxList>(
+                        cell.car, arena, heap);
+                    if (!elem_r.has_value())
+                        return elem_r;
+                    lst.elements.push_back(
+                        smdscheme::foundation::make_arena_box(arena,
+                                                              elem_r.value()));
+                    cur = cell.cdr;
+                }
+                if (!std::holds_alternative<closure::nil_t>(cur))
+                    return smdscheme::foundation::parse_error{
+                        {},
+                        "defmacro: macro expansion produced an improper "
+                        "list (no dotted-list datum representation, "
+                        "decision D6)"};
+                return D{datum_f{std::move(lst)}};
+            },
+            [&](closure::builtin const &) -> Res {
+                return smdscheme::foundation::parse_error{
+                    {},
+                    "defmacro: macro expansion produced a builtin value, "
+                    "not data"};
+            },
+            [&](closure::closure<Core> const &) -> Res {
+                return smdscheme::foundation::parse_error{
+                    {},
+                    "defmacro: macro expansion produced a closure value, "
+                    "not data"};
+            },
+            [&](closure::foreign_function<Core> const &) -> Res {
+                return smdscheme::foundation::parse_error{
+                    {},
+                    "defmacro: macro expansion produced a foreign-"
+                    "function value, not data"};
+            }},
+        v);
+}
+
+/// Parsed shape of a `defmacro` lambda list: `(p1 p2 ... [&rest|&body
+/// rest-name])`.
+///
+/// **Known simplification (docs/divergences/DIV-0010):** this project's
+/// macro lambda lists support only a run of required, fixed-position
+/// parameters, optionally followed by exactly one `&rest`/`&body` name
+/// capturing the remaining raw call arguments as a list -- not full ANSI
+/// CL destructuring macro lambda lists (`&optional`/`&key`/`&aux`/nested
+/// destructuring are unsupported). `&body` is accepted as a spelling
+/// synonym for `&rest`: ANSI CL distinguishes them only for
+/// pretty-printer indentation, which this pipeline has no use for.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+template <int MaxNodes, int MaxList>
+struct macro_formals {
+    /// Formal-parameter datum handles, in `lambda` order: required
+    /// parameters first, then the rest-name (if @ref has_rest) -- reused
+    /// directly from the `defmacro` form's own formals list, never
+    /// copied.
+    smdscheme::foundation::static_vector<
+        smdscheme::foundation::arena_box<datum<MaxNodes, MaxList>, MaxNodes>,
+        MaxList>
+        plain_params{};
+    int required_count = 0; ///< Number of entries in @ref plain_params
+                            ///< before the rest-name, if any.
+    bool has_rest = false;  ///< True if the lambda list ended in
+                            ///< `&rest`/`&body name`.
+};
+
+/// Parses @p formals per @ref macro_formals's grammar.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto
+parse_macro_formals(datum_list<MaxNodes, MaxList> const &formals,
+                    datum_arena<MaxNodes, MaxList> const &arena)
+    -> smdscheme::foundation::result<macro_formals<MaxNodes, MaxList>> {
+    macro_formals<MaxNodes, MaxList> out{};
+    for (int i = 0; i < formals.elements.size(); ++i) {
+        auto const &p = arena.get(formals.elements[i]);
+        if (!std::holds_alternative<reader::datum_symbol>(p.inner))
+            return smdscheme::foundation::parse_error{
+                {}, "defmacro: formal must be a symbol"};
+        auto pname = std::get<reader::datum_symbol>(p.inner).name.view();
+        if (pname == "&REST" || pname == "&BODY") {
+            if (i + 2 != formals.elements.size())
+                return smdscheme::foundation::parse_error{
+                    {},
+                    "defmacro: &rest/&body must be followed by exactly "
+                    "one name, with nothing after it"};
+            auto const &rest_node = arena.get(formals.elements[i + 1]);
+            if (!std::holds_alternative<reader::datum_symbol>(rest_node.inner))
+                return smdscheme::foundation::parse_error{
+                    {}, "defmacro: &rest/&body name must be a symbol"};
+            out.plain_params.push_back(formals.elements[i + 1]);
+            out.has_rest = true;
+            return out;
+        }
+        out.plain_params.push_back(formals.elements[i]);
+        ++out.required_count;
+    }
+    return out;
+}
+
+/// True if @p lst is headed by the symbol `DEFMACRO`.
+///
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum list length.
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto
+is_defmacro_form(datum_list<MaxNodes, MaxList> const &lst,
+                 datum_arena<MaxNodes, MaxList> const &arena) -> bool {
+    if (lst.elements.empty())
+        return false;
+    auto const &head = arena.get(lst.elements[0]);
+    return std::holds_alternative<reader::datum_symbol>(head.inner) &&
+           std::get<reader::datum_symbol>(head.inner).name.view() == "DEFMACRO";
+}
+
+/// Processes a `(DEFMACRO name (formals...) body...)` form: parses and
+/// validates the formals (@ref parse_macro_formals), builds a synthetic
+/// `(LAMBDA (plain-params...) body...)` datum from the macro's own body
+/// forms and formal names (reused verbatim, never copied), macro-expands
+/// it (so a macro body may itself use backquote, host macros, or a
+/// previously-registered `defmacro` -- @ref expand_datum), elaborates the
+/// expanded lambda (@ref elaborator::elaborate) into @p ctx's private
+/// compile-time core arena, and evaluates it (@ref closure::eval_direct)
+/// in @p ctx's compile-time environment to materialize the closure
+/// @ref invoke_user_macro will later apply. Registers the result in
+/// @p ctx.table.
+///
+/// Per ANSI CL, `defmacro` returns the macro name; since this step has no
+/// elaborator-level representation for "a compile-time-only definition"
+/// (unlike `defun`/`defvar`, `defmacro` leaves nothing for the real
+/// program's evaluator to run), the form is fully consumed here and
+/// replaced with a quoted-symbol datum naming the macro -- see
+/// docs/divergences/DIV-0010.
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum list length.
+/// @tparam MaxBindings @ref macro_context's environment capacity.
+/// @tparam MaxEnvs     @ref macro_context's env-arena capacity.
+// 76bd8411-361f-4baa-9464-18aebd4128ce
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
+[[nodiscard]] constexpr auto
+process_defmacro(datum_list<MaxNodes, MaxList> const &call,
+                 datum_arena<MaxNodes, MaxList> &arena,
+                 macro_context<MaxNodes, MaxList, MaxBindings, MaxEnvs> &ctx)
+    -> smdscheme::foundation::result<datum<MaxNodes, MaxList>> {
+    using DatumT = datum<MaxNodes, MaxList>;
+    using DList = datum_list<MaxNodes, MaxList>;
+    using datum_f =
+        typename reader::datum_f_factory<MaxNodes,
+                                         MaxList>::template type<DatumT>;
+
+    if (call.elements.size() < 3)
+        return smdscheme::foundation::parse_error{
+            {},
+            "defmacro: expected a name, formals, and at least one body "
+            "expression"};
+
+    auto const &name_node = arena.get(call.elements[1]);
+    if (!std::holds_alternative<reader::datum_symbol>(name_node.inner))
+        return smdscheme::foundation::parse_error{
+            {}, "defmacro: name must be a symbol"};
+    auto macro_name =
+        std::get<reader::datum_symbol>(name_node.inner).name.view();
+
+    auto const &formals_node = arena.get(call.elements[2]);
+    if (!std::holds_alternative<DList>(formals_node.inner))
+        return smdscheme::foundation::parse_error{
+            {}, "defmacro: formals must be a list"};
+
+    auto formals_r = parse_macro_formals<MaxNodes, MaxList>(
+        std::get<DList>(formals_node.inner), arena);
+    if (!formals_r.has_value())
+        return formals_r.error();
+    auto const &formals = formals_r.value();
+
+    DList lambda_formals{};
+    for (int i = 0; i < formals.plain_params.size(); ++i)
+        lambda_formals.elements.push_back(formals.plain_params[i]);
+
+    DList lambda_form{};
+    lambda_form.elements.push_back(smdscheme::foundation::make_arena_box(
+        arena, make_symbol<MaxNodes, MaxList>("LAMBDA")));
+    lambda_form.elements.push_back(smdscheme::foundation::make_arena_box(
+        arena, DatumT{datum_f{std::move(lambda_formals)}}));
+    for (int i = 3; i < call.elements.size(); ++i)
+        lambda_form.elements.push_back(call.elements[i]);
+
+    auto lambda_datum = DatumT{datum_f{std::move(lambda_form)}};
+
+    auto expanded_lambda_r =
+        expand_datum<MaxNodes, MaxList, MaxBindings, MaxEnvs>(lambda_datum,
+                                                              arena, ctx);
+    if (!expanded_lambda_r.has_value())
+        return expanded_lambda_r;
+
+    auto core_r = elaborator::elaborate<MaxNodes, MaxList>(
+        expanded_lambda_r.value(), arena, ctx.core_arena);
+    if (!core_r.has_value())
+        return core_r.error();
+
+    if (ctx.table.size() >= max_user_macros)
+        return smdscheme::foundation::parse_error{
+            {}, "defmacro: too many macros registered in this expansion"};
+
+    user_macro<MaxNodes, MaxList> um{};
+    um.name = macro_name;
+    um.required_count = formals.required_count;
+    um.has_rest = formals.has_rest;
+    um.lambda_node = core_r.value();
+    ctx.table.push_back(std::move(um));
+    auto &entry = ctx.table[ctx.table.size() - 1];
+
+    auto clo_r = closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+        entry.lambda_node, ctx.core_arena, ctx.env, ctx.envs);
+    if (!clo_r.has_value())
+        return clo_r.error();
+    entry.macro_value = clo_r.value();
+
+    return make_quote<MaxNodes, MaxList>(
+        arena, make_symbol<MaxNodes, MaxList>(macro_name));
+}
+// 76bd8411-361f-4baa-9464-18aebd4128ce end
+
+} // namespace detail
+
+/// Applies a registered `defmacro` macro @p m to a call form @p call:
+/// slices @p call's raw argument data into @p m's required positional
+/// arguments plus (if @ref user_macro::has_rest) a trailing raw-argument
+/// list, reifies each into a @ref closure::value (@ref
+/// detail::datum_to_value), applies @p m's compiled closure (@ref
+/// closure::apply_function_value), and reifies the resulting value back
+/// into a datum (@ref detail::value_to_datum) for the caller to
+/// recursively expand.
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum list length.
+/// @tparam MaxBindings @ref macro_context's environment capacity.
+/// @tparam MaxEnvs     @ref macro_context's env-arena capacity.
+// 9d3bc54e-ef26-4b12-9471-0ad05344ff20
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
+[[nodiscard]] constexpr auto
+invoke_user_macro(user_macro<MaxNodes, MaxList> const &m,
+                  datum_list<MaxNodes, MaxList> const &call,
+                  datum_arena<MaxNodes, MaxList> &arena,
+                  macro_context<MaxNodes, MaxList, MaxBindings, MaxEnvs> &ctx)
+    -> smdscheme::foundation::result<datum<MaxNodes, MaxList>> {
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
+    using Val = closure::value<Core>;
+
+    int nargs = call.elements.size() - 1;
+    if (m.has_rest) {
+        if (nargs < m.required_count)
+            return smdscheme::foundation::parse_error{
+                {}, "defmacro: too few arguments in macro call"};
+    } else if (nargs != m.required_count) {
+        return smdscheme::foundation::parse_error{
+            {}, "defmacro: wrong number of arguments in macro call"};
+    }
+
+    smdscheme::foundation::static_vector<Val, MaxList> args{};
+    for (int i = 0; i < m.required_count; ++i) {
+        auto v_r = detail::datum_to_value<MaxNodes, MaxList>(
+            arena.get(call.elements[1 + i]), arena, ctx.heap);
+        if (!v_r.has_value())
+            return v_r.error();
+        args.push_back(v_r.value());
+    }
+    if (m.has_rest) {
+        Val rest_val{closure::nil_t{}};
+        for (int i = call.elements.size() - 1; i >= 1 + m.required_count; --i) {
+            auto v_r = detail::datum_to_value<MaxNodes, MaxList>(
+                arena.get(call.elements[i]), arena, ctx.heap);
+            if (!v_r.has_value())
+                return v_r.error();
+            rest_val = Val{closure::pair_ref{ctx.heap.alloc(
+                closure::pair_cell<Core>{v_r.value(), rest_val})}};
+        }
+        args.push_back(rest_val);
+    }
+
+    auto result_r =
+        closure::apply_function_value<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            m.macro_value, std::span<Val const>(args.begin(), args.end()),
+            ctx.core_arena, &ctx.heap, ctx.envs);
+    if (!result_r.has_value())
+        return result_r.error();
+
+    return detail::value_to_datum<MaxNodes, MaxList>(result_r.value(), arena,
+                                                     ctx.heap);
+}
+// 9d3bc54e-ef26-4b12-9471-0ad05344ff20 end
+
+/// One step of macro expansion at the head position of @p d, trying host
+/// macros first (@ref macroexpand_1) and, failing that, `defmacro`
+/// -registered user macros in @p ctx.table (@ref invoke_user_macro).
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum list length.
+/// @tparam MaxBindings @ref macro_context's environment capacity.
+/// @tparam MaxEnvs     @ref macro_context's env-arena capacity.
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
+[[nodiscard]] constexpr auto macroexpand_with_macros_1(
+    datum<MaxNodes, MaxList> const &d, datum_arena<MaxNodes, MaxList> &arena,
+    macro_context<MaxNodes, MaxList, MaxBindings, MaxEnvs> &ctx)
+    -> smdscheme::foundation::result<expansion_step<MaxNodes, MaxList>> {
+    auto host_r = macroexpand_1<MaxNodes, MaxList>(d, arena);
+    if (!host_r.has_value())
+        return host_r.error();
+    if (host_r.value().expanded)
+        return host_r.value();
+
+    using DList = datum_list<MaxNodes, MaxList>;
+    if (!std::holds_alternative<DList>(d.inner))
+        return expansion_step<MaxNodes, MaxList>{d, false};
+    auto const &lst = std::get<DList>(d.inner);
+    if (lst.elements.empty())
+        return expansion_step<MaxNodes, MaxList>{d, false};
+    auto const &head = arena.get(lst.elements[0]);
+    if (!std::holds_alternative<reader::datum_symbol>(head.inner))
+        return expansion_step<MaxNodes, MaxList>{d, false};
+    auto name = std::get<reader::datum_symbol>(head.inner).name.view();
+
+    for (int i = 0; i < ctx.table.size(); ++i) {
+        if (ctx.table[i].name != name)
+            continue;
+        auto rep_r = invoke_user_macro<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            ctx.table[i], lst, arena, ctx);
+        if (!rep_r.has_value())
+            return rep_r.error();
+        return expansion_step<MaxNodes, MaxList>{rep_r.value(), true};
+    }
+    return expansion_step<MaxNodes, MaxList>{d, false};
+}
+
+/// Applies @ref macroexpand_with_macros_1 repeatedly at the head position
+/// of @p d until fixpoint or @p max_expansions steps, exactly mirroring
+/// @ref macroexpand's budget discipline ("budget exhaustion is a
+/// diagnosed error, not a hang") for the combined host-macro/user-macro
+/// expansion loop.
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum list length.
+/// @tparam MaxBindings @ref macro_context's environment capacity.
+/// @tparam MaxEnvs     @ref macro_context's env-arena capacity.
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
+[[nodiscard]] constexpr auto macroexpand_with_macros(
+    datum<MaxNodes, MaxList> const &d, datum_arena<MaxNodes, MaxList> &arena,
+    macro_context<MaxNodes, MaxList, MaxBindings, MaxEnvs> &ctx,
+    int max_expansions = default_max_expansions)
+    -> smdscheme::foundation::result<datum<MaxNodes, MaxList>> {
+    datum<MaxNodes, MaxList> current = d;
+    for (int i = 0; i < max_expansions; ++i) {
+        auto step_r =
+            macroexpand_with_macros_1<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                current, arena, ctx);
+        if (!step_r.has_value())
+            return step_r.error();
+        if (!step_r.value().expanded)
+            return current;
+        current = step_r.value().node;
+    }
+    return smdscheme::foundation::parse_error{
+        {}, "macroexpand: expansion budget exceeded"};
+}
+
 namespace detail {
 
 /// True if @p lst is a `(QUOTE datum)` form written out as an ordinary
@@ -782,11 +1437,28 @@ is_quote_form(datum_list<MaxNodes, MaxList> const &lst,
 /// recursive step) terminates without needing a second, outer fixpoint
 /// loop across the whole tree.
 ///
-/// @tparam MaxNodes Arena capacity.
-/// @tparam MaxList  Maximum list length.
-template <int MaxNodes, int MaxList>
-[[nodiscard]] constexpr auto expand_datum(datum<MaxNodes, MaxList> const &d,
-                                          datum_arena<MaxNodes, MaxList> &arena)
+/// This overload is @ref macro_context-aware (step L19): `defmacro` forms
+/// are recognized directly by head spelling (@ref detail::is_defmacro_form),
+/// like backquote is recognized by datum kind -- registering a macro is a
+/// side effect on @p ctx, not "rewrite this call into replacement code",
+/// so it does not go through @ref macroexpand_with_macros at all. Every
+/// other list position tries host macros then `defmacro`-registered user
+/// macros, in that order, via @ref macroexpand_with_macros.
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum list length.
+/// @tparam MaxBindings @ref macro_context's environment capacity.
+/// @tparam MaxEnvs     @ref macro_context's env-arena capacity.
+/// @param  d     Root datum to expand.
+/// @param  arena Datum arena backing @p d; also receives every node this
+///               pass allocates.
+/// @param  ctx   Mutable `defmacro` registry and compile-time evaluator
+///               state, threaded through the whole recursive walk.
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
+[[nodiscard]] constexpr auto
+expand_datum(datum<MaxNodes, MaxList> const &d,
+             datum_arena<MaxNodes, MaxList> &arena,
+             macro_context<MaxNodes, MaxList, MaxBindings, MaxEnvs> &ctx)
     -> smdscheme::foundation::result<datum<MaxNodes, MaxList>> {
     using D = datum<MaxNodes, MaxList>;
     using datum_f =
@@ -801,8 +1473,8 @@ template <int MaxNodes, int MaxList>
 
     if (std::holds_alternative<DatumFunction>(d.inner)) {
         auto const &fq = std::get<DatumFunction>(d.inner);
-        auto inner_r =
-            expand_datum<MaxNodes, MaxList>(arena.get(fq.target), arena);
+        auto inner_r = expand_datum<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            arena.get(fq.target), arena, ctx);
         if (!inner_r.has_value())
             return inner_r;
         return D{datum_f{DatumFunction{
@@ -822,7 +1494,8 @@ template <int MaxNodes, int MaxList>
             arena.get(bq.templ), arena);
         if (!lowered_r.has_value())
             return lowered_r;
-        return expand_datum<MaxNodes, MaxList>(lowered_r.value(), arena);
+        return expand_datum<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            lowered_r.value(), arena, ctx);
     }
 
     if (!std::holds_alternative<DatumList>(d.inner))
@@ -832,13 +1505,22 @@ template <int MaxNodes, int MaxList>
                                                  arena))
         return d;
 
-    auto expanded_r = macroexpand<MaxNodes, MaxList>(d, arena);
+    if (detail::is_defmacro_form<MaxNodes, MaxList>(
+            std::get<DatumList>(d.inner), arena))
+        return detail::process_defmacro<MaxNodes, MaxList, MaxBindings,
+                                        MaxEnvs>(std::get<DatumList>(d.inner),
+                                                 arena, ctx);
+
+    auto expanded_r =
+        macroexpand_with_macros<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            d, arena, ctx);
     if (!expanded_r.has_value())
         return expanded_r;
     auto const &expanded = expanded_r.value();
 
     if (!std::holds_alternative<DatumList>(expanded.inner))
-        return expand_datum<MaxNodes, MaxList>(expanded, arena);
+        return expand_datum<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            expanded, arena, ctx);
 
     auto const &lst = std::get<DatumList>(expanded.inner);
     if (detail::is_quote_form<MaxNodes, MaxList>(lst, arena))
@@ -846,14 +1528,32 @@ template <int MaxNodes, int MaxList>
 
     DatumList new_lst{};
     for (int i = 0; i < lst.elements.size(); ++i) {
-        auto elem_r =
-            expand_datum<MaxNodes, MaxList>(arena.get(lst.elements[i]), arena);
+        auto elem_r = expand_datum<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            arena.get(lst.elements[i]), arena, ctx);
         if (!elem_r.has_value())
             return elem_r;
         new_lst.elements.push_back(
             smdscheme::foundation::make_arena_box(arena, elem_r.value()));
     }
     return D{datum_f{std::move(new_lst)}};
+}
+
+/// @overload Uses a fresh, local @ref macro_context: `defmacro`
+/// registrations made while expanding @p d are visible only within this
+/// one call (see docs/divergences/DIV-0010). Existing callers that never
+/// use `defmacro` (host-macro and backquote expansion) are unaffected.
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum list length.
+/// @tparam MaxBindings @ref macro_context's environment capacity.
+/// @tparam MaxEnvs     @ref macro_context's env-arena capacity.
+template <int MaxNodes, int MaxList, int MaxBindings = 16,
+          int MaxEnvs = closure::default_max_envs>
+[[nodiscard]] constexpr auto expand_datum(datum<MaxNodes, MaxList> const &d,
+                                          datum_arena<MaxNodes, MaxList> &arena)
+    -> smdscheme::foundation::result<datum<MaxNodes, MaxList>> {
+    macro_context<MaxNodes, MaxList, MaxBindings, MaxEnvs> ctx{};
+    return expand_datum<MaxNodes, MaxList, MaxBindings, MaxEnvs>(d, arena, ctx);
 }
 
 /// Expands then elaborates @p pd: the public pipeline entry point wiring
@@ -863,13 +1563,24 @@ template <int MaxNodes, int MaxList>
 /// callers can drop this in as a direct replacement for a bare
 /// `elaborate(...)` call.
 ///
-/// @tparam MaxNodes Arena capacity.
-/// @tparam MaxList  Maximum list/argument length.
+/// Constructs one fresh @ref macro_context for this call (see that
+/// class's docs and docs/divergences/DIV-0010): `defmacro` forms anywhere
+/// in @p pd are visible to the rest of @p pd's expansion, but not to a
+/// separate, later call to this function.
+///
+/// @tparam MaxNodes    Arena capacity.
+/// @tparam MaxList     Maximum list/argument length.
+/// @tparam MaxBindings @ref macro_context's environment capacity.
+/// @tparam MaxEnvs     @ref macro_context's env-arena capacity.
 /// @param  pd          Root datum to expand and elaborate.
 /// @param  datum_arena Datum arena produced by the reader; also receives
 ///                     every node the expansion pass allocates.
-/// @param  core_arena  Core arena that receives elaborated nodes.
-template <int MaxNodes, int MaxList>
+/// @param  core_arena  Core arena that receives elaborated nodes (the
+///                     REAL program's core arena -- distinct from
+///                     @ref macro_context's own private, compile-time-only
+///                     core arena used for macro bodies).
+template <int MaxNodes, int MaxList, int MaxBindings = 16,
+          int MaxEnvs = closure::default_max_envs>
 [[nodiscard]] constexpr auto expand_and_elaborate(
     reader::datum_type<MaxNodes, MaxList> const &pd,
     smdscheme::foundation::tree_arena<reader::datum_type<MaxNodes, MaxList>,
@@ -877,7 +1588,9 @@ template <int MaxNodes, int MaxList>
     smdscheme::foundation::tree_arena<elaborator::core_type<MaxNodes, MaxList>,
                                       MaxNodes> &core_arena)
     -> smdscheme::foundation::result<elaborator::core_type<MaxNodes, MaxList>> {
-    auto expanded_r = expand_datum<MaxNodes, MaxList>(pd, datum_arena);
+    macro_context<MaxNodes, MaxList, MaxBindings, MaxEnvs> ctx{};
+    auto expanded_r = expand_datum<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+        pd, datum_arena, ctx);
     if (!expanded_r.has_value())
         return expanded_r.error();
     return elaborator::elaborate<MaxNodes, MaxList>(expanded_r.value(),

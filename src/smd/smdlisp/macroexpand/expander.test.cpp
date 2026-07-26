@@ -572,3 +572,156 @@ TEST_CASE("ExpanderTest - CaseEndToEndDefaultClause") {
     REQUIRE(std::holds_alternative<int>(vr.value()));
     REQUIRE(std::get<int>(vr.value()) == 300);
 }
+
+// -- defmacro (docs/cl-pivot-plan.md step L19) -------------------------------
+//
+// Merge criterion: a `defmacro`-defined `my-when` behaves identically to the
+// host `when` macro, and an expansion that never reaches a fixpoint is a
+// diagnosed budget error (not a hang). A `defmacro`'s expander is compiled
+// and run by the SAME evaluator (elaborate + eval_direct) an ordinary program
+// runs through -- "the compiler running the language it compiles, at compile
+// time". The `defmacro` and its use sites share one top-level form (here a
+// `progn`) because a `macro_context`'s registrations live for exactly one
+// top-level expand pass (docs/divergences/DIV-0010).
+
+TEST_CASE("ExpanderTest - DefmacroMyWhenTrueBranchMatchesHostWhen") {
+    // my-when built by explicit list construction:
+    //   (list 'if test (cons 'progn body) nil)
+    // == host when's (IF test (PROGN body...) NIL).
+    DatumArena da;
+    CoreArena ca;
+    Core root;
+    Heap heap;
+    Envs envs;
+    auto vr = run("(progn"
+                  "  (defmacro my-when (test &body body)"
+                  "    (list 'if test (cons 'progn body) nil))"
+                  "  (my-when t 1 2))",
+                  da, ca, root, heap, envs);
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<int>(vr.value()));
+    REQUIRE(std::get<int>(vr.value()) == 2);
+}
+
+TEST_CASE("ExpanderTest - DefmacroMyWhenFalseBranchMatchesHostWhen") {
+    // (my-when nil ...) yields NIL, exactly as (when nil ...) does, and the
+    // body is not evaluated (undefined-var would error if it were).
+    DatumArena da;
+    CoreArena ca;
+    Core root;
+    Heap heap;
+    Envs envs;
+    auto vr = run("(progn"
+                  "  (defmacro my-when (test &body body)"
+                  "    (list 'if test (cons 'progn body) nil))"
+                  "  (my-when nil undefined-var))",
+                  da, ca, root, heap, envs);
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(vr.value()));
+}
+
+TEST_CASE("ExpanderTest - DefmacroMyWhenViaBackquoteMatchesHostWhen") {
+    // The standard CL macro-writing idiom: a backquote template in the macro
+    // body. `(if ,test (progn ,@body) nil) lowers to CONS/APPEND code that is
+    // evaluated at expansion time, exercising defmacro + backquote together.
+    DatumArena da;
+    CoreArena ca;
+    Core root;
+    Heap heap;
+    Envs envs;
+    auto vr = run("(progn"
+                  "  (defmacro my-when (test &body body)"
+                  "    `(if ,test (progn ,@body) nil))"
+                  "  (my-when t 10 20 30))",
+                  da, ca, root, heap, envs);
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<int>(vr.value()));
+    REQUIRE(std::get<int>(vr.value()) == 30);
+}
+
+TEST_CASE("ExpanderTest - DefmacroMyWhenExpandsToSameShapeAsHostWhen") {
+    // Structural equivalence: my-when expands to (IF T (PROGN 10 20) NIL),
+    // the exact shape host `when` produces (see expand_when).
+    DatumArena arena;
+    auto d = read("(progn"
+                  "  (defmacro my-when (test &body body)"
+                  "    (list 'if test (cons 'progn body) nil))"
+                  "  (my-when t 10 20))",
+                  arena);
+    auto r = lisp::macroexpand::expand_datum<MaxNodes, MaxList>(d, arena);
+    REQUIRE(r.has_value());
+    REQUIRE(head_name(r.value(), arena) == "PROGN");
+    auto const &progn = std::get<DatumList>(r.value().inner);
+    // progn = (PROGN (QUOTE MY-WHEN) <expanded my-when call>).
+    REQUIRE(progn.elements.size() == 3);
+    auto const &expanded_call = arena.get(progn.elements[2]);
+    REQUIRE(head_name(expanded_call, arena) == "IF");
+    auto const &if_list = std::get<DatumList>(expanded_call.inner);
+    REQUIRE(if_list.elements.size() == 4);
+    // test position is the symbol T.
+    auto const &test = arena.get(if_list.elements[1]);
+    REQUIRE(std::holds_alternative<lisp::reader::datum_symbol>(test.inner));
+    REQUIRE(std::get<lisp::reader::datum_symbol>(test.inner).name.view() ==
+            "T");
+    // consequent is (PROGN 10 20).
+    REQUIRE(head_name(arena.get(if_list.elements[2]), arena) == "PROGN");
+    // alternative is NIL.
+    auto const &alt = arena.get(if_list.elements[3]);
+    REQUIRE(std::holds_alternative<lisp::reader::datum_symbol>(alt.inner));
+    REQUIRE(std::get<lisp::reader::datum_symbol>(alt.inner).name.view() ==
+            "NIL");
+}
+
+TEST_CASE("ExpanderTest - DefmacroFormIsReplacedByQuotedName") {
+    // Per ANSI CL a `defmacro` form denotes the macro name; since it leaves
+    // nothing for the real program's evaluator to run, it is replaced with a
+    // quoted symbol naming the macro (docs/divergences/DIV-0010).
+    DatumArena arena;
+    auto d = read("(defmacro my-id (x) x)", arena);
+    auto r = lisp::macroexpand::expand_datum<MaxNodes, MaxList>(d, arena);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::reader::datum_quote<Datum, MaxNodes>>(
+        r.value().inner));
+    auto const &q =
+        std::get<lisp::reader::datum_quote<Datum, MaxNodes>>(r.value().inner);
+    REQUIRE(std::get<lisp::reader::datum_symbol>(arena.get(q.quoted).inner)
+                .name.view() == "MY-ID");
+}
+
+TEST_CASE("ExpanderTest - DefmacroExpansionBudgetExceededIsDiagnosedError") {
+    // A user macro that expands into a call to itself never reaches a
+    // fixpoint; the combined host/user expansion loop diagnoses this as a
+    // budget error rather than hanging (mirrors macroexpand's own budget
+    // discipline). Registered via expand_datum, then driven at a small,
+    // explicit budget so the pair heap / datum arena never overflow first.
+    DatumArena arena;
+    lisp::macroexpand::macro_context<MaxNodes, MaxList, MaxBindings, MaxEnvs>
+        ctx;
+
+    auto def = read("(defmacro loopy (x) (list 'loopy x))", arena);
+    auto reg = lisp::macroexpand::expand_datum<MaxNodes, MaxList, MaxBindings,
+                                               MaxEnvs>(def, arena, ctx);
+    REQUIRE(reg.has_value());
+
+    auto call = read("(loopy 1)", arena);
+    auto r = lisp::macroexpand::macroexpand_with_macros<MaxNodes, MaxList,
+                                                        MaxBindings, MaxEnvs>(
+        call, arena, ctx, /*max_expansions=*/4);
+    REQUIRE(!r.has_value());
+}
+
+TEST_CASE("ExpanderTest - DefmacroTooFewArgumentsIsDiagnosedError") {
+    // A required parameter with no matching call argument is a diagnosed
+    // error, not a silent nil binding.
+    DatumArena da;
+    CoreArena ca;
+    Core root;
+    Heap heap;
+    Envs envs;
+    auto vr = run("(progn"
+                  "  (defmacro my-when (test &body body)"
+                  "    (list 'if test (cons 'progn body) nil))"
+                  "  (my-when))",
+                  da, ca, root, heap, envs);
+    REQUIRE(!vr.has_value());
+}

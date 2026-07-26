@@ -88,6 +88,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ ~setq~ returns the assigned value and ~defun~/~defvar~/~defparameter~ return the bound name, both departures from Scheme; the store from Phase 14 adapted for ANSI CL's return conventions; a mutable environment reference threaded through both the direct evaluator and a new continuation-passing backend; and a datum-arena lifetime bug caught at compile time while building a one-argument ~compile_to_closure~.
 
+** [[file:phase-20-defmacro.org][Phase 20 — defmacro: the Compiler Runs the Language]]
+
+/DRAFT — pending author revision./ Object-language macros: a ~defmacro~-defined ~my-when~ is a Lisp lambda that ~smdlisp~ compiles with its own elaborator and runs with its own evaluator during the expansion pass — the compiler running the language it compiles, at compile time. The new machinery is a datum⇄value reification pair; the merge test is that ~my-when~ is ~when~, whether written with ~list~/~cons~ or with a backquote template, plus an expansion-budget diagnostic for a macro that expands into itself.
+
 * Table of Contents
 
 #+toc: headlines 1
