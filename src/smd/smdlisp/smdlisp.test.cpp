@@ -127,9 +127,16 @@ static_assert(!std::is_move_constructible_v<arith_t>);
 static_assert(std::is_default_constructible_v<arith_t>);
 
 // The variable template caches: naming the same source twice yields one
-// object, not two.
-static_assert(&lisp::compiled_lisp<"(+ 1 (* 2 3))"> ==
-              &lisp::compiled_lisp<"(+ 1 (* 2 3))">);
+// object, not two -- i.e. two occurrences of the literal produce equal
+// `source_literal` template arguments and so the same specialization.
+//
+// Taken through named pointers rather than compared inline: written as
+// `&compiled_lisp<S> == &compiled_lisp<S>` this is a syntactic
+// self-comparison and GCC rejects it with -Wtautological-compare, which
+// -Wall makes a diagnostic in this build.
+constexpr auto const *arith_first = &lisp::compiled_lisp<"(+ 1 (* 2 3))">;
+constexpr auto const *arith_second = &lisp::compiled_lisp<"(+ 1 (* 2 3))">;
+static_assert(arith_first == arith_second);
 static_assert(
     std::is_same_v<
         std::remove_cvref_t<decltype(lisp::compiled_lisp<"(+ 1 (* 2 3))">)>,
