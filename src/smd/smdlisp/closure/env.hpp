@@ -58,6 +58,7 @@ inline constexpr char block_unwind_marker_storage[] =
     "smdlisp: block/return-from unwind";
 inline constexpr char const *block_unwind_marker = block_unwind_marker_storage;
 
+// 1232b7f6-c9b9-4611-a958-bd1bb14b0ff5
 /// The shared, static, identity-compared marker used for a `throw` unwind
 /// travelling through the same frozen `result<value<Core>>` error channel
 /// (step L15).
@@ -81,6 +82,7 @@ inline constexpr char const *block_unwind_marker = block_unwind_marker_storage;
 /// during constant evaluation and silently fails at run time.
 inline constexpr char throw_unwind_marker_storage[] = "smdlisp: throw unwind";
 inline constexpr char const *throw_unwind_marker = throw_unwind_marker_storage;
+// 1232b7f6-c9b9-4611-a958-bd1bb14b0ff5 end
 
 /// One-shot lexical exit bookkeeping for one dynamic activation of a
 /// `block` form (decision D5, step L14).
@@ -127,6 +129,7 @@ struct exit_record {
                                ///< this record is in flight.
 };
 
+// a5b4dac9-bc87-4fe7-9160-c3f1283df8a3
 /// One-shot **dynamic** exit bookkeeping for one activation of a `catch`
 /// form (decision D5, step L15).
 ///
@@ -171,6 +174,7 @@ struct catch_record {
                                ///< an unwind targeting this frame is in
                                ///< flight.
 };
+// a5b4dac9-bc87-4fe7-9160-c3f1283df8a3 end
 
 /// A Lisp-2 lexical environment: two independent, linear,
 /// most-recent-first binding lists, one per namespace (decision D4,
@@ -645,6 +649,7 @@ class env_arena {
         return &exits_[exits_.size() - 1];
     }
 
+    // 107e5185-5361-44a8-9fbd-016334660d25
     /// Pushes a fresh, live @ref catch_record for one activation of a
     /// `catch` form keyed by the already-evaluated @p tag (step L15) and
     /// returns a pointer to it, valid until the matching @ref pop_catch.
@@ -676,6 +681,7 @@ class env_arena {
             frames_.push_back(std::move(rec));
         return &frames_[depth_++];
     }
+    // 107e5185-5361-44a8-9fbd-016334660d25 end
 
     /// Pops the innermost `catch` frame pushed by @ref push_catch.
     ///
