@@ -23,7 +23,7 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-16-reading-common-lisp.org` | `2c80467` | `blog/phase-16` | `Merge step L6` (P4 method 1) |
 | `phase-17-nil-t-lisp2.org` | `50fa0f4` | `blog/phase-17` | `Merge step L11` (P4 method 1) |
 | `phase-18-setq-defun-progn.org` | `15fb19a` | `blog/phase-18` | `Merge step L13` (P4 method 1) |
-| `phase-19-one-shot-control.org` | `8971db6` | `blog/phase-19` | `Merge step L15` |
+| `phase-19-one-shot-control.org` | `b31c88f` | `blog/phase-19` | `Merge blog phase 19` (see note) |
 | `phase-20-defmacro.org` | `c7deeb1` | `blog/phase-20` | `Merge step L19` (P4 method 1) |
 
 49 transclusions across 11 posts. Every row passes the anchor test at its pin,
@@ -35,6 +35,15 @@ P4 method 1 — first-parent walk of `main` for the merge carrying the step
 identifier — works only for the Common Lisp pivot posts (16 onward). Those were
 drafted on their step's branch and landed with a `--no-ff` merge, so the merge
 commit is exactly "the revision the prose was written against."
+
+Phase 19 is the exception to "the tag is created at the step merge and never
+moves." Its tag was created at step L15's merge (`8971db6`), but the post needed
+five UUID anchors that did not exist there, so the tag was repointed to the
+merge of the post's own branch (`b31c88f`), which carries both L15's code and
+the anchor commit. A pin may move for exactly this reason — an anchor absent at
+the pin — and only before the post is published; once the prose is out, moving
+the tag is what pinning exists to prevent. The cleaner sequence, when a post
+needs new anchors, is to land the anchors with the step and tag afterwards.
 
 From phase 20 on, the orchestrator creates the tag at the `--no-ff` merge and
 the post is written against it, so there is no method to apply retroactively:

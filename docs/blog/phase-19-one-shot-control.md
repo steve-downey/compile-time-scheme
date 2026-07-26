@@ -1,6 +1,6 @@
 **DRAFT &#x2014; pending author revision**
 
-<div class="abstract" id="orgcc98598">
+<div class="abstract" id="orgcce6513">
 <p>
 Phase 15 argued that <code>call/cc</code> cannot ride on senders, and that Common Lisp's nonlocal exits &#x2014; one-shot, upward-only, dynamic extent &#x2014; are the control operators a sender backend can actually express.
 Steps L14 and L15 are the first half of collecting on that argument: <code>block</code> and <code>return-from</code>, then <code>catch</code>, <code>throw</code>, and <code>unwind-protect</code>, in both the direct evaluator and the CPS backend.
@@ -71,7 +71,7 @@ Nothing about a `throw` is checkable at elaboration time, because a tag is an ar
 
 Here is the part I did not see coming, and it is the best thing in the step.
 
-An `exit_record` &#x2014; the `block` side, from L14 &#x2014; is installed in the environment under its name, in a third namespace alongside variables and functions. A `lambda` written inside the block captures that environment by value, and therefore carries the exit record's pointer out with it. That is deliberate: it is how the implicit `(block f ...)` around a `defun` body works when `f` recurses. It is also how a closure can smuggle a `return-from` out past the block's own extent, which is why the record carries a `live` flag and a stale one is a diagnosed error instead of a jump into nothing.
+An `exit_record` &#x2014; the `block` side, from L14 &#x2014; is installed in the environment under its name, in a third namespace alongside variables and functions. A `lambda` written inside the block captures that environment by value, and therefore carries the exit record's pointer out with it. That is deliberate: a `lambda` called while its block is still on the stack can `return-from` it, which is what makes a block an escape a helper can invoke rather than just a labelled early return. (The implicit `(block f ...)` that ANSI CL wraps around a `defun` body is here too, though `f` cannot yet call itself &#x2014; a `defun` captures its environment before its own name is bound, which is DIV-0009 and unrelated to any of this.) Capture is also how a closure can smuggle a `return-from` out past the block's own extent, which is why the record carries a `live` flag and a stale one is a diagnosed error instead of a jump into nothing.
 
 A `catch_record` cannot be captured by anything, and the reason is the environment itself:
 
