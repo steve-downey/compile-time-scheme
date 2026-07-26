@@ -88,6 +88,6 @@
 - [x] Step L19: defmacro (+ phase 20 draft)
 - [ ] Step L20: multiple values
 - [ ] Step L21: sender backend for the CL core (+ phase 21 draft)
-- [ ] Step L22: public API, Godbolt, FFI parity
+- [x] Step L22: public API, Godbolt, FFI parity
 - [ ] Step L23: tagbody / go (optional, D8)
 - [ ] Step L24: documentation consolidation (+ phase 22 draft)
