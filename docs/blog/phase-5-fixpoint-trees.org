@@ -44,7 +44,7 @@ Before I can define a recursive tree type, I need a way to tie the
 recursive knot at the type level. The technique is the fixed-point
 combinator ~Fix<F>~:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/fixpoint/fix.hpp::57d4bd6e-c8c7-4806-afd3-2e42aec8ae27]] :lines 2- :src cpp :end "57d4bd6e-c8c7-4806-afd3-2e42aec8ae27 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-5::src/smd/fixpoint/fix.hpp::57d4bd6e-c8c7-4806-afd3-2e42aec8ae27]] :lines 2- :src cpp :end "57d4bd6e-c8c7-4806-afd3-2e42aec8ae27 end"
 
 This satisfies the isomorphism ~Fix<F> ≅ F<Fix<F>>~. A value of type
 ~Fix<F>~ holds one layer of ~F~, where the recursive positions are
@@ -53,7 +53,7 @@ terminates because ~Fix<F>~ is defined before it is used inside ~F<Fix<F>>~.
 
 Two zero-cost boundary operations complete the interface:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/fixpoint/fix.hpp::53775b7e-8a78-4b79-885b-046f6232d7a3]] :lines 2- :src cpp :end "53775b7e-8a78-4b79-885b-046f6232d7a3 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-5::src/smd/fixpoint/fix.hpp::53775b7e-8a78-4b79-885b-046f6232d7a3]] :lines 2- :src cpp :end "53775b7e-8a78-4b79-885b-046f6232d7a3 end"
 
 ~wrap_fix~ injects one layer into the fixed point. ~unwrap_fix~ exposes
 the layer for pattern matching. They are the iso-recursive isomorphism
@@ -92,9 +92,9 @@ becomes ~Fix<CompF>~ once the knot is tied. Each alternative in the
 variant is either a leaf (no children, does not use the type parameter ~A~)
 or an internal node (children stored as ~Box<A>~):
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/comp_tree.hpp::31435b33-ce4b-4e8e-ae10-abc64aa13501]] :lines 2- :src cpp :end "31435b33-ce4b-4e8e-ae10-abc64aa13501 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-5::src/smd/smdscheme/sender/comp_tree.hpp::31435b33-ce4b-4e8e-ae10-abc64aa13501]] :lines 2- :src cpp :end "31435b33-ce4b-4e8e-ae10-abc64aa13501 end"
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/comp_tree.hpp::950ee4f0-367a-47bb-9335-30191f783119]] :lines 2- :src cpp :end "950ee4f0-367a-47bb-9335-30191f783119 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-5::src/smd/smdscheme/sender/comp_tree.hpp::950ee4f0-367a-47bb-9335-30191f783119]] :lines 2- :src cpp :end "950ee4f0-367a-47bb-9335-30191f783119 end"
 
 ~comp_pure~ holds only atoms — integers, booleans, and ~string_view~. It
 does not hold full ~closure::value~ objects. The reason is circular type
@@ -123,7 +123,7 @@ For ~Fix<CompF>~ to support generic folds and transformations, ~CompF~
 must be a functor — it must define a ~fmap~ operation that transforms
 children while leaving structure intact [cite:@meijer1991functional]:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/comp_tree.hpp::731f3ab0-d9ea-4254-aab4-8b38a30bb28e]] :lines 2- :src cpp :end "731f3ab0-d9ea-4254-aab4-8b38a30bb28e end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-5::src/smd/smdscheme/sender/comp_tree.hpp::731f3ab0-d9ea-4254-aab4-8b38a30bb28e]] :lines 2- :src cpp :end "731f3ab0-d9ea-4254-aab4-8b38a30bb28e end"
 
 Leaves (~comp_pure~, ~comp_lookup~) pass through unchanged. Internal nodes
 apply ~f~ to each child and rebuild the node with the transformed children.

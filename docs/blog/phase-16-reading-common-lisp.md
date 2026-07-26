@@ -1,6 +1,6 @@
 **DRAFT &#x2014; pending author revision**
 
-<div class="abstract" id="orgb9b4875">
+<div class="abstract" id="org5fe144b">
 <p>
 The Scheme reader from Phase 3 asked one question of every character run: is this a valid datum?
 The Common Lisp reader in <code>smd/smdlisp</code> asks the same question, but the answer now depends on a readtable's worth of decisions the Scheme side never had to make.

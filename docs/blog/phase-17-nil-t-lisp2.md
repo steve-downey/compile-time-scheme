@@ -1,6 +1,6 @@
 **DRAFT &#x2014; pending author revision**
 
-<div class="abstract" id="org8fcfa39">
+<div class="abstract" id="org76d653f">
 <p>
 Steps L4 through L10 built a reader and an elaborator; neither one runs anything.
 Step L11 is the first <code>smdlisp</code> code that actually executes a program, and executing a program is where the semantic decisions from <code>docs/cl-pivot-plan.md</code> stop being paperwork and start being code you have to get right on the first try.

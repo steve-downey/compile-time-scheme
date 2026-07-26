@@ -1,4 +1,4 @@
-<div class="abstract" id="org604f192">
+<div class="abstract" id="org719568f">
 <p>
 I represent the computation tree as <code>Fix&lt;CompF&gt;</code> — a type-level fixed-point
 combinator that ties the recursive knot. Each node is a variant layer
@@ -29,7 +29,10 @@ So I introduce a second intermediate representation: `Fix<CompF>`. This is a sel
 Before I can define a recursive tree type, I need a way to tie the recursive knot at the type level. The technique is the fixed-point combinator `Fix<F>`:
 
 ```cpp
-
+template <template <typename> class F>
+struct Fix {
+    F<Fix<F>> inner;
+};
 ```
 
 This satisfies the isomorphism `Fix<F> ≅ F<Fix<F>>`. A value of type `Fix<F>` holds one layer of `F`, where the recursive positions are themselves `Fix<F>`. There is no infinite type: the template instantiation terminates because `Fix<F>` is defined before it is used inside `F<Fix<F>>`.
@@ -37,7 +40,17 @@ This satisfies the isomorphism `Fix<F> ≅ F<Fix<F>>`. A value of type `Fix<F>` 
 Two zero-cost boundary operations complete the interface:
 
 ```cpp
+/** Wrap one layer of @p F into the fixed-point type. */
+template <template <typename> class F>
+constexpr auto wrap_fix(F<Fix<F>> layer) -> Fix<F> {
+    return Fix<F>{std::move(layer)};
+}
 
+/** Unwrap one layer from a fixed-point value, exposing F<Fix<F>>. */
+template <template <typename> class F>
+constexpr auto unwrap_fix(const Fix<F> &fixed) -> const F<Fix<F>> & {
+    return fixed.inner;
+}
 ```
 
 `wrap_fix` injects one layer into the fixed point. `unwrap_fix` exposes the layer for pattern matching. They are the iso-recursive isomorphism boundaries (Bird, Richard S. and de Moor, Oege, 1997).
@@ -67,11 +80,73 @@ constexpr auto make_box(Args &&...args) -> Box<A> {
 The `comp_f_factory` template defines the open-recursive variant that becomes `Fix<CompF>` once the knot is tied. Each alternative in the variant is either a leaf (no children, does not use the type parameter `A`) or an internal node (children stored as `Box<A>`):
 
 ```cpp
+/// A computation node holding a literal atom (integer, boolean, or symbol).
+/// Stores atoms only — no full values or closures — to avoid circular type
+/// dependencies with closure::value<Comp>.
+struct comp_pure {
+    std::variant<int, bool, std::string_view> atom;
+};
 
+/// A computation node that looks up a variable name in the environment.
+struct comp_lookup {
+    std::string_view name;
+};
+
+/// A computation node for conditional branching: condition, consequent,
+/// alternative, each as a recursive child computation.
+///
+/// @tparam A The type of recursive children (will be instantiated as Comp).
+template <typename A>
+struct comp_if {
+    smd::fixpoint::Box<A> cond;
+    smd::fixpoint::Box<A> cons;
+    smd::fixpoint::Box<A> alt;
+};
+
+/// A computation node for lambda (function) abstraction.
+///
+/// @tparam A        The type of recursive children.
+/// @tparam MaxList  Maximum number of formal parameters.
+template <typename A, int MaxList>
+struct comp_lambda {
+    foundation::static_vector<std::string_view, MaxList> params;
+    smd::fixpoint::Box<A> body;
+};
+
+/// A computation node for function application.
+///
+/// @tparam A        The type of recursive children.
+/// @tparam MaxList  Maximum number of arguments.
+template <typename A, int MaxList>
+struct comp_apply {
+    smd::fixpoint::Box<A> func;
+    foundation::static_vector<smd::fixpoint::Box<A>, MaxList> args;
+};
 ```
 
 ```cpp
+/// Factory template producing the open-recursive variant layer for CompF.
+/// Each structural node (comp_if, comp_lambda, comp_apply) is parameterized
+/// by A, the type of recursive children. Leaf nodes (comp_pure, comp_lookup)
+/// have no children and do not use A.
+///
+/// @tparam MaxList  Maximum list/argument length.
+template <int MaxList>
+struct comp_f_factory {
+    /// One variant layer; @p A is the recursive self-reference.
+    template <typename A>
+    using type = std::variant<comp_pure, comp_lookup, comp_if<A>,
+                              comp_lambda<A, MaxList>, comp_apply<A, MaxList>>;
+};
 
+/// The concrete recursive computation tree type.
+/// Fix<F> ties the knot: Comp = F<Comp> where F = comp_f_factory<MaxList>.
+/// Children are stored as Box<Comp> (constexpr owning pointer) rather than
+/// arena handles.
+///
+/// @tparam MaxList  Maximum list/argument length.
+template <int MaxList>
+using Comp = smd::fixpoint::Fix<comp_f_factory<MaxList>::template type>;
 ```
 
 `comp_pure` holds only atoms — integers, booleans, and `string_view`. It does not hold full `closure::value` objects. The reason is circular type dependency: `closure::value` is parameterized by `Comp`, so if `comp_pure` held a `closure::value`, the definition of `Comp` would circularly depend on `closure::value` which circularly depends on `Comp`. Storing only atoms breaks the cycle.
@@ -94,7 +169,39 @@ using Comp = smd::fixpoint::Fix<comp_f_factory<MaxList>::template type>;
 For `Fix<CompF>` to support generic folds and transformations, `CompF` must be a functor — it must define a `fmap` operation that transforms children while leaving structure intact (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991):
 
 ```cpp
+template <int MaxList, typename F, typename A>
+constexpr auto
+fmap_comp(F &&f,
+          typename comp_f_factory<MaxList>::template type<A> const &layer) {
+    using B = std::invoke_result_t<F, A const &>;
+    using ResultF = typename comp_f_factory<MaxList>::template type<B>;
 
+    return std::visit(
+        smd::fixpoint::overloaded{
+            [](comp_pure const &p) -> ResultF { return p; },
+            [](comp_lookup const &l) -> ResultF { return l; },
+            [&f](comp_if<A> const &ci) -> ResultF {
+                return comp_if<B>{smd::fixpoint::make_box<B>(f(*ci.cond)),
+                                  smd::fixpoint::make_box<B>(f(*ci.cons)),
+                                  smd::fixpoint::make_box<B>(f(*ci.alt))};
+            },
+            [&f](comp_lambda<A, MaxList> const &lam) -> ResultF {
+                return comp_lambda<B, MaxList>{
+                    lam.params, smd::fixpoint::make_box<B>(f(*lam.body))};
+            },
+            [&f](comp_apply<A, MaxList> const &app) -> ResultF {
+                foundation::static_vector<smd::fixpoint::Box<B>, MaxList>
+                    args_result;
+                for (auto const &arg : app.args) {
+                    args_result.push_back(
+                        smd::fixpoint::make_box<B>(std::invoke(f, *arg)));
+                }
+                return comp_apply<B, MaxList>{
+                    smd::fixpoint::make_box<B>(std::invoke(f, *app.func)),
+                    std::move(args_result)};
+            }},
+        layer);
+}
 ```
 
 Leaves (`comp_pure`, `comp_lookup`) pass through unchanged. Internal nodes apply `f` to each child and rebuild the node with the transformed children. The type changes from `F<A>` to `F<B>` — the node shape is preserved, only the child type changes.

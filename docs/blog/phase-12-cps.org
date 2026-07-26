@@ -52,7 +52,7 @@ add_cps(3, 4, [](int partial_sum) {
 
 To represent this statically at compile time without relying on dynamically allocated ~std::function~ closures, I use C++ templating. My ~cps_code~ wraps any callable object representing Scheme code.
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/closure/cps_code.hpp::715f2954-9e34-4da8-a339-c7d810a82f70]] :lines 2- :src cpp :end "715f2954-9e34-4da8-a339-c7d810a82f70 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-12::src/smd/smdscheme/closure/cps_code.hpp::715f2954-9e34-4da8-a339-c7d810a82f70]] :lines 2- :src cpp :end "715f2954-9e34-4da8-a339-c7d810a82f70 end"
 
 Each CPS form takes an environment (~env~) containing variables and a continuation function (~k~). When execution finishes, it calls ~k(result)~ instead of returning it directly (or passes it out naturally back through the call).
 
@@ -62,13 +62,13 @@ Instead of rewriting an entire interpreter loop within C++ structures natively (
 Over the ~core_type~ AST from Phase 4---with its ~arena_box~ handles, ~core_if~, ~core_lambda~, and ~core_application~ nodes---I built ~cps_dispatch~.
 The result type of every dispatch is ~foundation::result<closure::value<Core>>~: the ~result<T>~ error-handling type from Phase 1, parameterized on the closure value type defined in Phase 6.
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/closure/cps_code.hpp::ceecf448-bff3-4b76-99cc-8c11ac4140f3]] :lines 2- :src cpp :end "ceecf448-bff3-4b76-99cc-8c11ac4140f3 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-12::src/smd/smdscheme/closure/cps_code.hpp::ceecf448-bff3-4b76-99cc-8c11ac4140f3]] :lines 2- :src cpp :end "ceecf448-bff3-4b76-99cc-8c11ac4140f3 end"
 
 Notice how ~cps_dispatch~ chains continuations via ~Cont~ and ~K~ template parameters. Eager sub-evaluation (such as determining node conditions or processing function arguments before an application) passes ~identity_k~ continuations which simply return the result directly to the C++ call stack.
 
 However, for capturing a lambda scope, the ~cps_dispatch~ returns control directly through the continuation parameter ~cont~:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/closure/cps_code.hpp::9a78bc9b-37eb-4b80-bd27-6146c24f6244]] :lines 2- :src cpp :end "9a78bc9b-37eb-4b80-bd27-6146c24f6244 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-12::src/smd/smdscheme/closure/cps_code.hpp::9a78bc9b-37eb-4b80-bd27-6146c24f6244]] :lines 2- :src cpp :end "9a78bc9b-37eb-4b80-bd27-6146c24f6244 end"
 
 * Relying on the C++ Compiler for TCO
 
@@ -77,7 +77,7 @@ Because Scheme mandates Tail-Call Optimization (meaning infinite recursion witho
 Rather than represent continuations as heap-allocated data, I keep the continuation machinery simple and let the native C++ optimizer handle tail calls.
 Instead of manually building a trampolining loop to evaluate defunctionalized continuations, my ~cps_dispatch~ places its final AST execution steps (like executing the body of a lambda) in C++ return position.
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/closure/cps_code.hpp::7d7514b6-5dcb-41d9-8938-5f539e66688f]] :lines 2- :src cpp :end "7d7514b6-5dcb-41d9-8938-5f539e66688f end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-12::src/smd/smdscheme/closure/cps_code.hpp::7d7514b6-5dcb-41d9-8938-5f539e66688f]] :lines 2- :src cpp :end "7d7514b6-5dcb-41d9-8938-5f539e66688f end"
 
 By forwarding ~cont~ and ~k~ into the recursive instantiation of ~cps_dispatch(arena.get(lam.body)...)~ inside the ~return~ statement, a tail call stays in C++ return position. At runtime, compiling with ~-O2~ lets GCC apply sibling-call optimization there, so a tail-recursive Scheme loop need not grow the native C++ stack.
 

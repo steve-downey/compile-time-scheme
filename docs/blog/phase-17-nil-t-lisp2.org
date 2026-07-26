@@ -35,11 +35,11 @@ Common Lisp only has one false value, and I wanted the evaluator to say so in on
 Everything else is true, including ~0~ and every keyword.
 There is exactly one function that gets to answer the question:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdlisp/closure/value.hpp::82728208-0712-4e1a-9252-036e99276919]] :lines 2- :src cpp :end "82728208-0712-4e1a-9252-036e99276919 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-17::src/smd/smdlisp/closure/value.hpp::82728208-0712-4e1a-9252-036e99276919]] :lines 2- :src cpp :end "82728208-0712-4e1a-9252-036e99276919 end"
 
 And the evaluator's only branching form calls it, and nothing else in the evaluator is allowed to reinvent it:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdlisp/closure/eval_direct.hpp::6332b396-3733-4eb0-adc5-af7a57adb809]] :lines 2- :src cpp :end "6332b396-3733-4eb0-adc5-af7a57adb809 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-17::src/smd/smdlisp/closure/eval_direct.hpp::6332b396-3733-4eb0-adc5-af7a57adb809]] :lines 2- :src cpp :end "6332b396-3733-4eb0-adc5-af7a57adb809 end"
 
 ~t~ needed a runtime representation, which the L10 elaborator deliberately left unpicked --- the core AST only records that the source spelled the canonical true constant, and defers what value that becomes.
 ~pairs.hpp~'s predicates (~null~, ~eq~, ~eql~, ~atom~) already return the symbol ~T~ for a true result, so making ~core_true~ evaluate to that exact same value, ~symbol{"T"}~, was the only choice that did not invent a second notion of true a step later.
@@ -54,7 +54,7 @@ Step L9 built the environment with two independent binding lists to support this
 An ordinary symbol used as an expression --- the ~x~ in ~(+ x 1)~ --- always resolves through the variable namespace.
 An application head, a ~#'name~, or a ~(function name)~ always resolves through the function namespace, and the elaborator already collapsed all three spellings down to one core node (~core_function~) so the evaluator only has to get this right in one place:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdlisp/closure/eval_direct.hpp::bd5cf19a-ccb0-45a1-b208-b76970bcb0c6]] :lines 2- :src cpp :end "bd5cf19a-ccb0-45a1-b208-b76970bcb0c6 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-17::src/smd/smdlisp/closure/eval_direct.hpp::bd5cf19a-ccb0-45a1-b208-b76970bcb0c6]] :lines 2- :src cpp :end "bd5cf19a-ccb0-45a1-b208-b76970bcb0c6 end"
 
 Notice what is missing: there is no fallback from ~lookup_function~ to ~lookup_value~, or the other way, anywhere in this code.
 A Lisp-1 evaluator ported carelessly would have one lookup path and be tempted to special-case function position; getting a Lisp-2 right means having two lookup paths and never letting them touch.
@@ -69,7 +69,7 @@ Evaluate it, and you get a function value, full stop, regardless of which of the
 ~funcall~ and ~apply~ needed something a plain two-argument builtin can't give them: the ability to call an arbitrary function value with an arbitrary argument list computed at runtime.
 So they're builtins that recurse into the same call-dispatch helper ordinary application already uses, instead of a case in ~pairs.hpp~'s primitive table:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdlisp/closure/eval_direct.hpp::1d30e953-16e2-4812-9eee-10934eafdec3]] :lines 2- :src cpp :end "1d30e953-16e2-4812-9eee-10934eafdec3 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-17::src/smd/smdlisp/closure/eval_direct.hpp::1d30e953-16e2-4812-9eee-10934eafdec3]] :lines 2- :src cpp :end "1d30e953-16e2-4812-9eee-10934eafdec3 end"
 
 ~apply~'s only real complication is CL's rule that the last argument is a list to be spread and every argument before it is passed through unchanged --- ~(apply #'+ 1 (list 2 3))~ has to walk the pair chain that ~(list 2 3)~ built and turn it back into three ordinary arguments, ~1~, ~2~, and ~3~, before making the call.
 
@@ -81,7 +81,7 @@ This is the same class of bug L10 hit with ~core_symbol~'s ~folded_name~, one la
 
 The fix is the same shape as ~pair_heap~, which already solves an identical problem for cons cells: give every captured environment a stable home in caller-owned, fixed-capacity storage, and hand out a pointer into that storage instead of a pointer onto the call stack.
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdlisp/closure/env.hpp::a73f8d39-7455-4ddc-a541-7424ab1d3a35]] :lines 2- :src cpp :end "a73f8d39-7455-4ddc-a541-7424ab1d3a35 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-17::src/smd/smdlisp/closure/env.hpp::a73f8d39-7455-4ddc-a541-7424ab1d3a35]] :lines 2- :src cpp :end "a73f8d39-7455-4ddc-a541-7424ab1d3a35 end"
 
 ~smd::smdscheme::closure::env~'s own answer to this problem is a ~constexpr_box~ --- an owning box backed by ~new~ and ~delete~ whose destructor runs when the closure holding it is destroyed, relying on C++20's rule that transient constant-evaluation allocation just has to be freed before the enclosing evaluation finishes.
 That works, but only because Scheme's ~closure~ and ~env~ are defined together in one header, where ~env~ is complete everywhere ~constexpr_box~ needs it to be.

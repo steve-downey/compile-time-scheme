@@ -29,13 +29,13 @@ Because the compiler validates, elaborates, and lowers the abstract syntax tree 
 
 To embed the compiler in a runtime process, pre-compile a script with ~scm::compiled_closure~.
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/godbolt_ffi.cpp::2f7b4590-ca62-426d-a66f-2e9ace961764]] :lines 2- :src cpp :end "2f7b4590-ca62-426d-a66f-2e9ace961764 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-11::src/examples/godbolt_ffi.cpp::2f7b4590-ca62-426d-a66f-2e9ace961764]] :lines 2- :src cpp :end "2f7b4590-ca62-426d-a66f-2e9ace961764 end"
 
 Here, the template string ~(print-and-add current-year 10)~ is fully elaborated and safely evaluated down to the lowest CPS core at compile-time.
 
 The returned variable is a callable program object --- a ~closure::closure_program~ functor --- that represents the entry point to the pre-constructed AST sequence. At runtime, the caller initializes a dynamic variable environment and passes it into this entry point.
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/godbolt_ffi.cpp::27260b5f-089c-4210-bc68-5f5b25b2a025]] :lines 2- :src cpp :end "27260b5f-089c-4210-bc68-5f5b25b2a025 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-11::src/examples/godbolt_ffi.cpp::27260b5f-089c-4210-bc68-5f5b25b2a025]] :lines 2- :src cpp :end "27260b5f-089c-4210-bc68-5f5b25b2a025 end"
 
 The execution requires registering variables natively. A ~current-year~ variable is mapped, an FFI function is registered, and the statically checked AST is invoked via ~program(env)~. No textual parsing logic occurs locally at runtime.
 
@@ -43,7 +43,7 @@ The execution requires registering variables natively. A ~current-year~ variable
 
 I bridge the C++ type system to the value wrappers with a ~std::span~ over ~scm::closure::value<Core>~ --- the same ~value<Core>~ variant type that ~cps_dispatch~ (Phase 12) produces and the closure backend (Phase 6) defines.
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/godbolt_ffi.cpp::2a057d0f-ec4f-4c3f-9c0f-7147a3675b6a]] :lines 2- :src cpp :end "2a057d0f-ec4f-4c3f-9c0f-7147a3675b6a end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-11::src/examples/godbolt_ffi.cpp::2a057d0f-ec4f-4c3f-9c0f-7147a3675b6a]] :lines 2- :src cpp :end "2a057d0f-ec4f-4c3f-9c0f-7147a3675b6a end"
 
 Native callbacks get a ~std::span~ into the evaluated variable pool.
 The callback then unpacks values with ~std::holds_alternative<int>~ before calling through.
@@ -54,11 +54,11 @@ While the standard closure backend relies on standard C++ stack evaluation by wr
 
 First, standard instantiation requires ~compile_to_sender~ rather than the simplified ~compiled_closure~ variant --- switching from the closure backend (Phase 6) to the sender backend (Phase 8).
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/advanced_sender_ffi.cpp::034f2f75-e8af-4228-bcbb-d2edd3dfd2d2]] :lines 2- :src cpp :end "034f2f75-e8af-4228-bcbb-d2edd3dfd2d2 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-11::src/examples/advanced_sender_ffi.cpp::034f2f75-e8af-4228-bcbb-d2edd3dfd2d2]] :lines 2- :src cpp :end "034f2f75-e8af-4228-bcbb-d2edd3dfd2d2 end"
 
 Second, the returned program object is still invoked synchronously as ~program(env)~, exactly like the closure backend. The difference is internal: the sender backend describes evaluation as a graph of senders and drives it to completion with ~sync_wait~ inside ~operator()~, rather than walking the tree directly. The asynchronous machinery is hidden behind the same synchronous call interface.
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/advanced_sender_ffi.cpp::906360cf-7ab2-4c5c-b0f1-b136104cee4b]] :lines 2- :src cpp :end "906360cf-7ab2-4c5c-b0f1-b136104cee4b end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-11::src/examples/advanced_sender_ffi.cpp::906360cf-7ab2-4c5c-b0f1-b136104cee4b]] :lines 2- :src cpp :end "906360cf-7ab2-4c5c-b0f1-b136104cee4b end"
 
 The call returns a ~foundation::result<closure::value<Core>>~ --- the same result type the closure backend yields. The caller checks ~result.has_value()~ and extracts the payload with ~std::get<int>(result.value())~ (reporting ~result.error().message~ on failure); the ~sync_wait~ that drives the sender graph runs internally and never appears at the call site.
 
@@ -72,7 +72,7 @@ C++26 Reflection offers a more ambitious alternative: let the compiler *generate
 
 ~reified_environment.hpp~ provides two pieces:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/reflection/reified_environment.hpp::d0092f7c-b9de-440d-ac67-02e4e48c5aa4]] :lines 2- :src cpp :end "d0092f7c-b9de-440d-ac67-02e4e48c5aa4 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-11::src/smd/smdscheme/reflection/reified_environment.hpp::d0092f7c-b9de-440d-ac67-02e4e48c5aa4]] :lines 2- :src cpp :end "d0092f7c-b9de-440d-ac67-02e4e48c5aa4 end"
 
 ~reified_environment<Tag>~ starts as a declared-but-undefined struct template.
 ~compile_environment<Tag>~ calls ~std::meta::define_aggregate~ at ~consteval~ time, which *injects data members* into that template specialization.
@@ -86,7 +86,7 @@ Here, reflection *writes* a new type into existence.
 
 The mechanism is invoked via a C++26 standalone ~consteval~ block --- a block-level statement that executes unconditionally at compile time, with no enclosing function:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/advanced_reflection_ffi.cpp::e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6071]] :lines 2- :src cpp :end "e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6071 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-11::src/examples/advanced_reflection_ffi.cpp::e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6071]] :lines 2- :src cpp :end "e3f4a5b6-c7d8-4e9f-0a1b-2c3d4e5f6071 end"
 
 After this block executes, ~reified_environment<RuntimeStateTag>~ is a complete struct equivalent to:
 
@@ -101,7 +101,7 @@ struct reified_environment<RuntimeStateTag> {
 
 At runtime, the struct is used exactly like any other aggregate --- by field name, with native C++ types:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/examples/advanced_reflection_ffi.cpp::f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f607182]] :lines 2- :src cpp :end "f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f607182 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-11::src/examples/advanced_reflection_ffi.cpp::f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f607182]] :lines 2- :src cpp :end "f4a5b6c7-d8e9-4f0a-1b2c-3d4e5f607182 end"
 
 ~state.eval_result~ and ~state.successful_run~ are accessed as ordinary struct members.
 There is no ~std::any~, no type-erased variant, no runtime map lookup.

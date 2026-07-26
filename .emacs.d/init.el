@@ -228,3 +228,20 @@
 
 (require 'org-transclusion)
 (add-hook 'org-transclusion-add-functions 'org-transclusion-add-orgit)
+
+;; Pinned transclusion for the epistolary blog posts.
+;;
+;; Two document categories, two policies (docs/epistolary-pinning-plan.md):
+;;   - living docs (docs/compiler_architecture.org) transclude via `file:' /
+;;     `orgit:' and roll forward with the worktree, which is the point of them;
+;;   - blog posts transclude via `orgit-file:' pinned to a `blog/phase-NN' tag,
+;;     so a later refactor cannot rewrite the code inside a published entry.
+;;
+;; Both adapters live on `org-transclusion-add-functions' and coexist; the link
+;; type selects the policy. See docs/blog/pins.md for the post-to-tag mapping.
+(add-to-list 'load-path
+             (expand-file-name
+              "lisp" (or (and load-file-name
+                              (file-name-directory load-file-name))
+                         user-emacs-directory)))
+(require 'orgit-file-transclusion)

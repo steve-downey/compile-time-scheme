@@ -35,9 +35,9 @@ compile time.
 The test file ~src/smd/smdscheme/sender/fixpoint_program.test.cpp~ contains
 this:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/fixpoint_program.test.cpp::a817bd64-c6de-4e00-a16b-4df6c46e183d]] :lines 2- :src cpp :end "a817bd64-c6de-4e00-a16b-4df6c46e183d end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-10::src/smd/smdscheme/sender/fixpoint_program.test.cpp::a817bd64-c6de-4e00-a16b-4df6c46e183d]] :lines 2- :src cpp :end "a817bd64-c6de-4e00-a16b-4df6c46e183d end"
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/fixpoint_program.test.cpp::c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5]] :lines 2- :src cpp :end "c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-10::src/smd/smdscheme/sender/fixpoint_program.test.cpp::c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5]] :lines 2- :src cpp :end "c603a9be-c6b3-4c33-8ec4-5c4e9d9084a5 end"
 
 These are not unit tests. They are compiler-enforced invariants. If any of
 them is wrong, the translation unit does not compile. The ~constexpr_eval~

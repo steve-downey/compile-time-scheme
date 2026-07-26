@@ -1,4 +1,4 @@
-<div class="abstract" id="org2e63833">
+<div class="abstract" id="orgb8d6b65">
 <p>
 By Phase 4, my compile-time compiler could parse and elaborate code into a typed <code>core_type</code> AST, and Phase 6 gave it a closure-based value domain.
 This phase recasts evaluation in Continuation-Passing Style (CPS (Reynolds, John C., 1972)) at the C++ template layer: continuations are threaded explicitly through the closure evaluator, and tail positions are written as C++ return-position calls so the native optimizer can treat them as loops at runtime.

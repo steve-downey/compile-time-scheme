@@ -45,7 +45,7 @@ runs.
 
 The vocabulary I use comes from ~sender_v.hpp~:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/sender_v.hpp::7a257e82-8d19-480a-974c-a088b7681250]] :lines 2- :src cpp :end "7a257e82-8d19-480a-974c-a088b7681250 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-8::src/smd/smdscheme/sender/sender_v.hpp::7a257e82-8d19-480a-974c-a088b7681250]] :lines 2- :src cpp :end "7a257e82-8d19-480a-974c-a088b7681250 end"
 
 - ~just(v)~ — a sender that completes immediately with value ~v~
 - ~then(s, f)~ — when sender ~s~ completes with value ~v~, call ~f(v)~ and
@@ -132,7 +132,7 @@ The payoff comes in the ~comp_apply~ builtin case. Builtins take exactly two
 arguments — an arity enforced by a runtime check — and the two argument
 sub-trees are sibling ~Box~ nodes with no data dependency between them.
 
-#+transclude: [[orgit:~/src/compile-time-scheme/main::src/smd/smdscheme/sender/sender_mendler_eval.hpp::25cb48b9-23f3-4099-9469-17935b733c09]] :lines 2- :src cpp :end "25cb48b9-23f3-4099-9469-17935b733c09 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-8::src/smd/smdscheme/sender/sender_mendler_eval.hpp::25cb48b9-23f3-4099-9469-17935b733c09]] :lines 2- :src cpp :end "25cb48b9-23f3-4099-9469-17935b733c09 end"
 
 ~s0~ and ~s1~ are constructed but not started. ~when_all(s0, s1)~ produces a
 new sender that, when connected, starts both. With ~sync_wait~ and the bare
