@@ -73,6 +73,41 @@ set_tests_properties(
         PASS_REGULAR_EXPRESSION "FFI Called with: 2026 and 10.*Result: 2036"
 )
 
+add_executable(godbolt_lisp)
+target_sources(godbolt_lisp PRIVATE godbolt_lisp.cpp)
+target_link_libraries(godbolt_lisp PRIVATE smdlisp.smdlisp)
+
+install(
+    TARGETS godbolt_lisp
+    COMPONENT smdlisp.smdlisp.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
+
+add_test(NAME examples_godbolt_lisp COMMAND godbolt_lisp)
+set_tests_properties(
+    examples_godbolt_lisp
+    PROPERTIES PASS_REGULAR_EXPRESSION "16"
+)
+
+add_executable(godbolt_lisp_ffi)
+target_sources(godbolt_lisp_ffi PRIVATE godbolt_lisp_ffi.cpp)
+target_link_libraries(godbolt_lisp_ffi PRIVATE smdlisp.smdlisp)
+
+install(
+    TARGETS godbolt_lisp_ffi
+    COMPONENT smdlisp.smdlisp.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
+
+add_test(NAME examples_godbolt_lisp_ffi COMMAND godbolt_lisp_ffi)
+set_tests_properties(
+    examples_godbolt_lisp_ffi
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION "FFI Called with: 2026 and 10.*Result: 2036"
+)
+
 add_executable(advanced_reflection_ffi)
 target_sources(advanced_reflection_ffi PRIVATE advanced_reflection_ffi.cpp)
 target_link_libraries(advanced_reflection_ffi PRIVATE smdscheme.smdscheme)
