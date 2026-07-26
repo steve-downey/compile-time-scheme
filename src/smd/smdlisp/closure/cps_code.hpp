@@ -325,8 +325,10 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
 ///
 /// Adapted by copy from `smd::smdscheme::cps::detail::cps_dispatch`, per
 /// `docs/cps-direction.md`'s structural-recursion-over-the-arena decision.
-/// Covers all fifteen core kinds (the twelve carried over from the CL
-/// elaborator plus `core_setq`/`core_defun`/`core_defvar`, step L12), using
+/// Covers all twenty core kinds (the twelve carried over from the CL
+/// elaborator, plus `core_setq`/`core_defun`/`core_defvar` from step L12,
+/// `core_block`/`core_return_from` from step L14, and
+/// `core_catch`/`core_throw`/`core_unwind_protect` from step L15), using
 /// the same evaluation semantics as @ref eval_direct (`eval_direct.hpp`) --
 /// this function must be a drop-in CPS replacement for it (the L13 merge
 /// criterion: every L11/L12 end-to-end test also passes through this path).
@@ -703,6 +705,107 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
                 rec->payload = val_r.value();
                 rec->live = false;
                 return parse_error{{}, block_unwind_marker};
+            },
+            [&](elaborator::core_catch<Core, MaxNodes, MaxList> const &cc)
+                -> Res {
+                // Like core_block above, a catch is a continuation barrier:
+                // every body statement, including the last, is dispatched
+                // with identity_k/identity_k rather than the caller's
+                // cont/k, so this frame regains control and can decide
+                // whether an in-flight throw is aimed at it before cont/k
+                // ever run -- and, just as importantly, so that the catch
+                // stack is popped exactly once on every path out. See
+                // eval_direct.hpp's identical core_catch handling and
+                // env.hpp's catch_record docs.
+                auto tag_r =
+                    cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(cc.tag), arena, environment, envs,
+                        identity_k<Core>{}, identity_k<Core>{});
+                if (!tag_r.has_value())
+                    return tag_r;
+
+                auto *rec = envs.push_catch(tag_r.value());
+                Res last{parse_error{{}, "catch: empty body"}};
+                for (int i = 0; i < cc.body.size(); ++i) {
+                    last =
+                        cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                            arena.get(cc.body[i]), arena, environment, envs,
+                            identity_k<Core>{}, identity_k<Core>{});
+                    if (!last.has_value()) {
+                        if (last.error().message == throw_unwind_marker &&
+                            !rec->live) {
+                            Val const caught = rec->payload;
+                            envs.pop_catch();
+                            auto r = cont(caught);
+                            if (!r.has_value())
+                                return r;
+                            return k(r.value());
+                        }
+                        rec->live = false;
+                        envs.pop_catch();
+                        return last;
+                    }
+                }
+                rec->live = false;
+                envs.pop_catch();
+                auto r = cont(last.value());
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
+            },
+            [&](elaborator::core_throw<Core, MaxNodes> const &ct) -> Res {
+                auto tag_r =
+                    cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(ct.tag), arena, environment, envs,
+                        identity_k<Core>{}, identity_k<Core>{});
+                if (!tag_r.has_value())
+                    return tag_r;
+                auto res_r =
+                    cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(ct.result), arena, environment, envs,
+                        identity_k<Core>{}, identity_k<Core>{});
+                if (!res_r.has_value())
+                    return res_r;
+                auto *rec = envs.find_catch(tag_r.value());
+                if (rec == nullptr)
+                    // Uncaught throw: a diagnosed error, never UB (D5).
+                    // Neither cont nor k runs -- there is no value to hand
+                    // onward, which is the whole point of an unwind.
+                    return parse_error{{}, "throw: no catch for tag"};
+                rec->payload = res_r.value();
+                rec->live = false;
+                return parse_error{{}, throw_unwind_marker};
+            },
+            [&](elaborator::core_unwind_protect<Core, MaxNodes, MaxList> const
+                    &up) -> Res {
+                // The protected form is dispatched with identity_k/
+                // identity_k, never the caller's cont/k: this frame must
+                // regain control to run the cleanups on the NORMAL path
+                // before cont/k see the value, as well as on the escape
+                // path. Wrapping only one of the two would leak an exit
+                // path uncleaned, which is exactly what `unwind-protect`
+                // exists to prevent (see core_unwind_protect's docs and
+                // eval_direct.hpp's identical handling).
+                Res protected_r =
+                    cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(up.protected_form), arena, environment, envs,
+                        identity_k<Core>{}, identity_k<Core>{});
+                for (int i = 0; i < up.cleanup.size(); ++i) {
+                    auto cl_r =
+                        cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                            arena.get(up.cleanup[i]), arena, environment, envs,
+                            identity_k<Core>{}, identity_k<Core>{});
+                    // ANSI CL: a cleanup form that itself exits non-locally
+                    // (or errors) supersedes whatever was already in flight.
+                    if (!cl_r.has_value())
+                        return cl_r;
+                }
+                if (!protected_r.has_value())
+                    return protected_r;
+                auto r = cont(protected_r.value());
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
             }},
         // 180a37f4-6ab1-4657-a7c7-35bac23d150e end
         node.inner);

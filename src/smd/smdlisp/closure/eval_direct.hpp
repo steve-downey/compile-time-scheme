@@ -578,6 +578,91 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 rec->payload = val_r.value();
                 rec->live = false;
                 return parse_error{{}, block_unwind_marker};
+            },
+            [&](elaborator::core_catch<Core, MaxNodes, MaxList> const &cc)
+                -> Res {
+                // The dynamic counterpart of core_block above. The tag is an
+                // ordinary expression evaluated once, on entry; the frame it
+                // pushes lives on env_arena's catch stack (never in the
+                // environment), because `catch` is found by evaluated tag
+                // value at run time, not by name at elaboration time -- see
+                // env.hpp's catch_record docs for the full contrast.
+                auto tag_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(cc.tag), arena, environment, envs);
+                if (!tag_r.has_value())
+                    return tag_r.error();
+
+                auto *rec = envs.push_catch(tag_r.value());
+                Res last{parse_error{{}, "catch: empty body"}};
+                for (int i = 0; i < cc.body.size(); ++i) {
+                    last = eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(cc.body[i]), arena, environment, envs);
+                    if (!last.has_value()) {
+                        if (last.error().message == throw_unwind_marker &&
+                            !rec->live) {
+                            // The throw that just propagated up killed THIS
+                            // frame: it targets this activation.
+                            Res const caught{rec->payload};
+                            envs.pop_catch();
+                            return caught;
+                        }
+                        // An ordinary error, a `return-from` unwind, or a
+                        // `throw` aimed at an outer frame: this activation's
+                        // extent is ending non-locally either way, and the
+                        // stack must be popped on that path too.
+                        rec->live = false;
+                        envs.pop_catch();
+                        return last;
+                    }
+                }
+                // Falling off the end also ends the extent (D5).
+                rec->live = false;
+                envs.pop_catch();
+                return last;
+            },
+            [&](elaborator::core_throw<Core, MaxNodes> const &ct) -> Res {
+                auto tag_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(ct.tag), arena, environment, envs);
+                if (!tag_r.has_value())
+                    return tag_r.error();
+                auto res_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(ct.result), arena, environment, envs);
+                if (!res_r.has_value())
+                    return res_r.error();
+                auto *rec = envs.find_catch(tag_r.value());
+                if (rec == nullptr)
+                    // Uncaught throw: a diagnosed error, never UB (D5).
+                    return parse_error{{}, "throw: no catch for tag"};
+                rec->payload = res_r.value();
+                rec->live = false;
+                return parse_error{{}, throw_unwind_marker};
+            },
+            [&](elaborator::core_unwind_protect<Core, MaxNodes, MaxList> const
+                    &up) -> Res {
+                // Every exit path out of the protected form -- a value, an
+                // ordinary error, a `return-from` unwind, a `throw` unwind --
+                // arrives here as one `Res`, because all four already travel
+                // through the same result channel (env.hpp's marker docs).
+                // That is what makes "run the cleanups on every path" a
+                // single unconditional loop rather than four cases.
+                Res protected_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        arena.get(up.protected_form), arena, environment, envs);
+                for (int i = 0; i < up.cleanup.size(); ++i) {
+                    auto cl_r =
+                        eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                            arena.get(up.cleanup[i]), arena, environment, envs);
+                    // ANSI CL: a cleanup form that itself exits non-locally
+                    // (or errors) supersedes whatever was already in flight.
+                    if (!cl_r.has_value())
+                        return cl_r;
+                }
+                // Cleanup values are discarded; the protected form's result
+                // (value or in-flight unwind) is what propagates.
+                return protected_r;
             }},
         // e6a2c1de-3b2a-4c8d-9c6f-1a7e5b9d2f30 end
         node.inner);

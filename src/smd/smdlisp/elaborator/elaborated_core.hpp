@@ -393,6 +393,92 @@ struct core_return_from {
         expr; ///< The value expression (implicit `nil` if omitted).
 };
 
+/// A Common Lisp `catch` form: `(catch tag-form body...)`.
+///
+/// Establishes a **dynamic**, one-shot, tag-keyed exit (decision D5, step
+/// L15). @ref tag is an ordinary expression, evaluated at run time; the
+/// resulting value -- not any name -- is what a `throw` matches against,
+/// with `eq`. That is the entire distinction from @ref core_block, and it is
+/// why nothing here is checked at elaboration time: unlike
+/// @ref core_return_from's block name, a `throw` tag is not knowable
+/// statically, so "is there a catch for this tag?" is necessarily a runtime
+/// question (see @ref core_throw).
+///
+/// A zero-form `(catch tag)` is legal per ANSI CL and evaluates to `nil`;
+/// @ref detail::elaborate_list synthesizes a single @ref core_nil body
+/// element in that case, so @ref body always holds at least one expression,
+/// matching @ref core_block's and @ref core_lambda's identical invariant.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum number of body expressions.
+template <typename R, int MaxNodes, int MaxList>
+struct core_catch {
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        tag; ///< The tag expression, evaluated once on entry.
+    smdscheme::foundation::static_vector<
+        smdscheme::foundation::arena_box<R, MaxNodes>, MaxList>
+        body; ///< Body expressions, implicit progn (at least one; see
+              ///< above).
+};
+
+/// A Common Lisp `throw` form: `(throw tag-form result-form)`.
+///
+/// Evaluates @ref tag, then @ref result, then transfers control to the
+/// innermost dynamically active @ref core_catch whose tag is `eq` to the
+/// evaluated @ref tag, which becomes that `catch`'s value.
+///
+/// Both subforms are required, per ANSI CL -- there is no implicit-`nil`
+/// result the way @ref core_return_from has an implicit-`nil` value, because
+/// ANSI CL's `throw` genuinely requires two arguments while `return-from`'s
+/// second is genuinely optional.
+///
+/// If no matching, still-active `catch` exists when this node evaluates, that
+/// is a *diagnosed runtime error* (decision D5: CL's "undefined consequences"
+/// become checked errors here), not undefined behavior and not a silent
+/// no-op -- see the evaluators' (`eval_direct.hpp`/`cps_code.hpp`)
+/// `env_arena::find_catch` check (`env.hpp`).
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_throw {
+    smdscheme::foundation::arena_box<R, MaxNodes> tag;    ///< Tag expression.
+    smdscheme::foundation::arena_box<R, MaxNodes> result; ///< Value
+                                                          ///< expression.
+};
+
+/// A Common Lisp `unwind-protect` form:
+/// `(unwind-protect protected-form cleanup...)`.
+///
+/// Evaluates @ref protected_form, then evaluates every @ref cleanup form in
+/// order on **every** way out of that extent -- normal completion, an
+/// ordinary error, a `return-from` unwind, and a `throw` unwind alike -- and
+/// yields @ref protected_form's value (or re-propagates whatever was in
+/// flight) once the cleanups have run.
+///
+/// @ref cleanup may be empty: `(unwind-protect x)` is a legal, if pointless,
+/// ANSI CL form, so unlike @ref core_block's and @ref core_catch's bodies no
+/// implicit @ref core_nil is synthesized here -- there is nothing whose value
+/// would be observed.
+///
+/// Innermost-first cleanup ordering is not encoded in this node; it falls out
+/// of nesting, because an inner `unwind-protect` regains control (and so runs
+/// its cleanups) strictly before the unwind reaches an outer one.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum number of cleanup forms.
+template <typename R, int MaxNodes, int MaxList>
+struct core_unwind_protect {
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        protected_form; ///< The form whose extent is protected.
+    smdscheme::foundation::static_vector<
+        smdscheme::foundation::arena_box<R, MaxNodes>, MaxList>
+        cleanup; ///< Cleanup forms, run in order on every exit path;
+                 ///< possibly empty (see above).
+};
+
 /// Factory template that produces the open-recursive variant layer for the
 /// core AST.
 ///
@@ -409,7 +495,8 @@ struct core_f_factory {
         core_function<R, MaxNodes>, core_application<R, MaxNodes, MaxList>,
         core_setq<R, MaxNodes, MaxList>, core_defun<R, MaxNodes>,
         core_defvar<R, MaxNodes>, core_block<R, MaxNodes, MaxList>,
-        core_return_from<R, MaxNodes>>;
+        core_return_from<R, MaxNodes>, core_catch<R, MaxNodes, MaxList>,
+        core_throw<R, MaxNodes>, core_unwind_protect<R, MaxNodes, MaxList>>;
 };
 
 /// The concrete recursive core AST type, formed as the fixed point of
