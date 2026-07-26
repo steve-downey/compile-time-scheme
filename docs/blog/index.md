@@ -19,6 +19,7 @@
   - [[Phase 16 — Reading Common Lisp: Case, Keywords, and #'](phase-16-reading-common-lisp.md)](#org5a566b9)
   - [[Phase 17 — nil, t, and Living in a Lisp-2](phase-17-nil-t-lisp2.md)](#org1048d97)
   - [[Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)](#org180a37f4)
+  - [[Phase 20 — defmacro: the Compiler Runs the Language](phase-20-defmacro.md)](#org76bd8411)
 - [Table of Contents](#org7118c4c)
 
 
@@ -166,6 +167,13 @@ Come back down from the summit for `set!`: a shared store of mutable cells, an e
 ## [Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)
 
 *DRAFT — pending author revision.* `setq` returns the assigned value and `defun`/`defvar`/`defparameter` return the bound name, both departures from Scheme; the store from Phase 14 adapted for ANSI CL's return conventions; a mutable environment reference threaded through both the direct evaluator and a new continuation-passing backend; and a datum-arena lifetime bug caught at compile time while building a one-argument `compile_to_closure`.
+
+
+<a id="org76bd8411"></a>
+
+## [Phase 20 — defmacro: the Compiler Runs the Language](phase-20-defmacro.md)
+
+*DRAFT — pending author revision.* Object-language macros: a `defmacro`-defined `my-when` is a Lisp lambda that `smdlisp` compiles with its own elaborator and runs with its own evaluator during the expansion pass — the compiler running the language it compiles, at compile time. The new machinery is a datum⇄value reification pair; the merge test is that `my-when` is `when`, whether written with `list`/`cons` or with a backquote template, plus an expansion-budget diagnostic for a macro that expands into itself.
 
 
 <a id="org7118c4c"></a>

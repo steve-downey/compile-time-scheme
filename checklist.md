@@ -85,7 +85,7 @@
 - [ ] Step L16: special variables and dynamic binding
 - [x] Step L17: macro expander with host macros
 - [x] Step L18: backquote
-- [ ] Step L19: defmacro (+ phase 20 draft)
+- [x] Step L19: defmacro (+ phase 20 draft)
 - [ ] Step L20: multiple values
 - [ ] Step L21: sender backend for the CL core (+ phase 21 draft)
 - [ ] Step L22: public API, Godbolt, FFI parity

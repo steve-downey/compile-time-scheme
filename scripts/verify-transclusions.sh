@@ -136,6 +136,10 @@ for doc in ${living_glob}; do
 done
 
 echo "== generated markdown: no unresolved directives =="
+# The entries are glob patterns, not filenames, and must undergo pathname
+# expansion here -- so the expansion is deliberately unquoted. IFS is \n\t, and
+# the -e test below skips a pattern that matched nothing.
+# shellcheck disable=SC2048
 for md in ${md_globs[*]}; do
     [[ -e "${md}" ]] || continue
     if grep -q '^#+transclude' "${md}"; then
