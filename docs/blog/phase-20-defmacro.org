@@ -43,7 +43,7 @@ Running the evaluator at expansion time needs the evaluator's plumbing: a pair h
 None of that can be the real program's plumbing --- the program has not started running, and its heap and environment belong to /its/ evaluation, not to the macro expander's.
 So the expander carries its own, in a ~macro_context~ threaded through the recursive walk the same way the datum arena already is:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/cl-pivot-l19-defmacro::src/smd/smdlisp/macroexpand/expander.hpp::ee158407-41ed-4add-9a40-3ce719f057e6]] :lines 2- :src cpp :end "ee158407-41ed-4add-9a40-3ce719f057e6 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-20::src/smd/smdlisp/macroexpand/expander.hpp::ee158407-41ed-4add-9a40-3ce719f057e6]] :lines 2- :src cpp :end "ee158407-41ed-4add-9a40-3ce719f057e6 end"
 
 The ~table~ is the registry of user macros; everything else is a private, compile-time-only copy of the machinery ~closure/~ already builds for the real program.
 One ~macro_context~ lives for exactly one top-level form: a ~defmacro~ is visible to the rest of that form's expansion and no further.
@@ -66,7 +66,7 @@ Both restrictions match limits that already exist one layer down.
 With the round trip in place, ~defmacro~ is mechanical.
 Parse the lambda list, build a synthetic ~(lambda (params...) body...)~ out of the macro's own formals and body forms, expand /that/ (so a macro body may itself use backquote or an already-defined macro), elaborate it into the context's private core arena, and evaluate it to get a closure:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/cl-pivot-l19-defmacro::src/smd/smdlisp/macroexpand/expander.hpp::76bd8411-361f-4baa-9464-18aebd4128ce]] :lines 2- :src cpp :end "76bd8411-361f-4baa-9464-18aebd4128ce end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-20::src/smd/smdlisp/macroexpand/expander.hpp::76bd8411-361f-4baa-9464-18aebd4128ce]] :lines 2- :src cpp :end "76bd8411-361f-4baa-9464-18aebd4128ce end"
 
 The two lines that matter are the ~elaborate~ and the ~eval_direct~ near the end.
 That is the milestone stated plainly: the macro's expander is compiled and run by the compiler's own front end and evaluator, during compilation.
@@ -74,7 +74,7 @@ The closure is stashed in the registry, and the ~defmacro~ form itself --- which
 
 Then, at each call site, ~invoke_user_macro~ slices the raw call arguments, reifies them (the ~&body~ rest becomes one list value), applies the stored closure, and reifies the result back to a datum for the expander to keep working on:
 
-#+transclude: [[orgit:~/src/compile-time-scheme/cl-pivot-l19-defmacro::src/smd/smdlisp/macroexpand/expander.hpp::9d3bc54e-ef26-4b12-9471-0ad05344ff20]] :lines 2- :src cpp :end "9d3bc54e-ef26-4b12-9471-0ad05344ff20 end"
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-20::src/smd/smdlisp/macroexpand/expander.hpp::9d3bc54e-ef26-4b12-9471-0ad05344ff20]] :lines 2- :src cpp :end "9d3bc54e-ef26-4b12-9471-0ad05344ff20 end"
 
 The returned datum is not trusted as final: it goes back through the ordinary recursive expansion, so a macro that expands into ~if~ and ~progn~, or into another macro, keeps expanding until it bottoms out in special forms.
 

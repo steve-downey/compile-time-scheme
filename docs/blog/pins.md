@@ -23,16 +23,26 @@ Ten of the nineteen posts transclude no code and take no pin.
 | `phase-16-reading-common-lisp.org` | `2c80467` | `blog/phase-16` | `Merge step L6` (P4 method 1) |
 | `phase-17-nil-t-lisp2.org` | `50fa0f4` | `blog/phase-17` | `Merge step L11` (P4 method 1) |
 | `phase-18-setq-defun-progn.org` | `15fb19a` | `blog/phase-18` | `Merge step L13` (P4 method 1) |
+| `phase-20-defmacro.org` | `c7deeb1` | `blog/phase-20` | `Merge step L19` (P4 method 1) |
 
-41 transclusions across 9 posts. Every row passes the anchor test at its pin,
+44 transclusions across 10 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
 
 ## Two authorship eras
 
 P4 method 1 — first-parent walk of `main` for the merge carrying the step
-identifier — works only for the Common Lisp pivot posts (16–18). Those were
+identifier — works only for the Common Lisp pivot posts (16 onward). Those were
 drafted on their step's branch and landed with a `--no-ff` merge, so the merge
 commit is exactly "the revision the prose was written against."
+
+From phase 20 on, the orchestrator creates the tag at the `--no-ff` merge and
+the post is written against it, so there is no method to apply retroactively:
+the pin is chosen before the prose exists. Phase 20 is a transitional case —
+step L19 branched before `d0ff8ec` made pinning mandatory, so the post arrived
+with worktree-path `orgit:` links and was repointed to `blog/phase-20`
+immediately after the merge that the tag names. Regenerating it before and after
+the repin produced byte-identical transcluded code, so the repin is
+content-moot, exactly as the era-1 pin choices were.
 
 Posts 5–12 predate that workflow. They are *retrospective*: the Scheme pipeline
 was built first, and the blog was written afterwards about code that already
@@ -117,3 +127,19 @@ to measure the leak.
    the *transcluded code* reproducible, not the whole file. Fixing the ids
    (`CUSTOM_ID` properties, or a deterministic reference generator) is separate
    work and is not attempted here.
+
+## The `.md.deps` rule no longer sees post transclusions, and that is correct
+
+Step L3 extended the Makefile's dependency-extraction `sed` to capture `orgit:`
+link targets so a post would rebuild when its transcluded source changed. That
+pattern does not match the `orgit-file:…::TAG::path::uuid` form pinning
+introduced, so pinned posts now generate `.md.deps` files naming only the `.org`
+itself.
+
+Do not "repair" this. A pinned post's code comes from an immutable tag, so it
+has no worktree dependency to track: rebuilding it when the working tree changes
+would be the bug, not the fix. The L3 rule stays useful only for
+`docs/compiler_architecture.org`, the one living document that still resolves
+against the worktree. A third encoding of a `&mdash;`-style HTML entity or an
+`#orgXXXXXXX` id may still differ run to run (see above); that is export churn,
+not drift, and is not worth committing.
