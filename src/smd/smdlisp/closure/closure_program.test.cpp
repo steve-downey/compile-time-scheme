@@ -72,6 +72,63 @@ static_assert([] {
     return !vr.has_value();
 }());
 
+// -- append (step L18 builtin) routes through the CPS backend --------------
+//
+// L18's `append` landed after L13's CPS backend, leaving cps_apply's
+// builtin_op switch non-exhaustive: `append` was handled in eval_direct and
+// fell through to "unknown builtin" here.  It is not an isolated gap --
+// backquote lowers `,@` splicing to `append` calls, so every spliced template
+// evaluated correctly under the direct evaluator and failed under CPS, which
+// is exactly the kind of one-backend-only divergence the parity discipline
+// exists to catch.  `(append '(1) '(2))` => (1 2).
+static_assert([] {
+    DatumArena datum_arena;
+    auto r =
+        lisp::closure::compile_to_closure("(append '(1) '(2))"sv, datum_arena);
+    if (!r.has_value())
+        return false;
+    Heap heap;
+    auto environment = lisp::closure::default_env<Core, 16>(heap);
+    Envs envs;
+    auto vr = r.value()(environment, envs);
+    if (!vr.has_value() ||
+        !std::holds_alternative<lisp::closure::pair_ref>(vr.value()))
+        return false;
+    auto const &c0 =
+        heap.get(std::get<lisp::closure::pair_ref>(vr.value()).loc);
+    if (!std::holds_alternative<int>(c0.car) || std::get<int>(c0.car) != 1 ||
+        !std::holds_alternative<lisp::closure::pair_ref>(c0.cdr))
+        return false;
+    auto const &c1 = heap.get(std::get<lisp::closure::pair_ref>(c0.cdr).loc);
+    return std::holds_alternative<int>(c1.car) && std::get<int>(c1.car) == 2 &&
+           std::holds_alternative<lisp::closure::nil_t>(c1.cdr);
+}());
+
+// Runtime twin of the static_assert above.  Step L14 established that
+// constexpr-green is not proof of runtime correctness, so every constexpr
+// contract here gets a run-time witness too.
+TEST_CASE("ClosureProgramTest - AppendRoutesThroughCpsBackend") {
+    DatumArena datum_arena;
+    auto r =
+        lisp::closure::compile_to_closure("(append '(1) '(2))"sv, datum_arena);
+    REQUIRE(r.has_value());
+    Heap heap;
+    auto environment = lisp::closure::default_env<Core, 16>(heap);
+    Envs envs;
+    auto vr = r.value()(environment, envs);
+    REQUIRE(vr.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::pair_ref>(vr.value()));
+    auto const &c0 =
+        heap.get(std::get<lisp::closure::pair_ref>(vr.value()).loc);
+    REQUIRE(std::holds_alternative<int>(c0.car));
+    REQUIRE(std::get<int>(c0.car) == 1);
+    REQUIRE(std::holds_alternative<lisp::closure::pair_ref>(c0.cdr));
+    auto const &c1 = heap.get(std::get<lisp::closure::pair_ref>(c0.cdr).loc);
+    REQUIRE(std::holds_alternative<int>(c1.car));
+    REQUIRE(std::get<int>(c1.car) == 2);
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(c1.cdr));
+}
+
 TEST_CASE("ClosureProgramTest - IfNilTakesFalseBranch") {
     DatumArena datum_arena;
     auto r = lisp::closure::compile_to_closure("(if nil 1 2)"sv, datum_arena);
