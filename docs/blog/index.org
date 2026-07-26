@@ -88,6 +88,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ ~setq~ returns the assigned value and ~defun~/~defvar~/~defparameter~ return the bound name, both departures from Scheme; the store from Phase 14 adapted for ANSI CL's return conventions; a mutable environment reference threaded through both the direct evaluator and a new continuation-passing backend; and a datum-arena lifetime bug caught at compile time while building a one-argument ~compile_to_closure~.
 
+** [[file:phase-19-one-shot-control.org][Phase 19 — block, catch, unwind-protect: One-Shot Control in CPS]]
+
+/DRAFT — pending author revision./ The one-shot nonlocal exits Phase 15 argued for, now built in both evaluators: ~block~ and ~return-from~ resolved lexically by name, ~catch~ and ~throw~ resolved dynamically by an evaluated tag, and ~unwind-protect~ running its cleanups on every way out. The lexical/dynamic distinction lands as two data structures with two lifetimes — an append-only slab of exit records a closure may capture, and a reused-slot stack of catch frames nothing can. Plus DIV-0011: an uncaught ~throw~ here runs cleanups that ANSI CL says should not run.
+
 ** [[file:phase-20-defmacro.org][Phase 20 — defmacro: the Compiler Runs the Language]]
 
 /DRAFT — pending author revision./ Object-language macros: a ~defmacro~-defined ~my-when~ is a Lisp lambda that ~smdlisp~ compiles with its own elaborator and runs with its own evaluator during the expansion pass — the compiler running the language it compiles, at compile time. The new machinery is a datum⇄value reification pair; the merge test is that ~my-when~ is ~when~, whether written with ~list~/~cons~ or with a backquote template, plus an expansion-budget diagnostic for a macro that expands into itself.

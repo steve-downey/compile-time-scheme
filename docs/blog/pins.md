@@ -8,7 +8,7 @@ against the worktree, so a later refactor cannot rewrite the code inside an
 already-published entry. `docs/compiler_architecture.org` is a living document
 and deliberately keeps worktree resolution — it is *supposed* to roll forward.
 
-Ten of the nineteen posts transclude no code and take no pin.
+Ten of the twenty-one posts transclude no code and take no pin.
 
 ## The mapping
 
@@ -23,9 +23,10 @@ Ten of the nineteen posts transclude no code and take no pin.
 | `phase-16-reading-common-lisp.org` | `2c80467` | `blog/phase-16` | `Merge step L6` (P4 method 1) |
 | `phase-17-nil-t-lisp2.org` | `50fa0f4` | `blog/phase-17` | `Merge step L11` (P4 method 1) |
 | `phase-18-setq-defun-progn.org` | `15fb19a` | `blog/phase-18` | `Merge step L13` (P4 method 1) |
+| `phase-19-one-shot-control.org` | `8971db6` | `blog/phase-19` | `Merge step L15` |
 | `phase-20-defmacro.org` | `c7deeb1` | `blog/phase-20` | `Merge step L19` (P4 method 1) |
 
-44 transclusions across 10 posts. Every row passes the anchor test at its pin,
+49 transclusions across 11 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
 
 ## Two authorship eras

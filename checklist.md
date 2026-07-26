@@ -81,7 +81,7 @@
 - [x] Step L12: setq, defun, defvar, defparameter (adapt landed set! work)
 - [x] Step L13: CPS closure backend (+ phase 18 draft)
 - [x] Step L14: block / return-from
-- [ ] Step L15: catch / throw / unwind-protect (+ phase 19 draft)
+- [x] Step L15: catch / throw / unwind-protect (+ phase 19 draft)
 - [ ] Step L16: special variables and dynamic binding
 - [x] Step L17: macro expander with host macros
 - [x] Step L18: backquote
