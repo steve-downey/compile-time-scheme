@@ -794,3 +794,331 @@ TEST_CASE("EvalDirectTest - ReturnFromWithoutValueReturnsNil") {
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
 }
+
+// -- catch / throw / unwind-protect (step L15) -------------------------------
+// -- merge criteria (docs/cl-pivot-plan.md, step L15) ------------------
+
+/// The cleanup-ordering witness, used by both the constexpr and the runtime
+/// halves of the first merge criterion below.
+///
+/// `log` accumulates base-10 digits in the order the cleanups run, so
+/// innermost-first yields 12 and outermost-first would yield 21 -- the two
+/// orders are distinguishable, not merely "both cleanups ran".
+constexpr auto cleanup_order_src =
+    "(let ((log 0))"
+    "  (catch 'c"
+    "    (unwind-protect"
+    "      (unwind-protect (throw 'c 99) (setq log (+ (* log 10) 1)))"
+    "      (setq log (+ (* log 10) 2))))"
+    "  log)"sv;
+
+/// The throw-through-nested-unwind-protect witness: the thrown value must
+/// reach the `catch` (99) *and* both cleanups must have already run by the
+/// time it does (log = 1), which `+` observes by evaluating its arguments
+/// left to right.
+constexpr auto throw_through_unwind_src =
+    "(let ((log 0))"
+    "  (+ (catch 'c (unwind-protect (throw 'c 99) (setq log 1))) log))"sv;
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{cleanup_order_src}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 12;
+}());
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{throw_through_unwind_src}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 100;
+}());
+
+static_assert([] {
+    // Uncaught throw: a diagnosed error, not UB and not a silent no-op.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(catch 'a (throw 'b 1))"sv}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return !vr.has_value();
+}());
+
+TEST_CASE("EvalDirectTest - UnwindProtectCleanupsRunInnermostFirst") {
+    // Runtime twin of the first L15 merge-criteria static_assert above. The
+    // twin is not redundant: L14 proved a constexpr-green unwind mechanism
+    // can still fail at run time (env.hpp's marker-identity note).
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut(cleanup_order_src, da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 12);
+}
+
+TEST_CASE("EvalDirectTest - ThrowThroughNestedUnwindProtectRunsCleanups") {
+    // Runtime twin of the second L15 merge-criteria static_assert above.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut(throw_through_unwind_src, da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 100);
+}
+
+TEST_CASE("EvalDirectTest - UncaughtThrowIsDiagnosedError") {
+    // Runtime twin of the third L15 merge-criteria static_assert above,
+    // in both the no-catch-at-all and the wrong-tag shapes.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(throw 'c 1)", da, ca, root, heap, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} == "throw: no catch for tag");
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto r2 = run("(catch 'a (throw 'b 1))", da2, ca2, root2, heap2, envs2);
+    REQUIRE_FALSE(r2.has_value());
+    REQUIRE(std::string_view{r2.error().message} == "throw: no catch for tag");
+}
+
+// -- catch / throw behaviour ------------------------------------------------
+
+TEST_CASE("EvalDirectTest - CatchReturnsThrownValue") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(catch 'c 1 (throw 'c 42) 3)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 42);
+}
+
+TEST_CASE("EvalDirectTest - CatchFallsOffEndReturnsLastValue") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(catch 'c 1 2 3)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("EvalDirectTest - CatchWithNoFormsEvaluatesToNil") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(catch 'c)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
+}
+
+TEST_CASE("EvalDirectTest - ThrowSkipsCatchWithNonMatchingTag") {
+    // The dynamic search is by `eq` on the evaluated tag, innermost-first:
+    // the inner `(catch 'b ...)` is passed straight through.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r =
+        run("(catch 'a (catch 'b (throw 'a 7)) 99)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 7);
+}
+
+TEST_CASE("EvalDirectTest - SameTagNestedCatchTargetsInnermost") {
+    // The dynamic-exit counterpart of L14's
+    // SameNameNestedBlockReturnFromTargetsInnermost: two simultaneously
+    // active frames carrying the SAME tag, so the throw must reach the
+    // innermost one and the outer frame must fall off its own end.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(catch 'c (+ 100 (catch 'c (throw 'c 5))))", da, ca, root,
+                 heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 105);
+}
+
+TEST_CASE("EvalDirectTest - CatchTagIsAnEvaluatedValue") {
+    // Not a name: a variable holding the tag works, and matching is `eq`.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((tag 'c)) (catch tag (throw tag 8)))", da, ca, root,
+                     heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 8);
+}
+
+// -- unwind-protect behaviour -----------------------------------------------
+
+TEST_CASE("EvalDirectTest - UnwindProtectReturnsProtectedFormValue") {
+    // Cleanup values are discarded, even when a cleanup is the last thing
+    // evaluated.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(unwind-protect 7 8 9)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 7);
+}
+
+TEST_CASE("EvalDirectTest - UnwindProtectCleanupRunsOnNormalCompletion") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((log 0)) (unwind-protect 7 (setq log 1)) log)", da,
+                     ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+}
+
+TEST_CASE("EvalDirectTest - UnwindProtectCleanupRunsOnReturnFromPath") {
+    // The third exit path (after normal completion and `throw`): a lexical
+    // `return-from` unwind passing through the protected extent.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r =
+        run_mut("(let ((log 0)) (block b (unwind-protect (return-from b 7) "
+                "(setq log 1))) log)",
+                da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+
+    // ...and the return-from still delivers its own value to the block.
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto r2 = run("(block b (unwind-protect (return-from b 7) 0))", da2, ca2,
+                  root2, heap2, envs2);
+    REQUIRE(r2.has_value());
+    REQUIRE(std::get<int>(r2.value()) == 7);
+}
+
+TEST_CASE("EvalDirectTest - ReturnFromUnwindsThroughCatchFrame") {
+    // A `catch` must let a `return-from` unwind pass through it untouched
+    // (the two markers are distinct objects precisely so neither mechanism
+    // intercepts the other), and must still pop its own dynamic frame on
+    // that path.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b (catch 'c (return-from b 3)) 99)", da, ca, root,
+                 heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+    REQUIRE(envs.catch_depth() == 0);
+}
+
+TEST_CASE("EvalDirectTest - EveryCatchExitPathPopsTheDynamicStack") {
+    // Normal completion, a caught throw, and an uncaught throw must each
+    // leave the dynamic stack balanced -- otherwise a later `throw` could
+    // find a frame whose extent has already ended.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    REQUIRE(run("(catch 'c 1)", da, ca, root, heap, envs).has_value());
+    REQUIRE(envs.catch_depth() == 0);
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    REQUIRE(run("(catch 'c (throw 'c 1))", da2, ca2, root2, heap2, envs2)
+                .has_value());
+    REQUIRE(envs2.catch_depth() == 0);
+
+    DatumArena da3;
+    CoreArena ca3;
+    Heap heap3;
+    Core root3;
+    Envs envs3;
+    REQUIRE_FALSE(run("(catch 'a (throw 'b 1))", da3, ca3, root3, heap3, envs3)
+                      .has_value());
+    REQUIRE(envs3.catch_depth() == 0);
+}

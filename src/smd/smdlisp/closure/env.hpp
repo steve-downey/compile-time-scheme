@@ -58,6 +58,30 @@ inline constexpr char block_unwind_marker_storage[] =
     "smdlisp: block/return-from unwind";
 inline constexpr char const *block_unwind_marker = block_unwind_marker_storage;
 
+/// The shared, static, identity-compared marker used for a `throw` unwind
+/// travelling through the same frozen `result<value<Core>>` error channel
+/// (step L15).
+///
+/// Everything @ref block_unwind_marker's docs say applies verbatim, with one
+/// difference: a `throw` unwind is aimed at a *dynamic* exit found by tag
+/// (@ref catch_record, @ref env_arena::find_catch), not at a lexically
+/// resolved block. A distinct marker object -- rather than reusing
+/// @ref block_unwind_marker -- is what keeps the two mechanisms from
+/// intercepting each other: an enclosing `block` must let a `throw` unwind
+/// pass straight through it (its own @ref exit_record is still live and it
+/// has no business claiming the value), and an enclosing `catch` must
+/// likewise let a `return-from` unwind pass. Both frames decide that by
+/// comparing the marker first.
+///
+/// **This must stay a named `inline constexpr char[]` object**, exactly like
+/// @ref block_unwind_marker_storage, and for exactly the reason spelled out
+/// there: a `constexpr char const *` initialized from a bare string literal
+/// is folded to the literal's address per use site, so with string-literal
+/// merging disabled (the Asan build) the pointer-identity comparison holds
+/// during constant evaluation and silently fails at run time.
+inline constexpr char throw_unwind_marker_storage[] = "smdlisp: throw unwind";
+inline constexpr char const *throw_unwind_marker = throw_unwind_marker_storage;
+
 /// One-shot lexical exit bookkeeping for one dynamic activation of a
 /// `block` form (decision D5, step L14).
 ///
@@ -101,6 +125,51 @@ struct exit_record {
     value<Core> payload{};     ///< The value being returned; only
                                ///< meaningful while an unwind targeting
                                ///< this record is in flight.
+};
+
+/// One-shot **dynamic** exit bookkeeping for one activation of a `catch`
+/// form (decision D5, step L15).
+///
+/// The dynamic twin of @ref exit_record, and the whole difference between
+/// `block`/`return-from` and `catch`/`throw`:
+///
+///  - an @ref exit_record is found by *name*, through the environment's
+///    lexical block namespace (@ref env::lookup_block), so a `return-from`
+///    reaches only blocks that lexically enclose it -- and can therefore be
+///    smuggled out of its own extent by a closure, which is the case
+///    @ref exit_record::live diagnoses;
+///  - a @ref catch_record is found by *evaluated tag value*, compared with
+///    `eq` (@ref env_arena::find_catch), searching the dynamically active
+///    `catch` frames innermost-first. Nothing lexical is consulted, and
+///    nothing captures a @ref catch_record: it is reachable only while its
+///    `catch` frame is on @ref env_arena's catch stack, which is precisely
+///    the form's dynamic extent.
+///
+/// Because a @ref catch_record cannot be smuggled anywhere, "the exit is
+/// dead" never shows up as a stale-pointer question the way it does for
+/// `block`; it shows up as @ref env_arena::find_catch simply not finding a
+/// matching frame, which is the diagnosed *uncaught throw* error. @ref live
+/// still exists, and still means "an unwind has fired against this frame",
+/// so that (a) the owning `catch` frame can tell an unwind aimed at *it*
+/// from one merely passing through, exactly as @ref exit_record does, and
+/// (b) a `throw` raised from an `unwind-protect` cleanup that runs *while*
+/// this frame is already unwinding does not re-target the frame that is
+/// already on its way out.
+///
+/// @tparam Core The core AST type (used to type @ref tag and @ref payload).
+template <typename Core>
+struct catch_record {
+    value<Core> tag{};         ///< The evaluated catch tag, compared by
+                               ///< `eq` (`value<Core>`'s `operator==`, the
+                               ///< same comparison `pairs.hpp`'s `eq`
+                               ///< primitive performs).
+    exit_id id = invalid_exit; ///< Unique per dynamic activation.
+    bool live = false;         ///< False once a `throw` has fired against
+                               ///< this frame, or the frame's own
+                               ///< evaluation has completed.
+    value<Core> payload{};     ///< The thrown value; only meaningful while
+                               ///< an unwind targeting this frame is in
+                               ///< flight.
 };
 
 /// A Lisp-2 lexical environment: two independent, linear,
@@ -524,6 +593,12 @@ inline constexpr int default_max_envs = 128;
 /// also owns (step L14).
 inline constexpr int default_max_exits = 128;
 
+/// Fixed default capacity of the dynamic `catch` stack an @ref env_arena
+/// also owns (step L15).  Unlike @ref default_max_exits this bounds the
+/// maximum *nesting depth* of simultaneously-active `catch` frames, not the
+/// total number of activations: see @ref env_arena::push_catch.
+inline constexpr int default_max_catches = 128;
+
 /// @tparam Core        The core AST type.
 /// @tparam MaxBindings Capacity of each captured @ref env (must match the
 ///                      @ref env this arena's caller is evaluating with).
@@ -534,8 +609,11 @@ inline constexpr int default_max_exits = 128;
 /// @tparam MaxExits     Maximum number of `block` activations (one
 ///                      @ref exit_record each) live at once over one
 ///                      evaluation (step L14; see @ref alloc_exit).
+/// @tparam MaxCatches   Maximum *nesting depth* of dynamically active
+///                      `catch` frames (step L15; see @ref push_catch).
 template <typename Core, int MaxBindings, int MaxEnvs = default_max_envs,
-          int MaxExits = default_max_exits>
+          int MaxExits = default_max_exits,
+          int MaxCatches = default_max_catches>
 class env_arena {
   public:
     constexpr env_arena() = default;
@@ -567,11 +645,82 @@ class env_arena {
         return &exits_[exits_.size() - 1];
     }
 
+    /// Pushes a fresh, live @ref catch_record for one activation of a
+    /// `catch` form keyed by the already-evaluated @p tag (step L15) and
+    /// returns a pointer to it, valid until the matching @ref pop_catch.
+    ///
+    /// **This is a stack, not an append-only arena** -- the opposite of
+    /// @ref alloc_exit, and deliberately so. An @ref exit_record must
+    /// survive its `block`'s evaluation because a closure can capture a
+    /// pointer to it (@ref env::define_block), so records accumulate and
+    /// the arena's capacity bounds the total number of activations. Nothing
+    /// captures a @ref catch_record: it is reachable only through this
+    /// stack, only while its frame is active, so the storage slot is reused
+    /// once the frame pops and @c MaxCatches bounds only the nesting depth.
+    ///
+    /// Slots are reused rather than truly popped (the shared
+    /// @ref smd::smdscheme::foundation::static_vector has no @c pop_back and
+    /// `smd::smdscheme` is frozen for semantic changes, decision D1), so
+    /// @ref depth_ -- not @c frames_.size() -- is the authority on how much
+    /// of the stack is live. Popping a frame therefore never invalidates a
+    /// pointer to a frame *below* it, which is exactly the guarantee an
+    /// in-flight `throw` needs: intervening `catch` frames pop themselves as
+    /// the unwind passes through them, while the target frame's pointer, held
+    /// since @ref find_catch, stays good.
+    constexpr auto push_catch(value<Core> tag) -> catch_record<Core> * {
+        exit_id const id = next_exit_id_++;
+        catch_record<Core> rec{std::move(tag), id, true, value<Core>{}};
+        if (depth_ < frames_.size())
+            frames_[depth_] = std::move(rec);
+        else
+            frames_.push_back(std::move(rec));
+        return &frames_[depth_++];
+    }
+
+    /// Pops the innermost `catch` frame pushed by @ref push_catch.
+    ///
+    /// Every exit path out of a `catch` body -- normal completion, an
+    /// ordinary error, a `return-from` unwind passing through, a `throw`
+    /// aimed at this frame, and a `throw` aimed at an outer one -- must call
+    /// this exactly once, which is what keeps the stack's depth in step with
+    /// the forms' real dynamic extents (see the evaluators' `core_catch`
+    /// handling).
+    constexpr auto pop_catch() -> void {
+        if (depth_ > 0)
+            --depth_;
+    }
+
+    /// Returns the innermost dynamically active, still-live `catch` frame
+    /// whose tag is `eq` to @p tag, or null if there is none -- the search
+    /// `throw` performs (step L15).
+    ///
+    /// Comparison is `value<Core>`'s @c operator==, which is precisely what
+    /// `pairs.hpp`'s `eq` primitive applies (identity for @ref pair_ref,
+    /// by-value for every other alternative), so a program can predict which
+    /// frame a `throw` reaches using the same `eq` it can call directly.
+    /// A null return is the *uncaught throw* case, which the evaluators
+    /// report as a diagnosed error rather than unwinding anywhere.
+    [[nodiscard]] constexpr auto find_catch(value<Core> const &tag)
+        -> catch_record<Core> * {
+        for (int i = depth_ - 1; i >= 0; --i)
+            if (frames_[i].live && frames_[i].tag == tag)
+                return &frames_[i];
+        return nullptr;
+    }
+
+    /// Returns the current `catch`-frame nesting depth (test/diagnostic
+    /// support: a balanced program returns to depth 0, which is how the
+    /// tests witness that every exit path pops exactly once).
+    [[nodiscard]] constexpr auto catch_depth() const -> int { return depth_; }
+
   private:
     smd::smdscheme::foundation::static_vector<env<Core, MaxBindings>, MaxEnvs>
         envs_{};
     smd::smdscheme::foundation::static_vector<exit_record<Core>, MaxExits>
         exits_{};
+    smd::smdscheme::foundation::static_vector<catch_record<Core>, MaxCatches>
+        frames_{};
+    int depth_ = 0; ///< Live prefix of @ref frames_; see @ref push_catch.
     exit_id next_exit_id_ = 0;
 };
 

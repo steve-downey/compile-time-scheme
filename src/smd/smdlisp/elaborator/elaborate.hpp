@@ -394,7 +394,8 @@ constexpr auto elaborate_function_position(
 /// Elaborates a datum list into a core form.
 ///
 /// Recognizes the special operators `quote`, `if`, `progn`, `let`, `let*`,
-/// `lambda`, `function`, `block`, and `return-from` by inspecting the
+/// `lambda`, `function`, `block`, `return-from`, `catch`, `throw`, and
+/// `unwind-protect` by inspecting the
 /// leading symbol (folded spellings, per decision D2). Any other head is an
 /// ordinary application, whose head is elaborated through @ref
 /// elaborate_function_position (a bare symbol resolves in the FUNCTION
@@ -596,6 +597,96 @@ constexpr auto elaborate_list(
 
             return core{
                 core_f{core_return_from<core, MaxNodes>{target_name, val_box}}};
+        }
+
+        if (name == "CATCH") {
+            // (catch tag-form body...) -- ANSI CL: body is &rest, zero or
+            // more forms; zero forms evaluates to nil, exactly as `block`'s
+            // does. Nothing about the tag is resolved here: a catch tag is
+            // an evaluated value, matched with `eq` at run time, so unlike
+            // `return-from`'s lexical block name there is no
+            // elaboration-time check to make (see core_catch's docs).
+            if (lst.elements.size() < 2)
+                return smdscheme::foundation::parse_error{
+                    {}, "catch: expected a tag form"};
+
+            auto tag_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[1]), datum_arena, core_arena,
+                block_scope);
+            if (!tag_r.has_value())
+                return tag_r;
+
+            core_catch<core, MaxNodes, MaxList> cat{};
+            cat.tag = smdscheme::foundation::make_arena_box(
+                core_arena, std::move(tag_r.value()));
+            for (int i = 2; i < lst.elements.size(); ++i) {
+                auto body_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[i]), datum_arena, core_arena,
+                    block_scope);
+                if (!body_r.has_value())
+                    return body_r;
+                cat.body.push_back(smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(body_r.value())));
+            }
+            if (cat.body.empty())
+                cat.body.push_back(smdscheme::foundation::make_arena_box(
+                    core_arena, core{core_f{core_nil{}}}));
+            return core{core_f{std::move(cat)}};
+        }
+
+        if (name == "THROW") {
+            // (throw tag-form result-form) -- both required per ANSI CL
+            // (see core_throw's docs for why there is no implicit-nil
+            // result the way return-from has an implicit-nil value).
+            if (lst.elements.size() != 3)
+                return smdscheme::foundation::parse_error{
+                    {}, "throw: expected a tag form and a result form"};
+
+            auto tag_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[1]), datum_arena, core_arena,
+                block_scope);
+            if (!tag_r.has_value())
+                return tag_r;
+            auto res_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[2]), datum_arena, core_arena,
+                block_scope);
+            if (!res_r.has_value())
+                return res_r;
+
+            return core{core_f{core_throw<core, MaxNodes>{
+                smdscheme::foundation::make_arena_box(core_arena,
+                                                      std::move(tag_r.value())),
+                smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(res_r.value()))}}};
+        }
+
+        if (name == "UNWIND-PROTECT") {
+            // (unwind-protect protected-form cleanup...) -- ANSI CL: the
+            // cleanup list may be empty, so no implicit nil is synthesized
+            // (core_unwind_protect's docs).
+            if (lst.elements.size() < 2)
+                return smdscheme::foundation::parse_error{
+                    {}, "unwind-protect: expected a protected form"};
+
+            auto prot_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[1]), datum_arena, core_arena,
+                block_scope);
+            if (!prot_r.has_value())
+                return prot_r;
+
+            core_unwind_protect<core, MaxNodes, MaxList> up{};
+            up.protected_form = smdscheme::foundation::make_arena_box(
+                core_arena, std::move(prot_r.value()));
+            for (int i = 2; i < lst.elements.size(); ++i) {
+                auto cl_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[i]), datum_arena, core_arena,
+                    block_scope);
+                if (!cl_r.has_value())
+                    return cl_r;
+                up.cleanup.push_back(smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(cl_r.value())));
+            }
+            return core{core_f{std::move(up)}};
         }
 
         if (name == "SETQ") {
@@ -1031,7 +1122,8 @@ constexpr auto elaborate_node(
 /// This is the public entry point for the elaboration phase: it converts
 /// the raw datum from the reader into a typed core expression, classifying
 /// the special operators `quote`, `if`, `progn`, `let`, `let*`, `lambda`,
-/// `function`, `block`, and `return-from`, and emitting errors for
+/// `function`, `block`, `return-from`, `catch`, `throw`, and
+/// `unwind-protect`, and emitting errors for
 /// malformed input. Elaboration begins with an empty lexical block scope
 /// (@ref detail::block_scope_type) -- see that type's docs for why
 /// `return-from` validation is a purely lexical, elaboration-time decision

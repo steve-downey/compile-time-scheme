@@ -730,3 +730,132 @@ TEST_CASE("ElaborateTest - DefunBodyIsImplicitlyWrappedInBlockNamedForIt") {
     auto er2 = elab("(defun f () (lambda () (return-from f 1)))", da2, ca2);
     REQUIRE(er2.has_value());
 }
+
+// -- catch / throw / unwind-protect (step L15) ------------------------------
+
+TEST_CASE("ElaborateTest - CatchElaboratesToCoreCatchWithTagAndBody") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(catch 'c 1 2 3)", da, ca);
+    REQUIRE(er.has_value());
+    using Catch_ = lisp::elaborator::core_catch<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<Catch_>(er.value().inner));
+    auto const &cat = std::get<Catch_>(er.value().inner);
+    REQUIRE(cat.body.size() == 3);
+    // The tag is an ordinary evaluated expression, not a name: `'c`
+    // elaborates to the quoted-symbol node any other quoted atom would.
+    REQUIRE(std::holds_alternative<lisp::elaborator::core_quote>(
+        ca.get(cat.tag).inner));
+}
+
+TEST_CASE("ElaborateTest - CatchTagMayBeAnArbitraryExpression") {
+    // Unlike `block`'s name, a catch tag is evaluated -- so a variable
+    // reference, or any other expression, is legal here.
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(catch (f x) 1)", da, ca);
+    REQUIRE(er.has_value());
+    using Catch_ = lisp::elaborator::core_catch<Core, MaxNodes, MaxList>;
+    auto const &cat = std::get<Catch_>(er.value().inner);
+    REQUIRE(std::holds_alternative<
+            lisp::elaborator::core_application<Core, MaxNodes, MaxList>>(
+        ca.get(cat.tag).inner));
+}
+
+TEST_CASE("ElaborateTest - CatchWithNoFormsIsImplicitNilBody") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(catch 'c)", da, ca);
+    REQUIRE(er.has_value());
+    using Catch_ = lisp::elaborator::core_catch<Core, MaxNodes, MaxList>;
+    auto const &cat = std::get<Catch_>(er.value().inner);
+    REQUIRE(cat.body.size() == 1);
+    REQUIRE(std::holds_alternative<lisp::elaborator::core_nil>(
+        ca.get(cat.body[0]).inner));
+}
+
+TEST_CASE("ElaborateTest - CatchWithoutTagIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(catch)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - ThrowElaboratesToCoreThrow") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(throw 'c 42)", da, ca);
+    REQUIRE(er.has_value());
+    using Throw_ = lisp::elaborator::core_throw<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Throw_>(er.value().inner));
+    auto const &thr = std::get<Throw_>(er.value().inner);
+    REQUIRE(std::holds_alternative<lisp::elaborator::core_integer>(
+        ca.get(thr.result).inner));
+}
+
+TEST_CASE("ElaborateTest - ThrowRequiresBothTagAndResult") {
+    // ANSI CL: `throw` takes exactly two arguments -- there is no implicit
+    // nil result the way `return-from`'s value form is optional.
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(throw 'c)", da, ca).has_value());
+    REQUIRE(!elab("(throw)", da, ca).has_value());
+    REQUIRE(!elab("(throw 'c 1 2)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - ThrowNeedsNoLexicallyVisibleCatch") {
+    // The counterpart of ReturnFromUndefinedBlockIsError: because a throw
+    // tag is a runtime value, "is there a catch for it?" cannot be an
+    // elaboration-time question, so a bare `throw` elaborates fine and is
+    // diagnosed only when it runs (see the evaluators' tests).
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(elab("(throw 'c 1)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - UnwindProtectElaboratesWithCleanupForms") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(unwind-protect 1 2 3)", da, ca);
+    REQUIRE(er.has_value());
+    using Unwind =
+        lisp::elaborator::core_unwind_protect<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<Unwind>(er.value().inner));
+    auto const &up = std::get<Unwind>(er.value().inner);
+    REQUIRE(up.cleanup.size() == 2);
+    REQUIRE(std::holds_alternative<lisp::elaborator::core_integer>(
+        ca.get(up.protected_form).inner));
+}
+
+TEST_CASE("ElaborateTest - UnwindProtectCleanupListMayBeEmpty") {
+    // ANSI CL allows a cleanup-less unwind-protect; unlike `block`/`catch`
+    // bodies no implicit nil is synthesized, because no cleanup value is
+    // ever observed.
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(unwind-protect 1)", da, ca);
+    REQUIRE(er.has_value());
+    using Unwind =
+        lisp::elaborator::core_unwind_protect<Core, MaxNodes, MaxList>;
+    auto const &up = std::get<Unwind>(er.value().inner);
+    REQUIRE(up.cleanup.empty());
+}
+
+TEST_CASE("ElaborateTest - UnwindProtectWithoutProtectedFormIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(unwind-protect)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - ReturnFromInsideUnwindProtectSeesEnclosingBlock") {
+    // The block scope threads through all three new forms unchanged, which
+    // is what lets an unwind-protect cleanup sit between a return-from and
+    // its target block.
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(elab("(block b (unwind-protect (return-from b 1) 2))", da, ca)
+                .has_value());
+    DatumArena da2;
+    CoreArena ca2;
+    REQUIRE(
+        elab("(block b (catch 'c (return-from b 1)))", da2, ca2).has_value());
+}

@@ -397,3 +397,97 @@ TEST_CASE("EnvTest - AllocExitReturnsStablePointersWithDistinctIds") {
     REQUIRE_FALSE(r1->live);
     REQUIRE(r2->live);
 }
+
+// -- catch / throw dynamic exit stack (step L15) -----------------------------
+
+static_assert([] {
+    // The dynamic stack is LIFO and tag-keyed: find_catch returns the
+    // innermost live frame whose tag is `eq` to the sought tag.
+    using smd::smdlisp::closure::env_arena;
+    env_arena<dummy_core, 4> arena;
+    auto *outer = arena.push_catch(val{symbol{"A"}});
+    auto *inner = arena.push_catch(val{symbol{"B"}});
+    if (outer == inner || outer->id == inner->id)
+        return false;
+    if (arena.catch_depth() != 2)
+        return false;
+    if (arena.find_catch(val{symbol{"A"}}) != outer)
+        return false;
+    if (arena.find_catch(val{symbol{"B"}}) != inner)
+        return false;
+    if (arena.find_catch(val{symbol{"C"}}) != nullptr)
+        return false;
+    arena.pop_catch();
+    // Popping the inner frame leaves the outer one reachable, and the
+    // inner tag now has no live frame at all.
+    if (arena.find_catch(val{symbol{"B"}}) != nullptr)
+        return false;
+    if (arena.find_catch(val{symbol{"A"}}) != outer)
+        return false;
+    arena.pop_catch();
+    return arena.catch_depth() == 0 &&
+           arena.find_catch(val{symbol{"A"}}) == nullptr;
+}());
+
+static_assert([] {
+    // Same-tag nesting: find_catch picks the innermost frame, and a frame
+    // marked dead (a throw already fired against it) is skipped in favor of
+    // the next one out.
+    using smd::smdlisp::closure::env_arena;
+    env_arena<dummy_core, 4> arena;
+    auto *outer = arena.push_catch(val{symbol{"T"}});
+    auto *inner = arena.push_catch(val{symbol{"T"}});
+    if (arena.find_catch(val{symbol{"T"}}) != inner)
+        return false;
+    inner->live = false;
+    return arena.find_catch(val{symbol{"T"}}) == outer;
+}());
+
+TEST_CASE("EnvTest - CatchStackIsLifoAndTagKeyed") {
+    // Runtime twin of the first static_assert above (the L14 marker lesson:
+    // constexpr-green is not run-time-green).
+    using smd::smdlisp::closure::env_arena;
+    env_arena<dummy_core, 4> arena;
+    auto *outer = arena.push_catch(val{symbol{"A"}});
+    auto *inner = arena.push_catch(val{symbol{"B"}});
+    REQUIRE(arena.catch_depth() == 2);
+    REQUIRE(arena.find_catch(val{symbol{"A"}}) == outer);
+    REQUIRE(arena.find_catch(val{symbol{"B"}}) == inner);
+    REQUIRE(arena.find_catch(val{symbol{"C"}}) == nullptr);
+    arena.pop_catch();
+    REQUIRE(arena.find_catch(val{symbol{"B"}}) == nullptr);
+    REQUIRE(arena.find_catch(val{symbol{"A"}}) == outer);
+    arena.pop_catch();
+    REQUIRE(arena.catch_depth() == 0);
+}
+
+TEST_CASE("EnvTest - PoppedCatchSlotsAreReusedNotAccumulated") {
+    // The catch stack bounds NESTING DEPTH, not total activations (unlike
+    // alloc_exit's append-only arena): a loop of balanced push/pop pairs
+    // must not exhaust a 4-frame arena.
+    using smd::smdlisp::closure::env_arena;
+    env_arena<dummy_core, 4, 8, 8, 2> arena;
+    for (int i = 0; i < 100; ++i) {
+        auto *rec = arena.push_catch(val{i});
+        REQUIRE(rec->live);
+        REQUIRE(arena.find_catch(val{i}) == rec);
+        arena.pop_catch();
+    }
+    REQUIRE(arena.catch_depth() == 0);
+}
+
+TEST_CASE("EnvTest - ThrowUnwindMarkerHasStableRuntimeIdentity") {
+    // The L14 gotcha, guarded for L15's own marker: the identity comparison
+    // must hold at RUN TIME, not merely under constant evaluation, which is
+    // why the marker is backed by a named object rather than a bare string
+    // literal (see env.hpp's docs).
+    using smd::smdlisp::closure::block_unwind_marker;
+    using smd::smdlisp::closure::throw_unwind_marker;
+    char const *a = throw_unwind_marker;
+    char const *b = throw_unwind_marker;
+    REQUIRE(a == b);
+    REQUIRE(a == smd::smdlisp::closure::throw_unwind_marker_storage);
+    // The two markers must also be distinguishable, or a `block` would
+    // intercept a `throw` (and vice versa).
+    REQUIRE(throw_unwind_marker != block_unwind_marker);
+}
