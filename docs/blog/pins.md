@@ -46,9 +46,10 @@ content-moot, exactly as the era-1 pin choices were.
 
 Posts 5–12 predate that workflow. They are *retrospective*: the Scheme pipeline
 was built first, and the blog was written afterwards about code that already
-existed (`804edad intial blogs`, `e224146 docs: convert blog series to org-mode
-with orgit transclusion`, `f56bdc8 docs(blog): fact-check fixes, citation
-corrections, transclusion plumbing`). There is no per-phase merge to find. For
+existed (`804edad`, the initial blog import; `e224146 docs: convert blog series
+to org-mode with orgit transclusion`; `f56bdc8 docs(blog): fact-check fixes,
+citation corrections, transclusion plumbing`). There is no per-phase merge to
+find. For
 these the pin is the last commit that modified the post's `.org`, which in every
 case is also the commit that generated the committed `.md`. That choice makes
 the pinned `.org` reproduce the published `.md`, which is the property that
