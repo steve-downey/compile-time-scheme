@@ -13,7 +13,7 @@ target_sources(
         FILE_SET smdlisp_smdlisp_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES version.hpp
+            FILES smdlisp.hpp version.hpp
     PRIVATE version.cpp
 )
 target_link_libraries(
