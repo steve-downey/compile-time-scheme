@@ -393,6 +393,7 @@ struct core_return_from {
         expr; ///< The value expression (implicit `nil` if omitted).
 };
 
+// e5bf324e-a6a5-4d14-817b-69b0c88b114b
 /// A Common Lisp `catch` form: `(catch tag-form body...)`.
 ///
 /// Establishes a **dynamic**, one-shot, tag-keyed exit (decision D5, step
@@ -421,6 +422,7 @@ struct core_catch {
         body; ///< Body expressions, implicit progn (at least one; see
               ///< above).
 };
+// e5bf324e-a6a5-4d14-817b-69b0c88b114b end
 
 /// A Common Lisp `throw` form: `(throw tag-form result-form)`.
 ///
@@ -448,6 +450,7 @@ struct core_throw {
                                                           ///< expression.
 };
 
+// 46e1d48b-cfc0-44dc-a723-1f701ed49bc0
 /// A Common Lisp `unwind-protect` form:
 /// `(unwind-protect protected-form cleanup...)`.
 ///
@@ -478,6 +481,7 @@ struct core_unwind_protect {
         cleanup; ///< Cleanup forms, run in order on every exit path;
                  ///< possibly empty (see above).
 };
+// 46e1d48b-cfc0-44dc-a723-1f701ed49bc0 end
 
 /// Factory template that produces the open-recursive variant layer for the
 /// core AST.

@@ -19,6 +19,7 @@
   - [[Phase 16 — Reading Common Lisp: Case, Keywords, and #'](phase-16-reading-common-lisp.md)](#org5a566b9)
   - [[Phase 17 — nil, t, and Living in a Lisp-2](phase-17-nil-t-lisp2.md)](#org1048d97)
   - [[Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)](#org180a37f4)
+  - [[Phase 19 — block, catch, unwind-protect: One-Shot Control in CPS](phase-19-one-shot-control.md)](#org46e1d48b)
   - [[Phase 20 — defmacro: the Compiler Runs the Language](phase-20-defmacro.md)](#org76bd8411)
 - [Table of Contents](#org7118c4c)
 
@@ -167,6 +168,13 @@ Come back down from the summit for `set!`: a shared store of mutable cells, an e
 ## [Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)
 
 *DRAFT — pending author revision.* `setq` returns the assigned value and `defun`/`defvar`/`defparameter` return the bound name, both departures from Scheme; the store from Phase 14 adapted for ANSI CL's return conventions; a mutable environment reference threaded through both the direct evaluator and a new continuation-passing backend; and a datum-arena lifetime bug caught at compile time while building a one-argument `compile_to_closure`.
+
+
+<a id="org46e1d48b"></a>
+
+## [Phase 19 — block, catch, unwind-protect: One-Shot Control in CPS](phase-19-one-shot-control.md)
+
+*DRAFT — pending author revision.* The one-shot nonlocal exits Phase 15 argued for, now built in both evaluators: `block` and `return-from` resolved lexically by name, `catch` and `throw` resolved dynamically by an evaluated tag, and `unwind-protect` running its cleanups on every way out. The lexical/dynamic distinction lands as two data structures with two lifetimes — an append-only slab of exit records a closure may capture, and a reused-slot stack of catch frames nothing can. Plus DIV-0011: an uncaught `throw` here runs cleanups that ANSI CL says should not run.
 
 
 <a id="org76bd8411"></a>
