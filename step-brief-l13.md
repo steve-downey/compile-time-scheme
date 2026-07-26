@@ -1,103 +1,110 @@
-# step-brief-l13.md — Step L15: catch / throw / unwind-protect (Track A)
+# step-brief-l13.md — Step L16: special variables and dynamic binding (Track A)
 
 Forward-only brief for the next clean agent on **Track A**. Bounded; not a log.
 This file keeps Track A's lane-brief filename (`step-brief-l13.md`); it now
-describes **L15**, per the step-brief contract in `AGENTS.md`. Prior-step
-narrative lives in `git log`; architecture lives in
-`docs/compiler_architecture.org`; deliberate deviations live in
-`docs/divergences/`.
+describes **L16**, per the step-brief contract in `AGENTS.md`. Prior-step
+narrative lives in `git log`; deliberate deviations live in
+`docs/divergences/`. `docs/compiler_architecture.org` still has **no
+`smdlisp` section and no UUID anchors** — it documents the pre-pivot Scheme
+PoC only, so there is currently nowhere in it to record an `smdlisp`
+cross-step fact in place. Do not invent a section; that is an orchestrator
+scope decision.
 
-**Status:** L14 (`block`/`return-from`) is merged; L15 depends on L14
-(satisfied). Track C runs concurrently in a non-overlapping lane. Likely
+**Status:** L15 (`catch`/`throw`/`unwind-protect`) is merged into this lane's
+branch and L16 depends on L12 and L15 (both satisfied). Track C's L19
+(`defmacro`) is already merged to `main`; this branch has `main` merged in, so
+`macroexpand/**` and `reader/**` are current — still not your lane. Likely
 integration conflict surfaces remain `checklist.md` and
-`src/smd/smdlisp/CMakeLists.txt` (and any per-dir `CMakeLists.txt` you add).
+`src/smd/smdlisp/**/CMakeLists.txt`.
 
-## The step (plan §9, L15)
+## The step (plan §9, L16)
 
-`catch` establishes a **dynamic** exit keyed by an *evaluated* tag value
-(`eq` comparison); `throw` searches the dynamic exit stack innermost-first;
-both share the one-shot exit machinery L14 built (see below). `unwind-protect`
-registers cleanup forms that run on **every** exit path through its extent:
-normal completion, `return-from`, and `throw`; in CPS this must wrap both the
-normal continuation and the escape path.
-**Parity required:** implement in BOTH `eval_direct` and the CPS backend; the
-merge programs must pass on both, exactly as L14 required.
-Merge criteria: cleanup-ordering tests (innermost cleanups first); `throw`
-through nested `unwind-protect`; uncaught `throw` is a diagnosed error.
-Deliverable: blog phase 19 draft (covers L14's material, one step behind, per
-the docs-lag-code-by-one-step pattern).
+`defvar`/`defparameter` already *mark* a name special (`env::mark_special` /
+`env::is_special`, step L12) but nothing yet *behaves* differently. L16 makes
+the mark mean something: a binding form (`let`/`let*`/lambda parameters) that
+binds a name marked special must establish a **dynamic** binding — visible to
+every function called during the binding's extent, regardless of lexical
+scope — and must restore the previous value on **every** exit path out of that
+extent, including the non-local ones L14/L15 built.
+**Parity required:** implement in BOTH `eval_direct.hpp` and the CPS backend
+`cps_code.hpp`; every merge program must pass on both, exactly as L14 and L15
+required.
 
-## What L14 built that L15 reuses — and the one gotcha that will bite you
+## What L15 built that L16 should reuse
 
-L14's non-local-exit mechanism lives in `src/smd/smdlisp/closure/env.hpp` and
-is reused verbatim by both evaluators (`eval_direct.hpp`, `cps_code.hpp`,
-`core_block`/`core_return_from` cases):
+- **`unwind-protect`'s discipline is exactly the restore-on-every-exit
+  discipline you need.** `eval_direct.hpp`/`cps_code.hpp`'s
+  `core_unwind_protect` case is a single unconditional loop rather than a
+  four-way case analysis, because a value, an ordinary error, a `return-from`
+  unwind and a `throw` unwind all already arrive as one `result<value<Core>>`.
+  A dynamic rebinding's restore step has the identical shape: do the work,
+  regain control unconditionally, restore, then re-return whatever arrived.
+  Model the special-binding save/restore on that case, not on a new mechanism.
+- **`env_arena` now owns a real dynamic stack** (`push_catch`/`pop_catch`/
+  `find_catch`/`catch_depth`, `env.hpp`). It is the right home for a
+  special-variable binding stack too, and for the same reason: `env` is copied
+  for lexical capture, so anything dynamically scoped must *not* live there,
+  while `env_arena` is threaded by mutable reference and never copied. Note
+  the deliberate contrast documented on `push_catch`: the catch stack pops and
+  reuses slots (capacity bounds nesting depth), unlike `alloc_exit`'s
+  append-only slab (capacity bounds total activations). A special-binding
+  stack wants the popping kind.
+- `env::is_special` is already the query you need at binding time, and it is
+  already carried across `env` copies.
 
-- **`exit_record<Core>` + `env_arena::alloc_exit`** — one fresh, live record
-  per dynamic activation, arena-owned (stable pointer, survives closure
-  capture). `env::define_block`/`lookup_block` are a third, independent
-  namespace (D4) threaded on the *ambient* env by mutable reference (never a
-  copy), the same discipline `progn`/`setq`/`defun` rely on. `catch`/`throw`
-  want the same shape, but keyed by an evaluated **tag value** (`eq`), not a
-  lexical name — so the tag lives in a *dynamic* stack, not the lexical block
-  namespace. Consider a parallel dynamic exit stack in `env`/`env_arena`
-  rather than overloading the block namespace.
-- **The unwind travels through the frozen `result<value<Core>>` error channel**
-  as a `parse_error` whose `message` is a single sentinel pointer
-  (`block_unwind_marker`); every existing `!has_value()` guard already "skips
-  intervening frames" for free. `throw` will want its own analogous sentinel.
+## Gotchas that will bite you
 
-- **GOTCHA (this is what silently broke L14 at run time and cost the most
-  time):** the sentinel is compared by **raw pointer identity**
-  (`err.message == block_unwind_marker`). A `constexpr char const *`
-  initialized directly from a *bare string literal* is constant-folded to the
-  literal's address at each use site; with string-literal merging off (Asan
-  build) those sites get **distinct addresses for identical content**, so the
-  identity check passes in `constexpr` (all the merge-criteria `static_assert`s
-  went green) yet **fails at run time**, and the unwind escapes its handler.
-  The fix, already in `env.hpp`: back the sentinel with a **named**
-  `inline constexpr char[] block_unwind_marker_storage` and point the
-  `char const *` at it — one named object has one address. **Any new sentinel
-  L15 adds (e.g. a `throw` marker) MUST use this named-object pattern, not a
-  bare literal.** See `block_unwind_marker`'s doc comment in `env.hpp`.
-
-- `unwind-protect` cleanup must run even while a `block_unwind_marker` /
-  throw-marker error is propagating — i.e. on the `!has_value()` path, not only
-  the value path. In CPS specifically, the cleanup wraps both continuations.
-  Model it on how `core_block` intercepts, runs its own logic, then re-returns
-  the propagating error unchanged when the unwind is not aimed at it.
+- **Sentinel markers are compared by RAW POINTER IDENTITY, and a bare string
+  literal will pass in `constexpr` and fail at run time.** `block_unwind_marker`
+  (L14) and `throw_unwind_marker` (L15) are each backed by a *named*
+  `inline constexpr char[] ..._marker_storage` for exactly this reason: a
+  `constexpr char const *` initialized from an anonymous literal is folded to
+  that literal's address per use site, and with string-literal merging off (the
+  Asan build) equal content gets distinct addresses. **Any new marker L16 adds
+  must use the named-object pattern.** See `block_unwind_marker`'s doc comment
+  in `env.hpp`, and `EnvTest - ThrowUnwindMarkerHasStableRuntimeIdentity`.
+- **Corollary: `static_assert` merge-criteria tests are not sufficient alone.**
+  Every constexpr test needs a runtime `TEST_CASE` twin, and you must actually
+  run `make test`. This cost L14 the most time and is why L15 pairs all three
+  merge criteria.
+- **Recursive `defun` is unsupported (DIV-0009).** A closure captures a *copy*
+  of the environment before its own name is bound. Do not write a merge
+  program that relies on recursion; use iterative or lexically-nested
+  formulations. L14 and L15 both had to.
+- `env::set_value` is `const` and writes through the shared `store`; a special
+  binding that shadows a lexical one has to decide which cell `setq` hits.
+  Settle that explicitly and test it, in both evaluators.
 
 ## Standing constraints (unchanged)
 
 - `src/smd/smdscheme/**` frozen for semantic changes (D1) — reference only.
+  In particular `foundation::static_vector` has **no `pop_back`**; L15's catch
+  stack works around that with an explicit live-prefix depth counter
+  (`env_arena::depth_`). Reuse that pattern rather than editing the frozen tree.
 - Lane = `elaborator/**` + `closure/{eval_direct,cps_code,closure_program,
   value,env}.hpp` (+ tests + per-dir `CMakeLists.txt`). Do NOT touch
   `macroexpand/**` or `reader/**` (Track C).
-- C++26/GCC16; Catch2; header included first and twice; mirror file prolog /
-  include-guard / canonical-angle-include conventions.
-- Every public `constexpr` API gets a `static_assert`/constexpr test. Note the
-  `static_assert` merge-criteria tests are **not sufficient on their own** —
-  L14 proved a constexpr-green mechanism can still fail at run time (the marker
-  gotcha). Always add the runtime `TEST_CASE` twin and run `make test`.
-- File a DIV for any knowing ANSI CL deviation. Next free Track-A number is
-  **DIV-0010 or higher** — but DIV-0010 is claimed by the concurrent Track-C
-  lane, so re-check `docs/divergences/` before filing and take the next unused.
-- Before handoff: `make compile`, `make test`, `make lint` all green. If the
-  blog deliverable lands, verify `make blog-md` leaves every *other* phase's
-  `.md` unchanged and hand-edit `docs/blog/index.{org,md}` for just the new
-  entry (don't commit the regenerated, anchor-churned `index.md`).
-- Do not continue past L15 into L16 unless blocked; document blockers here.
+- Never edit inside a UUID anchor block anywhere.
+- C++26/GCC16; Catch2; component header included first and twice; file prolog
+  with repo-relative path + Emacs mode line, then SPDX; classical include
+  guards; canonical angle includes; co-located tests; constexpr-first.
+- File a DIV for any knowing ANSI CL deviation. **DIV-0011 is the highest used**
+  (L15); re-check `docs/divergences/` before filing and take the next unused.
+- Before handoff: `make compile`, `make test`, `make lint` all green.
+- Do not write the blog draft. The orchestrator dispatches blog posts
+  separately, *after* the step's `--no-ff` merge, so transclusions can be
+  pinned to a `blog/phase-NN` tag that only exists post-merge. Write nothing
+  under `docs/blog/`, and do not tick your step's `checklist.md` box.
+- Do not continue past L16 into L17. Document blockers here.
 
-## L14 discoveries L15 must account for
+## Open defect found during L15 (not fixed, deliberately out of lane scope)
 
-- **Recursive `defun` is unsupported — DIV-0009.** A closure captures a *copy*
-  of the environment before its own name is bound, so a function cannot call
-  itself (`undefined function` at run time); this is independent of
-  block/throw. Do **not** write a merge program that relies on recursion
-  (the predecessor's recursive `block` test was replaced with a non-recursive
-  same-name-nested-block witness for exactly this reason). Iterative / nested
-  formulations only, until a self-reference mechanism is added.
-- L14's own-activation property is witnessed by
-  `SameNameNestedBlockReturnFromTargetsInnermost` (both evaluators):
-  `(block b (+ 100 (block b (return-from b 5)))) => 105`. `catch`/`throw`
-  ordering tests should follow the same non-recursive, lexically-nested style.
+`cps_code.hpp`'s `cps_apply_function_value` builtin `switch` does **not** list
+`builtin_op::append`, so `(append ...)` under the CPS backend falls through to
+`unknown builtin`. `eval_direct.hpp` handles it correctly. This is a live
+`-Wswitch` warning on every build of `cps_code.hpp` and the only warning in
+the smdlisp tree. It matters because backquote (L18) lowers `,@x` onto that
+builtin, so splicing works under `eval_direct` and fails under CPS. The fix is
+to add `case builtin_op::append:` to the existing `cons`…`atom` group, plus a
+parity test. Left alone by L15 to keep the step to its stated scope; whoever
+picks it up should do it as its own small commit with its own test.
