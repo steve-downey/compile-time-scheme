@@ -63,3 +63,23 @@ convention for the steps listed above so this does not need a fresh divergence d
 The six orgit links were re-pointed from `wt-l6` to `main` immediately after the merge (commit follows this doc's update); the re-rendered `.md` differs only in an org-export id.
 Standing convention adopted for all later blog-bearing steps (L11, L13, L15, L19, L21, L24): workers author orgit links against their own worktree path so `make blog-md` works pre-merge; the orchestrator re-points them to `main` and re-renders as part of the merge, with no fresh divergence doc per occurrence.
 Status: resolved.
+
+## Superseded (2026-07-25)
+
+The repointing convention above is retired. Its root cause — an `orgit:` link naming a
+filesystem path, so a transclusion always shows the file *as of now* — was fixed properly by
+`docs/epistolary-pinning-plan.md`: posts now transclude via `orgit-file:` links pinned to a
+`blog/phase-NN` tag, resolved with `git show TAG:PATH` instead of a worktree read.
+
+A worker therefore authors the link **once**, naming the tag the orchestrator creates at the
+step's `--no-ff` merge, and nobody repoints anything afterwards. The consequence this doc
+worried about — that `wt-l6` may not exist as a checkout by the time anyone re-renders — no
+longer applies: the blob comes from git history, which is not disposable.
+
+This also fixed a live instance of the same bug in the other direction: `phase-5-fixpoint-trees.md`
+had been published with **five empty code blocks**, because its links pointed at `main` while
+the anchors existed only in the authoring worktree at generation time — exactly the failure mode
+described above, from before this doc was written. All five now resolve.
+
+Per-post pins are recorded in `docs/blog/pins.md`; `scripts/verify-transclusions.sh` enforces
+that posts pin and living docs do not.

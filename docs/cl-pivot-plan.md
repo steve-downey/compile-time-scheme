@@ -87,8 +87,16 @@ The plan is executed by an **orchestrator** agent managing **worker** sub-agents
   - Confirm the frozen-tree rule: no semantic edits inside `src/smd/smdscheme/**` UUID anchor blocks (check with `git diff -- src/smd/smdscheme` — anchor-block edits require a divergence doc and orchestrator sign-off).
   - Confirm `checklist.md` was ticked, durable cross-step facts recorded in `docs/compiler_architecture.org` (in place, by anchor), and the lane's step brief rewritten per the step-brief contract (forward-only, bounded, no log).
   - Confirm any deviation from this plan or from ANSI CL semantics has a divergence doc (section 3).
-  - Confirm `docs/compiler_architecture.org` transclusions still resolve: every `#+transclude:` target file exists and contains its UUID `start` and `<uuid> end` anchors. A file rename/move silently orphans a transclude, turning the living doc into dead narrative (this is exactly how the pre-pivot `schemepoc/*.hpp` anchors rotted). Quick check: `grep -oE 'file:[^:]+::[0-9a-f-]{36}' docs/compiler_architecture.org` and verify each target (relative to `docs/`) exists and contains the uuid twice.
+  - Confirm transclusions still resolve, in both document categories: run `scripts/verify-transclusions.sh`. Living docs (`docs/compiler_architecture.org`) are checked against the worktree — every `#+transclude:` target file must exist and contain its UUID anchor and `<uuid> end` marker, because a rename silently orphans a transclude and turns the living doc into dead narrative (this is exactly how the pre-pivot `schemepoc/*.hpp` anchors rotted). Blog posts are checked against the `blog/phase-NN` tag each one is pinned to, *not* the worktree.
 - Merge to main with `--no-ff` only when all checks pass.
+- **Immediately after a `--no-ff` merge of a step with a blog deliverable, before dispatching the blog agent:** create the post's pin tag on the merge commit and push it.
+
+  ```bash
+  git tag -a blog/phase-NN -m "Phase NN: <title> (step LNN)" <merge-sha>
+  git push origin blog/phase-NN
+  ```
+
+  The tag must exist before the blog agent runs, because the agent writes `orgit-file:` links naming it. Record the post-to-tag mapping in `docs/blog/pins.md`. This replaces the DIV-0004 convention of authoring links against the worker's worktree path and re-pointing them to `main` after the merge: pinned links are written once, correctly, and never need repointing.
 - **Branch policy:** all compiler work happens on feature branches, never directly on main.
   Main is always a complete set of work: a branch merges only when it finishes a feature goal (a step, or a coherent group of steps for one feature).
   Formatting-only and lint-only fixes are the exception: commit them by themselves, directly on main, before starting feature work, so feature diffs stay semantic.
@@ -283,6 +291,19 @@ Each new phase is drafted as `docs/blog/phase-NN-slug.org` in the established fo
 | 22 | What we left out, and why it matters | L24 |
 
 Prose rules: one sentence per line; drafts are written in the author's voice per the repo's voice conventions and are marked `DRAFT — pending author revision` at the top; agents draft, the author finalizes.
+
+Transclusion rules (`docs/epistolary-pinning-plan.md`; mapping in `docs/blog/pins.md`):
+
+- A post transcludes code **pinned to its own step's tag**, never from the worktree:
+
+  ```org
+  #+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-NN::src/smd/smdlisp/<file>.hpp::<uuid>]] :lines 2- :src cpp :end "<uuid> end"
+  ```
+
+  The orchestrator creates `blog/phase-NN` at the step's `--no-ff` merge before dispatching the blog agent (section 2), so the tag already exists when the post is written. Attributes are unchanged from the worktree form; only the link type and the added `::TAG` segment differ.
+- The anchor must exist **at the pin**, which is a weaker obligation than existing in the worktree. A later step may move, rename, reformat, or delete an anchored region without owing anything to already-published posts — `git show TAG:PATH` is indifferent to the worktree. This is what makes the frozen-tree rule on `src/smd/smdscheme/**` (D1) a semantic constraint rather than a textual one: phases 5–12 are pinned, so their code can no longer be rewritten from under them.
+- Living documents are the opposite policy and keep worktree resolution: `docs/compiler_architecture.org` transcludes via plain `file:` links and is *supposed* to roll forward. Never pin a living doc, and never leave a worktree-form link in a post; `scripts/verify-transclusions.sh` enforces both directions.
+- A post is a real-time, non-omniscient diary entry. Its code is frozen with its prose, so re-running `make blog-md` on the back catalogue must not change any transcluded block. If it does, something is wrong with the pin, not with the post.
 Phase 15 is the pivot-rationale post and draws directly on section 0 of this plan; it should also note that phase 14's `set!`/store work survives the pivot as the seed of `setq` (L12) and that the pairs work seeds the CL list machinery (L8).
 
 ---
