@@ -208,3 +208,63 @@ TEST_CASE("SmdlispTest - CompiledLispReportsRuntimeErrorForUnboundName") {
     auto r = lisp::compiled_lisp<"(+ nope 1)">(environment, envs);
     REQUIRE_FALSE(r.has_value());
 }
+
+// -- multiple values through the public surface (step L20) ---------------
+//
+// Both L20 merge criteria, restated through `compiled_lisp` itself. Neither
+// program materializes a closure inside the *public variable template*'s own
+// evaluation path... except that `multiple-value-bind` always does (it is
+// lowered to a lambda application), so per DIV-0013 its constexpr twin uses
+// a function-local `lisp_program` while the runtime twin uses
+// `compiled_lisp` directly.
+
+using mvb_t =
+    lisp::lisp_program<"(multiple-value-bind (a b) (values 1 2) (+ a b))">;
+
+static_assert([] {
+    mvb_t::env_arena_type envs;
+    auto environment = lisp::closure::default_env<Core, 16>();
+    mvb_t const program{};
+    auto r = program(environment, envs);
+    return r.has_value() && std::holds_alternative<int>(r.value()) &&
+           std::get<int>(r.value()) == 3;
+}());
+
+// `(+ (values 1 2) 10)` builds no closure, so the public variable template
+// is directly constant-evaluable here.
+static_assert([] {
+    lisp::lisp_program<"(+ (values 1 2) 10)">::env_arena_type envs;
+    auto environment = lisp::closure::default_env<Core, 16>();
+    auto r = lisp::compiled_lisp<"(+ (values 1 2) 10)">(environment, envs);
+    return r.has_value() && std::holds_alternative<int>(r.value()) &&
+           std::get<int>(r.value()) == 11;
+}());
+
+TEST_CASE("SmdlispTest - CompiledLispBindsMultipleValues") {
+    mvb_t::env_arena_type envs;
+    auto environment = lisp::closure::default_env<Core, 16>();
+    auto r =
+        lisp::compiled_lisp<"(multiple-value-bind (a b) (values 1 2) (+ a b))">(
+            environment, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE(
+    "SmdlispTest - CompiledLispTakesThePrimaryValueInASingleValueContext") {
+    lisp::lisp_program<"(+ (values 1 2) 10)">::env_arena_type envs;
+    auto environment = lisp::closure::default_env<Core, 16>();
+    auto r = lisp::compiled_lisp<"(+ (values 1 2) 10)">(environment, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 11);
+}
+
+TEST_CASE("SmdlispTest - CompiledLispReadsZeroValuesAsNil") {
+    // `(values)` returns no values at top level; the single-value call
+    // surface reports nil, per ANSI CL.
+    lisp::lisp_program<"(values)">::env_arena_type envs;
+    auto environment = lisp::closure::default_env<Core, 16>();
+    auto r = lisp::compiled_lisp<"(values)">(environment, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
+}

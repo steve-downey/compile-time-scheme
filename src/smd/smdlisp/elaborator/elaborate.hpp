@@ -394,8 +394,8 @@ constexpr auto elaborate_function_position(
 /// Elaborates a datum list into a core form.
 ///
 /// Recognizes the special operators `quote`, `if`, `progn`, `let`, `let*`,
-/// `lambda`, `function`, `block`, `return-from`, `catch`, `throw`, and
-/// `unwind-protect` by inspecting the
+/// `lambda`, `function`, `block`, `return-from`, `catch`, `throw`,
+/// `unwind-protect`, and `multiple-value-bind` by inspecting the
 /// leading symbol (folded spellings, per decision D2). Any other head is an
 /// ordinary application, whose head is elaborated through @ref
 /// elaborate_function_position (a bare symbol resolves in the FUNCTION
@@ -819,6 +819,77 @@ constexpr auto elaborate_list(
             return core{core_f{std::move(dv)}};
         }
 
+        // Note what is NOT recognized here: `values`.  It is a *function* in
+        // ANSI CL, and step L20 keeps it one -- an ordinary builtin in the
+        // FUNCTION namespace -- so `(values 1 2)` falls through to the
+        // application path below like any other call.  See
+        // core_multiple_value_bind's docs for why the binding form cannot
+        // get the same treatment.
+        if (name == "MULTIPLE-VALUE-BIND") {
+            // (multiple-value-bind (var...) values-form body...)
+            //   -> core_multiple_value_bind{values-form,
+            //                               (lambda (var...) body...)}
+            // The body is carried by a real core_lambda so that binding
+            // reuses `let`'s exact lowering -- and therefore step L16's
+            // special-variable rule -- rather than restating it; see
+            // core_multiple_value_bind's docs.
+            if (lst.elements.size() < 3)
+                return smdscheme::foundation::parse_error{
+                    {},
+                    "multiple-value-bind: expected a variable list and a "
+                    "values form"};
+
+            auto const &vars_node = datum_arena.get(lst.elements[1]);
+            if (!std::holds_alternative<DatumList>(vars_node.inner))
+                return smdscheme::foundation::parse_error{
+                    {}, "multiple-value-bind: variables must be a list"};
+            auto const &vars = std::get<DatumList>(vars_node.inner);
+
+            core_lambda<core, MaxNodes, MaxList> lam{};
+            for (int i = 0; i < vars.elements.size(); ++i) {
+                auto const &v = datum_arena.get(vars.elements[i]);
+                if (!std::holds_alternative<reader::datum_symbol>(v.inner))
+                    return smdscheme::foundation::parse_error{
+                        {}, "multiple-value-bind: variable must be a symbol"};
+                auto v_name =
+                    std::get<reader::datum_symbol>(v.inner).name.view();
+                for (auto const &existing : lam.params) {
+                    if (existing == v_name)
+                        return smdscheme::foundation::parse_error{
+                            {}, "multiple-value-bind: duplicate variable"};
+                }
+                lam.params.push_back(v_name);
+            }
+
+            auto values_r = elaborate_node<MaxNodes, MaxList>(
+                datum_arena.get(lst.elements[2]), datum_arena, core_arena,
+                block_scope);
+            if (!values_r.has_value())
+                return values_r;
+
+            for (int i = 3; i < lst.elements.size(); ++i) {
+                auto body_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[i]), datum_arena, core_arena,
+                    block_scope);
+                if (!body_r.has_value())
+                    return body_r;
+                lam.body.push_back(smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(body_r.value())));
+            }
+            // A zero-form body is legal and evaluates to nil, exactly as
+            // `block`'s and `catch`'s are.
+            if (lam.body.empty())
+                lam.body.push_back(smdscheme::foundation::make_arena_box(
+                    core_arena, core{core_f{core_nil{}}}));
+
+            auto values_box = smdscheme::foundation::make_arena_box(
+                core_arena, std::move(values_r.value()));
+            auto lambda_box = smdscheme::foundation::make_arena_box(
+                core_arena, core{core_f{std::move(lam)}});
+            return core{core_f{core_multiple_value_bind<core, MaxNodes>{
+                values_box, lambda_box}}};
+        }
+
         if (name == "LET") {
             // (let ((name expr)...) body...)
             //   -> ((lambda (name...) body...) expr...)
@@ -1122,9 +1193,9 @@ constexpr auto elaborate_node(
 /// This is the public entry point for the elaboration phase: it converts
 /// the raw datum from the reader into a typed core expression, classifying
 /// the special operators `quote`, `if`, `progn`, `let`, `let*`, `lambda`,
-/// `function`, `block`, `return-from`, `catch`, `throw`, and
-/// `unwind-protect`, and emitting errors for
-/// malformed input. Elaboration begins with an empty lexical block scope
+/// `function`, `block`, `return-from`, `catch`, `throw`,
+/// `unwind-protect`, and `multiple-value-bind`, and emitting errors
+/// for malformed input. Elaboration begins with an empty lexical block scope
 /// (@ref detail::block_scope_type) -- see that type's docs for why
 /// `return-from` validation is a purely lexical, elaboration-time decision
 /// (decision D5).

@@ -25,6 +25,19 @@ constexpr int MaxEnvs = 32;
 using Core = lisp::elaborator::core_type<MaxNodes, MaxList>;
 using Val = lisp::closure::value<Core>;
 using Res = scm::foundation::result<Val>;
+/// Step L20 made CPS continuations n-ary: a continuation is handed the
+/// form's whole value list, not one value.  These two aliases and the
+/// @ref primary helper are all this file needs to keep the pre-L20 tests
+/// reading exactly as they did.
+using Vals = lisp::closure::value_list<Core, lisp::closure::default_max_values>;
+using ResV = scm::foundation::result<Vals>;
+
+/// Runs @p code to completion and narrows the result to its primary value.
+constexpr auto primary(ResV const &r) -> Res {
+    if (!r.has_value())
+        return Res{r.error()};
+    return lisp::closure::primary_value(r.value());
+}
 using DatumArena =
     scm::foundation::tree_arena<lisp::reader::datum_type<MaxNodes, MaxList>,
                                 MaxNodes>;
@@ -55,7 +68,7 @@ auto run(std::string_view src, DatumArena &datum_arena, CoreArena &core_arena,
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             root, core_arena);
-    return code(environment, envs, [](Val v) -> Res { return v; });
+    return primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
 }
 
 /// Like @ref run, but builds a *mutable* environment (a shared @ref Store,
@@ -77,7 +90,7 @@ auto run_mut(std::string_view src, DatumArena &datum_arena,
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             root, core_arena);
-    return code(environment, envs, [](Val v) -> Res { return v; });
+    return primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
 }
 
 } // namespace
@@ -106,7 +119,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 2;
 }());
@@ -129,7 +143,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 2;
 }());
@@ -152,7 +167,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
     if (!vr.has_value() ||
         !std::holds_alternative<lisp::closure::pair_ref>(vr.value()))
         return false;
@@ -184,7 +200,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 8;
 }());
@@ -444,7 +461,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 42;
 }());
@@ -471,7 +489,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 0;
 }());
@@ -624,8 +643,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr =
-        code(environment, envs, lisp::closure::detail::identity_k<Core>{});
+    auto vr = primary(
+        code(environment, envs, lisp::closure::detail::identity_k<Core>{}));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 12;
 }());
@@ -650,8 +669,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr =
-        code(environment, envs, lisp::closure::detail::identity_k<Core>{});
+    auto vr = primary(
+        code(environment, envs, lisp::closure::detail::identity_k<Core>{}));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 100;
 }());
@@ -676,8 +695,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr =
-        code(environment, envs, lisp::closure::detail::identity_k<Core>{});
+    auto vr = primary(
+        code(environment, envs, lisp::closure::detail::identity_k<Core>{}));
     return !vr.has_value();
 }());
 
@@ -933,7 +952,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 2 && envs.dynamic_depth() == 0;
 }());
@@ -958,7 +978,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 1 && envs.dynamic_depth() == 0;
 }());
@@ -983,7 +1004,8 @@ static_assert([] {
     auto code =
         lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
             er.value(), ca);
-    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
     return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
            std::get<int>(vr.value()) == 3 && envs.dynamic_depth() == 0;
 }());
@@ -1142,4 +1164,263 @@ TEST_CASE("CpsCodeTest - EveryDynamicExitPathRestoresTheBindingStack") {
                           ca3, root3, heap3, store3, envs3)
                       .has_value());
     REQUIRE(envs3.dynamic_depth() == 0);
+}
+
+// -- multiple values (step L20) ---------------------------------------------
+// -- merge criteria (docs/cl-pivot-plan.md, step L20) ------------------
+//
+// The same set eval_direct.test.cpp asserts, run through compile_cps -- the
+// standing L13 parity criterion, extended to the n-ary continuation.
+
+namespace {
+
+/// Runs @p src through the CPS backend and returns the terminal
+/// continuation's whole value list, not just its primary value.
+auto run_values(std::string_view src, DatumArena &datum_arena,
+                CoreArena &core_arena, Core &root, Heap &heap, Store &store,
+                Envs &envs) -> ResV {
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{src}, datum_arena);
+    if (!dr.has_value())
+        return ResV{dr.error()};
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(
+        dr.value().value, datum_arena, core_arena);
+    if (!er.has_value())
+        return ResV{er.error()};
+    root = er.value();
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            root, core_arena);
+    return code(environment, envs, lisp::closure::detail::identity_k<Core>{});
+}
+
+constexpr auto mvb_sum_src =
+    "(multiple-value-bind (a b) (values 1 2) (+ a b))"sv;
+constexpr auto values_primary_src = "(+ (values 1 2) 10)"sv;
+
+} // namespace
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{mvb_sum_src}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr = primary(
+        code(environment, envs, lisp::closure::detail::identity_k<Core>{}));
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 3;
+}());
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{values_primary_src}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr = primary(
+        code(environment, envs, lisp::closure::detail::identity_k<Core>{}));
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 11;
+}());
+
+TEST_CASE("CpsCodeTest - MultipleValueBindSumsTwoValues") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run(mvb_sum_src, da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("CpsCodeTest - ValuesInSingleValueContextYieldsPrimary") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run(values_primary_src, da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 11);
+}
+
+TEST_CASE("CpsCodeTest - ContinuationReceivesEveryValue") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_values("(values 1 2 3)", da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(r.value().size() == 3);
+    REQUIRE(std::get<int>(r.value()[2]) == 3);
+}
+
+TEST_CASE("CpsCodeTest - ZeroValuesReadAsNilInSingleValueContext") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto n = run_values("(values)", da, ca, root, heap, store, envs);
+    REQUIRE(n.has_value());
+    REQUIRE(n.value().empty());
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto r = run("(if (values) 1 2)", da2, ca2, root2, heap2, envs2);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 2);
+}
+
+TEST_CASE("CpsCodeTest - MissingValuesPadWithNilAndSurplusIsDiscarded") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto pad = run("(multiple-value-bind (a b) (values 7) (if b 1 a))", da, ca,
+                   root, heap, envs);
+    REQUIRE(pad.has_value());
+    REQUIRE(std::get<int>(pad.value()) == 7);
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto drop = run("(multiple-value-bind (a) (values 4 5 6) a)", da2, ca2,
+                    root2, heap2, envs2);
+    REQUIRE(drop.has_value());
+    REQUIRE(std::get<int>(drop.value()) == 4);
+}
+
+TEST_CASE("CpsCodeTest - ValuesPropagateThroughIfAndPrognTailPositions") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto i = run("(multiple-value-bind (a b) (if t (values 1 2) nil) (+ a b))",
+                 da, ca, root, heap, envs);
+    REQUIRE(i.has_value());
+    REQUIRE(std::get<int>(i.value()) == 3);
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto p = run("(multiple-value-bind (a b) (progn 0 (values 5 6)) (+ a b))",
+                 da2, ca2, root2, heap2, envs2);
+    REQUIRE(p.has_value());
+    REQUIRE(std::get<int>(p.value()) == 11);
+}
+
+TEST_CASE("CpsCodeTest - ValuesPropagateThroughFunctionReturn") {
+    // A call is a continuation barrier under CPS (see
+    // cps_apply_function_value), so this is the test that says the barrier
+    // does not swallow the secondary values on the way back out.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defun two () (values 3 4))"
+                     "  (multiple-value-bind (a b) (two) (+ a b)))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 7);
+}
+
+TEST_CASE("CpsCodeTest - ValuesPropagateThroughUnwindProtect") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((log 0))"
+                     "  (+ (multiple-value-bind (a b)"
+                     "         (unwind-protect (values 1 2) (setq log 10))"
+                     "       (+ a b))"
+                     "     log))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 13);
+}
+
+TEST_CASE("CpsCodeTest - ValuesIsAnOrdinaryFunctionUnderFuncallAndApply") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto f = run("(multiple-value-bind (a b) (funcall #'values 1 2) (+ a b))",
+                 da, ca, root, heap, envs);
+    REQUIRE(f.has_value());
+    REQUIRE(std::get<int>(f.value()) == 3);
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto a =
+        run("(multiple-value-bind (a b) (apply #'values (list 1 2)) (+ a b))",
+            da2, ca2, root2, heap2, envs2);
+    REQUIRE(a.has_value());
+    REQUIRE(std::get<int>(a.value()) == 3);
+}
+
+TEST_CASE("CpsCodeTest - MultipleValueBindBindsSpecialsDynamically") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn"
+                     "  (defvar *x* 1)"
+                     "  (defun get-x () *x*)"
+                     "  (+ (multiple-value-bind (*x*) (values 2) (get-x))"
+                     "     (get-x)))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+    REQUIRE(envs.dynamic_depth() == 0);
 }

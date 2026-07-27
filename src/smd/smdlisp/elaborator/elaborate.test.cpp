@@ -859,3 +859,85 @@ TEST_CASE("ElaborateTest - ReturnFromInsideUnwindProtectSeesEnclosingBlock") {
     REQUIRE(
         elab("(block b (catch 'c (return-from b 1)))", da2, ca2).has_value());
 }
+
+// -- multiple values (step L20) -----------------------------------------
+
+TEST_CASE("ElaborateTest - ValuesIsAnOrdinaryApplicationNotASpecialOperator") {
+    // ANSI CL: `values` is a function. There is no core_values node; the
+    // form elaborates to an application whose head resolves in the FUNCTION
+    // namespace, which is what makes `#'values` and `funcall` work.
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(values 1 2)", da, ca);
+    REQUIRE(er.has_value());
+    using App = lisp::elaborator::core_application<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<App>(er.value().inner));
+    auto const &app = std::get<App>(er.value().inner);
+    REQUIRE(app.args.size() == 2);
+    using Fn = lisp::elaborator::core_function<Core, MaxNodes>;
+    auto const &fn = std::get<Fn>(ca.get(app.func).inner);
+    REQUIRE(std::get<std::string_view>(fn.target) == "VALUES");
+}
+
+TEST_CASE("ElaborateTest - MultipleValueBindLowersToALambdaOverTheNames") {
+    // The binding form carries its body in a real core_lambda so that
+    // calling it inherits implicit progn, arity checking, closure capture
+    // and L16's special-variable rule with nothing restated.
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(multiple-value-bind (a b) (values 1 2) a b)", da, ca);
+    REQUIRE(er.has_value());
+    using Mvb = lisp::elaborator::core_multiple_value_bind<Core, MaxNodes>;
+    REQUIRE(std::holds_alternative<Mvb>(er.value().inner));
+    auto const &mvb = std::get<Mvb>(er.value().inner);
+    using Lambda = lisp::elaborator::core_lambda<Core, MaxNodes, MaxList>;
+    auto const &lam = std::get<Lambda>(ca.get(mvb.lambda_node).inner);
+    REQUIRE(lam.params.size() == 2);
+    REQUIRE(lam.params[0] == "A");
+    REQUIRE(lam.params[1] == "B");
+    REQUIRE(lam.body.size() == 2);
+}
+
+TEST_CASE("ElaborateTest - MultipleValueBindWithNoBodyGetsANilBody") {
+    // Same invariant core_block and core_catch hold: the evaluators may
+    // assume at least one body form.
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(multiple-value-bind (a) (values 1))", da, ca);
+    REQUIRE(er.has_value());
+    using Mvb = lisp::elaborator::core_multiple_value_bind<Core, MaxNodes>;
+    auto const &mvb = std::get<Mvb>(er.value().inner);
+    using Lambda = lisp::elaborator::core_lambda<Core, MaxNodes, MaxList>;
+    auto const &lam = std::get<Lambda>(ca.get(mvb.lambda_node).inner);
+    REQUIRE(lam.body.size() == 1);
+    REQUIRE(std::holds_alternative<lisp::elaborator::core_nil>(
+        ca.get(lam.body[0]).inner));
+}
+
+TEST_CASE("ElaborateTest - MalformedMultipleValueBindIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(multiple-value-bind (a))", da, ca).has_value());
+    DatumArena da2;
+    CoreArena ca2;
+    REQUIRE(
+        !elab("(multiple-value-bind a (values 1) a)", da2, ca2).has_value());
+    DatumArena da3;
+    CoreArena ca3;
+    REQUIRE(
+        !elab("(multiple-value-bind (1) (values 1) 1)", da3, ca3).has_value());
+    DatumArena da4;
+    CoreArena ca4;
+    REQUIRE(!elab("(multiple-value-bind (a a) (values 1 2) a)", da4, ca4)
+                 .has_value());
+}
+
+TEST_CASE(
+    "ElaborateTest - ReturnFromInsideMultipleValueBindSeesEnclosingBlock") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(elab("(block b (multiple-value-bind (a) (values 1)"
+                 "            (return-from b a)))",
+                 da, ca)
+                .has_value());
+}

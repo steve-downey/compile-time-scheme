@@ -1396,3 +1396,417 @@ TEST_CASE("EvalDirectTest - EveryDynamicExitPathRestoresTheBindingStack") {
                       .has_value());
     REQUIRE(envs3.dynamic_depth() == 0);
 }
+
+// -- multiple values (step L20) ---------------------------------------------
+// -- merge criteria (docs/cl-pivot-plan.md, step L20) ------------------
+
+namespace {
+
+/// Like @ref run_mut, but returns the whole value list rather than only the
+/// primary value -- the only way to observe from outside that `(values 1 2)`
+/// really did produce two values rather than a single one.
+auto run_values(std::string_view src, DatumArena &datum_arena,
+                CoreArena &core_arena, Core &root, Heap &heap, Store &store,
+                Envs &envs)
+    -> scm::foundation::result<
+        lisp::closure::value_list<Core, lisp::closure::default_max_values>> {
+    using ResV = scm::foundation::result<
+        lisp::closure::value_list<Core, lisp::closure::default_max_values>>;
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{src}, datum_arena);
+    if (!dr.has_value())
+        return ResV{dr.error()};
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(
+        dr.value().value, datum_arena, core_arena);
+    if (!er.has_value())
+        return ResV{er.error()};
+    root = er.value();
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    return lisp::closure::eval_direct_values<MaxNodes, MaxList, MaxBindings,
+                                             MaxEnvs>(root, core_arena,
+                                                      environment, envs);
+}
+
+/// The plan's first L20 merge criterion, verbatim.
+constexpr auto mvb_sum_src =
+    "(multiple-value-bind (a b) (values 1 2) (+ a b))"sv;
+
+/// The plan's second L20 merge criterion, verbatim: an argument position is
+/// a single-value context, so `(values 1 2)` contributes only its primary
+/// value and the sum is 11, not 13.
+constexpr auto values_primary_src = "(+ (values 1 2) 10)"sv;
+
+} // namespace
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{mvb_sum_src}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 3;
+}());
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{values_primary_src}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment = lisp::closure::default_env<Core, MaxBindings>(heap);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 11;
+}());
+
+TEST_CASE("EvalDirectTest - MultipleValueBindSumsTwoValues") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run(mvb_sum_src, da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("EvalDirectTest - ValuesInSingleValueContextYieldsPrimary") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run(values_primary_src, da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 11);
+}
+
+TEST_CASE("EvalDirectTest - ValuesReallyReturnsMoreThanOneValue") {
+    // The single-value tests above would also pass if `values` simply
+    // returned its first argument. This is the one that says otherwise.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_values("(values 1 2 3)", da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(r.value().size() == 3);
+    REQUIRE(std::get<int>(r.value()[0]) == 1);
+    REQUIRE(std::get<int>(r.value()[2]) == 3);
+}
+
+TEST_CASE("EvalDirectTest - ZeroValuesReadAsNilInSingleValueContext") {
+    // ANSI CL: `(values)` returns zero values; a single-value context that
+    // receives none sees nil, which is false (D3).
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto n = run_values("(values)", da, ca, root, heap, store, envs);
+    REQUIRE(n.has_value());
+    REQUIRE(n.value().empty());
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto r = run("(if (values) 1 2)", da2, ca2, root2, heap2, envs2);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 2);
+}
+
+TEST_CASE("EvalDirectTest - MissingValuesPadWithNil") {
+    // Three variables, one value: b and c are nil.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(multiple-value-bind (a b c) (values 7) (if b 1 (if c 2 a)))",
+                 da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 7);
+}
+
+TEST_CASE("EvalDirectTest - MultipleValueBindOverZeroValuesBindsNil") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(multiple-value-bind (a) (values) (if a 1 2))", da, ca, root,
+                 heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 2);
+}
+
+TEST_CASE("EvalDirectTest - SurplusValuesAreDiscarded") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(multiple-value-bind (a) (values 4 5 6) a)", da, ca, root,
+                 heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 4);
+}
+
+TEST_CASE("EvalDirectTest - MultipleValueBindWithNoVariablesRunsItsBody") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(multiple-value-bind () (values 1 2) 9)", da, ca, root, heap,
+                 envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 9);
+}
+
+TEST_CASE("EvalDirectTest - ValuesPropagateThroughIfTailPosition") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(multiple-value-bind (a b) (if t (values 1 2) nil) (+ a b))",
+                 da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("EvalDirectTest - ValuesPropagateThroughPrognTailPosition") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(multiple-value-bind (a b) (progn 0 (values 5 6)) (+ a b))",
+                 da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 11);
+}
+
+TEST_CASE("EvalDirectTest - ValuesPropagateThroughFunctionReturn") {
+    // The lambda body's last form is in tail position, so a function really
+    // does return multiple values to its caller.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defun two () (values 3 4))"
+                     "  (multiple-value-bind (a b) (two) (+ a b)))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 7);
+}
+
+TEST_CASE("EvalDirectTest - ValuesPropagateThroughUnwindProtect") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((log 0))"
+                     "  (+ (multiple-value-bind (a b)"
+                     "         (unwind-protect (values 1 2) (setq log 10))"
+                     "       (+ a b))"
+                     "     log))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 13);
+}
+
+TEST_CASE("EvalDirectTest - ValuesIsAnOrdinaryFunctionUnderFuncall") {
+    // `values` is a FUNCTION in ANSI CL, not a special operator, so `#'values`
+    // names it and `funcall` calls it -- multiple values and all.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(multiple-value-bind (a b) (funcall #'values 1 2) (+ a b))",
+                 da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("EvalDirectTest - ValuesIsAnOrdinaryFunctionUnderApply") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r =
+        run("(multiple-value-bind (a b) (apply #'values (list 1 2)) (+ a b))",
+            da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("EvalDirectTest - MultipleValueBindBodyIsImplicitProgn") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((log 0))"
+                     "  (multiple-value-bind (a b) (values 1 2)"
+                     "    (setq log 1) (+ a b log)))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 4);
+}
+
+TEST_CASE("EvalDirectTest - MultipleValueBindClosesOverTheAmbientEnvironment") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(let ((outer 10))"
+                 "  (multiple-value-bind (a b) (values 1 2) (+ a b outer)))",
+                 da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 13);
+}
+
+TEST_CASE("EvalDirectTest - MultipleValueBindBindsSpecialsDynamically") {
+    // The step L16 witness, restated over `multiple-value-bind`: because the
+    // form lowers to a real lambda application, it inherits the rule that a
+    // `defvar`-marked name binds dynamically -- and restores on the way out.
+    // `get-x` sees 2 inside the extent and 1 after it. 2 + 1.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn"
+                     "  (defvar *x* 1)"
+                     "  (defun get-x () *x*)"
+                     "  (+ (multiple-value-bind (*x*) (values 2) (get-x))"
+                     "     (get-x)))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+    REQUIRE(envs.dynamic_depth() == 0);
+}
+
+TEST_CASE("EvalDirectTest - MultipleValueBindRejectsMalformedForms") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    REQUIRE_FALSE(
+        run("(multiple-value-bind (a))", da, ca, root, heap, envs).has_value());
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    REQUIRE_FALSE(run("(multiple-value-bind a (values 1) a)", da2, ca2, root2,
+                      heap2, envs2)
+                      .has_value());
+
+    DatumArena da3;
+    CoreArena ca3;
+    Heap heap3;
+    Core root3;
+    Envs envs3;
+    REQUIRE_FALSE(run("(multiple-value-bind (a a) (values 1 2) a)", da3, ca3,
+                      root3, heap3, envs3)
+                      .has_value());
+}
+
+TEST_CASE("EvalDirectTest - NonlocalExitPayloadsCarryOnlyThePrimaryValue") {
+    // DIV-0019, pinned: an unwind payload lives in a single-value
+    // exit_record/catch_record, so `return-from` and `throw` narrow. If a
+    // later step widens those records this test is what tells it to.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(multiple-value-bind (a b)"
+                 "    (block blk (return-from blk (values 1 2)))"
+                 "  (if b 99 a))",
+                 da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto t = run("(multiple-value-bind (a b)"
+                 "    (catch 'c (throw 'c (values 1 2)))"
+                 "  (if b 99 a))",
+                 da2, ca2, root2, heap2, envs2);
+    REQUIRE(t.has_value());
+    REQUIRE(std::get<int>(t.value()) == 1);
+}
+
+TEST_CASE("EvalDirectTest - MoreValuesThanMaxValuesIsDiagnosed") {
+    // DIV-0020: the payload width is `default_max_values` (8), below ANSI
+    // CL's required minimum of 20. Overflowing it is an error the user can
+    // see, not a truncation.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(values 1 2 3 4 5 6 7 8 9)", da, ca, root, heap, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} ==
+            "values: more values than MaxValues");
+}
+
+TEST_CASE("EvalDirectTest - MultipleValueListIsNotProvided") {
+    // DIV-0020: the operator set is `values` and `multiple-value-bind` only.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    REQUIRE_FALSE(
+        run("(multiple-value-list (values 1 2))", da, ca, root, heap, envs)
+            .has_value());
+}

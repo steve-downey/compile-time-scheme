@@ -56,6 +56,25 @@ struct closure_program {
     constexpr auto operator()(env<Core, MaxBindings> &environment,
                               env_arena<Core, MaxBindings, MaxEnvs> &envs) const
         -> smd::smdscheme::foundation::result<value<Core>> {
+        auto r = call_values(environment, envs);
+        if (!r.has_value())
+            return smd::smdscheme::foundation::result<value<Core>>{r.error()};
+        return primary_value(r.value());
+    }
+
+    /// Evaluates the program and returns **all** the values it produced
+    /// (step L20).
+    ///
+    /// The n-ary counterpart of @ref operator(): a top-level `(values 1 2)`
+    /// really does produce two values, and this is where a caller can see
+    /// them. @ref operator() is the single-value adapter over this, taking
+    /// @ref primary_value -- so a program ending in `(values)` reads as
+    /// `nil` through the ordinary call, per ANSI CL.
+    constexpr auto
+    call_values(env<Core, MaxBindings> &environment,
+                env_arena<Core, MaxBindings, MaxEnvs> &envs) const
+        -> smd::smdscheme::foundation::result<
+            value_list<Core, default_max_values>> {
         return code(environment, envs, detail::identity_k<Core>{});
     }
 };

@@ -483,6 +483,59 @@ struct core_unwind_protect {
 };
 // 46e1d48b-cfc0-44dc-a723-1f701ed49bc0 end
 
+// 98a22b58-964f-4853-be88-20a1d4a9b9d6
+/// A Common Lisp `multiple-value-bind` form:
+/// `(multiple-value-bind (var...) values-form body...)`.
+///
+/// Evaluates @ref values_form, then binds the variables named by
+/// @ref lambda_node's parameter list to the values it produced -- padding
+/// with `nil` when it produced fewer than there are variables, and dropping
+/// the surplus when it produced more (ANSI CL) -- and evaluates the body with
+/// those bindings in force.
+///
+/// **There is deliberately no `core_values` node beside this one.** `values`
+/// is a *function* in ANSI CL, not a special operator, and once the
+/// evaluators' return channel is n-ary (`closure::value_list`, step L20)
+/// nothing is gained by pretending otherwise: `values` is an ordinary
+/// builtin in the FUNCTION namespace (`closure::builtin_op::values`), so
+/// `(values 1 2)` elaborates to a plain @ref core_application, and
+/// `#'values`, `(funcall #'values 1 2)` and `(apply #'values '(1 2))` all
+/// work with no further machinery.  `multiple-value-bind` cannot be given
+/// the same treatment, because it is a *binding* form: its variables are not
+/// argument expressions but names, and the values they take are only known
+/// once @ref values_form has run.
+///
+/// **@ref lambda_node is a real @ref core_lambda**, holding the variable
+/// names as its parameters and the body forms as its body, and the evaluators
+/// bind by *calling* it. This is the same "lower a binding form to a lambda
+/// application" strategy @ref detail::elaborate_list already uses for `let`
+/// and `let*`, and it is what makes `multiple-value-bind` inherit, for free
+/// and without restating any of it, the whole of: implicit progn, arity
+/// checking, closure capture, and -- crucially -- the special-variable rule
+/// that a bound name marked by `defvar`/`defparameter` binds *dynamically*
+/// rather than lexically (`eval_direct.hpp`'s
+/// @c detail::bind_lambda_parameters, step L16). The one thing it cannot be
+/// lowered to is a bare @ref core_application, because the arguments are not
+/// expressions at all: they are the elements of a value list that only
+/// exists once @ref values_form has been evaluated, padded and truncated to
+/// the parameter count.
+///
+/// A zero-form body is legal and evaluates to `nil`;
+/// @ref detail::elaborate_list synthesizes a single @ref core_nil body element
+/// in that case, matching @ref core_block's and @ref core_catch's identical
+/// invariant.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+template <typename R, int MaxNodes>
+struct core_multiple_value_bind {
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        values_form; ///< The form whose (possibly multiple) values are bound.
+    smdscheme::foundation::arena_box<R, MaxNodes>
+        lambda_node; ///< A @ref core_lambda over the bound names; see above.
+};
+// 98a22b58-964f-4853-be88-20a1d4a9b9d6 end
+
 /// Factory template that produces the open-recursive variant layer for the
 /// core AST.
 ///
@@ -500,7 +553,8 @@ struct core_f_factory {
         core_setq<R, MaxNodes, MaxList>, core_defun<R, MaxNodes>,
         core_defvar<R, MaxNodes>, core_block<R, MaxNodes, MaxList>,
         core_return_from<R, MaxNodes>, core_catch<R, MaxNodes, MaxList>,
-        core_throw<R, MaxNodes>, core_unwind_protect<R, MaxNodes, MaxList>>;
+        core_throw<R, MaxNodes>, core_unwind_protect<R, MaxNodes, MaxList>,
+        core_multiple_value_bind<R, MaxNodes>>;
 };
 
 /// The concrete recursive core AST type, formed as the fixed point of
