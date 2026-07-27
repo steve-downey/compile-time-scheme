@@ -1,0 +1,222 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+bibliography: references.bib
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 21 - Common Lisp Control Flow as Sender Graphs
+#+AUTHOR: Steve Downey
+#+DATE: 2026-07-27
+
+*DRAFT --- pending author revision*
+
+#+begin_abstract
+Phase 15 argued that Common Lisp's control operators are the largest control vocabulary a structured-concurrency backend can express soundly, and Phase 19 built them in two evaluators that had never met a sender.
+This is the step where they meet one.
+The closure backends push four different things down a single ~result<value>~ wire and tell them apart with sentinel error messages compared by pointer identity; a sender already has three completion channels, so the sentinels get deleted instead of ported.
+The payoff is ~unwind-protect~, which stops being an evaluator special case and becomes an ordinary sender adapter: a receiver whose three completion functions all funnel into one cleanup call.
+The counterweight is that dynamic-binding restore does not move at all, and stays in the C++ control flow around a recursive call.
+#+end_abstract
+
+#+MACRO: TEASER_END
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-20-defmacro.org][Phase 20 - defmacro ←]]
+#+html: </nav>
+
+
+* Four things on one wire
+
+An evaluation in ~closure::eval_direct~ or ~closure::cps_code~ returns a ~result<value<Core>>~, and that type has two alternatives: a value, or a ~parse_error~.
+Four things have to travel down it.
+An ordinary value, a diagnosed error, a ~return-from~ unwind, and a ~throw~ unwind.
+Three of the four are the error alternative, so telling them apart needs a discriminator carried out of band, and the one steps L14 and L15 used is a sentinel ~parse_error~ message compared by *pointer identity*.
+
+The pointer identity is the part that bites.
+~block_unwind_marker~ and ~throw_unwind_marker~ have to be named ~inline constexpr char[]~ objects, because a ~constexpr char const *~ initialized from a bare string literal gets folded to the literal's address at each use, and two equal string literals are not required to share an address.
+[[file:phase-19-one-shot-control.org][Phase 19]] has the whole story of that bug, which was green under constant evaluation and broken at run time.
+The mechanism works. It's still a wart, and it's a wart of exactly one kind: it exists because a two-alternative carrier is being asked to carry four things.
+
+* Deleting the sentinels
+
+A sender doesn't have that problem, because it was born with three completion channels [cite:@niebler2020p2300].
+So decision D5's mapping writes itself, and the interesting thing is what the mapping lets you throw away:
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-21::src/smd/smdlisp/sender/outcome.hpp::5c044086-ef0c-4041-8f39-b89b92cde079]] :lines 2- :src cpp :end "5c044086-ef0c-4041-8f39-b89b92cde079 end"
+
+An ordinary value goes to ~set_value~, a diagnosed error to ~set_error~, an unwind in flight to ~set_stopped~.
+Nothing is multiplexed, so nothing needs discriminating, and the two markers have no work left to do.
+They aren't ported into this backend. They're deleted.
+
+What a ~block~ still has to answer is a different question, and one the sentinels were never answering anyway: is this unwind aimed at /me/?
+That was always decided by the ~live~ flag on the block's own exit record, and it still is.
+Here is the ~block~ arm with the comparison gone:
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-21::src/smd/smdlisp/sender/sender_eval.hpp::02f32bd6-6a27-4b63-b0b8-744347bc6484]] :lines 2- :src cpp :end "02f32bd6-6a27-4b63-b0b8-744347bc6484 end"
+
+Two of those arms are the reason I like this mapping.
+A ~return-from~ naming a block whose extent has already ended returns an /error/, and an uncaught ~throw~ returns an error too.
+Neither of them is an unwind.
+An unwind is a transfer of control to somewhere; a ~throw~ with no live catcher is the diagnosis that there is nowhere to transfer to, which is a different fact about the program and deserves a different channel.
+D5 says a dead exit is a diagnosed error and never UB [cite:@steele1990cltl2], and on this backend that sentence is a channel choice instead of a convention you have to remember.
+
+* One leaf sender, and why the stock ones won't do
+
+Everything above returns an ~outcome~, which is data.
+Getting data to become a completion needs a sender, and none of the stock factories can do it: ~just~ always completes with a value, ~just_error~ always with an error, ~just_stopped~ always stopped, and which of the three a ~smdlisp~ form completes on isn't known until the form has run.
+~let_value~ can't select between them either, because all of its branches have to have one type.
+
+So there's one hand-written leaf:
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-21::src/smd/smdlisp/sender/defer_outcome.hpp::e64f025f-7464-419a-b739-301569245544]] :lines 2- :src cpp :end "e64f025f-7464-419a-b739-301569245544 end"
+
+The ~switch~ in ~start~ is the only place in the backend where an ~outcome~ turns into a real completion, which is what keeps the channel mapping one auditable statement instead of a convention spread over twenty visitor arms.
+And being lazy is load-bearing.
+Nothing in the thunk runs until the operation state is started, so wrapping this in an adapter really does put the protected form's evaluation /inside/ the adapter's operation.
+
+* unwind-protect is an adapter now
+
+This is the part of the step I actually wanted to see, and it's the part where the sender model earns something the closure model gets for free.
+
+Under direct or CPS evaluation, ~unwind-protect~ runs its cleanups on every exit path because there is only one exit path.
+The four outcomes have already been merged into one ~result~ by the time ~core_unwind_protect~ sees them, so a single unconditional loop covers all of them, and Phase 19 was pleased about it.
+A sender backend can't inherit that from C++ control flow.
+Three channels really are three functions, called from three different places inside the child operation, and there is no arrangement of the surrounding code that makes them one.
+The property has to be rebuilt, and the natural place to rebuild it is a receiver:
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-21::src/smd/smdlisp/sender/unwind_protect.hpp::cae50b27-0d34-4779-b73f-7d625d1060d8]] :lines 2- :src cpp :end "cae50b27-0d34-4779-b73f-7d625d1060d8 end"
+
+~set_value~, ~set_error~ and ~set_stopped~ each do one thing, which is call ~finish~.
+That's the whole reconstruction, and it's checkable by looking at it.
+~finish~ then applies ANSI CL's precedence rule: a cleanup that completes abnormally supersedes whatever was in flight, and a cleanup that completes normally has its value discarded.
+
+The evaluator arm for ~unwind-protect~ is now the one arm that doesn't evaluate anything:
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-21::src/smd/smdlisp/sender/sender_eval.hpp::06514953-0711-4ac8-b392-9fad1aed130e]] :lines 2- :src cpp :end "06514953-0711-4ac8-b392-9fad1aed130e end"
+
+It builds a lazy child sender, hands over a cleanup thunk, and stops.
+Which of the three channels the child completes on, and what ~unwind-protect~ owes that channel, is decided inside the receiver.
+So this arm can't forget a channel, because it never enumerates them.
+The closure backends' guarantee is a loop somebody has to keep unconditional; this one is a shape.
+
+* The driver is connect and start
+
+Every sender here completes synchronously and inline, so running one is a stack-allocated operation state and a recording receiver:
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-21::src/smd/smdlisp/sender/outcome.hpp::6ffe3840-6f72-435d-b975-b945cd4e46f2]] :lines 2- :src cpp :end "6ffe3840-6f72-435d-b975-b945cd4e46f2 end"
+
+~sync_wait~ would have been shorter and is the wrong tool.
+It collapses three channels back into two: an engaged ~optional~ for a value, a disengaged one for stopped, and a /throw/ on ~set_error~.
+A backend whose entire claim is that the three channels are distinct can't observe its own completions through an adapter that merges two of them into an exception, and nothing else in this project uses exceptions for diagnosed errors.
+
+One place still calls ~sync_wait~, and I'd rather say so than have someone find it.
+The ~cons~ arm builds a ~when_all~ over its two children, because ~cons~ is the one node whose children are structurally independent, and drains it with ~sync_wait~.
+That's safe because both children have already been evaluated in source order by then, so the ~when_all~ joins two ~just~ senders holding values that can't fail.
+Common Lisp fixes left-to-right evaluation order, and a ~when_all~ over genuinely deferred children would start the second one even after the first had unwound, so the join says something true about how the results combine and nothing at all about concurrency.
+The same shape, and the same caveat, as the Scheme backend's builtin case.
+
+* The part that doesn't move
+
+Now the honest half, because it would be easy to write this post as though senders won on points.
+
+Step L16's dynamic binding of a special variable has to be undone when the ~let~ that established it exits, on every path out, which sounds like exactly the problem ~unwind-protect~ just solved.
+It isn't.
+A ~let~ elaborates to an immediate lambda application here, so the restore lives in the callee's body loop in ~apply_function_value~, and that loop still breaks rather than returns, so that a value, an error and an unwind all leave through the one statement that calls ~unwind_dynamic_bindings~.
+That's the closure backends' only-one-path trick, still doing its job here.
+
+The reason is about what's being bracketed.
+A cleanup is attached to a /completion/, so a receiver can hold it.
+A dynamic binding brackets a callee's whole extent, which isn't a completion of anything; it's a region of the recursion, and the natural place to close a region is the C++ scope that opened it.
+A sender backend is better exactly where the thing being expressed is a completion, and no better anywhere else.
+I've written that down in ~docs/compiler_architecture.org~ under Phase 6, because it outlives this step and applies to any backend built on senders.
+
+Worth adding that the shallow-binding helpers themselves are /called/, not reimplemented.
+~closure::detail::bind_lambda_parameters~ and ~closure::detail::unwind_dynamic_bindings~ are templates over the environment and arena types with no dependency on ~eval_direct~, so the sender backend gets special variables by using the same two functions the other two backends use.
+A second implementation of shallow binding is a second place for it to be wrong.
+
+* Drawing it
+
+Phase 9 walked a Scheme sender type with P2996 reflection and printed the graph [cite:@brown2024p2996].
+The same trick works here, with two changes forced by what a ~smdlisp~ graph contains:
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-21::src/smd/smdlisp/sender/build_lisp_tree.hpp::45796b9c-5930-453b-82b4-1b609ae2c8f8]] :lines 2- :src cpp :end "45796b9c-5930-453b-82b4-1b609ae2c8f8 end"
+
+The first change is that the two most interesting nodes in any graph here are hand-written senders and not ~basic_sender~ specializations, so the tag-based path can't see them and they're matched by template identity.
+
+The second one caught me out.
+The completion channel lives in the tag's own template argument and not in the tag's name.
+In this vendored Beman revision ~just_error_t~ /is/ ~just_t<set_error_t>~, ~upon_stopped_t~ is ~then_t<set_stopped_t>~, ~let_value_t~ is ~let_t<set_value_t>~, and so on down the three families.
+So ~identifier_of(template_of(tag))~ answers ~"just_t"~ for all three of ~just~, ~just_error~ and ~just_stopped~, and the classifier has to read ~tag_args[0]~ to tell them apart.
+The Scheme classifier from Phase 9 doesn't do that, and gets the right answer anyway, because the Scheme backend never built a sender that completed on any channel but ~set_value~.
+It was never wrong about a graph it was ever shown.
+A ~smdlisp~ graph is largely /about/ the other two channels, so here it would have collapsed the whole point into one label.
+
+~src/examples/lisp_sender_graph_demo.cpp~ runs Phase 19's cleanup-ordering program through this backend and prints both the answer and the graph:
+
+#+begin_example
+// smdlisp sender backend
+// program: (let ((log 0))  (catch 'c    (unwind-protect      (unwind-protect (throw 'c 99) (setq log (+ (* log 10) 1)))      (setq log (+ (* log 10) 2))))  log)
+// cleanup log (innermost first): 12
+// Pipe to: dot -Tpng -o plan.png
+
+digraph LispExecutionPlan {
+  node [shape=Mrecord, style=filled, fillcolor=lightyellow];
+  n0 [label="unwind_protect\n[]"];
+  n0 -> n1;
+  n1 [label="unwind_protect\n[]"];
+  n1 -> n2;
+  n2 [label="defer\n[]"];
+}
+#+end_example
+
+12, so the inner cleanup ran before the outer one, and the thrown 99 still reached the ~catch~ with both of them already done.
+The stop crossed two adapters and each one ran its cleanup on the way past.
+
+The graph is three nodes, and that's the honest size of it.
+The ~catch~, the ~throw~, the ~let~ and the arithmetic are all evaluated by the Mendler algebra as ordinary C++, so none of them is a node.
+Only ~unwind-protect~ is delegated to a sender adapter, because ~unwind-protect~ is the only form in this language whose meaning /is/ "do something on completion".
+A picture of what this backend expresses as a graph is a picture of the cleanups.
+
+* What the tests can and can't say
+
+There's no ~static_assert~ anywhere in this backend, and there can't be.
+~connect~ and ~start~ aren't constant-evaluable, and ~sync_wait~ runs a ~run_loop~ over a mutex and a condition variable, so a sender can't be started during constant evaluation and there's no compile-time value for an assertion to be about.
+The closure backends state each merge criterion twice, once inside a ~static_assert~ and once as a run-time ~TEST_CASE~; this one has the run-time half only, which is DIV-0015.
+
+I want to be careful about what that costs, because it's tempting to overstate it in either direction.
+The standing rule since L14 is "every ~static_assert~ needs a run-time twin, because a constexpr-green mechanism can still be broken at run time," and that rule exists to stop anyone trusting compile-time evidence on its own.
+Here there's no compile-time evidence to over-trust.
+The backend has only the kind of evidence the rule says to insist on.
+What's genuinely weaker is the /parity/ claim: 68 run-time cases, 65 of which copy their source string verbatim out of ~cps_code.test.cpp~ or ~eval_direct.test.cpp~ so the claim is checkable by diffing the sources, and it's parity between programs and their answers, which says nothing about which evaluation phase produced them.
+The other three have no counterpart in the closure backends and can't have one, because the thing they witness doesn't exist there: which of three channels a program completed on.
+Those are this backend's own merge criterion, and the third of them is the interesting one, since it pins that no well-formed program completes stopped at top level.
+A stop only gets created after a ~return-from~ or ~throw~ has already found a live target, so the scope that will consume it is always still below on the stack.
+~sender_program::run~ is left unmarked ~constexpr~ on purpose, so the constraint shows in the API and doesn't live only in the tests.
+754 tests green at the merge.
+
+Two more divergences to record.
+The Mendler paramorphism is re-derived locally, eight lines of it, because ~smd::fixpoint::mendler_para~ takes a ~Fix<F>~ and the ~smdlisp~ core is a ~smdscheme::foundation::fix~, which is the same shape under a different name in a frozen tree.
+There are now two of them in the repository with the same semantics and different parameter types, which is DIV-0016 and reads like an accident if you find it cold.
+And the backend doesn't cover multiple values, because L20 was being built in a sibling worktree and hadn't landed; ~outcome~'s value channel carries exactly one ~value<Core>~, and widening it before L20 settles its representation would have meant guessing and then disagreeing.
+DIV-0017, and L20 itself is where it closes.
+
+* Collecting on the argument
+
+Phase 15 made a claim about contracts before any of the code existed: one-shot, upward-only, dynamic extent is what a sender's completion contract can carry, and ~call/cc~ isn't.
+Two steps of implementation later there was a Common Lisp core with all of that in it and no sender anywhere near it.
+Now there is.
+
+The thing I didn't expect is which direction the win came from.
+I thought the sender backend would be harder and would buy correctness by being checked more strictly.
+What it actually bought was one form, ~unwind-protect~, turning from a loop I had to keep unconditional into a receiver that can't enumerate its channels wrongly because it doesn't enumerate them.
+Everything else either transcribed straight across or, in the dynamic-binding case, refused to move at all.
+
+Next up is L20's multiple values, which this backend is deliberately unprepared for.
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-20-defmacro.org][← Phase 20 - defmacro]]
+#+html: </nav>
+
+* References
+
+#+print_bibliography:
