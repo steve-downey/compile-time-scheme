@@ -273,27 +273,46 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs, class Cont,
                 // visible to any other closure sharing the same store-
                 // backed binding.
                 env<Core, MaxBindings> new_env = *clo.captured;
-                for (int i = 0; i < lam.params.size(); ++i)
-                    new_env.define_value(symbol{lam.params[i]}, args[i]);
+                // A parameter naming a special variable binds DYNAMICALLY
+                // (step L16); everything else binds lexically, as before.
+                // Same call, same semantics, as eval_direct.hpp's closure
+                // case -- the shared helper is the parity guarantee.
+                auto const bound_r =
+                    bind_lambda_parameters(lam.params, args, new_env, envs);
+                if (!bound_r.has_value())
+                    return Res{bound_r.error()};
+                int const dynamic_count = bound_r.value();
 
                 // Implicit progn: at least one body expression is
-                // guaranteed by the elaborator (elaborate_lambda). Earlier
-                // body expressions are evaluated for effect only (identity
-                // continuations); the last one tail-passes cont/k, exactly
-                // mirroring core_progn's CPS handling below.
+                // guaranteed by the elaborator (elaborate_lambda).
+                //
+                // A call is a continuation barrier, for the same reason
+                // core_block, core_catch and core_unwind_protect are: EVERY
+                // body statement, including the last, is dispatched with
+                // identity_k/identity_k rather than tail-passing the
+                // caller's cont/k, so that this frame regains control on
+                // every exit path and can restore the dynamic bindings
+                // before cont/k ever run. Tail-passing cont/k out of the
+                // last body form would run the continuation while the
+                // bindings were still in effect, and then have nowhere left
+                // to undo them.
                 int const n = lam.body.size();
-                if (n == 0)
-                    return parse_error{{}, "lambda: empty body"};
-                for (int i = 0; i < n - 1; ++i) {
-                    auto r =
+                Res last{parse_error{{}, "lambda: empty body"}};
+                for (int i = 0; i < n; ++i) {
+                    last =
                         cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
                             arena.get(lam.body[i]), arena, new_env, envs,
                             identity_k<Core>{}, identity_k<Core>{});
-                    if (!r.has_value())
-                        return r;
+                    if (!last.has_value())
+                        break;
                 }
-                return cps_dispatch<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
-                    arena.get(lam.body[n - 1]), arena, new_env, envs, cont, k);
+                unwind_dynamic_bindings(new_env, envs, dynamic_count);
+                if (!last.has_value())
+                    return last;
+                auto r = cont(last.value());
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
             },
             [&](foreign_function<Core> const &ff) -> Res {
                 auto ff_r = ff.fn(args);

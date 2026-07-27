@@ -82,7 +82,7 @@
 - [x] Step L13: CPS closure backend (+ phase 18 draft)
 - [x] Step L14: block / return-from
 - [x] Step L15: catch / throw / unwind-protect (+ phase 19 draft)
-- [ ] Step L16: special variables and dynamic binding
+- [x] Step L16: special variables and dynamic binding
 - [x] Step L17: macro expander with host macros
 - [x] Step L18: backquote
 - [x] Step L19: defmacro (+ phase 20 draft)

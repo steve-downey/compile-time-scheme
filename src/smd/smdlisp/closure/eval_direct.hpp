@@ -61,6 +61,96 @@ namespace detail {
     return list_op::cons; // Unreachable: see the doc comment above.
 }
 
+// e0468b60-4a31-4526-bd12-722bbd15ceac
+/// Undoes the innermost @p count dynamic bindings established by
+/// @ref bind_lambda_parameters, writing each saved value back into the
+/// special variable's single cell (step L16).
+///
+/// Shared verbatim by both backends (`eval_direct.hpp` and `cps_code.hpp`).
+/// It is deliberately total -- no error channel, nothing to propagate -- so
+/// that a caller can restore *unconditionally*, on the one path where a
+/// value, an ordinary error, a `return-from` unwind and a `throw` unwind
+/// have already been merged back into a single `result`. That is the same
+/// shape `core_unwind_protect` has, and for the same reason: a dynamic
+/// binding must be undone on every exit path out of its extent, and the
+/// cheapest way to be sure of that is to have only one exit path.
+///
+/// @p callee_env is only needed for its @ref env::set_value, i.e. for the
+/// @ref store it shares with every other environment naming the same cell;
+/// which environment object is passed is immaterial as long as it resolves
+/// the name to that cell, which the callee environment does by construction
+/// (@ref bind_lambda_parameters never gives a special a shadowing binding).
+template <class Env, class Envs>
+constexpr auto unwind_dynamic_bindings(Env const &callee_env, Envs &envs,
+                                       int count) -> void {
+    for (int i = 0; i < count; ++i) {
+        auto const rec = envs.pop_dynamic();
+        // Cannot fail: establishing the binding already proved the name
+        // resolves to a mutable cell, and nothing since could have unbound it.
+        auto const restored = callee_env.set_value(rec.name, rec.saved);
+        static_cast<void>(restored);
+    }
+}
+
+/// Binds a lambda's parameters into @p callee_env, dynamically for those
+/// naming a special variable and lexically for all the rest (step L16), and
+/// returns how many dynamic bindings it established.
+///
+/// This is the single place where the `defvar`/`defparameter` mark
+/// (@ref env::mark_special) starts to *mean* something. Every `smdlisp`
+/// binding form -- `let`, `let*`, a `lambda` parameter list, a `defun`
+/// parameter list -- is lowered by the elaborator to a lambda application,
+/// so one decision here covers all of them, in both backends.
+///
+///  - **Not special:** @ref env::define_value, exactly as before: a fresh
+///    binding in @p callee_env (a fresh @ref store cell in mutable mode),
+///    shadowing anything outside. Purely lexical; invisible to a function
+///    called from the body that did not capture this environment.
+///  - **Special:** no binding is added at all. The variable's one existing
+///    cell is saved (@ref env::lookup_value), overwritten with the argument
+///    (@ref env::set_value), and the saved value handed to
+///    @ref env_arena::push_dynamic for the matching
+///    @ref unwind_dynamic_bindings. Because the cell is shared by every
+///    environment that names the variable -- including captures made long
+///    before this call -- the new value is what *any* function called during
+///    the body's extent sees. That is dynamic scope, and it is the whole
+///    mechanism.
+///
+/// A special with no value cell to save is a diagnosed error rather than a
+/// fresh dynamic binding; see DIV-0014 (`docs/divergences/`). If that (or a
+/// store-less environment) is hit partway through a parameter list, the
+/// bindings already established are undone before returning, so the caller
+/// never has to unwind a partially-bound frame.
+template <class Params, class Val, class Env, class Envs>
+[[nodiscard]] constexpr auto bind_lambda_parameters(Params const &params,
+                                                    std::span<Val const> args,
+                                                    Env &callee_env, Envs &envs)
+    -> smd::smdscheme::foundation::result<int> {
+    int established = 0;
+    for (int i = 0; i < params.size(); ++i) {
+        symbol const name{params[i]};
+        if (!callee_env.is_special(name)) {
+            callee_env.define_value(name, args[i]);
+            continue;
+        }
+        auto const saved = callee_env.lookup_value(name);
+        if (!saved.has_value()) {
+            unwind_dynamic_bindings(callee_env, envs, established);
+            return smd::smdscheme::foundation::parse_error{
+                {}, "dynamic binding: special variable is unbound"};
+        }
+        auto const bound = callee_env.set_value(name, args[i]);
+        if (!bound.has_value()) {
+            unwind_dynamic_bindings(callee_env, envs, established);
+            return bound.error();
+        }
+        envs.push_dynamic(name, saved.value());
+        ++established;
+    }
+    return established;
+}
+// e0468b60-4a31-4526-bd12-722bbd15ceac end
+
 } // namespace detail
 
 /// Forward declaration: @ref eval_direct and @ref apply_function_value
@@ -223,18 +313,30 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                         "environment"};
 
                 env<Core, MaxBindings> new_env = *clo.captured;
-                for (int i = 0; i < lam.params.size(); ++i)
-                    new_env.define_value(symbol{lam.params[i]}, args[i]);
+                // A parameter naming a special variable binds DYNAMICALLY
+                // (step L16); everything else binds lexically, as before.
+                // `let`/`let*` lower to lambda applications, so this one
+                // call is where all of them get their scoping decided.
+                auto const bound_r = detail::bind_lambda_parameters(
+                    lam.params, args, new_env, envs);
+                if (!bound_r.has_value())
+                    return Res{bound_r.error()};
+                int const dynamic_count = bound_r.value();
 
                 // Implicit progn: at least one body expression is
-                // guaranteed by the elaborator (elaborate_lambda).
+                // guaranteed by the elaborator (elaborate_lambda).  The loop
+                // BREAKS rather than returns, so that -- exactly as in
+                // core_unwind_protect below -- a value, an ordinary error, a
+                // `return-from` unwind and a `throw` unwind all leave by the
+                // single path that restores the dynamic bindings.
                 Res last{parse_error{{}, "lambda: empty body"}};
                 for (int i = 0; i < lam.body.size(); ++i) {
                     last = eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
                         arena.get(lam.body[i]), arena, new_env, envs);
                     if (!last.has_value())
-                        return last;
+                        break;
                 }
+                detail::unwind_dynamic_bindings(new_env, envs, dynamic_count);
                 return last;
             },
             [&](foreign_function<Core> const &ff) -> Res {

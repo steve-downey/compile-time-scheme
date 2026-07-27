@@ -176,6 +176,38 @@ struct catch_record {
 };
 // a5b4dac9-bc87-4fe7-9160-c3f1283df8a3 end
 
+// d5b819ef-6cdf-4adb-9753-1f056c4bdb4f
+/// One saved special-variable value, held while a *dynamic* binding of that
+/// variable is in effect (step L16).
+///
+/// `smdlisp` implements dynamic binding by **shallow binding**: a special
+/// variable has exactly one value cell -- the @ref store location its
+/// `defvar`/`defparameter` allocated -- and every environment that names the
+/// variable, including every closure capture made before or during the
+/// binding, resolves to that same cell (@ref env::lookup_value reads it,
+/// @ref env::set_value writes it).  Binding a special therefore does not add
+/// a binding anywhere; it *overwrites the one cell* after stashing the
+/// previous contents here, and restores them when the binding's extent ends.
+/// Two consequences fall straight out of that and need no extra machinery:
+/// a function called during the extent sees the new value however it was
+/// captured (the dynamic-scope property itself), and a `setq` of the special
+/// hits the innermost dynamic binding, because the innermost dynamic binding
+/// *is* the cell.
+///
+/// The saved value is the whole record: no @ref exit_id, no @c live flag.
+/// Unlike @ref exit_record and @ref catch_record, nothing targets a dynamic
+/// binding -- it is never the destination of an unwind, only something an
+/// unwind must pass through and undo -- so there is nothing to identify and
+/// nothing to mark spent.
+///
+/// @tparam Core The core AST type (used to type @ref saved).
+template <typename Core>
+struct dynamic_binding {
+    symbol name{};       ///< The special variable whose cell was overwritten.
+    value<Core> saved{}; ///< That cell's contents before the overwrite.
+};
+// d5b819ef-6cdf-4adb-9753-1f056c4bdb4f end
+
 /// A Lisp-2 lexical environment: two independent, linear,
 /// most-recent-first binding lists, one per namespace (decision D4,
 /// docs/cl-pivot-plan.md), plus a third, equally independent list for
@@ -296,17 +328,30 @@ class env {
     /// Errors if this environment has no backing @ref store (functional
     /// mode -- mirrors `smd::smdscheme::closure::env::assign`'s identical
     /// check) or if @p name has no VARIABLE-namespace binding.
-    /// Special-variable dynamic rebinding is deferred to step L16; this
-    /// function only ever mutates the nearest *lexical* binding, per the
-    /// plan's explicit scope cut for this step.
+    ///
+    /// This one function serves `setq` on a lexical variable *and* `setq` on
+    /// a special variable (step L16), with no case analysis, because
+    /// shallow binding makes the two the same operation: a special has a
+    /// single value cell that a dynamic binding overwrites in place rather
+    /// than shadowing (see @ref dynamic_binding), so "the nearest binding for
+    /// @p name" already *is* the innermost dynamic binding whenever @p name
+    /// is special.  It is also how a dynamic binding is established and
+    /// undone -- @ref lookup_value to save, this to overwrite, this again to
+    /// restore.
     [[nodiscard]] constexpr auto set_value(symbol name, value<Core> val) const
         -> smd::smdscheme::foundation::result<value<Core>>;
 
     /// Marks @p name as a special variable (`defvar`/`defparameter`, step
-    /// L12).  Recorded now; dynamic-binding *behavior* for special
-    /// variables arrives in step L16 -- this step only stores the mark.
-    /// Idempotent: marking an already-special name does not duplicate the
-    /// entry.
+    /// L12).  Idempotent: marking an already-special name does not duplicate
+    /// the entry.
+    ///
+    /// The mark is what makes a *later* binding of @p name dynamic rather
+    /// than lexical (step L16): every binding form lowers to a lambda
+    /// application, so the whole behavioural difference is decided in one
+    /// place, where lambda parameters are bound (`eval_direct.hpp`'s
+    /// @c detail::bind_lambda_parameters).  Like every other part of an
+    /// @ref env the mark is carried across copies, so a closure created after
+    /// the `defvar` binds that name dynamically too.
     constexpr auto mark_special(symbol name) -> void;
 
     /// Returns whether @p name has been marked special by
@@ -603,6 +648,13 @@ inline constexpr int default_max_exits = 128;
 /// total number of activations: see @ref env_arena::push_catch.
 inline constexpr int default_max_catches = 128;
 
+/// Fixed default capacity of the dynamic special-variable binding stack an
+/// @ref env_arena also owns (step L16).  Like @ref default_max_catches, and
+/// for the same reason, this bounds the maximum *nesting depth* of
+/// simultaneously-active dynamic bindings, not their total number: see
+/// @ref env_arena::push_dynamic.
+inline constexpr int default_max_dynamic = 128;
+
 /// @tparam Core        The core AST type.
 /// @tparam MaxBindings Capacity of each captured @ref env (must match the
 ///                      @ref env this arena's caller is evaluating with).
@@ -615,9 +667,13 @@ inline constexpr int default_max_catches = 128;
 ///                      evaluation (step L14; see @ref alloc_exit).
 /// @tparam MaxCatches   Maximum *nesting depth* of dynamically active
 ///                      `catch` frames (step L15; see @ref push_catch).
+/// @tparam MaxDynamic   Maximum *nesting depth* of simultaneously-active
+///                      special-variable dynamic bindings (step L16; see
+///                      @ref push_dynamic).
 template <typename Core, int MaxBindings, int MaxEnvs = default_max_envs,
           int MaxExits = default_max_exits,
-          int MaxCatches = default_max_catches>
+          int MaxCatches = default_max_catches,
+          int MaxDynamic = default_max_dynamic>
 class env_arena {
   public:
     constexpr env_arena() = default;
@@ -719,6 +775,67 @@ class env_arena {
     /// tests witness that every exit path pops exactly once).
     [[nodiscard]] constexpr auto catch_depth() const -> int { return depth_; }
 
+    // 13f2e157-acc1-4845-b93e-9892573eccc9
+    /// Records that the special variable @p name's single value cell has
+    /// been overwritten by a dynamic binding, stashing its previous contents
+    /// @p saved for the matching @ref pop_dynamic (step L16).
+    ///
+    /// **This belongs here, and not in @ref env, for exactly the reason
+    /// @ref push_catch does not live there either**: a dynamic binding is
+    /// dynamically scoped, and an @ref env is *copied* to make a lexical
+    /// capture (@ref alloc).  A saved value living in the environment would
+    /// be duplicated into every closure materialized inside the binding's
+    /// extent, and each copy would then be restorable independently -- which
+    /// is not a scoping rule anyone has ever wanted.  An @ref env_arena, by
+    /// contrast, is threaded by mutable reference through the entire
+    /// evaluation and never copied, so a stack it owns has exactly one live
+    /// instance: the dynamic nesting the program actually has.
+    ///
+    /// **And it is a stack rather than an append-only slab** (@ref alloc_exit
+    /// is the contrast) because nothing can capture a @ref dynamic_binding:
+    /// it is reachable only from here, only between the @ref push_dynamic
+    /// that saved it and the @ref pop_dynamic that spends it, so its slot is
+    /// reusable and @c MaxDynamic bounds nesting depth rather than total
+    /// activations.  As with @ref push_catch, slots are reused rather than
+    /// truly popped -- the shared
+    /// @ref smd::smdscheme::foundation::static_vector has no @c pop_back and
+    /// `smd::smdscheme` is frozen for semantic changes (decision D1) -- so
+    /// @ref dyn_depth_, not @c dynamics_.size(), is the authority on the live
+    /// prefix.
+    constexpr auto push_dynamic(symbol name, value<Core> saved) -> void {
+        dynamic_binding<Core> rec{name, std::move(saved)};
+        if (dyn_depth_ < dynamics_.size())
+            dynamics_[dyn_depth_] = std::move(rec);
+        else
+            dynamics_.push_back(std::move(rec));
+        ++dyn_depth_;
+    }
+
+    /// Pops and returns the innermost record pushed by @ref push_dynamic;
+    /// its @ref dynamic_binding::saved value is what the caller must write
+    /// back into the variable's cell (via @ref env::set_value).
+    ///
+    /// Returns a default-constructed record if the stack is empty, which a
+    /// correctly paired caller never observes: the evaluators pop exactly as
+    /// many bindings as they pushed, on every exit path, in the
+    /// `unwind-protect` shape that makes "every path" a single unconditional
+    /// statement rather than a case analysis.
+    [[nodiscard]] constexpr auto pop_dynamic() -> dynamic_binding<Core> {
+        if (dyn_depth_ <= 0)
+            return dynamic_binding<Core>{};
+        --dyn_depth_;
+        return dynamics_[dyn_depth_];
+    }
+
+    /// Returns the current dynamic-binding nesting depth (test/diagnostic
+    /// support, exactly like @ref catch_depth: a balanced program returns to
+    /// depth 0, which is how the tests witness that every exit path out of a
+    /// dynamic extent restores exactly once).
+    [[nodiscard]] constexpr auto dynamic_depth() const -> int {
+        return dyn_depth_;
+    }
+    // 13f2e157-acc1-4845-b93e-9892573eccc9 end
+
   private:
     smd::smdscheme::foundation::static_vector<env<Core, MaxBindings>, MaxEnvs>
         envs_{};
@@ -726,7 +843,11 @@ class env_arena {
         exits_{};
     smd::smdscheme::foundation::static_vector<catch_record<Core>, MaxCatches>
         frames_{};
-    int depth_ = 0; ///< Live prefix of @ref frames_; see @ref push_catch.
+    smd::smdscheme::foundation::static_vector<dynamic_binding<Core>, MaxDynamic>
+        dynamics_{};
+    int depth_ = 0;     ///< Live prefix of @ref frames_; see @ref push_catch.
+    int dyn_depth_ = 0; ///< Live prefix of @ref dynamics_; see
+                        ///< @ref push_dynamic.
     exit_id next_exit_id_ = 0;
 };
 

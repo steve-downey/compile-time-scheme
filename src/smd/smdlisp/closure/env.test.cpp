@@ -491,3 +491,84 @@ TEST_CASE("EnvTest - ThrowUnwindMarkerHasStableRuntimeIdentity") {
     // intercept a `throw` (and vice versa).
     REQUIRE(throw_unwind_marker != block_unwind_marker);
 }
+
+// -- dynamic special-variable binding stack (step L16) ----------------------
+
+static_assert([] {
+    // Save/restore is last-in-first-out, and the depth counter -- not the
+    // backing static_vector's size -- is the authority on the live prefix.
+    using smd::smdlisp::closure::env_arena;
+    env_arena<dummy_core, 4> arena;
+    if (arena.dynamic_depth() != 0)
+        return false;
+    arena.push_dynamic(symbol{"*X*"}, val{1});
+    arena.push_dynamic(symbol{"*X*"}, val{2});
+    if (arena.dynamic_depth() != 2)
+        return false;
+    auto const inner = arena.pop_dynamic();
+    auto const outer = arena.pop_dynamic();
+    return arena.dynamic_depth() == 0 && inner.name == symbol{"*X*"} &&
+           std::get<int>(inner.saved) == 2 && std::get<int>(outer.saved) == 1;
+}());
+
+TEST_CASE("EnvTest - DynamicBindingStackIsLastInFirstOut") {
+    // Runtime twin of the static_assert above.
+    using smd::smdlisp::closure::env_arena;
+    env_arena<dummy_core, 4> arena;
+    REQUIRE(arena.dynamic_depth() == 0);
+    arena.push_dynamic(symbol{"*X*"}, val{1});
+    arena.push_dynamic(symbol{"*Y*"}, val{2});
+    REQUIRE(arena.dynamic_depth() == 2);
+    auto const inner = arena.pop_dynamic();
+    REQUIRE(inner.name == symbol{"*Y*"});
+    REQUIRE(std::get<int>(inner.saved) == 2);
+    auto const outer = arena.pop_dynamic();
+    REQUIRE(outer.name == symbol{"*X*"});
+    REQUIRE(std::get<int>(outer.saved) == 1);
+    REQUIRE(arena.dynamic_depth() == 0);
+}
+
+TEST_CASE("EnvTest - PoppedDynamicBindingSlotsAreReusedNotAccumulated") {
+    // Like the catch stack, MaxDynamic bounds NESTING DEPTH, not total
+    // activations: a loop of balanced push/pop pairs must not exhaust a
+    // two-slot arena.
+    using smd::smdlisp::closure::env_arena;
+    env_arena<dummy_core, 4, 8, 8, 8, 2> arena;
+    for (int i = 0; i < 100; ++i) {
+        arena.push_dynamic(symbol{"*X*"}, val{i});
+        REQUIRE(arena.dynamic_depth() == 1);
+        REQUIRE(std::get<int>(arena.pop_dynamic().saved) == i);
+    }
+    REQUIRE(arena.dynamic_depth() == 0);
+}
+
+TEST_CASE("EnvTest - DynamicBindingsAreNotCarriedByAnEnvCopy") {
+    // The reason the stack lives in env_arena and not in env: an env is
+    // COPIED to make a lexical capture, so a saved dynamic value stored
+    // there would be duplicated into every closure created inside the
+    // binding's extent. env_arena is threaded by reference and never
+    // copied, so there is exactly one stack. The special MARK, by
+    // contrast, is lexical information and is deliberately carried across
+    // copies -- that asymmetry is the whole design.
+    using smd::smdlisp::closure::env_arena;
+    env_arena<dummy_core, 4> arena;
+    store<dummy_core, default_max_store> s;
+    env<dummy_core, 4> e{&s};
+    e.mark_special(symbol{"*X*"});
+    e.define_value(symbol{"*X*"}, val{1});
+
+    auto const *captured = arena.alloc(e);
+    arena.push_dynamic(symbol{"*X*"}, val{1});
+    REQUIRE(e.set_value(symbol{"*X*"}, val{2}).has_value());
+
+    // The mark survives the copy; the saved value was never in it, and the
+    // shared store means the copy sees the new value.
+    REQUIRE(captured->is_special(symbol{"*X*"}));
+    REQUIRE(std::get<int>(captured->lookup_value(symbol{"*X*"}).value()) == 2);
+    REQUIRE(arena.dynamic_depth() == 1);
+
+    auto const saved = arena.pop_dynamic();
+    REQUIRE(e.set_value(saved.name, saved.saved).has_value());
+    REQUIRE(std::get<int>(captured->lookup_value(symbol{"*X*"}).value()) == 1);
+    REQUIRE(arena.dynamic_depth() == 0);
+}
