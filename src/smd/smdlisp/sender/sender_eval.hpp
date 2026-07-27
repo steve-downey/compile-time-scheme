@@ -192,6 +192,17 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                         closure::apply_prim<Core, closure::default_max_pairs>(
                             closure::detail::to_list_op(bi.op), args,
                             ctx.environment->pairs()));
+                case closure::builtin_op::values:
+                    // Step L20 made `values` an ordinary builtin whose
+                    // result is n-ary.  This backend's carrier -- `outcome`,
+                    // and behind it `lisp_completions`' `set_value_t(value)`
+                    // -- holds exactly one value, so there is nowhere to put
+                    // the rest.  Diagnosed rather than silently truncated;
+                    // see DIV-0018.
+                    return make_error<Core>(parse_error{
+                        {},
+                        "values: multiple values are not supported by the "
+                        "sender backend"});
                 case closure::builtin_op::funcall: {
                     if (args.empty())
                         return make_error<Core>(parse_error{
@@ -655,9 +666,23 @@ struct eval_algebra {
                             // protected form's own completion unchanged.
                             return make_value<Core>(Val{closure::nil_t{}});
                         }));
-                }
+                },
                 // 06514953-0711-4ac8-b392-9fad1aed130e end
-            },
+                [&](elaborator::core_multiple_value_bind<Core, MaxNodes> const
+                        &) -> Out {
+                    // Step L20's binding form, deliberately not ported.  The
+                    // closure backends carry multiple values in an n-ary
+                    // return channel (`closure::value_list`); this backend
+                    // carries a single value per completion, so porting the
+                    // form means widening `outcome`, `outcome_receiver`,
+                    // `lisp_completions` and both hand-written senders.  That
+                    // is real work with its own design questions, and it is
+                    // out of this step's scope: see DIV-0018.
+                    return make_error<Core>(parse_error{
+                        {},
+                        "multiple-value-bind is not supported by the sender "
+                        "backend"});
+                }},
             layer);
     }
 };

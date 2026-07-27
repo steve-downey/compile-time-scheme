@@ -30,6 +30,13 @@ namespace smd::smdlisp::closure {
 /// `append` joins the set in step L18: the backquote expander lowers
 /// `,@x` (unquote-splicing) to a call against this builtin, again named
 /// identically to `pairs.hpp::list_op::append`.
+/// `values` joins in step L20 and, like `funcall`/`apply`, has no
+/// `apply_prim` case: it is the one builtin whose result is *n-ary*, so it
+/// can only be implemented where the evaluator's n-ary return channel is in
+/// scope (see @ref value_list).  Making it an ordinary builtin rather than a
+/// special operator is what ANSI CL actually specifies -- `values` is a
+/// function -- and is what makes `#'values`, `(funcall #'values 1 2)` and
+/// `(apply #'values '(1 2))` work with no extra machinery.
 enum class builtin_op {
     add,
     multiply,
@@ -43,7 +50,8 @@ enum class builtin_op {
     atom,
     funcall,
     apply,
-    append
+    append,
+    values
 };
 
 /// A built-in operator value (holds the operation kind).
@@ -185,6 +193,72 @@ struct foreign_function {
 template <typename Core>
 using value = std::variant<nil_t, int, symbol, keyword, builtin, closure<Core>,
                            foreign_function<Core>, pair_ref>;
+
+// a4a90af9-fd64-4f75-ad47-609c7c1e50fd
+/// Fixed default bound on how many values one form may return (step L20).
+///
+/// This bounds the *width* of a single multiple-value return, not any kind
+/// of nesting or activation count, so it is small on purpose: ANSI CL only
+/// requires an implementation to accept 20, and no program in this project
+/// returns more than a handful.  Every continuation payload in both closure
+/// backends is a @ref value_list of exactly this capacity, so raising it
+/// costs stack in every recursive evaluator frame.
+inline constexpr int default_max_values = 8;
+
+/// The n-ary payload a form evaluates to (step L20).
+///
+/// Common Lisp's evaluation relation does not produce *a* value; it produces
+/// a possibly-empty sequence of values, of which single-value contexts take
+/// the first.  This is that sequence, and it is the type both closure
+/// backends' continuations take: `eval_direct_values` returns one, and a CPS
+/// continuation is invoked with one.  The @ref value-returning
+/// `eval_direct`/`apply_function_value` overloads are thin adapters over the
+/// n-ary primitives that call @ref primary_value on the result.
+///
+/// The alternative -- a side "values register" hung off the environment
+/// arena, which is how many real implementations do it -- was rejected for
+/// this project: a register makes "who last wrote the register" a global
+/// invariant that every arm of every backend has to maintain by hand, and
+/// the three backends here have three different control-flow shapes.  An
+/// n-ary return channel makes the same information travel exactly where the
+/// value already travels, so no arm can forget it.
+///
+/// @tparam Core      The core AST type.
+/// @tparam MaxValues Maximum number of values (see @ref default_max_values).
+template <typename Core, int MaxValues = default_max_values>
+using value_list =
+    smd::smdscheme::foundation::static_vector<value<Core>, MaxValues>;
+
+/// Returns the **primary value** of @p vs: its first element, or `nil` when
+/// @p vs is empty.
+///
+/// This is ANSI CL's rule for reading a multiple-value result in a
+/// single-value context, in one place: `(values)` returns zero values, and a
+/// single-value context that receives zero values sees `nil`.  Every place
+/// either backend narrows an n-ary result to one value routes through here,
+/// the same way every truthiness test routes through @ref is_true.
+template <typename Core, int MaxValues>
+[[nodiscard]] constexpr auto primary_value(
+    smd::smdscheme::foundation::static_vector<value<Core>, MaxValues> const &vs)
+    -> value<Core> {
+    return vs.empty() ? value<Core>{nil_t{}} : vs[0];
+}
+
+/// Returns a one-element @ref value_list holding @p v.
+///
+/// The overwhelmingly common case: every form that is not `values` (or a
+/// call to something that ends in one) returns exactly one value.
+///
+/// @tparam MaxValues Capacity of the returned list; defaults to
+///                    @ref default_max_values.
+template <int MaxValues = default_max_values, typename Core>
+[[nodiscard]] constexpr auto single_value(value<Core> v)
+    -> value_list<Core, MaxValues> {
+    value_list<Core, MaxValues> vs{};
+    vs.push_back(std::move(v));
+    return vs;
+}
+// a4a90af9-fd64-4f75-ad47-609c7c1e50fd end
 
 /// Fixed capacity of the mutable variable @ref store shared by an @ref env.
 inline constexpr int default_max_store = 256;

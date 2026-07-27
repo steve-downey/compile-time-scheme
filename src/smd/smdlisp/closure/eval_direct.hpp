@@ -30,8 +30,9 @@ namespace detail {
 /// `pairs.hpp`'s `list_op` back without a header cycle), but they share the
 /// same nine names by construction, so the bridge is a same-name lookup,
 /// not a semantic mapping.  Only called for the nine @p op values listed
-/// below; @c add/@c multiply/@c funcall/@c apply are handled directly by
-/// @ref apply_function_value and never reach this function.
+/// below; @c add/@c multiply/@c funcall/@c apply/@c values are handled
+/// directly by @ref apply_function_value_values and never reach this
+/// function.
 [[nodiscard]] constexpr auto to_list_op(builtin_op op) -> list_op {
     switch (op) {
     case builtin_op::cons:
@@ -56,6 +57,7 @@ namespace detail {
     case builtin_op::multiply:
     case builtin_op::funcall:
     case builtin_op::apply:
+    case builtin_op::values:
         break;
     }
     return list_op::cons; // Unreachable: see the doc comment above.
@@ -153,10 +155,41 @@ template <class Params, class Val, class Env, class Envs>
 
 } // namespace detail
 
-/// Forward declaration: @ref eval_direct and @ref apply_function_value
-/// recurse into each other (a call evaluates a lambda body via
-/// @ref eval_direct; an application dispatches the evaluated function
-/// value via @ref apply_function_value).
+// 4f5a55a0-11e1-4ab6-83d2-01fbdbdd8eea
+/// Forward declarations of this header's four mutually recursive entry
+/// points.
+///
+/// Since step L20 each of the two operations comes in a pair, and the naming
+/// convention is uniform across both closure backends:
+///
+///  - the `_values` spelling is the **primitive**: it returns the form's
+///    whole @ref value_list, which is what Common Lisp's evaluation relation
+///    actually produces;
+///  - the plain spelling is a **single-value adapter** over it, taking
+///    @ref primary_value of the result.
+///
+/// Every context in the language is a single-value context except one -- the
+/// values form of a `multiple-value-bind` -- so the adapters are what almost
+/// every caller wants, and they are what the pre-L20 public surface
+/// (`macroexpand/expander.hpp`, the tests) keeps using unchanged.  What the
+/// primitives buy is that multiple values *propagate* correctly out of every
+/// tail position: an `if` branch, a `progn`'s last form, a lambda body's last
+/// form, a `block`/`catch` body's last form, and the protected form of an
+/// `unwind-protect` all recurse through `_values`, so
+/// `(multiple-value-bind (a b) (if t (values 1 2) nil) ...)` sees both
+/// values.
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs,
+          int MaxValues = default_max_values>
+[[nodiscard]] constexpr auto eval_direct_values(
+    elaborator::core_type<MaxNodes, MaxList> const &node,
+    smd::smdscheme::foundation::tree_arena<
+        elaborator::core_type<MaxNodes, MaxList>, MaxNodes> const &arena,
+    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> &environment,
+    env_arena<elaborator::core_type<MaxNodes, MaxList>, MaxBindings, MaxEnvs>
+        &envs)
+    -> smd::smdscheme::foundation::result<
+        value_list<elaborator::core_type<MaxNodes, MaxList>, MaxValues>>;
+
 template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
 [[nodiscard]] constexpr auto eval_direct(
     elaborator::core_type<MaxNodes, MaxList> const &node,
@@ -167,9 +200,10 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
         &envs)
     -> smd::smdscheme::foundation::result<
         value<elaborator::core_type<MaxNodes, MaxList>>>;
+// 4f5a55a0-11e1-4ab6-83d2-01fbdbdd8eea end
 
 /// Applies an already-evaluated function @ref value to already-evaluated
-/// argument values.
+/// argument values, returning **all** the values it produced.
 ///
 /// This is the single call-dispatch point shared by ordinary application
 /// (`core_application`, whose arguments are core expressions evaluated one
@@ -195,8 +229,9 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
 /// @param  envs      The shared environment arena that owns every
 ///                    environment a closure materialized during this call
 ///                    captures (see @ref env_arena).
-template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
-[[nodiscard]] constexpr auto apply_function_value(
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs,
+          int MaxValues = default_max_values>
+[[nodiscard]] constexpr auto apply_function_value_values(
     value<elaborator::core_type<MaxNodes, MaxList>> const &func_val,
     std::span<value<elaborator::core_type<MaxNodes, MaxList>> const> args,
     smd::smdscheme::foundation::tree_arena<
@@ -206,14 +241,15 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
     env_arena<elaborator::core_type<MaxNodes, MaxList>, MaxBindings, MaxEnvs>
         &envs)
     -> smd::smdscheme::foundation::result<
-        value<elaborator::core_type<MaxNodes, MaxList>>> {
+        value_list<elaborator::core_type<MaxNodes, MaxList>, MaxValues>> {
     static_assert(MaxBindings == 16,
                   "apply_function_value currently requires "
                   "closure::env<Core,16> (value<Core>'s embedded closure "
                   "alternative is closure<Core,16>, unconditionally)");
     using Core = elaborator::core_type<MaxNodes, MaxList>;
     using Val = value<Core>;
-    using Res = smd::smdscheme::foundation::result<Val>;
+    using Vals = value_list<Core, MaxValues>;
+    using Res = smd::smdscheme::foundation::result<Vals>;
     using smd::smdscheme::foundation::parse_error;
 
     return std::visit(
@@ -231,7 +267,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                         acc = bi.op == builtin_op::add ? acc + std::get<int>(a)
                                                        : acc * std::get<int>(a);
                     }
-                    return Val{acc};
+                    return single_value<MaxValues>(Val{acc});
                 }
                 case builtin_op::cons:
                 case builtin_op::car:
@@ -241,17 +277,38 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 case builtin_op::eq:
                 case builtin_op::eql:
                 case builtin_op::atom:
-                case builtin_op::append:
-                    return apply_prim<Core, default_max_pairs>(
+                case builtin_op::append: {
+                    auto pr = apply_prim<Core, default_max_pairs>(
                         detail::to_list_op(bi.op), args, heap);
+                    if (!pr.has_value())
+                        return Res{pr.error()};
+                    return single_value<MaxValues>(pr.value());
+                }
+                case builtin_op::values: {
+                    // ANSI CL: `values` is an ordinary function that returns
+                    // every argument it was given, as that many values. This
+                    // is the *only* builtin whose result is n-ary, and the
+                    // only reason this whole function returns a value_list
+                    // rather than a value.
+                    if (static_cast<int>(args.size()) > MaxValues)
+                        return parse_error{
+                            {}, "values: more values than MaxValues"};
+                    Vals vs{};
+                    for (auto const &a : args)
+                        vs.push_back(a);
+                    return vs;
+                }
                 case builtin_op::funcall: {
                     // (funcall f args...): the first argument IS the
                     // function to call; the rest are its call arguments.
+                    // The callee's values pass straight through, so
+                    // (multiple-value-bind (a b) (funcall #'values 1 2) ...)
+                    // binds both.
                     if (args.empty())
                         return parse_error{
                             {}, "funcall: expected a function argument"};
-                    return apply_function_value<MaxNodes, MaxList, MaxBindings,
-                                                MaxEnvs>(
+                    return apply_function_value_values<
+                        MaxNodes, MaxList, MaxBindings, MaxEnvs, MaxValues>(
                         args[0], args.subspan(1), arena, heap, envs);
                 }
                 case builtin_op::apply: {
@@ -280,8 +337,8 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                         spread.push_back(cell.car);
                         cur = cell.cdr;
                     }
-                    return apply_function_value<MaxNodes, MaxList, MaxBindings,
-                                                MaxEnvs>(
+                    return apply_function_value_values<
+                        MaxNodes, MaxList, MaxBindings, MaxEnvs, MaxValues>(
                         args[0],
                         std::span<Val const>(spread.begin(), spread.end()),
                         arena, heap, envs);
@@ -329,9 +386,15 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 // core_unwind_protect below -- a value, an ordinary error, a
                 // `return-from` unwind and a `throw` unwind all leave by the
                 // single path that restores the dynamic bindings.
+                // The LAST body form is in tail position, so it is evaluated
+                // through `eval_direct_values`: a function whose body ends in
+                // `(values ...)` returns those values to its caller, which is
+                // what makes `(multiple-value-bind (a b) (f) ...)` work for a
+                // user-defined `f`.
                 Res last{parse_error{{}, "lambda: empty body"}};
                 for (int i = 0; i < lam.body.size(); ++i) {
-                    last = eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                    last = eval_direct_values<MaxNodes, MaxList, MaxBindings,
+                                              MaxEnvs, MaxValues>(
                         arena.get(lam.body[i]), arena, new_env, envs);
                     if (!last.has_value())
                         break;
@@ -340,7 +403,12 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 return last;
             },
             [&](foreign_function<Core> const &ff) -> Res {
-                return ff.fn(args);
+                // A foreign function's C++ signature returns one value, so a
+                // foreign callee can never produce multiple values.
+                auto ff_r = ff.fn(args);
+                if (!ff_r.has_value())
+                    return Res{ff_r.error()};
+                return single_value<MaxValues>(ff_r.value());
             },
             [](nil_t const &) -> Res {
                 return parse_error{{}, "attempted to call non-function"};
@@ -361,7 +429,37 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
     // 1d30e953-16e2-4812-9eee-10934eafdec3 end
 }
 
-/// Directly evaluates a core AST node in the given environment.
+/// Single-value adapter over @ref apply_function_value_values: applies the
+/// callee and keeps only the primary value.
+///
+/// This is the pre-L20 signature, unchanged, and it is what
+/// `macroexpand/expander.hpp` (which invokes a macro's expander function and
+/// wants one datum back) still calls.
+///
+/// @copydetails apply_function_value_values
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
+[[nodiscard]] constexpr auto apply_function_value(
+    value<elaborator::core_type<MaxNodes, MaxList>> const &func_val,
+    std::span<value<elaborator::core_type<MaxNodes, MaxList>> const> args,
+    smd::smdscheme::foundation::tree_arena<
+        elaborator::core_type<MaxNodes, MaxList>, MaxNodes> const &arena,
+    pair_heap<elaborator::core_type<MaxNodes, MaxList>, default_max_pairs>
+        *heap,
+    env_arena<elaborator::core_type<MaxNodes, MaxList>, MaxBindings, MaxEnvs>
+        &envs)
+    -> smd::smdscheme::foundation::result<
+        value<elaborator::core_type<MaxNodes, MaxList>>> {
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
+    auto r =
+        apply_function_value_values<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            func_val, args, arena, heap, envs);
+    if (!r.has_value())
+        return smd::smdscheme::foundation::result<value<Core>>{r.error()};
+    return primary_value(r.value());
+}
+
+/// Directly evaluates a core AST node in the given environment, returning
+/// **all** the values it produced.
 ///
 /// A straightforward tree-walking interpreter over the `smdlisp` core AST
 /// (adapted from `smd::smdscheme::eval_direct`; see that file's docs for
@@ -399,6 +497,13 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
 ///    subexpressions (e.g. `if`'s branches, or one application's
 ///    arguments) still shares this same reference, matching ANSI CL's
 ///    "side effects are visible in evaluation order" model.
+///  - **The return channel is n-ary (step L20).** Only the arms below that
+///    are in *tail position* recurse through this function; everything else
+///    (an `if` condition, an application's function and arguments, a `setq`
+///    right-hand side, a `defvar` initializer, an `unwind-protect` cleanup,
+///    a `throw` tag) recurses through the single-value @ref eval_direct
+///    adapter, which is exactly ANSI CL's rule that those are single-value
+///    contexts.
 ///
 /// @tparam MaxNodes    Arena capacity; bounds tree depth.
 /// @tparam MaxList     Maximum argument/body/list length.
@@ -426,11 +531,14 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
 /// @param  envs        Shared, caller-owned storage for captured
 ///                      environments; must outlive every closure this
 ///                      call (or anything it returns) might produce.
-/// @return The evaluated @ref value on success, or a
+/// @tparam MaxValues   Maximum number of values one form may return; see
+///                      @ref value_list.
+/// @return The evaluated @ref value_list on success, or a
 ///         @ref smd::smdscheme::foundation::parse_error on type error,
 ///         arity mismatch, or unbound variable/undefined function.
-template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
-[[nodiscard]] constexpr auto eval_direct(
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs,
+          int MaxValues>
+[[nodiscard]] constexpr auto eval_direct_values(
     elaborator::core_type<MaxNodes, MaxList> const &node,
     smd::smdscheme::foundation::tree_arena<
         elaborator::core_type<MaxNodes, MaxList>, MaxNodes> const &arena,
@@ -438,31 +546,37 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
     env_arena<elaborator::core_type<MaxNodes, MaxList>, MaxBindings, MaxEnvs>
         &envs)
     -> smd::smdscheme::foundation::result<
-        value<elaborator::core_type<MaxNodes, MaxList>>> {
+        value_list<elaborator::core_type<MaxNodes, MaxList>, MaxValues>> {
     static_assert(MaxBindings == 16,
                   "eval_direct currently requires closure::env<Core,16> "
                   "(see the doc comment above)");
     using Core = elaborator::core_type<MaxNodes, MaxList>;
     using Val = value<Core>;
-    using Res = smd::smdscheme::foundation::result<Val>;
+    using Vals = value_list<Core, MaxValues>;
+    using Res = smd::smdscheme::foundation::result<Vals>;
     using smd::smdscheme::foundation::parse_error;
 
     return std::visit(
         smd::fixpoint::overloaded{
             [&](elaborator::core_integer const &ci) -> Res {
-                return Val{ci.value};
+                return single_value<MaxValues>(Val{ci.value});
             },
             // bd5cf19a-ccb0-45a1-b208-b76970bcb0c6
             [&](elaborator::core_symbol const &cs) -> Res {
                 // VARIABLE namespace only, per D4 -- never lookup_function.
-                return environment.lookup_value(symbol{cs.name.view()});
+                auto lr = environment.lookup_value(symbol{cs.name.view()});
+                if (!lr.has_value())
+                    return Res{lr.error()};
+                return single_value<MaxValues>(lr.value());
             },
             [&](elaborator::core_keyword const &ck) -> Res {
-                return Val{keyword{ck.name.view()}};
+                return single_value<MaxValues>(Val{keyword{ck.name.view()}});
             },
-            [&](elaborator::core_nil const &) -> Res { return Val{nil_t{}}; },
+            [&](elaborator::core_nil const &) -> Res {
+                return single_value<MaxValues>(Val{nil_t{}});
+            },
             [&](elaborator::core_true const &) -> Res {
-                return Val{symbol{"T"}};
+                return single_value<MaxValues>(Val{symbol{"T"}});
             },
             [&](elaborator::core_function<Core, MaxNodes> const &cf) -> Res {
                 return std::visit(
@@ -473,22 +587,28 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                             // and `(function name)` all resolve the same
                             // way, distinctly from a VARIABLE reference to
                             // the same spelling.
-                            return environment.lookup_function(symbol{name});
+                            auto lr = environment.lookup_function(symbol{name});
+                            if (!lr.has_value())
+                                return Res{lr.error()};
+                            return single_value<MaxValues>(lr.value());
                         },
                         [&](smd::smdscheme::foundation::arena_box<
                             Core, MaxNodes> const &target) -> Res {
                             // An embedded (lambda ...): evaluating it
                             // materializes the closure directly, no
-                            // lookup.
-                            return eval_direct<MaxNodes, MaxList, MaxBindings,
-                                               MaxEnvs>(
+                            // lookup.  Always exactly one value.
+                            auto cr = eval_direct<MaxNodes, MaxList,
+                                                  MaxBindings, MaxEnvs>(
                                 arena.get(target), arena, environment, envs);
+                            if (!cr.has_value())
+                                return Res{cr.error()};
+                            return single_value<MaxValues>(cr.value());
                         }},
                     cf.target);
             },
             // bd5cf19a-ccb0-45a1-b208-b76970bcb0c6 end
             [&](elaborator::core_quote const &cq) -> Res {
-                return std::visit(
+                return single_value<MaxValues>(std::visit(
                     smd::fixpoint::overloaded{
                         [](int i) -> Val { return Val{i}; },
                         [](elaborator::core_symbol const &sym) -> Val {
@@ -497,7 +617,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                         [](elaborator::core_keyword const &kw) -> Val {
                             return Val{keyword{kw.name.view()}};
                         }},
-                    cq.atom);
+                    cq.atom));
             },
             [&](elaborator::core_cons<Core, MaxNodes> const &cc) -> Res {
                 auto car_r =
@@ -511,9 +631,12 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 if (!cdr_r.has_value())
                     return cdr_r.error();
                 Val const cons_args[2] = {car_r.value(), cdr_r.value()};
-                return apply_prim<Core, default_max_pairs>(
+                auto pr = apply_prim<Core, default_max_pairs>(
                     list_op::cons, std::span<Val const>{cons_args},
                     environment.pairs());
+                if (!pr.has_value())
+                    return Res{pr.error()};
+                return single_value<MaxValues>(pr.value());
             },
             // 6332b396-3733-4eb0-adc5-af7a57adb809
             [&](elaborator::core_if<Core, MaxNodes> const &cif) -> Res {
@@ -522,18 +645,26 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                         arena.get(cif.condition), arena, environment, envs);
                 if (!cond_r.has_value())
                     return cond_r.error();
+                // Both branches are in tail position, so both propagate the
+                // whole value list outward (ANSI CL).
                 if (is_true(cond_r.value()))
-                    return eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                    return eval_direct_values<MaxNodes, MaxList, MaxBindings,
+                                              MaxEnvs, MaxValues>(
                         arena.get(cif.consequent), arena, environment, envs);
-                return eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                return eval_direct_values<MaxNodes, MaxList, MaxBindings,
+                                          MaxEnvs, MaxValues>(
                     arena.get(cif.alternative), arena, environment, envs);
             },
             // 6332b396-3733-4eb0-adc5-af7a57adb809 end
             [&](elaborator::core_progn<Core, MaxNodes, MaxList> const &cp)
                 -> Res {
+                // Only the last form is in tail position, but evaluating
+                // every form n-arily is equivalent: the earlier results are
+                // discarded whether they are one value or five.
                 Res last{parse_error{{}, "progn: empty"}};
                 for (int i = 0; i < cp.exprs.size(); ++i) {
-                    last = eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                    last = eval_direct_values<MaxNodes, MaxList, MaxBindings,
+                                              MaxEnvs, MaxValues>(
                         arena.get(cp.exprs[i]), arena, environment, envs);
                     if (!last.has_value())
                         return last;
@@ -547,7 +678,8 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 // environment stays valid for as long as the closure that
                 // captured it might be called.
                 auto const *captured = envs.alloc(environment);
-                return Val{closure<Core>{&node, captured}};
+                return single_value<MaxValues>(
+                    Val{closure<Core>{&node, captured}});
             },
             [&](elaborator::core_application<Core, MaxNodes, MaxList> const
                     &app) -> Res {
@@ -567,8 +699,8 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                         return arg_r.error();
                     evaluated_args.push_back(arg_r.value());
                 }
-                return apply_function_value<MaxNodes, MaxList, MaxBindings,
-                                            MaxEnvs>(
+                return apply_function_value_values<
+                    MaxNodes, MaxList, MaxBindings, MaxEnvs, MaxValues>(
                     func_r.value(),
                     std::span<Val const>(evaluated_args.begin(),
                                          evaluated_args.end()),
@@ -581,6 +713,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 // yielding the value of the LAST assignment -- never
                 // Scheme's `unspecified` (see this function's own doc
                 // comment / handoff for the return-type rationale).
+                // A `setq` right-hand side is a single-value context.
                 Res last{parse_error{{}, "setq: no assignments"}};
                 for (int i = 0; i < sq.names.size(); ++i) {
                     auto val_r =
@@ -592,7 +725,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                                                        val_r.value());
                     if (!set_r.has_value())
                         return set_r.error();
-                    last = set_r;
+                    last = single_value<MaxValues>(set_r.value());
                 }
                 return last;
             },
@@ -608,7 +741,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 environment.define_function(symbol{cd.name}, clo_r.value());
                 // ANSI CL: `defun` returns the function name, not the
                 // closure value.
-                return Val{symbol{cd.name}};
+                return single_value<MaxValues>(Val{symbol{cd.name}});
             },
             [&](elaborator::core_defvar<Core, MaxNodes> const &dv) -> Res {
                 environment.mark_special(symbol{dv.name});
@@ -629,7 +762,7 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 }
                 // ANSI CL: `defvar`/`defparameter` return the variable
                 // name.
-                return Val{symbol{dv.name}};
+                return single_value<MaxValues>(Val{symbol{dv.name}});
             },
             [&](elaborator::core_block<Core, MaxNodes, MaxList> const &cb)
                 -> Res {
@@ -644,14 +777,18 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
 
                 Res last{parse_error{{}, "block: empty body"}};
                 for (int i = 0; i < cb.body.size(); ++i) {
-                    last = eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                    last = eval_direct_values<MaxNodes, MaxList, MaxBindings,
+                                              MaxEnvs, MaxValues>(
                         arena.get(cb.body[i]), arena, environment, envs);
                     if (!last.has_value()) {
                         if (last.error().message == block_unwind_marker &&
                             !rec->live) {
                             // The unwind that just propagated up killed
                             // THIS record: it targets this activation.
-                            return Res{rec->payload};
+                            // An exit_record payload is a single value: see
+                            // DIV-0019 for why `return-from`/`throw` do not
+                            // carry multiple values.
+                            return single_value<MaxValues>(rec->payload);
                         }
                         // Either an ordinary error, or an unwind aimed at
                         // some other (enclosing) block: this activation's
@@ -698,14 +835,16 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 auto *rec = envs.push_catch(tag_r.value());
                 Res last{parse_error{{}, "catch: empty body"}};
                 for (int i = 0; i < cc.body.size(); ++i) {
-                    last = eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                    last = eval_direct_values<MaxNodes, MaxList, MaxBindings,
+                                              MaxEnvs, MaxValues>(
                         arena.get(cc.body[i]), arena, environment, envs);
                     if (!last.has_value()) {
                         if (last.error().message == throw_unwind_marker &&
                             !rec->live) {
                             // The throw that just propagated up killed THIS
                             // frame: it targets this activation.
-                            Res const caught{rec->payload};
+                            Res const caught{
+                                single_value<MaxValues>(rec->payload)};
                             envs.pop_catch();
                             return caught;
                         }
@@ -750,9 +889,14 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                 // through the same result channel (env.hpp's marker docs).
                 // That is what makes "run the cleanups on every path" a
                 // single unconditional loop rather than four cases.
+                // ANSI CL: `unwind-protect` returns the protected form's
+                // values, all of them, so the protected form is evaluated
+                // n-arily.  The cleanups are single-value contexts whose
+                // values are discarded anyway.
                 Res protected_r =
-                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
-                        arena.get(up.protected_form), arena, environment, envs);
+                    eval_direct_values<MaxNodes, MaxList, MaxBindings, MaxEnvs,
+                                       MaxValues>(arena.get(up.protected_form),
+                                                  arena, environment, envs);
                 for (int i = 0; i < up.cleanup.size(); ++i) {
                     auto cl_r =
                         eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
@@ -760,14 +904,89 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
                     // ANSI CL: a cleanup form that itself exits non-locally
                     // (or errors) supersedes whatever was already in flight.
                     if (!cl_r.has_value())
-                        return cl_r;
+                        return Res{cl_r.error()};
                 }
                 // Cleanup values are discarded; the protected form's result
-                // (value or in-flight unwind) is what propagates.
+                // (values or in-flight unwind) is what propagates.
                 return protected_r;
+            },
+            [&](elaborator::core_multiple_value_bind<Core, MaxNodes> const &mvb)
+                -> Res {
+                // The one genuinely n-ary *consumer* in the language: the
+                // values form is the sole multiple-value context, and every
+                // other arm above exists to make sure the values reach it.
+                auto vals_r = eval_direct_values<MaxNodes, MaxList, MaxBindings,
+                                                 MaxEnvs, MaxValues>(
+                    arena.get(mvb.values_form), arena, environment, envs);
+                if (!vals_r.has_value())
+                    return vals_r;
+
+                auto const &lam_node = arena.get(mvb.lambda_node);
+                if (!std::holds_alternative<
+                        elaborator::core_lambda<Core, MaxNodes, MaxList>>(
+                        lam_node.inner))
+                    return parse_error{
+                        {},
+                        "internal error: multiple-value-bind without a "
+                        "lambda"};
+                auto const &lam =
+                    std::get<elaborator::core_lambda<Core, MaxNodes, MaxList>>(
+                        lam_node.inner);
+
+                // Materializing the lambda is what captures the ambient
+                // environment; calling it is what binds -- including
+                // dynamically, for any name a `defvar` has marked special
+                // (step L16).  Neither rule is restated here.
+                auto clo_r =
+                    eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                        lam_node, arena, environment, envs);
+                if (!clo_r.has_value())
+                    return Res{clo_r.error()};
+
+                // ANSI CL: missing values default to nil, surplus values are
+                // discarded.  The arity the callee then sees is exact.
+                smd::smdscheme::foundation::static_vector<Val, MaxList> bound;
+                for (int i = 0; i < lam.params.size(); ++i)
+                    bound.push_back(i < vals_r.value().size()
+                                        ? vals_r.value()[i]
+                                        : Val{nil_t{}});
+
+                return apply_function_value_values<
+                    MaxNodes, MaxList, MaxBindings, MaxEnvs, MaxValues>(
+                    clo_r.value(),
+                    std::span<Val const>(bound.begin(), bound.end()), arena,
+                    environment.pairs(), envs);
             }},
         // e6a2c1de-3b2a-4c8d-9c6f-1a7e5b9d2f30 end
         node.inner);
+}
+
+/// Single-value adapter over @ref eval_direct_values: evaluates @p node and
+/// keeps only the primary value.
+///
+/// This is the pre-L20 signature, unchanged.  It is both the public
+/// single-value entry point and the way every single-value *context* inside
+/// @ref eval_direct_values evaluates its subexpressions, so ANSI CL's
+/// "single-value context takes the primary value, or `nil` if there were
+/// none" rule is enforced in exactly one place: @ref primary_value.
+///
+/// @copydetails eval_direct_values
+template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs>
+[[nodiscard]] constexpr auto eval_direct(
+    elaborator::core_type<MaxNodes, MaxList> const &node,
+    smd::smdscheme::foundation::tree_arena<
+        elaborator::core_type<MaxNodes, MaxList>, MaxNodes> const &arena,
+    env<elaborator::core_type<MaxNodes, MaxList>, MaxBindings> &environment,
+    env_arena<elaborator::core_type<MaxNodes, MaxList>, MaxBindings, MaxEnvs>
+        &envs)
+    -> smd::smdscheme::foundation::result<
+        value<elaborator::core_type<MaxNodes, MaxList>>> {
+    using Core = elaborator::core_type<MaxNodes, MaxList>;
+    auto r = eval_direct_values<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+        node, arena, environment, envs);
+    if (!r.has_value())
+        return smd::smdscheme::foundation::result<value<Core>>{r.error()};
+    return primary_value(r.value());
 }
 
 } // namespace smd::smdlisp::closure

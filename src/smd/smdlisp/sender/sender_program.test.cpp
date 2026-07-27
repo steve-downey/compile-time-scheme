@@ -1102,3 +1102,33 @@ TEST_CASE("SenderProgramTest - StoppedIsAlwaysConsumedByItsOwnScope") {
     REQUIRE(std::get<int>(o3.val) == 2);
     REQUIRE(envs3.catch_depth() == 0);
 }
+
+// -- multiple values are NOT supported here (step L20, DIV-0018) ---------
+
+TEST_CASE("SenderProgramTest - ValuesIsDiagnosedRatherThanTruncated") {
+    // The sender backend's carrier holds one value per completion, so step
+    // L20's `values` builtin has nowhere to put the rest. Silently returning
+    // the primary value would make this backend disagree with the other two
+    // on a program that looks like it worked; a diagnosed error does not.
+    // See DIV-0018 for what closing this gap costs.
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Envs envs;
+    auto r = run("(values 1 2)", da, prog, heap, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} ==
+            "values: multiple values are not supported by the sender backend");
+}
+
+TEST_CASE("SenderProgramTest - MultipleValueBindIsDiagnosed") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Envs envs;
+    auto r = run("(multiple-value-bind (a b) (values 1 2) (+ a b))", da, prog,
+                 heap, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} ==
+            "multiple-value-bind is not supported by the sender backend");
+}

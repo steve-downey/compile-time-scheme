@@ -86,7 +86,7 @@
 - [x] Step L17: macro expander with host macros
 - [x] Step L18: backquote
 - [x] Step L19: defmacro (+ phase 20 draft)
-- [ ] Step L20: multiple values
+- [x] Step L20: multiple values
 - [x] Step L21: sender backend for the CL core (+ phase 21 draft)
 - [x] Step L22: public API, Godbolt, FFI parity
 - [ ] Step L23: tagbody / go (optional, D8)

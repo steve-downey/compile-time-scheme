@@ -504,7 +504,10 @@ constexpr auto env<Core, MaxBindings>::lookup_block(symbol name) const
 /// Returns an environment pre-populated with the default builtins,
 /// installed in the *function* namespace per step L9: `+`, `*`, `cons`,
 /// `car`, `cdr`, `list`, `null`, `eq`, `eql`, `atom`, `funcall`, `apply`,
-/// `append` (the last added in step L18, for backquote's `,@x` lowering).
+/// `append` (added in step L18, for backquote's `,@x` lowering), and
+/// `values` (added in step L20 -- a *function* in ANSI CL, not a special
+/// operator, and installed here precisely so it behaves like one under
+/// `#'values`, `funcall` and `apply`).
 ///
 /// Symbol names are spelled uppercase to match what the reader (steps
 /// L4-L6) produces after case folding (decision D2); `+` and `*` are
@@ -530,6 +533,8 @@ template <typename Core, int MaxBindings>
     e.define_function(symbol{"APPLY"}, value<Core>{builtin{builtin_op::apply}});
     e.define_function(symbol{"APPEND"},
                       value<Core>{builtin{builtin_op::append}});
+    e.define_function(symbol{"VALUES"},
+                      value<Core>{builtin{builtin_op::values}});
     return e;
 }
 
@@ -563,6 +568,8 @@ template <typename Core, int MaxBindings>
     e.define_function(symbol{"APPLY"}, value<Core>{builtin{builtin_op::apply}});
     e.define_function(symbol{"APPEND"},
                       value<Core>{builtin{builtin_op::append}});
+    e.define_function(symbol{"VALUES"},
+                      value<Core>{builtin{builtin_op::values}});
     return e;
 }
 
@@ -598,6 +605,8 @@ template <typename Core, int MaxBindings>
     e.define_function(symbol{"APPLY"}, value<Core>{builtin{builtin_op::apply}});
     e.define_function(symbol{"APPEND"},
                       value<Core>{builtin{builtin_op::append}});
+    e.define_function(symbol{"VALUES"},
+                      value<Core>{builtin{builtin_op::values}});
     return e;
 }
 
