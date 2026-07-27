@@ -40,3 +40,27 @@ Here there is no compile-time evidence to over-trust; the backend has only the k
 
 Closed if Beman Execution gains constant-evaluable `connect`/`start` for inline, synchronous operation states, which would let the whole graph run during constant evaluation.
 Nothing in this project can bring that about, and it is not obviously desirable, so this is recorded as accepted-permanent rather than open.
+
+## Correction (2026-07-27, orchestrator)
+
+Appended rather than edited in place, per the append-only rule for these docs.
+
+The Consequences bullet above claims "Every source string in
+`sender_program.test.cpp` is copied verbatim from `cps_code.test.cpp` or
+`eval_direct.test.cpp`."
+That is true of most of the file but not all of it, and the L21 merge commit
+message repeats the overstatement.
+
+Exact counts at the L21 merge (`c11ac23`): the file has 68 `TEST_CASE`s — one
+header-idempotency check, 64 transcribed parity cases, and **three native
+cases** that have no closure-backend counterpart, as the file's own comment
+above them says: `OrdinaryValueUsesTheValueChannel`,
+`DiagnosedErrorUsesTheErrorChannel`, and `StoppedIsAlwaysConsumedByItsOwnScope`.
+They witness which of three channels a program completed on, which is not a
+thing the closure backends can express.
+
+The diffability claim therefore holds for the 64 transcribed cases, which are
+the ones the parity argument rests on. The three native cases are the sender
+backend's own merge criterion and are stronger evidence, not weaker — but they
+are not parity evidence, and should not be counted as such by step L24 when it
+rolls these docs up.

@@ -21,6 +21,7 @@
   - [[Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)](#org180a37f4)
   - [[Phase 19 — block, catch, unwind-protect: One-Shot Control in CPS](phase-19-one-shot-control.md)](#org46e1d48b)
   - [[Phase 20 — defmacro: the Compiler Runs the Language](phase-20-defmacro.md)](#org76bd8411)
+  - [[Phase 21 — Common Lisp Control Flow as Sender Graphs](phase-21-sender-graphs.md)](#org45796b9c)
 - [Table of Contents](#org7118c4c)
 
 
@@ -182,6 +183,13 @@ Come back down from the summit for `set!`: a shared store of mutable cells, an e
 ## [Phase 20 — defmacro: the Compiler Runs the Language](phase-20-defmacro.md)
 
 *DRAFT — pending author revision.* Object-language macros: a `defmacro`-defined `my-when` is a Lisp lambda that `smdlisp` compiles with its own elaborator and runs with its own evaluator during the expansion pass — the compiler running the language it compiles, at compile time. The new machinery is a datum⇄value reification pair; the merge test is that `my-when` is `when`, whether written with `list`/`cons` or with a backquote template, plus an expansion-budget diagnostic for a macro that expands into itself.
+
+
+<a id="org45796b9c"></a>
+
+## [Phase 21 — Common Lisp Control Flow as Sender Graphs](phase-21-sender-graphs.md)
+
+*DRAFT — pending author revision.* The Common Lisp core evaluated over Beman Execution senders. The closure backends push a value, a diagnosed error, a `return-from` unwind and a `throw` unwind down one `result<value>` wire and tell them apart with sentinel messages compared by pointer identity; a sender has three channels natively, so the sentinels are deleted instead of ported. `unwind-protect` becomes an ordinary sender adapter whose three completion functions all funnel into one cleanup call, while dynamic-binding restore refuses to move out of ordinary C++ control flow at all. Plus a P2996 graph dump, and DIV-0015: this backend has no `constexpr` twin.
 
 
 <a id="org7118c4c"></a>
