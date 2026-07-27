@@ -52,6 +52,27 @@ wrong contents.
 - Rewrite your lane's step brief for the next clean agent, per the step-brief contract
   above.
 
+## UUID anchors and the frozen Scheme tree
+
+Source files carry UUID-delimited blocks used by org-transclusion. Two different
+rules apply to them, and they are routinely conflated.
+
+- Inside `src/smd/smdlisp/**`, you **may** edit the contents of an anchored region.
+  Every blog post resolves its transclusions against its own `blog/phase-NN` tag
+  (`docs/blog/pins.md`), so a later step may move, rename, reformat, or delete an
+  anchored region without owing anything to already-published prose.
+- Never delete or nest an existing anchor pair. That is the whole of the anchor
+  rule; there is no prohibition on editing between the markers.
+- New anchors must be real `uuidgen` output, and must exist at the step's merge
+  commit — a post pinned to that tag can only transclude anchors present there.
+- `src/smd/smdscheme/**` is frozen for semantic changes (decision D1), anchored or
+  not. Read it, copy from it, link it; do not edit it. A frozen-tree edit needs a
+  divergence doc and orchestrator sign-off.
+
+Do not restate this rule in a step brief in stronger form than it is written here.
+An over-broad "never edit inside a UUID anchor block" has twice caused a worker to
+design around a constraint that does not exist.
+
 ## Required commands
 
 Before declaring the step complete, run:

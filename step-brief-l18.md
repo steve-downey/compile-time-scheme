@@ -67,16 +67,22 @@ editing.
   left it untouched); durable smdlisp facts live in code doc-comments + DIV
   docs. Opening an smdlisp section there is an orchestrator scope decision, not
   something to infer silently.
-- Never edit inside existing UUID anchor blocks.
+- UUID anchors: see the anchor section in `AGENTS.md`. Inside
+  `src/smd/smdlisp/**` the *contents* of an anchored region may be edited; only
+  deleting or nesting an anchor pair is forbidden. The no-touch rule is
+  `src/smd/smdscheme/**` (D1). An earlier revision of this brief stated the
+  restriction over-broadly and cost a worker an entire design.
 - C++26/GCC16 baseline; Catch2; mirror file prolog / include-guard /
   canonical-include conventions used throughout `src/smd/smdlisp/`.
 - File a DIV under `docs/divergences/` for any knowing ANSI CL deviation.
-  **Next free number is DIV-0011** as of L19's landing (DIV-0010 was L19's);
-  re-check the directory before filing, since concurrent lanes may claim
-  numbers.
+  **DIV-0014 is the highest used** (0005 is absent); re-check the directory
+  before filing, and take the number the orchestrator assigns you, since
+  concurrent lanes claim numbers.
 - If your step has a blog deliverable, author `#+transclude:` orgit links
-  against your own worktree path (DIV-0004); the orchestrator re-points them to
-  `main` at merge. Generate only your phase's `.md` (`make
+  pinned to the post's own `blog/phase-NN` tag, which the orchestrator creates at
+  the step's merge before the post is written. (`d0ff8ec` superseded DIV-0004's
+  worktree-path-then-repoint convention; pinned links are written once and never
+  repointed.) Generate only your phase's `.md` (`make
   docs/blog/phase-NN-*.md`) and hand-edit `index.org`/`index.md` — do not let
   `make blog-md` churn other phases' anchor ids.
 - Before handoff: `make compile`, `make test`, `make lint`. Do not continue
