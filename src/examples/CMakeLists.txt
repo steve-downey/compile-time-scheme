@@ -181,3 +181,23 @@ set_tests_properties(
     examples_fibonacci_graph
     PROPERTIES PASS_REGULAR_EXPRESSION "digraph SchemeExecutionPlan"
 )
+
+add_executable(lisp_sender_graph_demo)
+target_sources(lisp_sender_graph_demo PRIVATE lisp_sender_graph_demo.cpp)
+target_link_libraries(lisp_sender_graph_demo PRIVATE smdlisp.sender)
+target_compile_options(lisp_sender_graph_demo PRIVATE -freflection)
+
+install(
+    TARGETS lisp_sender_graph_demo
+    COMPONENT smdlisp.smdlisp.examples
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+    EXCLUDE_FROM_ALL
+)
+
+add_test(NAME examples_lisp_sender_graph_demo COMMAND lisp_sender_graph_demo)
+set_tests_properties(
+    examples_lisp_sender_graph_demo
+    PROPERTIES
+        PASS_REGULAR_EXPRESSION
+            "cleanup log \\(innermost first\\): 12.*digraph LispExecutionPlan.*unwind_protect"
+)

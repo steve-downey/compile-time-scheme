@@ -5,6 +5,7 @@ add_subdirectory(reader)
 add_subdirectory(elaborator)
 add_subdirectory(closure)
 add_subdirectory(macroexpand)
+add_subdirectory(sender)
 
 add_library(smdlisp.smdlisp STATIC "")
 target_sources(
@@ -25,6 +26,7 @@ target_link_libraries(
         smdlisp.closure
         smdlisp.elaborator
         smdlisp.macroexpand
+        smdlisp.sender
 )
 
 find_package(Catch2 REQUIRED)
@@ -34,6 +36,9 @@ if(SCHEMEPOC_ENABLE_TESTING)
         smdlisp_test
         PRIVATE smdlisp.smdlisp Catch2::Catch2WithMain
     )
+    # The sender backend's graph dump reflects on sender types (P2996), as
+    # `smdscheme_test` already does for the Scheme side.
+    target_compile_options(smdlisp_test PRIVATE -freflection)
 
     file(GLOB_RECURSE TEST_FILES "${CMAKE_CURRENT_SOURCE_DIR}/*test.cpp")
     target_sources(smdlisp_test PRIVATE ${TEST_FILES})
