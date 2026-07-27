@@ -110,13 +110,22 @@ which in the commit message rather than drifting.
 passing and **declined**: `value<Core>` names `closure<Core,16>` and
 `foreign_function<Core>` unconditionally, so a real fix has to thread
 `MaxBindings` through `value`, `store`, `pair_cell`, `pair_heap`, `apply_prim`,
-`env`, `env_arena` and both evaluators (~180 sites in 7 headers) *and* edit
-inside at least five existing UUID anchor blocks — `82728208` (`is_true`),
-`2d0e5b9a` (`env::set_value`'s out-of-line definition), `1d30e953` and
-`e6a2c1de` (`apply_prim` call sites in `eval_direct.hpp`), plus the
-`cps_code.hpp` anchors — which the standing rules forbid. That combination
-makes it its own step with an explicit dispensation, not a passenger on
-another one. Do not half-do it here either.
+`env`, `env_arena` and both evaluators (~180 sites in 7 headers). That size
+alone makes it its own step, not a passenger on another one. Do not half-do it
+here either.
+
+**Correction, from the orchestrator:** L16 also cited "must edit inside five
+existing UUID anchor blocks, which the standing rules forbid" as part of its
+reason to decline. That half of the reason is wrong, and the mistake was the
+orchestrator's — an over-broad dispatch instruction, not the worker's reading.
+Inside `src/smd/smdlisp/**`, editing the *contents* of an anchored region is
+allowed. `CLAUDE.md` forbids **deleting or nesting anchor pairs**, not editing
+between them, and the pinning design in the plan says outright that "a later
+step may move, rename, reformat, or delete an anchored region without owing
+anything to already-published posts," because every post resolves against its
+own `blog/phase-NN` tag. The absolute no-touch rule applies to
+`src/smd/smdscheme/**` (D1), which is frozen for a different reason. So the
+`MaxBindings` fix needs no dispensation — only a step sized to carry it.
 
 ## Standing constraints (unchanged)
 
