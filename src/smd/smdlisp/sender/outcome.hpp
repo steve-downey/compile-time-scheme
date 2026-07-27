@@ -156,8 +156,9 @@ template <typename Core>
 /// A receiver that records which completion channel fired, instead of doing
 /// anything with it.
 ///
-/// This is the sender backend's *only* driver, and it is deliberately not
-/// @c sync_wait.  @c sync_wait collapses the three channels back into two:
+/// This is how the backend observes a program's completion, and it is
+/// deliberately not @c sync_wait.  @c sync_wait collapses the three channels
+/// back into two:
 /// it returns an engaged @c optional for a value, a disengaged one for
 /// stopped, and it **throws** on @c set_error.  A backend whose entire thesis
 /// is that the three channels are distinct cannot observe its own
@@ -165,6 +166,14 @@ template <typename Core>
 /// and this project does not use exceptions for diagnosed errors anywhere
 /// else either.  @c connect + @c start with a recording receiver is both
 /// simpler and the honest primitive.
+///
+/// One internal exception, so the "deliberately not @c sync_wait" claim is not
+/// read wider than it holds: @c sender_eval.hpp's @c core_cons arm drains its
+/// @c when_all with @c sync_wait.  That is benign — by then both children have
+/// already been evaluated in source order, so the @c when_all joins two @c just
+/// senders holding values that cannot fail, and no error or stopped completion
+/// can reach it.  Nothing observing a *program's* completion goes through
+/// @c sync_wait.
 ///
 /// @tparam Core The core AST type.
 template <typename Core>
