@@ -887,3 +887,259 @@ TEST_CASE("CpsCodeTest - EveryCatchExitPathPopsTheDynamicStack") {
                       .has_value());
     REQUIRE(envs3.catch_depth() == 0);
 }
+
+// -- special variables / dynamic binding (step L16) --------------------------
+// -- merge criteria (docs/cl-pivot-plan.md, step L16) ------------------
+// Parity halves of `eval_direct.test.cpp`'s L16 merge criteria: the same
+// three sources, the same three answers, through the CPS backend. The
+// interesting difference is invisible from here -- applying a closure is a
+// continuation barrier under CPS (see cps_apply_function_value), because a
+// tail-passed continuation would otherwise run while the dynamic bindings
+// were still in effect.
+
+/// See `eval_direct.test.cpp` for what each of these three witnesses.
+constexpr auto dynamic_binding_src = "(progn"
+                                     "  (defvar *x* 1)"
+                                     "  (defun get-x () *x*)"
+                                     "  (let ((*x* 2)) (get-x)))"sv;
+
+constexpr auto lexical_contrast_src = "(let ((y 1))"
+                                      "  (defun get-y () y)"
+                                      "  (let ((y 2)) (get-y)))"sv;
+
+constexpr auto throw_past_dynamic_src =
+    "(progn"
+    "  (defvar *x* 1)"
+    "  (defun get-x () *x*)"
+    "  (+ (catch 'c (let ((*x* 2)) (throw 'c (get-x)))) (get-x)))"sv;
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{dynamic_binding_src}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 2 && envs.dynamic_depth() == 0;
+}());
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{lexical_contrast_src}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 1 && envs.dynamic_depth() == 0;
+}());
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{throw_past_dynamic_src}, da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr = code(environment, envs, [](Val v) -> Res { return v; });
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 3 && envs.dynamic_depth() == 0;
+}());
+
+TEST_CASE("CpsCodeTest - SpecialLetBindsDynamically") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut(dynamic_binding_src, da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 2);
+    REQUIRE(envs.dynamic_depth() == 0);
+}
+
+TEST_CASE("CpsCodeTest - NonSpecialLetStillBindsLexically") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut(lexical_contrast_src, da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+    REQUIRE(envs.dynamic_depth() == 0);
+}
+
+TEST_CASE("CpsCodeTest - ThrowPastDynamicBindingRestoresOuterValue") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut(throw_past_dynamic_src, da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+    REQUIRE(envs.dynamic_depth() == 0);
+}
+
+// -- dynamic binding behaviour ----------------------------------------------
+
+TEST_CASE("CpsCodeTest - ReturnFromPastDynamicBindingRestoresOuterValue") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defvar *x* 1) (defun get-x () *x*)"
+                     "  (+ (block b (let ((*x* 2)) (return-from b (get-x))))"
+                     "     (get-x)))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+    REQUIRE(envs.dynamic_depth() == 0);
+}
+
+TEST_CASE("CpsCodeTest - SetqOfSpecialAssignsInnermostDynamicBinding") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defvar *x* 1) (defun get-x () *x*)"
+                     "  (+ (let ((*x* 2)) (setq *x* 3) (get-x)) (get-x)))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 4);
+    REQUIRE(envs.dynamic_depth() == 0);
+}
+
+TEST_CASE("CpsCodeTest - NestedDynamicBindingsRestoreInnermostFirst") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defvar *x* 1) (defun get-x () *x*)"
+                     "  (+ (let ((*x* 2)) (+ (let ((*x* 3)) (get-x)) (get-x)))"
+                     "     (get-x)))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 6);
+    REQUIRE(envs.dynamic_depth() == 0);
+}
+
+TEST_CASE("CpsCodeTest - SpecialLambdaParameterBindsDynamically") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defvar *x* 1) (defun get-x () *x*)"
+                     "  (defun call-x (*x*) (get-x))"
+                     "  (+ (call-x 7) (get-x)))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 8);
+    REQUIRE(envs.dynamic_depth() == 0);
+}
+
+TEST_CASE("CpsCodeTest - DynamicBindingOfUnboundSpecialIsDiagnosedError") {
+    // DIV-0014, under the CPS backend too.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(progn (defvar *x*) (let ((*x* 2)) *x*))", da, ca, root,
+                     heap, store, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} ==
+            "dynamic binding: special variable is unbound");
+    REQUIRE(envs.dynamic_depth() == 0);
+}
+
+TEST_CASE("CpsCodeTest - EveryDynamicExitPathRestoresTheBindingStack") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    REQUIRE(run_mut("(progn (defvar *x* 1) (let ((*x* 2)) *x*))", da, ca, root,
+                    heap, store, envs)
+                .has_value());
+    REQUIRE(envs.dynamic_depth() == 0);
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Store store2;
+    Core root2;
+    Envs envs2;
+    REQUIRE(run_mut("(progn (defvar *x* 1)"
+                    "  (catch 'c (let ((*x* 2)) (throw 'c 9))))",
+                    da2, ca2, root2, heap2, store2, envs2)
+                .has_value());
+    REQUIRE(envs2.dynamic_depth() == 0);
+
+    DatumArena da3;
+    CoreArena ca3;
+    Heap heap3;
+    Store store3;
+    Core root3;
+    Envs envs3;
+    REQUIRE_FALSE(run_mut("(progn (defvar *x* 1) (let ((*x* 2)) (nope)))", da3,
+                          ca3, root3, heap3, store3, envs3)
+                      .has_value());
+    REQUIRE(envs3.dynamic_depth() == 0);
+}
