@@ -95,6 +95,20 @@ The Sender Backend walks our Core Semantic AST exactly like the Closure backend 
 
 #+transclude: [[file:../src/smd/smdscheme/sender/sender_program.hpp::87e88913-dd13-4994-b2fe-04cb6ffa34ee]] :lines 2- :src cpp :end "87e88913-dd13-4994-b2fe-04cb6ffa34ee end"
 
+** A sender has three completion channels, and that is a semantic resource
+
+A durable consequence, recorded here because it outlives the step that found it and applies to any backend built on senders, not only to the Common Lisp one.
+
+A receiver is conceptually a continuation, as above -- but it is *three* continuations, not one. `set_value`, `set_error` and `set_stopped` are three separate functions, and an interpreter can spend that structure rather than merely carry it.
+
+The Scheme backends above never do. They return a single `result<value>`, so a value and a diagnosed error share one wire and are told apart by inspecting the payload. That is fine while a language has only two outcomes. It stops being fine as soon as the language grows non-local control: with `block`/`return-from` and `catch`/`throw`, *four* things travel that one wire -- a value, an error, and two kinds of unwind -- and telling them apart needs an out-of-band discriminator. In the closure backends that discriminator is a pair of sentinel `parse_error` messages compared by pointer identity, which in turn forces them to be named `inline constexpr char[]` objects rather than bare string literals, because equal string literals may not share an address.
+
+Mapping the same language onto senders deletes that machinery instead of porting it. A value goes to `set_value`, a diagnosed error to `set_error`, an unwind in flight to `set_stopped`; nothing is multiplexed, so nothing needs discriminating, and the sentinels have no work left to do. The question a `block` still has to answer -- "is this unwind aimed at *me*?" -- is answered where it always was, by a flag on its own exit record.
+
+The second consequence is where cleanup lives. Under direct or CPS evaluation, "run the cleanup on every exit path" is achieved by arranging that there is only one exit path: the four outcomes are already merged into one value before `unwind-protect` sees them, so a single unconditional statement suffices. A sender backend cannot inherit that from C++ control flow, because the three channels really are three functions called from three places. The property has to be *reconstructed*, and the natural place to reconstruct it is a receiver whose three completion functions all funnel into one -- which makes `unwind-protect` an ordinary sender adapter rather than an evaluator special case, and makes "cleanup runs on all three channels" a structural property rather than a checklist.
+
+The reverse direction is worth stating too, since it is the part that does not carry over: the restore step for a *dynamic binding* stays in ordinary C++ control flow around the recursive call, because it brackets a callee's whole extent rather than a single sender's completion. A sender backend is not uniformly better; it is better exactly where the thing being expressed is a completion.
+
 * Phase 7: Data Reification with C++26 Reflection (`std::meta::info`)
 
 In an ordinary compiler targeting C++, data environments and captured scopes are rigidly defined structures (`struct { int a; char b; };`). To mimic dynamic scope capturing (like an environment map dictating variables available to a Scheme Lambda), one might traditionally reach into `std::map<std::string, std::any>`. But that implies heap allocations at runtime, virtual dispatch, and cache misses.

@@ -25,9 +25,16 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-18-setq-defun-progn.org` | `15fb19a` | `blog/phase-18` | `Merge step L13` (P4 method 1) |
 | `phase-19-one-shot-control.org` | `b31c88f` | `blog/phase-19` | `Merge blog phase 19` (see note) |
 | `phase-20-defmacro.org` | `c7deeb1` | `blog/phase-20` | `Merge step L19` (P4 method 1) |
+| `phase-21-sender-graphs.org` | `c11ac23` | `blog/phase-21` | `Merge step L21` (tag created at the merge, before the post) |
 
-49 transclusions across 11 posts. Every row passes the anchor test at its pin,
-with the one recorded exception below.
+49 transclusions across 11 posts, not counting phase 21. Every row passes the
+anchor test at its pin, with the one recorded exception below.
+
+Phase 21 is the first post whose tag was created *before* its prose, which is
+the convention from `d0ff8ec` onward: the orchestrator tags the step's `--no-ff`
+merge, and the post is then written with `orgit-file:` links already pinned, so
+no link ever needs repointing. The ten anchors it may draw on live in
+`src/smd/smdlisp/sender/` at that tag.
 
 ## Two authorship eras
 
