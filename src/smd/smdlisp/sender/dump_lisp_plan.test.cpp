@@ -83,33 +83,12 @@ TEST_CASE("DumpLispPlanTest - StockAlgorithmsStillClassify") {
     REQUIRE(dot.find("unknown") == std::string::npos);
 }
 
-TEST_CASE("DumpLispPlanTest - ErrorAndStoppedChannelsClassify") {
-    // The Scheme classifier knows three tags because the Scheme backend built
-    // three. These are the ones a `smdlisp` graph needs.
-    using ErrPlan = decltype(sv::just_error(1));
-    using StopPlan = decltype(sv::just_stopped());
-    REQUIRE(snd::lisp_plan_dot<ErrPlan>().find("just_error") !=
-            std::string::npos);
-    REQUIRE(snd::lisp_plan_dot<StopPlan>().find("just_stopped") !=
-            std::string::npos);
-}
+// Classification itself, and the pre-order shape of the walk, belong to
+// `build_lisp_tree.hpp` and are pinned in `build_lisp_tree.test.cpp`. This
+// file owns only the rendering.
 
 TEST_CASE("DumpLispPlanTest - DumpWritesToStream") {
     std::ostringstream out;
     snd::dump_lisp_plan<UnwindPlan>(out);
     REQUIRE(out.str().find("digraph LispExecutionPlan") != std::string::npos);
-}
-
-TEST_CASE("DumpLispPlanTest - TreeShapeIsPreOrder") {
-    constexpr auto tree = [] {
-        snd::lisp_plan_tree<16> t{};
-        t.root_id = snd::build_lisp_tree<16>(^^NestedUnwindPlan, t);
-        return t;
-    }();
-    static_assert(tree.root_id == 0);
-    static_assert(tree.nodes.size() == 3);
-    static_assert(tree.get(0).sender_algo == "unwind_protect");
-    static_assert(tree.get(1).sender_algo == "unwind_protect");
-    static_assert(tree.get(2).sender_algo == "defer");
-    REQUIRE(true);
 }

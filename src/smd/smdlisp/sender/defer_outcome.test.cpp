@@ -72,15 +72,4 @@ TEST_CASE("DeferOutcomeTest - IsLazyUntilStarted") {
     REQUIRE(o.is_value());
 }
 
-TEST_CASE("DeferOutcomeTest - ResultRoundTrip") {
-    using Res = smd::smdscheme::foundation::result<Val>;
-    Res const ok{Val{7}};
-    Res const bad{smd::smdscheme::foundation::parse_error{{}, "e"}};
-    REQUIRE(snd::from_result<Core>(ok).is_value());
-    REQUIRE(snd::from_result<Core>(bad).is_error());
-
-    auto const val = snd::make_value<Core>(Val{7});
-    auto const stopped = snd::make_stopped<Core>();
-    REQUIRE(snd::to_result<Core>(val).has_value());
-    REQUIRE_FALSE(snd::to_result<Core>(stopped).has_value());
-}
+// `from_result`/`to_result` belong to `outcome.hpp` and are tested there.
