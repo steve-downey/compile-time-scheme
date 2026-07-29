@@ -682,7 +682,75 @@ struct eval_algebra {
                         {},
                         "multiple-value-bind is not supported by the sender "
                         "backend"});
+                },
+                // a07baaf4-fabe-41d3-a9a6-fbd5c52dbff5
+                [&](elaborator::core_tagbody<Core, MaxNodes, MaxList> const &tb)
+                    -> Out {
+                    // The basic blocks are already laid out by the elaborator
+                    // (core_tagbody's docs); this is the dispatcher over them,
+                    // and it is a transcription of the closure backends' --
+                    // with the sentinel comparison deleted, exactly as
+                    // core_block above deletes it.  There, `live` alone answers
+                    // "is this unwind aimed at me?"; here it answers "is this
+                    // *transfer* aimed at me?", and it can, because a
+                    // `return-from` or `throw` passing through leaves this
+                    // record untouched and therefore live.
+                    auto *rec =
+                        ctx.envs->alloc_exit(closure::symbol{"TAGBODY"});
+                    for (int i = 0; i < tb.labels.size(); ++i)
+                        ctx.environment->define_tag(
+                            closure::detail::tag_key<Core>(tb.labels[i].tag),
+                            rec, tb.labels[i].index);
+
+                    int pc = 0;
+                    while (pc < tb.statements.size()) {
+                        Out o = child(tb.statements[pc]);
+                        if (o.is_value()) {
+                            ++pc;
+                            continue;
+                        }
+                        if (o.is_stopped() && !rec->live) {
+                            // Resume at the requested block and re-arm: a `go`
+                            // does not end its tagbody's extent, which is what
+                            // makes this form iterate.
+                            if (!std::holds_alternative<int>(rec->payload))
+                                return make_error<Core>(parse_error{
+                                    {},
+                                    "internal error: go target is not a block "
+                                    "index"});
+                            pc = std::get<int>(rec->payload);
+                            rec->live = true;
+                            continue;
+                        }
+                        // An ordinary error, or an unwind aimed at an
+                        // enclosing scope: this extent is ending either way.
+                        rec->live = false;
+                        return o;
+                    }
+                    // Falling off the end also ends the extent (D5).
+                    rec->live = false;
+                    // ANSI CL: `tagbody` always evaluates to nil.
+                    return make_value<Core>(Val{closure::nil_t{}});
+                },
+                [&](elaborator::core_go const &cg) -> Out {
+                    auto target_r = ctx.environment->lookup_tag(
+                        closure::detail::tag_key<Core>(cg.tag));
+                    if (!target_r.has_value())
+                        return make_error<Core>(target_r.error());
+                    auto const target = target_r.value();
+                    if (!target.record->live)
+                        // Using a dead tagbody is a diagnosed error, never UB
+                        // (D5) -- and it stays on the *error* channel, since
+                        // it is not a transfer at all, exactly as
+                        // `return-from` to a dead block does.
+                        return make_error<Core>(
+                            parse_error{{}, "go: tagbody has already exited"});
+                    target.record->payload = Val{target.index};
+                    target.record->live = false;
+                    // The transfer itself: complete early, with no value.
+                    return make_stopped<Core>();
                 }},
+            // a07baaf4-fabe-41d3-a9a6-fbd5c52dbff5 end
             layer);
     }
 };

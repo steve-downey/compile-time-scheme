@@ -9,6 +9,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <span>
 #include <string_view>
 #include <variant>
 
@@ -1423,4 +1424,250 @@ TEST_CASE("CpsCodeTest - MultipleValueBindBindsSpecialsDynamically") {
     REQUIRE(r.has_value());
     REQUIRE(std::get<int>(r.value()) == 3);
     REQUIRE(envs.dynamic_depth() == 0);
+}
+
+// -- tagbody / go (step L23) ----------------------------------------------
+//
+// The step L23 merge criteria, run through the CPS backend: the same two
+// programs `eval_direct.test.cpp` constant-evaluates, so the basic-block
+// lowering here is held to the parity standard every other form is.
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{
+            "(let ((x 0)) (tagbody a (go c) b (setq x 1) c) x)"sv},
+        da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 0;
+}());
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(let ((n 0)) (tagbody top (setq n (+ n 1)) "
+                            "(if (eql n 3) nil (go top))) n)"sv},
+        da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 3;
+}());
+
+namespace {
+
+/// `<` as a foreign function; see `eval_direct.test.cpp`'s identical helper
+/// for why the merge-criterion source needs one.
+constexpr auto cps_ffi_less(std::span<Val const> args) -> Res {
+    if (args.size() != 2)
+        return scm::foundation::parse_error{{}, "<: arity"};
+    if (!std::holds_alternative<int>(args[0]) ||
+        !std::holds_alternative<int>(args[1]))
+        return scm::foundation::parse_error{{}, "<: type"};
+    return std::get<int>(args[0]) < std::get<int>(args[1])
+               ? Val{lisp::closure::symbol{"T"}}
+               : Val{lisp::closure::nil_t{}};
+}
+
+} // namespace
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(let ((n 0)) (tagbody top (setq n (+ n 1)) "
+                            "(if (< n 3) (go top))) n)"sv},
+        da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    environment.define_function(
+        lisp::closure::symbol{"<"},
+        Val{lisp::closure::foreign_function<Core>{cps_ffi_less}});
+    auto code =
+        lisp::closure::compile_cps<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca);
+    auto vr =
+        primary(code(environment, envs, [](Vals v) -> ResV { return v; }));
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 3;
+}());
+
+TEST_CASE("CpsCodeTest - TagbodyAlwaysEvaluatesToNil") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(tagbody a (list 1 2) b)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
+}
+
+TEST_CASE("CpsCodeTest - GoSkipsInterveningStatements") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody a (go c) b (setq x 1) c) x)", da,
+                     ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("CpsCodeTest - TagbodyLoopsBackward") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((n 0)) (tagbody top (setq n (+ n 1)) "
+                     "(if (eql n 3) nil (go top))) n)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("CpsCodeTest - IntegerTagsCompareWithEql") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody 1 (go 2) (setq x 1) 2) x)", da, ca,
+                     root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("CpsCodeTest - GoThroughUnwindProtectRunsCleanup") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((log 0)) (tagbody a (unwind-protect (go c) "
+                     "(setq log 1)) b (setq log 99) c) log)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+}
+
+TEST_CASE("CpsCodeTest - GoPassesThroughBlockAndCatchFrames") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody a (block b (catch 'c (go done))) "
+                     "(setq x 1) done) x)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+    // Every exit path out of the catch frame still popped exactly once.
+    REQUIRE(envs.catch_depth() == 0);
+}
+
+TEST_CASE("CpsCodeTest - GoFromAClosureInsideTheExtentWorks") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody a (funcall (lambda () (go done))) "
+                     "(setq x 1) done) x)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("CpsCodeTest - GoToAFinishedTagbodyIsDiagnosed") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((f 0)) (tagbody a (setq f (lambda () (go a)))) "
+                     "(funcall f))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} ==
+            "go: tagbody has already exited");
+}
+
+TEST_CASE("CpsCodeTest - ReturnFromUnwindsOutOfATagbody") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b (tagbody a (return-from b 7) c) 0)", da, ca, root,
+                 heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 7);
+}
+
+TEST_CASE("CpsCodeTest - GoOutOfAnInnerTagbodyReachesTheOuterOne") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody outer (tagbody inner (go done)) "
+                     "(setq x 1) done) x)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
 }

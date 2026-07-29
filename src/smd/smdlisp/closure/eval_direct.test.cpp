@@ -9,6 +9,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <span>
 #include <string_view>
 #include <variant>
 
@@ -1809,4 +1810,310 @@ TEST_CASE("EvalDirectTest - MultipleValueListIsNotProvided") {
     REQUIRE_FALSE(
         run("(multiple-value-list (values 1 2))", da, ca, root, heap, envs)
             .has_value());
+}
+
+// -- tagbody / go (step L23) ----------------------------------------------
+//
+// The merge criteria for this step: a `tagbody` that skips forward, and a
+// `tagbody` that LOOPS -- both constant-evaluated, because iteration without
+// recursion running at compile time is the whole point of the form.
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{
+            "(let ((x 0)) (tagbody a (go c) b (setq x 1) c) x)"sv},
+        da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    // The `b` block was skipped, so `x` was never assigned.
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 0;
+}());
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    // A real loop, at compile time.  Spelled with `eql` rather than `<`
+    // because the builtin set has no numeric comparison (see the step L23
+    // handoff); the control flow under test is identical.
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(let ((n 0)) (tagbody top (setq n (+ n 1)) "
+                            "(if (eql n 3) nil (go top))) n)"sv},
+        da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 3;
+}());
+
+namespace {
+
+/// `<` as a foreign function, so the step's merge-criterion source can be run
+/// exactly as written.  The builtin set (`env.hpp`'s `default_env`) has no
+/// numeric comparison; installing one natively is what `foreign_function`
+/// exists for, and it keeps the builtin set out of this step's diff.
+constexpr auto ffi_less(std::span<Val const> args) -> Res {
+    if (args.size() != 2)
+        return scm::foundation::parse_error{{}, "<: arity"};
+    if (!std::holds_alternative<int>(args[0]) ||
+        !std::holds_alternative<int>(args[1]))
+        return scm::foundation::parse_error{{}, "<: type"};
+    return std::get<int>(args[0]) < std::get<int>(args[1])
+               ? Val{lisp::closure::symbol{"T"}}
+               : Val{lisp::closure::nil_t{}};
+}
+
+} // namespace
+
+static_assert([] {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Envs envs;
+
+    auto dr = lisp::reader::read_datum<MaxNodes, MaxList>(
+        scm::parser::cursor{"(let ((n 0)) (tagbody top (setq n (+ n 1)) "
+                            "(if (< n 3) (go top))) n)"sv},
+        da);
+    if (!dr.has_value())
+        return false;
+    auto er = lisp::elaborator::elaborate<MaxNodes, MaxList>(dr.value().value,
+                                                             da, ca);
+    if (!er.has_value())
+        return false;
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    environment.define_function(
+        lisp::closure::symbol{"<"},
+        Val{lisp::closure::foreign_function<Core>{ffi_less}});
+    auto vr =
+        lisp::closure::eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+            er.value(), ca, environment, envs);
+    return vr.has_value() && std::holds_alternative<int>(vr.value()) &&
+           std::get<int>(vr.value()) == 3;
+}());
+
+TEST_CASE("EvalDirectTest - TagbodyAlwaysEvaluatesToNil") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(tagbody a (list 1 2) b)", da, ca, root, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
+
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto e = run("(tagbody)", da2, ca2, root2, heap2, envs2);
+    REQUIRE(e.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(e.value()));
+}
+
+TEST_CASE("EvalDirectTest - GoSkipsInterveningStatements") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody a (go c) b (setq x 1) c) x)", da,
+                     ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("EvalDirectTest - TagbodyLoopsBackward") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((n 0)) (tagbody top (setq n (+ n 1)) "
+                     "(if (eql n 3) nil (go top))) n)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("EvalDirectTest - IntegerTagsCompareWithEql") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody 1 (go 2) (setq x 1) 2) x)", da, ca,
+                     root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("EvalDirectTest - GoThroughUnwindProtectRunsCleanup") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((log 0)) (tagbody a (unwind-protect (go c) "
+                     "(setq log 1)) b (setq log 99) c) log)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+}
+
+TEST_CASE("EvalDirectTest - GoPassesThroughBlockAndCatchFrames") {
+    // A `block` and a `catch` must let a `go` transfer through untouched --
+    // that is what the third distinct unwind marker buys.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody a (block b (catch 'c (go done))) "
+                     "(setq x 1) done) x)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("EvalDirectTest - GoFromAClosureInsideTheExtentWorks") {
+    // The live half of the extent rule: the closure is invoked while its
+    // tagbody activation is still running, so the transfer is legitimate.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody a (funcall (lambda () (go done))) "
+                     "(setq x 1) done) x)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("EvalDirectTest - GoToAFinishedTagbodyIsDiagnosed") {
+    // The dead half: the closure smuggles the `go` out of its tagbody's
+    // dynamic extent, and calling it later is a diagnosed error rather than
+    // a hang or UB (D5) -- the same rule `return-from` follows.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((f 0)) (tagbody a (setq f (lambda () (go a)))) "
+                     "(funcall f))",
+                     da, ca, root, heap, store, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} ==
+            "go: tagbody has already exited");
+}
+
+TEST_CASE("EvalDirectTest - ReturnFromUnwindsOutOfATagbody") {
+    // The other direction: a `tagbody` must not claim an unwind aimed at an
+    // enclosing block, and its own extent ends when one passes through.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(block b (tagbody a (return-from b 7) c) 0)", da, ca, root,
+                 heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 7);
+}
+
+TEST_CASE("EvalDirectTest - NestedTagbodyGoTargetsTheInnermostTag") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody outer (tagbody inner (go done) "
+                     "(setq x 1) done) (setq x (+ x 10))) x)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 10);
+}
+
+TEST_CASE("EvalDirectTest - GoOutOfAnInnerTagbodyReachesTheOuterOne") {
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Store store;
+    Core root;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody outer (tagbody inner (go done)) "
+                     "(setq x 1) done) x)",
+                     da, ca, root, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("EvalDirectTest - SameNamedInnerScopeShadowsForTheRestOfTheBody") {
+    // DIV-0021, pinned. A `block`/`tagbody` installs its exit record into the
+    // *ambient* environment and nothing ever removes it, so a same-named
+    // inner one shadows its outer for the remainder of the enclosing body
+    // rather than only for its own extent. ANSI CL would resolve both of
+    // these against the outer scope; smdlisp diagnoses instead.
+    DatumArena da;
+    CoreArena ca;
+    Heap heap;
+    Core root;
+    Envs envs;
+    auto r = run("(tagbody a (tagbody a) (go a))", da, ca, root, heap, envs);
+    REQUIRE_FALSE(r.has_value());
+    REQUIRE(std::string_view{r.error().message} ==
+            "go: tagbody has already exited");
+
+    // The identical pre-existing shape for `block`, which is why DIV-0021
+    // describes both: this behaviour is inherited, not introduced by L23.
+    DatumArena da2;
+    CoreArena ca2;
+    Heap heap2;
+    Core root2;
+    Envs envs2;
+    auto b = run("(block a (block a nil) (return-from a 1))", da2, ca2, root2,
+                 heap2, envs2);
+    REQUIRE_FALSE(b.has_value());
+    REQUIRE(std::string_view{b.error().message} ==
+            "return-from: block has already exited");
 }

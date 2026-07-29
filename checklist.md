@@ -89,5 +89,5 @@
 - [x] Step L20: multiple values
 - [x] Step L21: sender backend for the CL core (+ phase 21 draft)
 - [x] Step L22: public API, Godbolt, FFI parity
-- [ ] Step L23: tagbody / go (optional, D8)
+- [x] Step L23: tagbody / go (optional, D8)
 - [ ] Step L24: documentation consolidation (+ phase 22 draft)

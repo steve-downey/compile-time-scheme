@@ -268,3 +268,35 @@ TEST_CASE("SmdlispTest - CompiledLispReadsZeroValuesAsNil") {
     REQUIRE(r.has_value());
     REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
 }
+
+// -- tagbody / go through the public API (step L23) -----------------------
+//
+// `(let ...)` lowers to a lambda application, so this program materializes a
+// closure and its constexpr twin must build a function-local `lisp_program`
+// rather than going through `compiled_lisp` (DIV-0013, above).
+
+using loop_t = lisp::lisp_program<"(let ((n 0)) (tagbody top (setq n (+ n 1)) "
+                                  "(if (eql n 3) nil (go top))) n)">;
+
+static_assert([] {
+    loop_t const program{};
+    loop_t::env_arena_type envs;
+    loop_t::pair_heap_type heap;
+    loop_t::store_type store;
+    auto environment = lisp::closure::default_env<Core, 16>(heap, store);
+    auto r = program(environment, envs);
+    return r.has_value() && std::holds_alternative<int>(r.value()) &&
+           std::get<int>(r.value()) == 3;
+}());
+
+TEST_CASE("SmdlispTest - CompiledLispRunsATagbodyLoop") {
+    loop_t::env_arena_type envs;
+    loop_t::pair_heap_type heap;
+    loop_t::store_type store;
+    auto environment = lisp::closure::default_env<Core, 16>(heap, store);
+    auto r = lisp::compiled_lisp<
+        "(let ((n 0)) (tagbody top (setq n (+ n 1)) (if (eql n 3) nil (go "
+        "top))) n)">(environment, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
