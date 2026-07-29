@@ -143,7 +143,7 @@ will surprise anyone who types the plan's line into a demo.
 - `docs/compiler_architecture.org` is still smdscheme-only by design. **Opening
   its `smdlisp` section is L24's job**; L20 and L23 both deliberately added
   nothing to it.
-- C++26/GCC16 baseline; Catch2; the suite is **838 tests** as of the L23 merge
+- C++26/GCC16 baseline; Catch2; the suite is **839 tests** as of the L23 merge
   (795 before it).
 - Before handoff: `make compile`, `make test`, `make lint`.
 
