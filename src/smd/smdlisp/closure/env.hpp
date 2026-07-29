@@ -84,6 +84,28 @@ inline constexpr char throw_unwind_marker_storage[] = "smdlisp: throw unwind";
 inline constexpr char const *throw_unwind_marker = throw_unwind_marker_storage;
 // 1232b7f6-c9b9-4611-a958-bd1bb14b0ff5 end
 
+// 2a233beb-0954-4da5-98c7-7bde8b28f58e
+/// The shared, static, identity-compared marker used for a `go` transfer
+/// travelling through the same frozen `result<value<Core>>` error channel
+/// (step L23).
+///
+/// A third marker, for the same reason there is a second: a `block` must let a
+/// `go` pass through it untouched, a `catch` must too, and each frame decides
+/// that by comparing the marker before it looks at its own record. **This
+/// must stay a named `inline constexpr char[]` object**, exactly like the
+/// other two and for the reason spelled out on @ref block_unwind_marker.
+///
+/// What is *different* about this one is what happens when the transfer
+/// arrives: a `return-from` or `throw` ends its target's extent, but a `go`
+/// does not. The owning `tagbody` picks the transfer up, resumes at the
+/// requested basic block, and marks its own @ref exit_record live again --
+/// which is what makes `tagbody` iterate rather than merely escape. The
+/// transfer itself is still one-shot: it is spent the moment the `tagbody`
+/// claims it.
+inline constexpr char go_unwind_marker_storage[] = "smdlisp: go transfer";
+inline constexpr char const *go_unwind_marker = go_unwind_marker_storage;
+// 2a233beb-0954-4da5-98c7-7bde8b28f58e end
+
 /// One-shot lexical exit bookkeeping for one dynamic activation of a
 /// `block` form (decision D5, step L14).
 ///
@@ -128,6 +150,33 @@ struct exit_record {
                                ///< meaningful while an unwind targeting
                                ///< this record is in flight.
 };
+
+// 222e7d9c-2121-4831-bd34-b4110a310577
+/// What a `go` resolves its tag to: the @ref exit_record of the `tagbody`
+/// activation that owns the tag, and which basic block to resume at (step
+/// L23).
+///
+/// **A `tagbody` reuses @ref exit_record verbatim rather than getting a
+/// record type of its own**, because it needs exactly the two things that
+/// record already provides and nothing else: a per-*activation* identity with
+/// a stable address a closure can capture (@ref env_arena::alloc_exit), and a
+/// @ref exit_record::live flag saying whether that activation is still
+/// running. The one reinterpretation is the payload: for a `block` it is the
+/// value being returned, and for a `tagbody` it is the *index of the basic
+/// block to resume at*, carried as an ordinary integer @ref value. The
+/// alternative -- a parallel `tagbody_record` type with a parallel arena and a
+/// parallel liveness rule -- would have duplicated the one piece of this
+/// machinery that is subtle (a captured pointer outliving the frame that
+/// allocated it) for no gain.
+///
+/// @tparam Core The core AST type.
+template <typename Core>
+struct tag_target {
+    exit_record<Core> *record = nullptr; ///< The owning activation; non-owning,
+                                         ///< arena-stable (@ref exit_record).
+    int index = 0; ///< Index of the first statement of the tag's basic block.
+};
+// 222e7d9c-2121-4831-bd34-b4110a310577 end
 
 // a5b4dac9-bc87-4fe7-9160-c3f1283df8a3
 /// One-shot **dynamic** exit bookkeeping for one activation of a `catch`
@@ -211,7 +260,8 @@ struct dynamic_binding {
 /// A Lisp-2 lexical environment: two independent, linear,
 /// most-recent-first binding lists, one per namespace (decision D4,
 /// docs/cl-pivot-plan.md), plus a third, equally independent list for
-/// `block`/`return-from` tags (decision D5, step L14).
+/// `block`/`return-from` tags (decision D5, step L14) and a fourth for
+/// `tagbody`/`go` tags (step L23).
 ///
 /// Adapted by copy from `smd::smdscheme::closure::env`'s architecture
 /// (`foundation::static_vector`-backed, linear search from the newest
@@ -256,10 +306,10 @@ struct dynamic_binding {
 /// of environments searched outward.  That copy-and-extend approach is
 /// exactly what makes an eventual owning capture (see `value.hpp`'s
 /// `closure` documentation) reproduce lexical scoping correctly: copying
-/// an `env` copies its three `static_vector`s by value.
+/// an `env` copies its four `static_vector`s by value.
 ///
 /// @tparam Core        The core AST type (see @ref value).
-/// @tparam MaxBindings Capacity of each of the three binding lists.
+/// @tparam MaxBindings Capacity of each of the four binding lists.
 template <typename Core, int MaxBindings>
 class env {
   public:
@@ -379,6 +429,34 @@ class env {
     [[nodiscard]] constexpr auto lookup_block(symbol name) const
         -> smd::smdscheme::foundation::result<exit_record<Core> *>;
 
+    /// Adds a new tag-namespace binding for @p key -> (@p record, @p index)
+    /// (the `tagbody` primitive, step L23).  A later binding for the same
+    /// @p key (a nested `tagbody` reusing the tag, or a re-entrant activation
+    /// of the same one) shadows this one, matching every other namespace's
+    /// most-recent-first shadowing.
+    ///
+    /// **A fourth namespace, independent of the other three**, because ANSI CL
+    /// says go tags are their own namespace: a `tagbody` tag named `FOO`
+    /// neither shadows nor is shadowed by a `block` named `FOO`, a variable
+    /// named `FOO`, or a function named `FOO`.  Keying the tag list on the
+    /// same @ref value type @ref catch_record uses -- rather than on
+    /// @ref symbol -- is also what gets ANSI's tag-comparison rule for free:
+    /// @ref value's @c operator== is `eq` for symbols and `eql` for integers,
+    /// which is exactly what the standard specifies for symbol and integer
+    /// tags respectively.
+    constexpr auto define_tag(value<Core> key, exit_record<Core> *record,
+                              int index) -> void;
+
+    /// Looks up @p key in the tag namespace, most-recent binding first (the
+    /// `go` primitive, step L23).
+    /// @return The bound @ref tag_target, or an "undefined tag" error.
+    ///         Reaching that error at runtime should not happen for a `go`
+    ///         the elaborator accepted (tag resolution is lexical, done at
+    ///         elaboration time) -- see @ref exit_record::live for the runtime
+    ///         check that *does* apply to an elaborator-accepted `go`.
+    [[nodiscard]] constexpr auto lookup_tag(value<Core> const &key) const
+        -> smd::smdscheme::foundation::result<tag_target<Core>>;
+
   private:
     struct binding {
         symbol name{};
@@ -398,6 +476,12 @@ class env {
                                              ///< @ref exit_record's docs).
     };
 
+    struct tag_binding {
+        value<Core> key{};         ///< Symbol or integer tag; see
+                                   ///< @ref define_tag.
+        tag_target<Core> target{}; ///< Owning activation and block index.
+    };
+
     pair_heap<Core, default_max_pairs> *pairs_ =
         nullptr; ///< Non-owning; may be null (see @ref pairs).
     store<Core, default_max_store> *store_ =
@@ -409,6 +493,7 @@ class env {
     smd::smdscheme::foundation::static_vector<symbol, MaxBindings> special_{};
     smd::smdscheme::foundation::static_vector<block_binding, MaxBindings>
         blocks_{};
+    smd::smdscheme::foundation::static_vector<tag_binding, MaxBindings> tags_{};
 };
 
 template <typename Core, int MaxBindings>
@@ -499,6 +584,36 @@ constexpr auto env<Core, MaxBindings>::lookup_block(symbol name) const
         if (blocks_[i].name == name)
             return blocks_[i].record;
     return smd::smdscheme::foundation::parse_error{{}, "undefined block"};
+}
+
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::define_tag(value<Core> key,
+                                                  exit_record<Core> *record,
+                                                  int index) -> void {
+    // Rebinding an existing key OVERWRITES rather than shadows, unlike every
+    // other namespace here.  It is observationally the same -- a shadowed
+    // binding can never be looked up again, since nothing pops these lists --
+    // and it is what keeps a `tagbody` nested inside a *looping* `tagbody`
+    // from appending one binding per iteration until it exhausts MaxBindings.
+    // Iteration is the whole point of the form, so the one namespace that can
+    // be re-entered arbitrarily often is the one that must not grow.
+    for (int i = tags_.size() - 1; i >= 0; --i) {
+        if (tags_[i].key == key) {
+            tags_[i].target = tag_target<Core>{record, index};
+            return;
+        }
+    }
+    tags_.push_back(
+        tag_binding{std::move(key), tag_target<Core>{record, index}});
+}
+
+template <typename Core, int MaxBindings>
+constexpr auto env<Core, MaxBindings>::lookup_tag(value<Core> const &key) const
+    -> smd::smdscheme::foundation::result<tag_target<Core>> {
+    for (int i = tags_.size() - 1; i >= 0; --i)
+        if (tags_[i].key == key)
+            return tags_[i].target;
+    return smd::smdscheme::foundation::parse_error{{}, "undefined tag"};
 }
 
 /// Returns an environment pre-populated with the default builtins,

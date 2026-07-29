@@ -63,6 +63,23 @@ namespace detail {
     return list_op::cons; // Unreachable: see the doc comment above.
 }
 
+/// Converts an elaborated `tagbody` tag into the runtime @ref value that keys
+/// it in the environment's tag namespace (step L23).
+///
+/// Shared verbatim by all three backends, and the whole reason tag comparison
+/// needs no comparison code of its own: a symbol tag becomes a @ref symbol
+/// value and an integer tag an @c int value, and @ref value's @c operator==
+/// then compares them by name and by numeric value respectively -- which is
+/// exactly what ANSI CL specifies (`eq` for symbol tags, `eql` for integer
+/// ones).
+template <class Core>
+[[nodiscard]] constexpr auto tag_key(elaborator::core_tag const &t)
+    -> value<Core> {
+    if (std::holds_alternative<int>(t.key))
+        return value<Core>{std::get<int>(t.key)};
+    return value<Core>{symbol{std::get<std::string_view>(t.key)}};
+}
+
 // e0468b60-4a31-4526-bd12-722bbd15ceac
 /// Undoes the innermost @p count dynamic bindings established by
 /// @ref bind_lambda_parameters, writing each saved value back into the
@@ -706,6 +723,79 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs,
                                          evaluated_args.end()),
                     arena, environment.pairs(), envs);
             },
+            // 152148ae-5a16-4a5b-9f88-258efb2bc5c7
+            [&](elaborator::core_tagbody<Core, MaxNodes, MaxList> const &tb)
+                -> Res {
+                // One fresh, live record per dynamic activation -- allocated
+                // exactly as core_block allocates its own, and installed into
+                // the *ambient* environment for the identical reason (a
+                // sibling setq/defun elsewhere in the enclosing sequence must
+                // still mutate the one object every statement shares).
+                auto *rec = envs.alloc_exit(symbol{"TAGBODY"});
+                for (int i = 0; i < tb.labels.size(); ++i)
+                    environment.define_tag(
+                        detail::tag_key<Core>(tb.labels[i].tag), rec,
+                        tb.labels[i].index);
+
+                // The trampoline over the basic blocks the elaborator already
+                // laid out (core_tagbody's docs). `pc` is the statement about
+                // to run; running off the end of one block falls into the
+                // next, and a `go` chooses a different one. Every statement
+                // is an ordinary single-value context because its value is
+                // discarded.
+                int pc = 0;
+                while (pc < tb.statements.size()) {
+                    auto r =
+                        eval_direct<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+                            arena.get(tb.statements[pc]), arena, environment,
+                            envs);
+                    if (r.has_value()) {
+                        ++pc;
+                        continue;
+                    }
+                    if (r.error().message == go_unwind_marker && !rec->live) {
+                        // The transfer that just propagated up is aimed at
+                        // THIS activation: resume at the requested block and
+                        // re-arm the record, because -- unlike `return-from`
+                        // -- a `go` does not end its target's extent (see
+                        // env.hpp's go_unwind_marker docs).
+                        if (!std::holds_alternative<int>(rec->payload))
+                            return parse_error{
+                                {},
+                                "internal error: go target is not a block "
+                                "index"};
+                        pc = std::get<int>(rec->payload);
+                        rec->live = true;
+                        continue;
+                    }
+                    // An ordinary error, a `return-from`/`throw` unwind, or a
+                    // `go` aimed at an enclosing tagbody: this activation is
+                    // ending non-locally either way.
+                    rec->live = false;
+                    return Res{r.error()};
+                }
+                // Falling off the end ends the extent too (D5).
+                rec->live = false;
+                // ANSI CL: `tagbody` always evaluates to nil.
+                return single_value<MaxValues>(Val{nil_t{}});
+            },
+            [&](elaborator::core_go const &cg) -> Res {
+                auto target_r =
+                    environment.lookup_tag(detail::tag_key<Core>(cg.tag));
+                if (!target_r.has_value())
+                    return Res{target_r.error()};
+                auto const target = target_r.value();
+                // The extent check. The tag's `tagbody` may have finished long
+                // ago, with this `go` carried out of it inside a closure --
+                // diagnosed, never UB (D5), by the same flag and the same test
+                // `return-from` applies to a dead block.
+                if (!target.record->live)
+                    return parse_error{{}, "go: tagbody has already exited"};
+                target.record->payload = Val{target.index};
+                target.record->live = false;
+                return parse_error{{}, go_unwind_marker};
+            },
+            // 152148ae-5a16-4a5b-9f88-258efb2bc5c7 end
             // e6a2c1de-3b2a-4c8d-9c6f-1a7e5b9d2f30
             [&](elaborator::core_setq<Core, MaxNodes, MaxList> const &sq)
                 -> Res {

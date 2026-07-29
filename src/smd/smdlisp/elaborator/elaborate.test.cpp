@@ -941,3 +941,125 @@ TEST_CASE(
                  da, ca)
                 .has_value());
 }
+
+// -- tagbody / go (step L23) ----------------------------------------------
+
+TEST_CASE("ElaborateTest - TagbodySplitsStatementsFromLabels") {
+    // The lowering: the interleaved source body becomes a statement vector
+    // plus a tag -> block-index table, and a tag is never a statement.
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(tagbody a (setq x 1) b (setq x 2))", da, ca);
+    REQUIRE(er.has_value());
+    using TB = lisp::elaborator::core_tagbody<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<TB>(er.value().inner));
+    auto const &tb = std::get<TB>(er.value().inner);
+    REQUIRE(tb.statements.size() == 2);
+    REQUIRE(tb.labels.size() == 2);
+    REQUIRE(tb.labels[0].tag ==
+            lisp::elaborator::core_tag{std::string_view{"A"}});
+    REQUIRE(tb.labels[0].index == 0);
+    REQUIRE(tb.labels[1].tag ==
+            lisp::elaborator::core_tag{std::string_view{"B"}});
+    REQUIRE(tb.labels[1].index == 1);
+}
+
+TEST_CASE("ElaborateTest - TagbodyAcceptsIntegerTags") {
+    // ANSI CL: a tag is a symbol OR an integer.
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(tagbody 1 (go 1))", da, ca);
+    REQUIRE(er.has_value());
+    using TB = lisp::elaborator::core_tagbody<Core, MaxNodes, MaxList>;
+    auto const &tb = std::get<TB>(er.value().inner);
+    REQUIRE(tb.labels.size() == 1);
+    REQUIRE(tb.labels[0].tag == lisp::elaborator::core_tag{1});
+    REQUIRE(tb.statements.size() == 1);
+    REQUIRE(std::holds_alternative<lisp::elaborator::core_go>(
+        ca.get(tb.statements[0]).inner));
+}
+
+TEST_CASE("ElaborateTest - TagbodyTrailingTagNamesAnEmptyBlock") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(tagbody (go done) done)", da, ca);
+    REQUIRE(er.has_value());
+    using TB = lisp::elaborator::core_tagbody<Core, MaxNodes, MaxList>;
+    auto const &tb = std::get<TB>(er.value().inner);
+    REQUIRE(tb.statements.size() == 1);
+    REQUIRE(tb.labels.size() == 1);
+    // Index == statement count: the block is empty and simply falls off the
+    // end, which is how a forward `go` to a trailing tag terminates.
+    REQUIRE(tb.labels[0].index == 1);
+}
+
+TEST_CASE("ElaborateTest - EmptyTagbodyIsLegal") {
+    DatumArena da;
+    CoreArena ca;
+    auto er = elab("(tagbody)", da, ca);
+    REQUIRE(er.has_value());
+    using TB = lisp::elaborator::core_tagbody<Core, MaxNodes, MaxList>;
+    REQUIRE(std::holds_alternative<TB>(er.value().inner));
+    REQUIRE(std::get<TB>(er.value().inner).statements.empty());
+}
+
+TEST_CASE("ElaborateTest - GoResolvesAForwardTag") {
+    // The label table is built in a first pass precisely so this elaborates:
+    // `c` is not seen until after the `go` that names it.
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(elab("(tagbody a (go c) b c)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - GoToUndefinedTagIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(tagbody a (go nowhere))", da, ca).has_value());
+    DatumArena da2;
+    CoreArena ca2;
+    REQUIRE(!elab("(go a)", da2, ca2).has_value());
+}
+
+TEST_CASE("ElaborateTest - GoSeesEnclosingTagbodyThroughNestedLambda") {
+    // A `lambda` does not reset the tag scope, exactly as it does not reset
+    // the block scope -- which is what makes the dead-extent diagnosis
+    // reachable at all.
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(
+        elab("(tagbody a (funcall (lambda () (go a))))", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - DuplicateTagbodyTagIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(tagbody a (setq x 1) a)", da, ca).has_value());
+}
+
+TEST_CASE("ElaborateTest - MalformedGoIsError") {
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(!elab("(tagbody a (go))", da, ca).has_value());
+    DatumArena da2;
+    CoreArena ca2;
+    REQUIRE(!elab("(tagbody a (go a a))", da2, ca2).has_value());
+    DatumArena da3;
+    CoreArena ca3;
+    REQUIRE(!elab("(tagbody a (go (a)))", da3, ca3).has_value());
+}
+
+TEST_CASE("ElaborateTest - BlockNamesAndTagsAreSeparateNamespaces") {
+    // ANSI CL gives them separate namespaces: the `return-from` here must
+    // resolve against the block, not be confused by the identically named
+    // tag, and a `go` naming a block name must still fail.
+    DatumArena da;
+    CoreArena ca;
+    REQUIRE(elab("(block foo (tagbody foo (return-from foo 1)))", da, ca)
+                .has_value());
+    DatumArena da2;
+    CoreArena ca2;
+    REQUIRE(!elab("(block foo (go foo))", da2, ca2).has_value());
+    DatumArena da3;
+    CoreArena ca3;
+    REQUIRE(!elab("(tagbody foo (return-from foo 1))", da3, ca3).has_value());
+}

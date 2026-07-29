@@ -536,6 +536,96 @@ struct core_multiple_value_bind {
 };
 // 98a22b58-964f-4853-be88-20a1d4a9b9d6 end
 
+// 8e268a26-7eaa-470f-86e5-3597d376b700
+/// A `tagbody` label, and the target of a `go` (step L23).
+///
+/// ANSI CL says a `tagbody` statement that is a symbol *or an integer* is a
+/// tag rather than a form, and that integer tags are compared with `eql`.
+/// Both spellings are supported, so @ref key is a two-alternative variant
+/// rather than a bare name -- and the pairing is not an accident: at run time
+/// a tag is keyed by an ordinary @c closure::value, whose @c operator== is
+/// exactly `eq` for symbols and `eql` for integers (the same comparison
+/// @ref core_catch's tag already uses). Nothing extra had to be invented to
+/// get ANSI's comparison rule; it fell out of using the value type.
+///
+/// The symbol alternative is a plain @c std::string_view, not an owned
+/// @ref reader::folded_name, for the reason @ref core_setq's names are: a tag
+/// is always a list element inside the `tagbody`/`go` form, never the
+/// elaboration root, so it is always arena-backed.
+struct core_tag {
+    std::variant<int, std::string_view> key; ///< Symbol spelling (folded per
+                                             ///< D2) or integer value.
+    friend constexpr auto operator==(core_tag const &lhs, core_tag const &rhs)
+        -> bool = default;
+};
+
+/// One entry of a @ref core_tagbody's label table: a tag and the index of the
+/// first statement of the basic block it names.
+struct core_tag_label {
+    core_tag tag;  ///< The label.
+    int index = 0; ///< Index into @ref core_tagbody::statements of the block's
+                   ///< first statement; equal to the statement count when the
+                   ///< tag is the last thing in the body (an empty trailing
+                   ///< block, which simply falls off the end).
+};
+
+/// A Common Lisp `tagbody` form: `(tagbody {tag | statement}*)`.
+///
+/// **Tags are separated from statements at elaboration time.** The source
+/// body is a single interleaved sequence, but a tag is not a form and is
+/// never evaluated, so what the evaluators receive is already split: the
+/// forms in order in @ref statements, and a table in @ref labels mapping each
+/// tag to the index where its basic block begins. That is the whole of the
+/// "lower `tagbody` to basic blocks indexed by tag" lowering, and doing it
+/// here means no evaluator has to re-derive it, in any backend.
+///
+/// `tagbody` always evaluates to `nil` and every statement's value is
+/// discarded, so a statement is a single-value context and there is nothing
+/// in this node for a value to come out of.
+///
+/// **Tag resolution is lexical; tag extent is dynamic.** @ref
+/// detail::elaborate_list validates that every `go` names a tag of some
+/// lexically enclosing `tagbody` (an unknown tag is an elaboration error,
+/// decision D5, exactly as `return-from`'s unknown block name is), and a
+/// `lambda` does not reset that scope -- so a closure created inside a
+/// `tagbody` may contain a `go` to its tags. Whether the `tagbody`'s
+/// *activation* is still running when such a `go` fires is a runtime
+/// question, answered by the same @c closure::exit_record @c live flag
+/// `block`/`return-from` use; see @ref core_go.
+///
+/// @tparam R        Recursive self-reference.
+/// @tparam MaxNodes Arena capacity.
+/// @tparam MaxList  Maximum number of statements (and of labels).
+template <typename R, int MaxNodes, int MaxList>
+struct core_tagbody {
+    smdscheme::foundation::static_vector<
+        smdscheme::foundation::arena_box<R, MaxNodes>, MaxList>
+        statements; ///< The body's forms, in order, tags removed; possibly
+                    ///< empty (`(tagbody)` is legal and yields `nil`).
+    smdscheme::foundation::static_vector<core_tag_label, MaxList>
+        labels; ///< The basic-block table; see @ref core_tag_label.
+};
+
+/// A Common Lisp `go` form: `(go tag)`.
+///
+/// Transfers control to @ref tag's basic block in the lexically enclosing
+/// @ref core_tagbody, which @ref detail::elaborate_list has already validated
+/// exists. Unlike @ref core_return_from, a `go` does not end its target's
+/// extent: the `tagbody` resumes executing statements at the tag and the
+/// activation stays live, which is exactly what makes `tagbody` an iteration
+/// construct rather than a second spelling of `block`. Each individual
+/// transfer is still one-shot in the L14 sense -- the unwind in flight is
+/// spent when the owning `tagbody` picks it up.
+///
+/// A `go` reached only through a closure invoked after its target `tagbody`
+/// has finished is a diagnosed runtime error, never UB, precisely as a
+/// `return-from` to a dead block is (decision D5); see the evaluators'
+/// `live` check.
+struct core_go {
+    core_tag tag; ///< The target label.
+};
+// 8e268a26-7eaa-470f-86e5-3597d376b700 end
+
 /// Factory template that produces the open-recursive variant layer for the
 /// core AST.
 ///
@@ -554,7 +644,8 @@ struct core_f_factory {
         core_defvar<R, MaxNodes>, core_block<R, MaxNodes, MaxList>,
         core_return_from<R, MaxNodes>, core_catch<R, MaxNodes, MaxList>,
         core_throw<R, MaxNodes>, core_unwind_protect<R, MaxNodes, MaxList>,
-        core_multiple_value_bind<R, MaxNodes>>;
+        core_multiple_value_bind<R, MaxNodes>,
+        core_tagbody<R, MaxNodes, MaxList>, core_go>;
 };
 
 /// The concrete recursive core AST type, formed as the fixed point of

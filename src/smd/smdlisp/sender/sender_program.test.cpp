@@ -6,6 +6,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <span>
 #include <string_view>
 #include <variant>
 
@@ -1131,4 +1132,189 @@ TEST_CASE("SenderProgramTest - MultipleValueBindIsDiagnosed") {
     REQUIRE_FALSE(r.has_value());
     REQUIRE(std::string_view{r.error().message} ==
             "multiple-value-bind is not supported by the sender backend");
+}
+
+// -- tagbody / go (step L23) ----------------------------------------------
+//
+// Real support, not a diagnosed stub: `tagbody`/`go` need no extra completion
+// channel, because a `go` is a nonlocal transfer and the stopped channel is
+// already exactly that.  What the closure backends need a third sentinel
+// marker for, this backend gets from `live` alone (see the `core_tagbody` arm
+// in `sender_eval.hpp`).
+
+namespace {
+
+/// `<` as a foreign function, so the step's merge-criterion source can be run
+/// exactly as written; the builtin set has no numeric comparison.
+constexpr auto snd_ffi_less(std::span<Val const> args) -> Res {
+    if (args.size() != 2)
+        return scm::foundation::parse_error{{}, "<: arity"};
+    if (!std::holds_alternative<int>(args[0]) ||
+        !std::holds_alternative<int>(args[1]))
+        return scm::foundation::parse_error{{}, "<: type"};
+    return std::get<int>(args[0]) < std::get<int>(args[1])
+               ? Val{lisp::closure::symbol{"T"}}
+               : Val{lisp::closure::nil_t{}};
+}
+
+/// Like @ref run_mut, but with `<` installed as a foreign function.
+auto run_less(std::string_view src, DatumArena &datum_arena, Program &prog,
+              Heap &heap, Store &store, Envs &envs) -> Res {
+    auto pr = snd::compile_to_sender<MaxNodes, MaxList, MaxBindings, MaxEnvs>(
+        src, datum_arena);
+    if (!pr.has_value())
+        return Res{pr.error()};
+    prog = pr.value();
+    auto environment =
+        lisp::closure::default_env<Core, MaxBindings>(heap, store);
+    environment.define_function(
+        lisp::closure::symbol{"<"},
+        Val{lisp::closure::foreign_function<Core>{snd_ffi_less}});
+    return prog(environment, envs);
+}
+
+} // namespace
+
+TEST_CASE("SenderProgramTest - TagbodyAlwaysEvaluatesToNil") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Envs envs;
+    auto r = run("(tagbody a (list 1 2) b)", da, prog, heap, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::holds_alternative<lisp::closure::nil_t>(r.value()));
+}
+
+TEST_CASE("SenderProgramTest - GoSkipsInterveningStatements") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Store store;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody a (go c) b (setq x 1) c) x)", da,
+                     prog, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("SenderProgramTest - TagbodyLoopsBackward") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Store store;
+    Envs envs;
+    auto r = run_mut("(let ((n 0)) (tagbody top (setq n (+ n 1)) "
+                     "(if (eql n 3) nil (go top))) n)",
+                     da, prog, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("SenderProgramTest - MergeCriterionLoopWithForeignLess") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Store store;
+    Envs envs;
+    auto r = run_less("(let ((n 0)) (tagbody top (setq n (+ n 1)) "
+                      "(if (< n 3) (go top))) n)",
+                      da, prog, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 3);
+}
+
+TEST_CASE("SenderProgramTest - IntegerTagsCompareWithEql") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Store store;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody 1 (go 2) (setq x 1) 2) x)", da,
+                     prog, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("SenderProgramTest - GoThroughUnwindProtectRunsCleanup") {
+    // The `unwind-protect` sender adapter decides what to do per completion
+    // channel rather than per form, so a `go` -- which is new to it -- runs
+    // the cleanup for free, on the stopped channel it already handled.
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Store store;
+    Envs envs;
+    auto r = run_mut("(let ((log 0)) (tagbody a (unwind-protect (go c) "
+                     "(setq log 1)) b (setq log 99) c) log)",
+                     da, prog, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 1);
+}
+
+TEST_CASE("SenderProgramTest - GoPassesThroughBlockAndCatchFrames") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Store store;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody a (block b (catch 'c (go done))) "
+                     "(setq x 1) done) x)",
+                     da, prog, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+    REQUIRE(envs.catch_depth() == 0);
+}
+
+TEST_CASE("SenderProgramTest - GoFromAClosureInsideTheExtentWorks") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Store store;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody a (funcall (lambda () (go done))) "
+                     "(setq x 1) done) x)",
+                     da, prog, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
+}
+
+TEST_CASE("SenderProgramTest - GoToAFinishedTagbodyIsOnTheErrorChannel") {
+    // D5 again, and the channel is the point: a dead-extent `go` is not a
+    // transfer looking for a target, it is the diagnosis that no target
+    // exists, so it must arrive on `set_error` rather than `set_stopped`.
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Store store;
+    Envs envs;
+    auto o = run_channel("(let ((f 0)) (tagbody a (setq f (lambda () (go a)))) "
+                         "(funcall f))",
+                         da, prog, heap, store, envs);
+    REQUIRE(o.is_error());
+    REQUIRE(std::string_view{o.err.message} ==
+            "go: tagbody has already exited");
+}
+
+TEST_CASE("SenderProgramTest - ReturnFromUnwindsOutOfATagbody") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Envs envs;
+    auto r = run("(block b (tagbody a (return-from b 7) c) 0)", da, prog, heap,
+                 envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 7);
+}
+
+TEST_CASE("SenderProgramTest - GoOutOfAnInnerTagbodyReachesTheOuterOne") {
+    DatumArena da;
+    Program prog;
+    Heap heap;
+    Store store;
+    Envs envs;
+    auto r = run_mut("(let ((x 0)) (tagbody outer (tagbody inner (go done)) "
+                     "(setq x 1) done) x)",
+                     da, prog, heap, store, envs);
+    REQUIRE(r.has_value());
+    REQUIRE(std::get<int>(r.value()) == 0);
 }

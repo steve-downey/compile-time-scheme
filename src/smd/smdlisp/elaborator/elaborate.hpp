@@ -35,6 +35,69 @@ template <int MaxList>
 using block_scope_type =
     smdscheme::foundation::static_vector<std::string_view, MaxList>;
 
+// bcb23ea4-e878-4fe7-99f5-8049175bda8b
+/// The set of `tagbody` tags (step L23) lexically visible at the point
+/// currently being elaborated: every tag of every enclosing `tagbody`.
+///
+/// The exact twin of @ref block_scope_type, one namespace over, and threaded
+/// for the same reason: `go`'s target check (@ref elaborate_list's `GO` case)
+/// is a purely lexical, elaboration-time decision, while whether the target
+/// `tagbody`'s activation is still running is a runtime one. A `lambda` does
+/// not push a new frame here either, which is what makes a `go` inside a
+/// closure -- and therefore the dead-extent diagnosis -- possible at all.
+///
+/// It is a *separate* list from @ref block_scope_type rather than a shared
+/// one because ANSI CL genuinely gives block names and go tags separate
+/// namespaces: `(block foo (tagbody foo (return-from foo 1)))` has a block
+/// and a tag both named `FOO`, and the `return-from` must find the block.
+///
+/// @tparam MaxList Maximum number of lexically visible tags.
+template <int MaxList>
+using tag_scope_type = smdscheme::foundation::static_vector<core_tag, MaxList>;
+
+/// The lexical scopes the elaborator threads through its mutually recursive
+/// functions: everything resolved by *name at elaboration time* rather than
+/// by value at run time.
+///
+/// Bundled into one struct rather than passed as two parallel parameters so
+/// that adding the tag namespace did not have to touch every call site of
+/// every elaboration function -- and so that adding a third such namespace
+/// later will not either.
+///
+/// @tparam MaxList Capacity of each namespace.
+template <int MaxList>
+struct lexical_scope {
+    block_scope_type<MaxList> blocks{}; ///< Enclosing `block` names.
+    tag_scope_type<MaxList> tags{};     ///< Enclosing `tagbody` tags.
+};
+
+/// Recognizes a `tagbody` body element that is a *tag* rather than a
+/// statement, writing it to @p out.
+///
+/// ANSI CL: an element that is a symbol or an integer is a tag; anything else
+/// is a form to evaluate. That is the entire classification, and it is
+/// deliberately not sensitive to *which* symbol -- a bare `nil` or `t` in
+/// statement position is a tag named `NIL`/`T`, not the constant, because a
+/// bare symbol in a `tagbody` is never an expression.
+///
+/// @param  d   The body element to classify.
+/// @param  out Receives the tag when @p d is one; untouched otherwise.
+/// @return True iff @p d is a tag.
+template <int MaxNodes, int MaxList>
+constexpr auto tagbody_tag_of(reader::datum_type<MaxNodes, MaxList> const &d,
+                              core_tag &out) -> bool {
+    if (std::holds_alternative<reader::datum_integer>(d.inner)) {
+        out = core_tag{std::get<reader::datum_integer>(d.inner).value};
+        return true;
+    }
+    if (std::holds_alternative<reader::datum_symbol>(d.inner)) {
+        out = core_tag{std::get<reader::datum_symbol>(d.inner).name.view()};
+        return true;
+    }
+    return false;
+}
+// bcb23ea4-e878-4fe7-99f5-8049175bda8b end
+
 /// Builds a @ref core_symbol from an already-uppercase static spelling.
 ///
 /// Used only for the synthetic `QUOTE`/`FUNCTION` head symbols
@@ -176,7 +239,7 @@ constexpr auto elaborate_node(
                                       MaxNodes> const &datum_arena,
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
         &core_arena,
-    block_scope_type<MaxList> const &block_scope)
+    lexical_scope<MaxList> const &scope)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>>;
 
 template <int MaxNodes, int MaxList>
@@ -187,7 +250,7 @@ constexpr auto elaborate_lambda(
                                       MaxNodes> const &datum_arena,
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
         &core_arena,
-    block_scope_type<MaxList> const &block_scope)
+    lexical_scope<MaxList> const &scope)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>>;
 
 template <int MaxNodes, int MaxList>
@@ -197,7 +260,7 @@ constexpr auto elaborate_function_position(
                                       MaxNodes> const &datum_arena,
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
         &core_arena,
-    char const *error_message, block_scope_type<MaxList> const &block_scope)
+    char const *error_message, lexical_scope<MaxList> const &scope)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>>;
 
 /// Elaborates a formals list and a body-expression range into a
@@ -224,7 +287,7 @@ constexpr auto elaborate_function_position(
 /// `lambda` and `defun` alike. @ref elaborate_list's `DEFUN` case wraps the
 /// returned body afterward -- see that case's comment and @ref
 /// core_defun's docs for why the wrapping happens one level up instead of
-/// being threaded through this shared helper. @p block_scope is still
+/// being threaded through this shared helper. @p scope is still
 /// threaded through unchanged (an ordinary `lambda` does not push a new
 /// block-scope frame; see @ref block_scope_type's docs) so a `defun` caller
 /// that already pushed its own name before calling this function has that
@@ -237,8 +300,8 @@ constexpr auto elaborate_function_position(
 ///                     only elements at and after @p body_start are read.
 /// @param  body_start  Index into @p lst.elements of the first body
 ///                     expression.
-/// @param  block_scope Lexically visible block-namespace names (see
-///                      @ref block_scope_type).
+/// @param  scope Lexically visible block names and tagbody tags (see
+///                      @ref lexical_scope).
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_lambda_body(
     smdscheme::foundation::arena_box<reader::datum_type<MaxNodes, MaxList>,
@@ -251,7 +314,7 @@ constexpr auto elaborate_lambda_body(
                                       MaxNodes> const &datum_arena,
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
         &core_arena,
-    block_scope_type<MaxList> const &block_scope)
+    lexical_scope<MaxList> const &scope)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>> {
     using core = core_type<MaxNodes, MaxList>;
     using core_f =
@@ -287,8 +350,7 @@ constexpr auto elaborate_lambda_body(
 
     for (int i = body_start; i < lst.elements.size(); ++i) {
         auto body_r = elaborate_node<MaxNodes, MaxList>(
-            datum_arena.get(lst.elements[i]), datum_arena, core_arena,
-            block_scope);
+            datum_arena.get(lst.elements[i]), datum_arena, core_arena, scope);
         if (!body_r.has_value())
             return body_r;
         lam.body.push_back(smdscheme::foundation::make_arena_box(
@@ -310,9 +372,9 @@ constexpr auto elaborate_lambda_body(
 ///
 /// @tparam MaxNodes Arena capacity.
 /// @tparam MaxList  Maximum list length.
-/// @param  block_scope Lexically visible block-namespace names, threaded
+/// @param  scope Lexically visible block names and tagbody tags, threaded
 ///                      through unchanged (a `lambda` does not push a new
-///                      frame; see @ref block_scope_type).
+///                      frame; see @ref lexical_scope).
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_lambda(
     reader::datum_list<reader::datum_type<MaxNodes, MaxList>, MaxNodes,
@@ -321,13 +383,13 @@ constexpr auto elaborate_lambda(
                                       MaxNodes> const &datum_arena,
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
         &core_arena,
-    block_scope_type<MaxList> const &block_scope)
+    lexical_scope<MaxList> const &scope)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>> {
     if (lst.elements.size() < 3)
         return smdscheme::foundation::parse_error{
             {}, "lambda: expected formals and at least one body expression"};
     return elaborate_lambda_body<MaxNodes, MaxList>(
-        lst.elements[1], lst, 2, datum_arena, core_arena, block_scope);
+        lst.elements[1], lst, 2, datum_arena, core_arena, scope);
 }
 
 /// Elaborates a datum in FUNCTION position (decision D4): the operand of
@@ -347,9 +409,9 @@ constexpr auto elaborate_lambda(
 /// @param  core_arena    Core arena receiving elaborated nodes.
 /// @param  error_message Static diagnostic used when @p d is neither a
 ///                       symbol nor a `(lambda ...)` form.
-/// @param  block_scope   Lexically visible block-namespace names, threaded
+/// @param  scope   Lexically visible block names and tagbody tags, threaded
 ///                        through unchanged into an embedded lambda's body
-///                        (see @ref block_scope_type).
+///                        (see @ref lexical_scope).
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_function_position(
     reader::datum_type<MaxNodes, MaxList> const &d,
@@ -357,7 +419,7 @@ constexpr auto elaborate_function_position(
                                       MaxNodes> const &datum_arena,
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
         &core_arena,
-    char const *error_message, block_scope_type<MaxList> const &block_scope)
+    char const *error_message, lexical_scope<MaxList> const &scope)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>> {
     using core = core_type<MaxNodes, MaxList>;
     using core_f =
@@ -378,7 +440,7 @@ constexpr auto elaborate_function_position(
                 std::get<reader::datum_symbol>(head.inner).name.view() ==
                     "LAMBDA") {
                 auto lam_r = elaborate_lambda<MaxNodes, MaxList>(
-                    lst, datum_arena, core_arena, block_scope);
+                    lst, datum_arena, core_arena, scope);
                 if (!lam_r.has_value())
                     return lam_r;
                 return core{core_f{core_function<core, MaxNodes>{
@@ -395,8 +457,8 @@ constexpr auto elaborate_function_position(
 ///
 /// Recognizes the special operators `quote`, `if`, `progn`, `let`, `let*`,
 /// `lambda`, `function`, `block`, `return-from`, `catch`, `throw`,
-/// `unwind-protect`, and `multiple-value-bind` by inspecting the
-/// leading symbol (folded spellings, per decision D2). Any other head is an
+/// `unwind-protect`, `multiple-value-bind`, `tagbody`, and `go` by inspecting
+/// the leading symbol (folded spellings, per decision D2). Any other head is an
 /// ordinary application, whose head is elaborated through @ref
 /// elaborate_function_position (a bare symbol resolves in the FUNCTION
 /// namespace; a `(lambda ...)` head is also legal per ANSI CL). An empty
@@ -408,8 +470,8 @@ constexpr auto elaborate_function_position(
 /// @param  lst         The list datum to elaborate.
 /// @param  datum_arena Read-only datum arena.
 /// @param  core_arena  Core arena receiving elaborated nodes.
-/// @param  block_scope Lexically visible block-namespace names (decision
-///                      D5, step L14) -- see @ref block_scope_type.
+/// @param  scope Lexically visible block names and tagbody tags (decision
+///                      D5, step L14) -- see @ref lexical_scope.
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_list(
     reader::datum_list<reader::datum_type<MaxNodes, MaxList>, MaxNodes,
@@ -418,7 +480,7 @@ constexpr auto elaborate_list(
                                       MaxNodes> const &datum_arena,
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
         &core_arena,
-    block_scope_type<MaxList> const &block_scope)
+    lexical_scope<MaxList> const &scope)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>> {
     using core = core_type<MaxNodes, MaxList>;
     using core_f =
@@ -440,13 +502,13 @@ constexpr auto elaborate_list(
 
             auto cond_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[1]), datum_arena, core_arena,
-                block_scope);
+                scope);
             if (!cond_r.has_value())
                 return cond_r;
 
             auto cons_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[2]), datum_arena, core_arena,
-                block_scope);
+                scope);
             if (!cons_r.has_value())
                 return cons_r;
 
@@ -454,7 +516,7 @@ constexpr auto elaborate_list(
             if (lst.elements.size() == 4) {
                 auto alt_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[3]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!alt_r.has_value())
                     return alt_r;
                 alt_box = smdscheme::foundation::make_arena_box(
@@ -490,7 +552,7 @@ constexpr auto elaborate_list(
             for (int i = 1; i < lst.elements.size(); ++i) {
                 auto expr_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[i]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!expr_r.has_value())
                     return expr_r;
                 seq.exprs.push_back(smdscheme::foundation::make_arena_box(
@@ -501,7 +563,7 @@ constexpr auto elaborate_list(
 
         if (name == "LAMBDA") {
             return elaborate_lambda<MaxNodes, MaxList>(lst, datum_arena,
-                                                       core_arena, block_scope);
+                                                       core_arena, scope);
         }
 
         if (name == "FUNCTION") {
@@ -511,7 +573,7 @@ constexpr auto elaborate_list(
             return elaborate_function_position<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[1]), datum_arena, core_arena,
                 "function: expected a function name or a lambda expression",
-                block_scope);
+                scope);
         }
 
         if (name == "BLOCK") {
@@ -519,7 +581,7 @@ constexpr auto elaborate_list(
             // forms; zero forms evaluates to nil (see core_block's docs,
             // which also cover the "block/tag names are their own
             // namespace, decision D4" and "a lambda does not reset this
-            // scope" points behind the block_scope threading below).
+            // scope" points behind the block-scope threading below).
             if (lst.elements.size() < 2)
                 return smdscheme::foundation::parse_error{
                     {}, "block: expected a name"};
@@ -531,8 +593,8 @@ constexpr auto elaborate_list(
             auto blk_name =
                 std::get<reader::datum_symbol>(name_node.inner).name.view();
 
-            block_scope_type<MaxList> inner_scope = block_scope;
-            inner_scope.push_back(blk_name);
+            lexical_scope<MaxList> inner_scope = scope;
+            inner_scope.blocks.push_back(blk_name);
 
             core_block<core, MaxNodes, MaxList> blk{};
             blk.name = blk_name;
@@ -572,7 +634,7 @@ constexpr auto elaborate_list(
                 std::get<reader::datum_symbol>(name_node.inner).name.view();
 
             bool found = false;
-            for (auto const &b : block_scope)
+            for (auto const &b : scope.blocks)
                 if (b == target_name)
                     found = true;
             if (!found)
@@ -583,7 +645,7 @@ constexpr auto elaborate_list(
             if (lst.elements.size() == 3) {
                 auto val_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[2]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!val_r.has_value())
                     return val_r;
                 val_box = smdscheme::foundation::make_arena_box(
@@ -612,7 +674,7 @@ constexpr auto elaborate_list(
 
             auto tag_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[1]), datum_arena, core_arena,
-                block_scope);
+                scope);
             if (!tag_r.has_value())
                 return tag_r;
 
@@ -622,7 +684,7 @@ constexpr auto elaborate_list(
             for (int i = 2; i < lst.elements.size(); ++i) {
                 auto body_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[i]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!body_r.has_value())
                     return body_r;
                 cat.body.push_back(smdscheme::foundation::make_arena_box(
@@ -644,12 +706,12 @@ constexpr auto elaborate_list(
 
             auto tag_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[1]), datum_arena, core_arena,
-                block_scope);
+                scope);
             if (!tag_r.has_value())
                 return tag_r;
             auto res_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[2]), datum_arena, core_arena,
-                block_scope);
+                scope);
             if (!res_r.has_value())
                 return res_r;
 
@@ -670,7 +732,7 @@ constexpr auto elaborate_list(
 
             auto prot_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[1]), datum_arena, core_arena,
-                block_scope);
+                scope);
             if (!prot_r.has_value())
                 return prot_r;
 
@@ -680,7 +742,7 @@ constexpr auto elaborate_list(
             for (int i = 2; i < lst.elements.size(); ++i) {
                 auto cl_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[i]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!cl_r.has_value())
                     return cl_r;
                 up.cleanup.push_back(smdscheme::foundation::make_arena_box(
@@ -688,6 +750,81 @@ constexpr auto elaborate_list(
             }
             return core{core_f{std::move(up)}};
         }
+
+        // 45420d1b-7082-46d4-a27a-9aef17024f8c
+        if (name == "TAGBODY") {
+            // (tagbody {tag | statement}*) -- split the interleaved body into
+            // a statement sequence and a tag -> block-index table right here,
+            // so that no evaluator has to re-derive the basic blocks (see
+            // core_tagbody's docs).
+            //
+            // TWO PASSES, and the reason is the merge criterion's own first
+            // example: `(tagbody a (go c) b (setq x 1) c)` jumps FORWARD, so
+            // every tag in the body must already be in scope when the first
+            // statement is elaborated. Collecting labels first and elaborating
+            // statements second is the whole of that.
+            core_tagbody<core, MaxNodes, MaxList> tb{};
+            lexical_scope<MaxList> inner_scope = scope;
+
+            int block_start = 0;
+            for (int i = 1; i < lst.elements.size(); ++i) {
+                core_tag tag{};
+                if (!tagbody_tag_of<MaxNodes, MaxList>(
+                        datum_arena.get(lst.elements[i]), tag)) {
+                    ++block_start;
+                    continue;
+                }
+                for (auto const &existing : tb.labels) {
+                    if (existing.tag == tag)
+                        return smdscheme::foundation::parse_error{
+                            {}, "tagbody: duplicate tag"};
+                }
+                tb.labels.push_back(core_tag_label{tag, block_start});
+                inner_scope.tags.push_back(tag);
+            }
+
+            for (int i = 1; i < lst.elements.size(); ++i) {
+                core_tag tag{};
+                if (tagbody_tag_of<MaxNodes, MaxList>(
+                        datum_arena.get(lst.elements[i]), tag))
+                    continue;
+                auto stmt_r = elaborate_node<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[i]), datum_arena, core_arena,
+                    inner_scope);
+                if (!stmt_r.has_value())
+                    return stmt_r;
+                tb.statements.push_back(smdscheme::foundation::make_arena_box(
+                    core_arena, std::move(stmt_r.value())));
+            }
+            return core{core_f{std::move(tb)}};
+        }
+
+        if (name == "GO") {
+            // (go tag) -- the tag must name a lexically enclosing tagbody's
+            // label (decision D5, exactly as return-from's block name must);
+            // whether that tagbody's activation is still running is a
+            // *runtime* question, see core_go's docs.
+            if (lst.elements.size() != 2)
+                return smdscheme::foundation::parse_error{{},
+                                                          "go: expected a tag"};
+
+            core_tag target{};
+            if (!tagbody_tag_of<MaxNodes, MaxList>(
+                    datum_arena.get(lst.elements[1]), target))
+                return smdscheme::foundation::parse_error{
+                    {}, "go: tag must be a symbol or an integer"};
+
+            bool found = false;
+            for (auto const &t : scope.tags)
+                if (t == target)
+                    found = true;
+            if (!found)
+                return smdscheme::foundation::parse_error{{},
+                                                          "go: undefined tag"};
+
+            return core{core_f{core_go{target}}};
+        }
+        // 45420d1b-7082-46d4-a27a-9aef17024f8c end
 
         if (name == "SETQ") {
             // (setq name1 expr1 name2 expr2 ...) -- ANSI CL allows any
@@ -714,7 +851,7 @@ constexpr auto elaborate_list(
 
                 auto expr_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[i + 1]), datum_arena,
-                    core_arena, block_scope);
+                    core_arena, scope);
                 if (!expr_r.has_value())
                     return expr_r;
 
@@ -734,7 +871,7 @@ constexpr auto elaborate_list(
             //
             // ANSI CL: a defun body is implicitly wrapped in `(block name
             // ...)` (step L14, core_block's docs), so `fn_name` is pushed
-            // onto block_scope *before* elaborating the body (making
+            // onto the block scope *before* elaborating the body (making
             // return-from valid inside the body, including inside a nested
             // lambda -- block_scope_type's docs), and the elaborated body
             // sequence is then re-wrapped into a single core_block node
@@ -754,8 +891,8 @@ constexpr auto elaborate_list(
             auto fn_name =
                 std::get<reader::datum_symbol>(name_node.inner).name.view();
 
-            block_scope_type<MaxList> inner_scope = block_scope;
-            inner_scope.push_back(fn_name);
+            lexical_scope<MaxList> inner_scope = scope;
+            inner_scope.blocks.push_back(fn_name);
 
             auto lam_r = elaborate_lambda_body<MaxNodes, MaxList>(
                 lst.elements[2], lst, 3, datum_arena, core_arena, inner_scope);
@@ -809,7 +946,7 @@ constexpr auto elaborate_list(
             if (lst.elements.size() == 3) {
                 auto init_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[2]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!init_r.has_value())
                     return init_r;
                 dv.init = smdscheme::foundation::make_arena_box(
@@ -863,14 +1000,14 @@ constexpr auto elaborate_list(
 
             auto values_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(lst.elements[2]), datum_arena, core_arena,
-                block_scope);
+                scope);
             if (!values_r.has_value())
                 return values_r;
 
             for (int i = 3; i < lst.elements.size(); ++i) {
                 auto body_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[i]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!body_r.has_value())
                     return body_r;
                 lam.body.push_back(smdscheme::foundation::make_arena_box(
@@ -940,7 +1077,7 @@ constexpr auto elaborate_list(
             for (int i = 2; i < lst.elements.size(); ++i) {
                 auto body_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[i]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!body_r.has_value())
                     return body_r;
                 lam.body.push_back(smdscheme::foundation::make_arena_box(
@@ -957,7 +1094,7 @@ constexpr auto elaborate_list(
             for (int i = 0; i < arg_ids.size(); ++i) {
                 auto arg_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(arg_ids[i]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!arg_r.has_value())
                     return arg_r;
                 app.args.push_back(smdscheme::foundation::make_arena_box(
@@ -988,7 +1125,7 @@ constexpr auto elaborate_list(
                 for (int i = 2; i < lst.elements.size(); ++i) {
                     auto body_r = elaborate_node<MaxNodes, MaxList>(
                         datum_arena.get(lst.elements[i]), datum_arena,
-                        core_arena, block_scope);
+                        core_arena, scope);
                     if (!body_r.has_value())
                         return body_r;
                     seq.exprs.push_back(smdscheme::foundation::make_arena_box(
@@ -1031,7 +1168,7 @@ constexpr auto elaborate_list(
             for (int i = 2; i < lst.elements.size(); ++i) {
                 auto body_r = elaborate_node<MaxNodes, MaxList>(
                     datum_arena.get(lst.elements[i]), datum_arena, core_arena,
-                    block_scope);
+                    scope);
                 if (!body_r.has_value())
                     return body_r;
                 innermost.body.push_back(smdscheme::foundation::make_arena_box(
@@ -1040,7 +1177,7 @@ constexpr auto elaborate_list(
 
             auto last_val_r = elaborate_node<MaxNodes, MaxList>(
                 datum_arena.get(vals[vals.size() - 1]), datum_arena, core_arena,
-                block_scope);
+                scope);
             if (!last_val_r.has_value())
                 return last_val_r;
 
@@ -1058,8 +1195,7 @@ constexpr auto elaborate_list(
 
             for (int i = names.size() - 2; i >= 0; --i) {
                 auto val_r = elaborate_node<MaxNodes, MaxList>(
-                    datum_arena.get(vals[i]), datum_arena, core_arena,
-                    block_scope);
+                    datum_arena.get(vals[i]), datum_arena, core_arena, scope);
                 if (!val_r.has_value())
                     return val_r;
 
@@ -1091,7 +1227,7 @@ constexpr auto elaborate_list(
         first, datum_arena, core_arena,
         "application: operator position must be a function name or a "
         "lambda expression",
-        block_scope);
+        scope);
     if (!func_r.has_value())
         return func_r;
 
@@ -1101,8 +1237,7 @@ constexpr auto elaborate_list(
 
     for (int i = 1; i < lst.elements.size(); ++i) {
         auto arg_r = elaborate_node<MaxNodes, MaxList>(
-            datum_arena.get(lst.elements[i]), datum_arena, core_arena,
-            block_scope);
+            datum_arena.get(lst.elements[i]), datum_arena, core_arena, scope);
         if (!arg_r.has_value())
             return arg_r;
         app.args.push_back(smdscheme::foundation::make_arena_box(
@@ -1124,8 +1259,8 @@ constexpr auto elaborate_list(
 /// @param  d           The datum to elaborate.
 /// @param  datum_arena Read-only datum arena.
 /// @param  core_arena  Core arena receiving elaborated nodes.
-/// @param  block_scope Lexically visible block-namespace names (see
-///                      @ref block_scope_type).
+/// @param  scope Lexically visible block names and tagbody tags (see
+///                      @ref lexical_scope).
 template <int MaxNodes, int MaxList>
 constexpr auto elaborate_node(
     reader::datum_type<MaxNodes, MaxList> const &d,
@@ -1133,7 +1268,7 @@ constexpr auto elaborate_node(
                                       MaxNodes> const &datum_arena,
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
         &core_arena,
-    block_scope_type<MaxList> const &block_scope)
+    lexical_scope<MaxList> const &scope)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>> {
     using core = core_type<MaxNodes, MaxList>;
     using core_f =
@@ -1172,14 +1307,13 @@ constexpr auto elaborate_node(
             std::get<reader::datum_function<DatumT, MaxNodes>>(d.inner);
         return elaborate_function_position<MaxNodes, MaxList>(
             datum_arena.get(fq.target), datum_arena, core_arena,
-            "function: expected a function name or a lambda expression",
-            block_scope);
+            "function: expected a function name or a lambda expression", scope);
     }
     if (std::holds_alternative<reader::datum_list<DatumT, MaxNodes, MaxList>>(
             d.inner)) {
         return elaborate_list<MaxNodes, MaxList>(
             std::get<reader::datum_list<DatumT, MaxNodes, MaxList>>(d.inner),
-            datum_arena, core_arena, block_scope);
+            datum_arena, core_arena, scope);
     }
 
     return smdscheme::foundation::parse_error{
@@ -1194,9 +1328,9 @@ constexpr auto elaborate_node(
 /// the raw datum from the reader into a typed core expression, classifying
 /// the special operators `quote`, `if`, `progn`, `let`, `let*`, `lambda`,
 /// `function`, `block`, `return-from`, `catch`, `throw`,
-/// `unwind-protect`, and `multiple-value-bind`, and emitting errors
-/// for malformed input. Elaboration begins with an empty lexical block scope
-/// (@ref detail::block_scope_type) -- see that type's docs for why
+/// `unwind-protect`, `multiple-value-bind`, `tagbody`, and `go`, and emitting
+/// errors for malformed input. Elaboration begins with empty lexical scopes
+/// (@ref detail::lexical_scope) -- see that type's docs for why
 /// `return-from` validation is a purely lexical, elaboration-time decision
 /// (decision D5).
 ///
@@ -1216,7 +1350,7 @@ constexpr auto elaborate(
     smdscheme::foundation::tree_arena<core_type<MaxNodes, MaxList>, MaxNodes>
         &core_arena)
     -> smdscheme::foundation::result<core_type<MaxNodes, MaxList>> {
-    detail::block_scope_type<MaxList> const empty_scope{};
+    detail::lexical_scope<MaxList> const empty_scope{};
     auto r = detail::elaborate_node<MaxNodes, MaxList>(pd, datum_arena,
                                                        core_arena, empty_scope);
     if (!r.has_value())

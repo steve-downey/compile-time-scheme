@@ -638,6 +638,89 @@ template <int MaxNodes, int MaxList, int MaxBindings, int MaxEnvs,
                                          evaluated_args.end()),
                     arena, environment.pairs(), envs, cont, k);
             },
+            // 7d388d02-7ba7-45ab-84cd-38b213b37ab2
+            [&](elaborator::core_tagbody<Core, MaxNodes, MaxList> const &tb)
+                -> Res {
+                // **The basic-block lowering.** The elaborator has already
+                // split the interleaved source body into a statement vector
+                // and a tag -> index table (core_tagbody's docs), so what is
+                // left here is exactly a set of basic blocks indexed by tag:
+                // block *i* is the statement run starting at index *i*, its
+                // ordinary continuation is "carry on with the next statement",
+                // and `go` replaces that continuation with "carry on at the
+                // block this tag names".
+                //
+                // The loop below IS that dispatcher. It is written as a
+                // trampoline rather than as mutually tail-calling
+                // continuation objects for one blunt reason: a CPS `go` that
+                // tail-called its target block would grow one C++ frame per
+                // iteration, so the compile-time loop this step exists to
+                // demonstrate would exhaust the constexpr evaluation depth
+                // instead of counting to three. Trampolining the transfer
+                // through the frame that owns the tagbody keeps every
+                // iteration at constant depth. The two continuations are still
+                // honoured exactly once, at the end, with the form's value.
+                //
+                // Like core_block, core_catch and a call, a tagbody is a
+                // continuation barrier: every statement is dispatched with
+                // identity_k/identity_k rather than the caller's cont/k, so
+                // this frame regains control and can decide whether an
+                // in-flight transfer is aimed at it before cont/k ever run.
+                auto *rec = envs.alloc_exit(symbol{"TAGBODY"});
+                for (int i = 0; i < tb.labels.size(); ++i)
+                    environment.define_tag(tag_key<Core>(tb.labels[i].tag), rec,
+                                           tb.labels[i].index);
+
+                int pc = 0;
+                while (pc < tb.statements.size()) {
+                    auto r = cps_dispatch<MaxNodes, MaxList, MaxBindings,
+                                          MaxEnvs, MaxValues>(
+                        arena.get(tb.statements[pc]), arena, environment, envs,
+                        Id{}, Id{});
+                    if (r.has_value()) {
+                        ++pc;
+                        continue;
+                    }
+                    if (r.error().message == go_unwind_marker && !rec->live) {
+                        // Aimed at this activation: resume at the requested
+                        // block and re-arm the record, since a `go` does not
+                        // end its target's extent (env.hpp's go_unwind_marker
+                        // docs).
+                        if (!std::holds_alternative<int>(rec->payload))
+                            return parse_error{
+                                {},
+                                "internal error: go target is not a block "
+                                "index"};
+                        pc = std::get<int>(rec->payload);
+                        rec->live = true;
+                        continue;
+                    }
+                    rec->live = false;
+                    return r;
+                }
+                rec->live = false;
+                // ANSI CL: `tagbody` always evaluates to nil.
+                auto r = cont(single_value<MaxValues>(Val{nil_t{}}));
+                if (!r.has_value())
+                    return r;
+                return k(r.value());
+            },
+            [&](elaborator::core_go const &cg) -> Res {
+                auto target_r = environment.lookup_tag(tag_key<Core>(cg.tag));
+                if (!target_r.has_value())
+                    return Res{target_r.error()};
+                auto const target = target_r.value();
+                // The extent check, identical to eval_direct.hpp's: a `go`
+                // carried out of its tagbody inside a closure is a diagnosed
+                // error, never UB (D5).  Neither cont nor k runs -- there is
+                // no value to hand onward, which is the point of a transfer.
+                if (!target.record->live)
+                    return parse_error{{}, "go: tagbody has already exited"};
+                target.record->payload = Val{target.index};
+                target.record->live = false;
+                return parse_error{{}, go_unwind_marker};
+            },
+            // 7d388d02-7ba7-45ab-84cd-38b213b37ab2 end
             // feb43c72-2f43-42a8-ad92-fc070070a838
             [&](elaborator::core_setq<Core, MaxNodes, MaxList> const &sq)
                 -> Res {
