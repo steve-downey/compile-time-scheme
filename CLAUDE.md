@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-SchemePoC (`smd/schemepoc`) is a compile-time Scheme-light compiler proof of concept targeting C++26 on GCC16. The architecture is a staged pipeline:
+A compile-time compiler proof of concept targeting C++26 on GCC16, with two front ends over a shared foundation. Both follow the same staged pipeline:
 
 ```
 source string -> reader datum tree -> elaborated core tree
@@ -12,9 +12,23 @@ source string -> reader datum tree -> elaborated core tree
   -> Beman Execution sender backend -> reflection reification spike
 ```
 
-The reader parses Scheme data but does not classify special forms. The elaborator handles `if`, `lambda`, application, quote, and binding forms. CPS is the semantic center. The closure backend is the stable demo path. The sender backend uses Beman Execution vendored as a git submodule at `vendor/execution`. Reflection is isolated until explicitly integrated.
+- `smd::smdscheme` (`src/smd/smdscheme/`) — the original Scheme-light front end, plus the language-agnostic `foundation/` (`static_vector`, `result`, `arena_box`, `tree_arena`, `fix`, parser combinators) that both front ends build on.
+- `smd::smdlisp` (`src/smd/smdlisp/`) — the Common Lisp front end, and the active development tree.
+- `smd::fixpoint` (`src/smd/fixpoint/`) — standalone recursion-scheme playground.
 
-See `docs/schempoc-plan.md` for the full implementation plan and step-by-step checklist.
+The reader parses data but does not classify special forms. The elaborator recognizes the language's special operators. CPS is the semantic center. The closure backend is the stable demo path. The sender backend uses Beman Execution vendored as a git submodule at `vendor/execution`. Reflection is isolated until explicitly integrated.
+
+**`src/smd/smdscheme/**` is frozen for semantic changes** (decision D1): published blog phases transclude its code by UUID anchor. Read it, copy from it, link it; do not edit it. A frozen-tree edit needs a divergence doc and orchestrator sign-off — see the frozen-tree section of `AGENTS.md`.
+
+Plans and status:
+
+- `checklist.md` — step-by-step status for both the original steps and the Common Lisp pivot.
+- `docs/cl-pivot-plan.md` — the active plan and its decision records (D1–D10). Read by named section on demand, never wholesale.
+- `docs/backlog/` — identified-but-unscheduled work, one file per item. Not a plan and not an agent read path; consult it only when deciding what to schedule next.
+- `docs/schemepoc-plan.md` — the superseded pre-pivot plan. Historical only.
+- `docs/divergences/` — one record per deliberate divergence from ANSI Common Lisp, the active plan, or the frozen-tree rule.
+
+`AGENTS.md` is authoritative on the agent reading contract and step protocol; `docs/codestyle.org` is authoritative on style.
 
 ## Build commands
 
@@ -44,24 +58,26 @@ Tooling (cmake, ninja, pre-commit, clang-format, gcovr) is managed by `uv` and i
 Merged `src/` layout (Pitchfork-style). Headers, implementations, and tests are co-located:
 
 ```
-src/smd/schemepoc/<component>.hpp
-src/smd/schemepoc/<component>.cpp
-src/smd/schemepoc/<component>.test.cpp
-src/smd/schemepoc/detail/<helper>.hpp    (non-public support only)
-src/examples/                            (example programs)
+src/smd/<package>/<component>.hpp             (package header, e.g. smdlisp.hpp)
+src/smd/<package>/<area>/<component>.hpp
+src/smd/<package>/<area>/<component>.cpp
+src/smd/<package>/<area>/<component>.test.cpp
+src/examples/                                 (example programs)
 ```
+
+`<package>` is `smdscheme`, `smdlisp`, or `fixpoint`. `<area>` is the pipeline stage — `foundation`, `parser`, `reader`, `elaborator`, `closure`, `macroexpand`, `sender`, `reflection` — each with its own `CMakeLists.txt`.
 
 Do not create split `include/`, `src/`, and `tests/` trees.
 
 ## C++ conventions
 
 - **C++26 baseline, GCC16 baseline.** Do not add fallback paths for older standards or other compilers.
-- **Namespace:** `smd::schemepoc`, aligned with directory path and include spelling.
-- **Includes:** canonical angle-bracket spelling only (`#include <smd/schemepoc/reader.hpp>`). No relative includes. No transitive include reliance.
-- **Header guards:** classical `#ifndef`/`#define` guards, not `#pragma once`. Guard names follow the local convention (e.g., `INCLUDED_SCHEMEPOC` or `SRC_SMD_SCHEMEPOC_READER_HPP`).
+- **Namespace:** aligned with directory path and include spelling — `smd::smdlisp::reader` lives in `src/smd/smdlisp/reader/`. Sub-namespace per pipeline area.
+- **Includes:** canonical angle-bracket spelling only (`#include <smd/smdlisp/reader/atom.hpp>`). No relative includes. No transitive include reliance.
+- **Header guards:** classical `#ifndef`/`#define` guards, not `#pragma once`. Guard names are the uppercased repo-relative path (e.g., `SRC_SMD_SMDLISP_READER_ATOM_HPP`); `src/smd/fixpoint/` predates that convention and uses `INCLUDED_SMD_FIXPOINT_*`.
 - **File prolog:** every source file starts with a canonical repo-relative path comment with Emacs mode line, then SPDX on the next line:
   ```cpp
-  // src/smd/schemepoc/reader.hpp                                  -*-C++-*-
+  // src/smd/smdlisp/reader/atom.hpp                               -*-C++-*-
   // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
   ```
 - **Formatting:** clang-format is enforced (config in `.clang-format`). gersemi formats CMake files. Do not fight formatter output.
@@ -76,15 +92,15 @@ Do not create split `include/`, `src/`, and `tests/` trees.
 - Co-locate tests with source under `src/`.
 - Test skeleton:
   ```cpp
-  // src/smd/schemepoc/reader.test.cpp                              -*-C++-*-
+  // src/smd/smdlisp/reader/atom.test.cpp                           -*-C++-*-
   // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-  #include <smd/schemepoc/reader.hpp>
-  #include <smd/schemepoc/reader.hpp>  // test 2nd include OK
+  #include <smd/smdlisp/reader/atom.hpp>
+  #include <smd/smdlisp/reader/atom.hpp>  // test 2nd include OK
 
   #include <catch2/catch_test_macros.hpp>
 
-  TEST_CASE("ReaderTest - HeaderIsIdempotent") { REQUIRE(true); }
+  TEST_CASE("AtomTest - HeaderIsIdempotent") { REQUIRE(true); }
   ```
 
 ## CMake conventions
@@ -96,7 +112,9 @@ Do not create split `include/`, `src/`, and `tests/` trees.
 
 ## UUID anchors and org-transclusion
 
-Source files contain UUID-delimited blocks (e.g., `// 44cc988c-7353-43aa-a7d3-8840f92371a6`) used by org-transclusion to embed live code in `schemepoc.org` for presentations. Do not delete or nest existing UUID anchor pairs.
+Source files contain UUID-delimited blocks (e.g., `// 44cc988c-7353-43aa-a7d3-8840f92371a6`) used by org-transclusion to embed live code in `schemepoc.org` and in the blog posts under `docs/blog/`. Do not delete or nest existing UUID anchor pairs; new anchors must be real `uuidgen` output.
+
+Editing *between* the markers is allowed — the prohibition is only on deleting or nesting the pairs themselves. Blog posts resolve transclusions against their own `blog/phase-NN` tag (`docs/blog/pins.md`), so an anchored region can be changed later. The binding constraint on `src/smd/smdscheme/**` is the D1 frozen-tree rule above, not the anchors. See `AGENTS.md` for the full statement; do not restate either rule in stronger form.
 
 ## Infrastructure
 
