@@ -52,3 +52,12 @@ Revisit once `defmacro`/backquote (L18-L19) bring real `gensym` machinery;
 at that point `expand_or`/`expand_cond`/`expand_case` in
 `src/smd/smdlisp/macroexpand/expander.hpp` should generate a fresh symbol
 per expansion instead of reusing `%OR-TEMP`/`%COND-TMP`/`%CASE-TMP`.
+
+## Classification (2026-07-31, rebuild phase R0)
+
+Appended, not edited in place, per the append-only rule for these docs.
+
+**Class: `defect`.**
+Macro capture is a bug, not a chosen limit: a colliding user identifier is silently shadowed rather than diagnosed.
+Closes under D12 (`docs/cl-rebuild-plan.md`), which makes `gensym` an ordinary uninterned symbol.
+No test may pin the capturing behaviour.

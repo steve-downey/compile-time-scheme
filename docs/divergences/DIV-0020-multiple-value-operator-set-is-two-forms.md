@@ -38,3 +38,12 @@ Note also that the cap interacts with `MaxList`: `values` receives its arguments
 
 Closed when the remaining operators are implemented, or accepted-permanent if the project decides the two-form subset is the intended teaching surface.
 The cap is separately closed by raising `default_max_values` to at least 20, which is a one-line change whose only cost is frame size.
+
+## Classification (2026-07-31, rebuild phase R0)
+
+Appended, not edited in place, per the append-only rule for these docs.
+
+**Class: mixed.**
+The two-form operator subset is a `scope-decision` and may be pinned by tests.
+The cap of 8 is a `defect`: ANSI requires `multiple-values-limit` to be at least 20, so this is nonconformance rather than scope.
+`EvalDirectTest - MoreValuesThanMaxValuesIsDiagnosed` pins the defect half and must not be carried forward.

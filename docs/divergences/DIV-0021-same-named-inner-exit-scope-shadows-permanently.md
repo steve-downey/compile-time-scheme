@@ -50,3 +50,12 @@ That is observationally identical -- a shadowed binding can never be looked up a
 
 Closed when a form's exit binding is removed at the end of its extent -- e.g. by recording the binding-list length on entry and truncating back to it on every exit path, which is the same "one exit path" shape `unwind-protect` and the dynamic-binding stack already use.
 That needs a truncation operation the frozen `static_vector` does not have, so it would arrive as a length field owned by `env` rather than as an edit to `smd::smdscheme`.
+
+## Classification (2026-07-31, rebuild phase R0)
+
+Appended, not edited in place, per the append-only rule for these docs.
+
+**Class: `defect`.**
+Diagnosed rather than silent, but ANSI-nonconforming, and this doc records a second consequence that is not merely a conformance gap: a `block` inside a `tagbody` loop grows the ambient environment by one binding per iteration until `MaxBindings` trips.
+The truncation operation it says `static_vector` lacks is now an ordinary change under D11.
+`EvalDirectTest - SameNamedInnerScopeShadowsForTheRestOfTheBody` pins this and must not be carried forward.

@@ -43,3 +43,12 @@ Diagnosing it is the honest small option: it is never silently wrong, and it fai
 
 Closed when special variables get a name-keyed value cell reachable from *any* environment rather than only from environments that happen to carry a binding for the name -- i.e. when a symbol has a value slot of its own.
 At that point `let` of an unbound special can allocate the cell on the spot and every previously captured environment will still find it.
+
+## Classification (2026-07-31, rebuild phase R0)
+
+Appended, not edited in place, per the append-only rule for these docs.
+
+**Class: `defect`.**
+Diagnosed rather than silent, which makes it a safe defect, but it is still ANSI-nonconforming behaviour rather than a chosen limit.
+This doc's own revisit condition — "when a symbol has a value slot of its own" — is precisely D12.
+The two `DynamicBindingOfUnboundSpecialIsDiagnosedError` tests must not be carried into `src/smd/cl/`.

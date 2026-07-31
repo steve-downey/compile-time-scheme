@@ -86,3 +86,11 @@ across top-level forms), a fuller macro lambda list (`&optional`/`&key`/nested
 destructuring), or a dotted-list datum representation. Close the `gensym` half
 by reference to DIV-0006 once a step that owns `closure/` adds a `gensym`
 builtin the compile-time evaluator can call from a macro body.
+
+## Classification (2026-07-31, rebuild phase R0)
+
+Appended, not edited in place, per the append-only rule for these docs.
+
+**Class: mixed.**
+Divergence 1 (registration scoped to one top-level form) is a `defect`: ANSI makes a `defmacro` visible to every later form, and this closes under D12's macro slot in a global symbol table.
+Divergences 2, 3 and 4 (the `(quote name)` rewrite, the reduced macro lambda list, the reification restrictions) are `scope-decision` and may be pinned by tests.

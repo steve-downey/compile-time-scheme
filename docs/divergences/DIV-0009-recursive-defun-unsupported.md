@@ -58,3 +58,11 @@ Closed when `defun` (and any `flet`/`labels`) install a self-visible binding
 before the body's environment is captured -- e.g. a mutable/shared function
 cell, or pre-binding the name to a placeholder that the just-built closure is
 then stored into -- so that a function can resolve its own name at call time.
+
+## Classification (2026-07-31, rebuild phase R0)
+
+Appended, not edited in place, per the append-only rule for these docs.
+
+**Class: `defect`. The headline defect of the pivot implementation.**
+A Lisp in which a function cannot call itself is not yet a Lisp, and this doc records that L14's block tests were rewritten to avoid recursion because of it.
+Closes under D12 (function slot resolved at call time) and is the named acceptance witness for phase R5: `(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))`.
