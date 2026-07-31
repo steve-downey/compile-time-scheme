@@ -18,15 +18,16 @@ source string -> reader datum tree -> elaborated core tree
 
 The reader parses data but does not classify special forms. The elaborator recognizes the language's special operators. CPS is the semantic center. The closure backend is the stable demo path. The sender backend uses Beman Execution vendored as a git submodule at `vendor/execution`. Reflection is isolated until explicitly integrated.
 
-**`src/smd/smdscheme/**` is frozen for semantic changes** (decision D1): published blog phases transclude its code by UUID anchor. Read it, copy from it, link it; do not edit it. A frozen-tree edit needs a divergence doc and orchestrator sign-off — see the frozen-tree section of `AGENTS.md`.
+**The D1 freeze on `src/smd/smdscheme/**` is retired** by decision D11 (`docs/cl-rebuild-plan.md`). Its rationale — that published blog phases transclude live code — was superseded when posts moved to `orgit-file:` links pinned to `blog/phase-NN` tags (`docs/blog/pins.md`). The UUID anchor rules are unchanged: do not delete or nest an existing anchor pair. `src/smd/smdlisp/**` is frozen from step R1 onward for a different reason — it is the behavioural oracle for the rebuild — and is never edited.
 
 Plans and status:
 
-- `checklist.md` — step-by-step status for both the original steps and the Common Lisp pivot.
-- `docs/cl-pivot-plan.md` — the active plan and its decision records (D1–D10). Read by named section on demand, never wholesale.
+- `checklist.md` — step-by-step status for the original steps, the Common Lisp pivot, and the rebuild.
+- `docs/cl-rebuild-plan.md` — the active plan, its decision records (D11–D17), and the phase list R0–R8.
+- `docs/cl-pivot-plan.md` — the pivot plan (decision records D1–D10). Still authoritative for how the current `smdlisp` got its shape; its step list is finished. Read by named section on demand, never wholesale.
 - `docs/backlog/` — identified-but-unscheduled work, one file per item. Not a plan and not an agent read path; consult it only when deciding what to schedule next.
 - `docs/schemepoc-plan.md` — the superseded pre-pivot plan. Historical only.
-- `docs/divergences/` — one record per deliberate divergence from ANSI Common Lisp, the active plan, or the frozen-tree rule.
+- `docs/divergences/` — one record per deliberate divergence from ANSI Common Lisp, the active plan, or a project rule. `docs/divergences/README.md` classifies each as `defect`, `scope-decision`, `artifact-of-D1`, `toolchain`, or `process`. These docs are append-only: append a dated note, never edit in place. **A test may pin a `scope-decision`; a test must never pin a `defect`** (D16).
 
 `AGENTS.md` is authoritative on the agent reading contract and step protocol; `docs/codestyle.org` is authoritative on style.
 

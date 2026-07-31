@@ -49,3 +49,11 @@ that itself constructs a nested backquote template; at that point
 entering a nested `datum_backquote`, decremented on the unquote that
 matches the current depth) instead of treating any nested `` ` `` as
 opaque data.
+
+## Classification (2026-07-31, rebuild phase R0)
+
+Appended, not edited in place, per the append-only rule for these docs.
+
+**Class: `defect`.**
+A nested template silently becomes literal data rather than being diagnosed, so this is a wrong answer, not a rejected program.
+Depth tracking is required work in the rebuild, not an optional extension.

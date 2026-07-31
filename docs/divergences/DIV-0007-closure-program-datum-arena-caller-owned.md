@@ -94,3 +94,11 @@ alternative, and `core_setq`/`core_defun`/`core_defvar`'s names to an owned
 `std::string_view`, the same fix already applied to the root-node
 `core_symbol`/`core_keyword` case, then drop the `datum_arena` parameter from
 `compile_to_closure`.
+
+## Classification (2026-07-31, rebuild phase R0)
+
+Appended, not edited in place, per the append-only rule for these docs.
+
+**Class: `defect`.**
+This doc already names it as such: a real dangling-`string_view` bug that the constexpr evaluator caught and that would dangle at run time too.
+Closes under D12, which replaces borrowed names with symbol ids, making a compiled program self-contained.

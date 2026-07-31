@@ -37,3 +37,11 @@ The narrower reason is that it would also require threading `MaxValues` into `en
 
 Closed when `exit_record::payload` and `catch_record::payload` hold a `closure::value_list` and the two escape forms store all the values they were given.
 The cheap version of that -- given how small `default_max_values` already is -- is to widen the payload without adding a template parameter, accepting the fixed size increase; the careful version threads `MaxValues` through `env_arena`.
+
+## Classification (2026-07-31, rebuild phase R0)
+
+Appended, not edited in place, per the append-only rule for these docs.
+
+**Class: `defect`. The only silent wrong answer among the twenty.**
+This doc says so itself: `(multiple-value-bind (a b) (block b (return-from b (values 1 2))) ...)` binds `b` to `nil` with no diagnostic.
+The blocker it names — that widening the payload multiplies 256 records by `default_max_values` — is exactly what D14 removes by taking capacity out of type identity.
