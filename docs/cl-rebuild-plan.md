@@ -176,7 +176,8 @@ Four tiers, in the order they are added:
    *Availability and licence terms are unverified and must be checked in phase R6 before this is relied on.*
 3. **Differential oracle.**
    SBCL, with ECL or CLISP as fallback, mirroring `gforth_diff`: same source through both pipelines, diff values and output, pin the oracle version.
-   *Also unverified in the current environment.*
+   Verified 2026-08-01: no implementation is installed in the dev environment, but sbcl (apt candidate 2:2.6.0-1), ecl and clisp are all one `apt install` away; the pinned oracle version is whatever is installed when the harness lands.
+   The harness itself is R6's deliverable, but informal hand-run differential checks are available from R2 onward, and should be preferred over tier 4 wherever the old tree pins a `defect` the rebuild fixes — for those behaviours the old tree is a wrong oracle by design.
 4. **The old tree as a behavioural oracle.**
    `src/smd/smdlisp/**` keeps building and running and is **never edited**.
    A disagreement between old and new is evidence to be explained, not a merge conflict to be resolved.
@@ -239,7 +240,7 @@ Recursive `defun` works at the end of this phase or the phase is not done.
 
 **R6 — conformance.**
 `ansi-test` subset and the SBCL differential harness, modelled directly on `src/smd/forth/conformance/`.
-Verify tool availability and licence terms first.
+Verify `ansi-test` availability, licence terms and its post-D10 usable subset first; the oracle side is already verified (§4, 2026-08-01 note).
 
 Scope this honestly at the start of the phase rather than discovering it midway.
 `ansi-test` leans heavily on strings, characters and the numeric tower, and D10 puts all three out of scope.
