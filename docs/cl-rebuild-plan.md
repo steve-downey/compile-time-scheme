@@ -61,7 +61,21 @@ It is the keystone decision: it closes or downgrades DIV-0002, DIV-0006, DIV-000
 **D13 — The evaluator result has three channels.**
 A result is a value, a diagnosed error, or an unwind in flight, as distinct alternatives of one type.
 Control flow does not travel in the error channel.
-This replaces the current scheme, in which `return-from`/`throw`/`go` travel as `parse_error` values discriminated by *pointer identity* against named marker arrays — a mechanism `closure/env.hpp:18-75` documents nearly failing silently under Asan when string-literal merging was disabled.
+
+This is not a new idea in this project, and the rationale is not restated here: read `docs/compiler_architecture.org` § "A sender has three completion channels, and that is a semantic resource".
+That section establishes that four things travel the closure backends' one wire — a value, a diagnosed error, and two kinds of unwind — that telling them apart "needs an out-of-band discriminator", and that the discriminator is a pair of sentinel `parse_error` messages compared by pointer identity.
+It also records that the sender backend already **deletes** that machinery rather than porting it: value to `set_value`, error to `set_error`, unwind to `set_stopped`, so "nothing is multiplexed, so nothing needs discriminating".
+D13 therefore generalises the backend that got this right to the two that did not.
+
+Two consequences that section names, which R5 must plan for rather than discover.
+
+The property `unwind-protect` currently gets for free must be **reconstructed**.
+Under direct and CPS evaluation, "run the cleanup on every exit path" works because the four outcomes are already merged into one value before `unwind-protect` sees them, so a single unconditional statement suffices.
+Split the channels and that is no longer true; the architecture doc's answer is a receiver whose three completion functions funnel into one, which makes cleanup-on-all-channels a structural property rather than a checklist item.
+
+The split is not uniformly better.
+Restoring a dynamic binding stays in ordinary C++ control flow around the recursive call, because it brackets a callee's whole extent rather than a single completion.
+Splitting is better exactly where the thing being expressed is a completion.
 
 **D14 — Capacity is not part of type identity.**
 No runtime value type may be parameterised on a container's capacity.
@@ -87,6 +101,16 @@ Additional backends are demonstrations and may lag.
 The object language is never held back to keep backends at parity, which is what produced DIV-0017 and DIV-0018.
 DIV-0015 (the sender backend cannot carry compile-time evidence) is accepted-permanent and is a reason to decouple, not to synchronise.
 
+A statement from `docs/cl-limitations.md` carries forward verbatim into the rebuild's own documentation, because it is easy to get wrong and consequential when it is: **do not describe all three backends as compile-time evaluators — only the closure backends are.**
+Beman Execution's `connect`/`start`/`sync_wait` are not constant-evaluable, so a sender graph cannot produce a compile-time value at all.
+
+**D18 — Prefer lowering to core forms over new node kinds.**
+A new special operator is implemented by lowering it onto forms the core already has, unless it needs semantics none of them express.
+The pivot proved this works, in the step that had most reason to add nodes.
+Step L20 added multiple values with **no** `core_values` node: `values` is an ordinary builtin, so `#'values`, `(funcall #'values 1 2)` and `(apply #'values '(1 2))` all work without further effort.
+`multiple-value-bind` lowers to a `core_lambda` application, which is how it inherits implicit progn, arity checking, closure capture and the special-variable dynamic-binding rule "without restating any of them" (DIV-0020).
+This is the standing mitigation for node-kind growth, and it is why the backend-multiplication cost stayed manageable across three evaluators.
+
 ---
 
 # 3. What the divergences actually say
@@ -107,7 +131,27 @@ DIV-0009 is the headline.
 A Lisp in which `(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))` fails is not yet a Lisp, and step L14's block tests were rewritten to avoid recursion because of it.
 
 The remaining divergences fall to D13 (DIV-0011, DIV-0021), D14 (DIV-0019, DIV-0020), D11 (DIV-0012, DIV-0016) and D17 (DIV-0017, DIV-0018).
-`docs/divergences/README.md` carries the full classification.
+
+One correction to a claim it would be easy to overstate.
+The three-backend structure looks expensive — `eval_direct` at 1084 lines, `cps_code` at 1068, `sender_eval` at 781, each an exhaustive visit over 26 core node kinds — but the pivot managed it better than those numbers suggest.
+`docs/cl-limitations.md` records that as of step L23, multiple values is the **only** place the three backends disagree on the object language, and D18 above is how that was achieved.
+So D17 does not rest on parity being unattainable.
+It rests on parity being a tax that should be paid deliberately, on a backend with genuinely different evidence to offer.
+
+## Where the divergences are recorded
+
+Three documents describe the same set of divergences and answer different questions.
+They are kept separate on purpose; do not merge them.
+
+- `docs/cl-limitations.md` — thematic and user-facing.
+  Organised by what broke rather than by when it was decided, because "a reader debugging a program cares what broke".
+  This is the behavioural baseline the rebuild must beat.
+- `docs/divergences/README.md` — classification and engineering triage.
+  Answers one question the thematic view does not: may a test pin this?
+- `docs/compiler_architecture.org` — the design record.
+  Why the pipeline has the shape it has, by UUID anchor, and the living document that rolls forward.
+- `docs/divergences/DIV-*.md` — the primary sources, append-only.
+  The other three summarise; none replaces them.
 
 ---
 
@@ -195,6 +239,11 @@ Recursive `defun` works at the end of this phase or the phase is not done.
 `ansi-test` subset and the SBCL differential harness, modelled directly on `src/smd/forth/conformance/`.
 Verify tool availability and licence terms first.
 
+Scope this honestly at the start of the phase rather than discovering it midway.
+`ansi-test` leans heavily on strings, characters and the numeric tower, and D10 puts all three out of scope.
+The directly usable subset may be small enough that the corpus tier degrades to cases hand-derived from the specification, with the differential oracle carrying most of the weight.
+That is the expected outcome rather than a fallback: `compile-time-forth` hit the same wall and its `ttester_corpus.hpp` is "adapted (not copied verbatim)" from ttester.fs for exactly this reason.
+
 **R7 — sender backend.**
 Only once the object language is settled, per D17.
 
@@ -207,6 +256,12 @@ Once Common Lisp is the third working client.
 
 Recorded rather than answered, to be settled in the phase that reaches them.
 
+- **Whether D10's out-of-scope list carries over unchanged.**
+  Step L24 consolidated it in one place for the first time: no strings, characters, floats, ratios, bignums, vectors, CLOS, conditions and restarts, `format`, `loop`, `setf` expanders beyond `setq`, readtables, `eval-when`.
+  Two entries now interact with decisions already taken, so this is a live question rather than an inherited given.
+  Conditions being out of scope is the *sole* reason DIV-0011 cannot be fixed — there is no "signal without unwinding" channel to signal into — and D13 is precisely the change that makes a minimal `signal`/`handler-case` expressible.
+  The absence of strings is what constrains R6.
+  Settle this before R3, since it determines what the reader and value model must carry.
 - Whether `ansi-test` is usable directly, needs adaptation as `ttester_corpus.hpp` did, or must be hand-derived from the specification. R6.
 - Whether the symbol table is a compile-time-only structure or survives into the runtime program, which interacts with D14 and with BL-0002's footprint work. R2.
 - Whether `smdlisp` is eventually retired or kept permanently as the pivot's artefact.

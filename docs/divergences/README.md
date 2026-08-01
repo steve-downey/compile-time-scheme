@@ -4,6 +4,22 @@ One record per deliberate divergence from ANSI Common Lisp, from the active plan
 Written from `TEMPLATE.md`.
 The docs are append-only: a correction is appended with a date, never edited in place (see DIV-0015's appended correction for the established form).
 
+## Related documents
+
+Three documents describe this same set of divergences and answer different questions.
+They are separate on purpose.
+
+- **This file** — classification and engineering triage.
+  Answers: may a test pin this?
+- `../cl-limitations.md` — thematic and user-facing, organised by what broke rather than by when it was decided.
+  Answers: my program misbehaved, is that a known limitation?
+  It is the behavioural baseline the rebuild must beat.
+- `../compiler_architecture.org` — the design record, by UUID anchor.
+  Answers: why does the pipeline have this shape?
+
+The `DIV-*.md` files are the primary sources.
+All three of the above summarise; none replaces them.
+
 ## Classification
 
 Added by phase R0 of `docs/cl-rebuild-plan.md` (2026-07-31).
