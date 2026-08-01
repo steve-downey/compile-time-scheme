@@ -7,6 +7,11 @@ Organization is by theme, not by DIV number, because a reader debugging a progra
 Each entry says what diverges, from what, and links to the DIV file if one exists.
 See the DIV file itself for the full "why" and "revisit condition" — this document summarizes, it does not replace them.
 
+Two companion views exist and answer different questions.
+[`divergences/README.md`](divergences/README.md) classifies each divergence as `defect`, `scope-decision`, `artifact-of-D1`, `toolchain`, or `process`, which is the engineering-triage question rather than the debugging one — in particular, whether a test may legitimately pin the behaviour.
+[`compiler_architecture.org`](compiler_architecture.org) is the design record for why the pipeline has the shape that produces these divergences.
+This document is the behavioural baseline that `docs/cl-rebuild-plan.md` must beat: every entry below is either closed by the rebuild or restated there with a decision record justifying it.
+
 ## Out of scope entirely (decision D10)
 
 `smdlisp` implements a deliberately small core of ANSI Common Lisp: enough control flow, binding, and macro machinery to demonstrate a compile-time compiler pipeline over three backends (direct evaluator, CPS closures, and Beman senders).

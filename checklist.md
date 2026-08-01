@@ -98,7 +98,7 @@ Supersedes the pivot's decision set with D11–D17.
 `src/smd/smdlisp/**` is frozen as a behavioural oracle from R1 onward and is never edited.
 
 - [x] Step R0: decisions, divergence classification, plan
-- [ ] Step R1: substrate — `src/smd/cl/foundation`, short-circuiting fold, typeclass instances, law tests
+- [ ] Step R1: substrate — `src/smd/cl/foundation`, short-circuiting fold, typeclass instances, law tests (brief: `step-brief-r1.md`)
 - [ ] Step R2: interned symbol table with value/function/macro slots (D12)
 - [ ] Step R3: reader and core AST — the tree as its own base functor's fixed point, with instances and schemes
 - [ ] Step R4: elaborator as three schemes (D15) — `traverse` atoms, `scan_down` roles, `para_short` emission
