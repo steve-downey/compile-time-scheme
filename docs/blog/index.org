@@ -100,6 +100,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ The Common Lisp core evaluated over Beman Execution senders. The closure backends push a value, a diagnosed error, a ~return-from~ unwind and a ~throw~ unwind down one ~result<value>~ wire and tell them apart with sentinel messages compared by pointer identity; a sender has three channels natively, so the sentinels are deleted instead of ported. ~unwind-protect~ becomes an ordinary sender adapter whose three completion functions all funnel into one cleanup call, while dynamic-binding restore refuses to move out of ordinary C++ control flow at all. Plus a P2996 graph dump, and DIV-0015: this backend has no ~constexpr~ twin.
 
+** [[file:phase-22-limitations.org][Phase 22 — What We Left Out, and Why It Matters]]
+
+/DRAFT — pending author revision./ The reflective finale. Most of decision D10's out-of-scope list — strings, floats, CLOS, ~format~, ~loop~ — is incidental to Phase 15's thesis about one-shot control; two gaps are not: the sender backend doesn't cover multiple values (DIV-0017/0018), and a nonlocal exit carries only its primary value even where every other exit path carries all of them (DIV-0019). Plus five sharper structural limits worth a paragraph each, including DIV-0015's warning not to call all three backends compile-time evaluators.
+
 * Table of Contents
 
 #+toc: headlines 1
