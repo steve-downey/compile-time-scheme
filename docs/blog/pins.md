@@ -26,8 +26,9 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-19-one-shot-control.org` | `b31c88f` | `blog/phase-19` | `Merge blog phase 19` (see note) |
 | `phase-20-defmacro.org` | `c7deeb1` | `blog/phase-20` | `Merge step L19` (P4 method 1) |
 | `phase-21-sender-graphs.org` | `c11ac23` | `blog/phase-21` | `Merge step L21` (tag created at the merge, before the post) |
+| `phase-22-limitations.org` | `d10efe7` | `blog/phase-22` | `Merge step L24` (tag created at the merge, before the post) |
 
-56 transclusions across 12 posts. Every row passes the anchor test at its pin,
+57 transclusions across 13 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
