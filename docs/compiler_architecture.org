@@ -9,7 +9,7 @@
 
 * Introduction
 
-This document details the compile-time compiler architecture for SchemePoC, a Scheme-light compiler proof-of-concept targeting C++26. The transcluded code below is drawn from the frozen reference tree =src/smd/smdscheme/= (see decision record D1); the Common Lisp layer =src/smd/smdlisp/= reuses this architecture and is consolidated into this document at step L24.
+This document details the compile-time compiler architecture for SchemePoC, a Scheme-light compiler proof-of-concept targeting C++26. Phases 1 through 7 below are drawn from the frozen reference tree =src/smd/smdscheme/= (see decision record D1). The Common Lisp layer =src/smd/smdlisp/= reuses this same staged architecture with a different front end and environment model, and is consolidated into this document in "The Common Lisp Layer", below.
 
 For many C++ developers, compiler jargon and functional programming idioms can feel like a completely different language. This document translates those concepts into familiar C++ terms. We are building a compiler entirely inside C++ standard constant expressions (`constexpr`).
 
@@ -120,3 +120,135 @@ We use this feature in the Reification phase to take the environment layouts cal
 This results in environment sizes that are as zero-cost as though a C++ expert manually wrote a distinct structure for every single lambda parameter capture.
 
 #+transclude: [[file:../src/smd/smdscheme/reflection/reified_environment.hpp::d0092f7c-b9de-440d-ac67-02e4e48c5aa4]] :lines 2- :src cpp :end "d0092f7c-b9de-440d-ac67-02e4e48c5aa4 end"
+
+* The Common Lisp Layer: =smd::smdlisp=
+
+Everything above builds a small Scheme. =smd::smdlisp= is a second front end over the *same* staged pipeline -- reader, elaborator, CPS, backend -- built for a subset of ANSI Common Lisp instead of Scheme. It is not a fork of the pipeline; it is a second package that reuses the pipeline's shape while trading Scheme's single namespace for a Lisp-2 (separate value and function namespaces), lexical scoping's simplicity for `defvar`/`defparameter` special variables and dynamic (shallow) binding, and Scheme's small control-flow surface for `block`/`return-from`, `catch`/`throw`/`unwind-protect`, `tagbody`/`go`, and `multiple-value-bind`. Every one of these forms compiles through all three backends described in Phases 4 through 6 above -- a direct tree-walking evaluator, a CPS-compiled closure backend, and a Beman-Execution sender backend -- with one gap, noted below.
+
+For everything this section states as fact but does not re-derive, see [[file:cl-limitations.md][=docs/cl-limitations.md=]], the consolidated record of every ANSI divergence this layer makes.
+
+** From datum to core: two new special forms
+
+The elaborator (Phase 3, above) grows two new alternatives in its core AST to carry Common-Lisp-specific control flow that has no Scheme counterpart: multiple-value binding, and `tagbody`/`go`.
+
+`multiple-value-bind` is a *binding* form, not a function call, so it cannot be lowered the way `values` is (next section). It elaborates to a real `core_lambda` over the bound variable names, which the evaluators *call* -- the same "lower a binding form to a lambda application" strategy already used for `let`. That is what lets it inherit implicit progn, arity checking, closure capture, and the special-variable dynamic-binding rule for free.
+
+#+transclude: [[file:../src/smd/smdlisp/elaborator/elaborated_core.hpp::98a22b58-964f-4853-be88-20a1d4a9b9d6]] :lines 2- :src cpp :end "98a22b58-964f-4853-be88-20a1d4a9b9d6 end"
+
+`tagbody` is where the elaborator does real work rather than a simple translation: the source body is a single sequence interleaving ordinary statements with bare tags (symbols or integers), and ANSI CL requires a forward `go` to a tag stated later in the same body to work. The elaborator therefore makes two passes over the body -- once to collect every tag's position, once to elaborate the statements with all tags already in scope -- so that by the time either evaluator sees a `core_tagbody`, the interleaved source is already split into an ordered statement vector and a tag-to-index table. No evaluator re-derives the basic blocks.
+
+#+transclude: [[file:../src/smd/smdlisp/elaborator/elaborated_core.hpp::8e268a26-7eaa-470f-86e5-3597d376b700]] :lines 2- :src cpp :end "8e268a26-7eaa-470f-86e5-3597d376b700 end"
+
+#+transclude: [[file:../src/smd/smdlisp/elaborator/elaborate.hpp::45420d1b-7082-46d4-a27a-9aef17024f8c]] :lines 2- :src cpp :end "45420d1b-7082-46d4-a27a-9aef17024f8c end"
+
+There is deliberately **no** `core_values` node beside `core_multiple_value_bind`. In ANSI CL, `values` is an ordinary *function*, not a special operator, so `(values 1 2)` elaborates to a plain function call and needs no elaborator support of its own; see the next section for where that pays off.
+
+** The value channel widens: multiple values
+
+Scheme's evaluators (Phase 4) return one value per form. Common Lisp's evaluation relation does not: a form produces a possibly-empty *sequence* of values, of which a single-value context (an `if` condition, a function argument) takes only the first. Rather than hang a side "values register" off the environment -- which would make "who last wrote the register" a global invariant every arm of every backend has to maintain by hand -- the closure backends widen their *return channel* itself to a small fixed-capacity vector.
+
+#+transclude: [[file:../src/smd/smdlisp/closure/value.hpp::a4a90af9-fd64-4f75-ad47-609c7c1e50fd]] :lines 2- :src cpp :end "a4a90af9-fd64-4f75-ad47-609c7c1e50fd end"
+
+Because that widening happens in the return channel, multiple values propagate correctly out of every tail position that already had to produce a result -- an `if` branch, a `progn`'s last form, a lambda body's last form -- with no extra machinery. They do *not* propagate through a nonlocal exit: `return-from` and `throw` still carry a single value, because their payloads live in a `block`/`catch` activation record, not in the return channel (=docs/cl-limitations.md=, DIV-0019). That is the honest one-line summary worth carrying forward: multiple values propagate through returns, not through escapes.
+
+** Closure backend: environment, dynamic binding, and nonlocal exit
+
+`smd::smdlisp::closure::env` is a Lisp-2 environment: two independent binding lists (value namespace, function namespace), plus a third for `block`/`return-from` exit records and a fourth for `tagbody`/`go` tags. All four are appended to the *ambient* environment a body shares, which is what lets a `setq` or `defun` anywhere in a sequence of statements mutate the one environment every sibling statement sees -- and is also the direct cause of the shadowing divergence described in =docs/cl-limitations.md= (DIV-0021).
+
+Special variables use *shallow* dynamic binding: a special has exactly one value cell, and binding it saves the old contents, overwrites the cell, and restores the saved contents when the binding's extent ends. Every environment that names the variable -- including a closure captured long before the binding -- resolves to that same cell, which is the entire mechanism and the entire reason `setq` of a special needs no special case.
+
+#+transclude: [[file:../src/smd/smdlisp/closure/eval_direct.hpp::e0468b60-4a31-4526-bd12-722bbd15ceac]] :lines 2- :src cpp :end "e0468b60-4a31-4526-bd12-722bbd15ceac end"
+
+Nonlocal exit reuses the same identity-compared-sentinel technique the Scheme backends use for propagating an out-of-band signal through a frozen two-alternative result type, extended from one marker to three: `return-from` (step L14) and `throw` (step L15) each already needed their own distinct marker, and step L23 (`tagbody`/`go`) adds a third rather than reusing either of the first two, because a `block`, a `catch`, and a `tagbody` must each let the *other two* kinds of transfer pass through untouched.
+
+#+transclude: [[file:../src/smd/smdlisp/closure/env.hpp::1232b7f6-c9b9-4611-a958-bd1bb14b0ff5]] :lines 2- :src cpp :end "1232b7f6-c9b9-4611-a958-bd1bb14b0ff5 end"
+
+`go` reuses the same `exit_record` type `block` uses, rather than inventing a parallel record type, because a `tagbody` activation needs exactly the same two things a `block` activation needs: a stable, arena-allocated identity a closure can capture, and a `live` flag saying whether the activation is still running. The one reinterpretation is the payload, which for a `tagbody` is the index of the basic block to resume at rather than a value being returned.
+
+#+transclude: [[file:../src/smd/smdlisp/closure/env.hpp::222e7d9c-2121-4831-bd34-b4110a310577]] :lines 2- :src cpp :end "222e7d9c-2121-4831-bd34-b4110a310577 end"
+
+The direct evaluator's `tagbody` handling is a small trampoline over the basic blocks the elaborator already laid out: a program counter walks the statement vector, an ordinary result advances it, and a `go` aimed at this activation resets it and marks the activation live again -- which is what makes `tagbody` iterate rather than merely escape.
+
+#+transclude: [[file:../src/smd/smdlisp/closure/eval_direct.hpp::152148ae-5a16-4a5b-9f88-258efb2bc5c7]] :lines 2- :src cpp :end "152148ae-5a16-4a5b-9f88-258efb2bc5c7 end"
+
+** CPS backend: the tagbody trampoline is deliberate, not incidental
+
+The CPS backend (Phase 4) ordinarily expresses control flow by having each node's continuation be *another* continuation object -- no C++ return, no C++ stack growth, tail calls that stay tail calls. `tagbody`/`go` is the one place that pattern is deliberately broken: a `go` that tail-called its target block as a continuation would grow one C++ frame per loop iteration, so a compile-time loop meant to demonstrate iteration without recursion would instead exhaust the constexpr evaluation depth. The fix is to trampoline the transfer through the one frame that owns the `tagbody`, exactly as the direct evaluator does, rather than expressing the loop as mutual tail calls between block continuations.
+
+#+transclude: [[file:../src/smd/smdlisp/closure/cps_code.hpp::7d388d02-7ba7-45ab-84cd-38b213b37ab2]] :lines 2- :src cpp :end "7d388d02-7ba7-45ab-84cd-38b213b37ab2 end"
+
+The demonstration this backend (and the direct evaluator, and =smdlisp.hpp='s public API, below) is built to run is iteration expressed with no self-recursion at all -- recall that recursive `defun` is unsupported (=docs/cl-limitations.md=, DIV-0009), so `tagbody`/`go` is the only iteration primitive this project has:
+
+#+begin_src lisp
+(let ((n 0)) (tagbody top (setq n (+ n 1)) (if (eql n 3) nil (go top))) n)  ; => 3
+#+end_src
+
+This is `static_assert`-green in both closure backends and in =smdlisp.hpp='s public `compiled_lisp`, and runtime-green in the sender backend below, which has no constexpr twin at all -- for reasons the next section states precisely rather than assumes.
+
+** Sender backend: the same three channels, spent on a second language
+
+Phase 6, above, records a durable fact that outlives any one language: a sender's three completion channels (`set_value`, `set_error`, `set_stopped`) are a semantic resource, not just a wider vocabulary for "return". The Common Lisp sender backend is where that resource gets spent a second time, on a language with four things -- a value, a diagnosed error, and two kinds of unwind -- that the closure backends have to multiplex onto one two-alternative result.
+
+#+transclude: [[file:../src/smd/smdlisp/sender/outcome.hpp::5c044086-ef0c-4041-8f39-b89b92cde079]] :lines 2- :src cpp :end "5c044086-ef0c-4041-8f39-b89b92cde079 end"
+
+Observing a program's completion is deliberately not `sync_wait`, because `sync_wait` collapses two of the three channels back together (an engaged optional for a value, a disengaged one for stopped, and a **throw** on an error) -- exactly the multiplexing this backend exists to avoid. `connect` plus `start` with a small recording receiver is the honest primitive instead.
+
+#+transclude: [[file:../src/smd/smdlisp/sender/outcome.hpp::6ffe3840-6f72-435d-b975-b945cd4e46f2]] :lines 2- :src cpp :end "6ffe3840-6f72-435d-b975-b945cd4e46f2 end"
+
+Which channel a `smdlisp` form completes on is not known until the form has been evaluated, and none of the stock sender factories can express "decide at start time" -- `just` always completes with a value, `just_error` always with an error. The backend's one leaf sender exists to fill exactly that gap, and its laziness is load-bearing: nothing inside it runs until the operation state is started, which is what lets `unwind-protect` (next) genuinely place the protected form's evaluation *inside* its own operation.
+
+#+transclude: [[file:../src/smd/smdlisp/sender/defer_outcome.hpp::e64f025f-7464-419a-b739-301569245544]] :lines 2- :src cpp :end "e64f025f-7464-419a-b739-301569245544 end"
+
+`unwind-protect` is where the payoff of three real channels is clearest. The closure backends get "run cleanup on every exit path" by arranging that there is only one exit path -- a value, an error, and both kinds of unwind are already merged into one result before `core_unwind_protect` ever sees them, so a single unconditional statement suffices. A sender backend cannot inherit that from C++ control flow, because the three channels really are three functions, called from three different places inside the child operation; the property has to be *reconstructed*. It is reconstructed by a receiver whose three completion functions all funnel into one `finish`, which is what turns `unwind-protect` into an ordinary sender adapter instead of an evaluator special case.
+
+#+transclude: [[file:../src/smd/smdlisp/sender/unwind_protect.hpp::cae50b27-0d34-4779-b73f-7d625d1060d8]] :lines 2- :src cpp :end "cae50b27-0d34-4779-b73f-7d625d1060d8 end"
+
+The evaluation algebra itself is a Mendler-style paramorphism over the core AST -- structurally the same recursion scheme `smd::fixpoint` already provides, but re-derived locally rather than reused, because the `smdlisp` core AST's fixed-point type is nominally distinct from the one the shared library expects, and the frozen Scheme tree cannot be given a conversion between them (=docs/cl-limitations.md='s "Known internal duplications", DIV-0016).
+
+#+transclude: [[file:../src/smd/smdlisp/sender/sender_eval.hpp::59265482-a0f4-4b96-9820-89abdc54f268]] :lines 2- :src cpp :end "59265482-a0f4-4b96-9820-89abdc54f268 end"
+
+`cons` is the one node in the whole algebra whose two children are structurally independent of each other, and so the one place a real `when_all` join -- rather than an ordinary sequence -- says something true about the program being evaluated.
+
+#+transclude: [[file:../src/smd/smdlisp/sender/sender_eval.hpp::44233d7a-ff4b-4c3d-b5ff-006c7ee0fd1d]] :lines 2- :src cpp :end "44233d7a-ff4b-4c3d-b5ff-006c7ee0fd1d end"
+
+`block`/`return-from` and `catch`/`throw` are where the three-channel design earns its keep most visibly: an in-flight unwind completes on `set_stopped` with no payload at all, because the payload already lives in the targeted exit or catch record, and "is this transfer aimed at me?" is answered the same way it is in the closure backends -- by testing `live` on that record.
+
+#+transclude: [[file:../src/smd/smdlisp/sender/sender_eval.hpp::02f32bd6-6a27-4b63-b0b8-744347bc6484]] :lines 2- :src cpp :end "02f32bd6-6a27-4b63-b0b8-744347bc6484 end"
+
+`unwind-protect` itself is the one form in this algebra that is not evaluated directly at all: it is delegated whole to the sender adapter above, with the protected form wrapped as a lazy child sender and the cleanup forms wrapped as the adapter's cleanup thunk.
+
+#+transclude: [[file:../src/smd/smdlisp/sender/sender_eval.hpp::06514953-0711-4ac8-b392-9fad1aed130e]] :lines 2- :src cpp :end "06514953-0711-4ac8-b392-9fad1aed130e end"
+
+`tagbody`/`go` needed no new machinery at all to reach the sender backend, which is worth stating plainly next to the paragraph that follows it: a `go` is a nonlocal transfer, `set_stopped` already *is* that channel, and `live` alone still answers "aimed at me?". This is a transcription of the closure backends' trampoline (above), with the identity-marker comparison simply deleted, because an unwind and an ordinary error can no longer be confused on this backend.
+
+#+transclude: [[file:../src/smd/smdlisp/sender/sender_eval.hpp::a07baaf4-fabe-41d3-a9a6-fbd5c52dbff5]] :lines 2- :src cpp :end "a07baaf4-fabe-41d3-a9a6-fbd5c52dbff5 end"
+
+What did *not* make it across is `multiple-value-bind` and `values`: as of this section, they are the only two forms where the three backends disagree on the object language (=docs/cl-limitations.md=, DIV-0017/DIV-0018). The reason is the same distinction that makes the rest of this section interesting rather than merely a port: the closure backends widened a *return channel*, which was nearly free, while the sender backend's result travels in a *completion signature*, and widening that reaches every hand-written sender in this file plus `outcome`, `outcome_receiver`, and `lisp_completions` -- a real design task, deliberately left for a later step rather than guessed at here.
+
+Also worth restating precisely, because it is easy to over-claim by analogy with the closure backends above: **this backend has no `static_assert` twin for any of it.** Beman Execution's `connect`/`start` is not constant-evaluable, so a sender graph cannot produce a compile-time value, so there is nothing for a `static_assert` to assert against. Every one of the transcluded arms above is exercised only by a runtime `TEST_CASE`. Do not describe all three `smdlisp` backends as compile-time evaluators; only the direct evaluator and the CPS closure backend are.
+
+Reflection-based visualization (Phase 7, above) also has an `smdlisp`-specific classifier, needed because this backend's two hand-written senders are not the library's `basic_sender` shape the Scheme classifier expects, and because the completion channel a `just`/`then`/`let` sender carries lives in a template argument rather than in the family name.
+
+#+transclude: [[file:../src/smd/smdlisp/sender/build_lisp_tree.hpp::45796b9c-5930-453b-82b4-1b609ae2c8f8]] :lines 2- :src cpp :end "45796b9c-5930-453b-82b4-1b609ae2c8f8 end"
+
+** Public API and demonstration
+
+`smd::smdlisp::smdlisp.hpp` is the package header a consumer actually includes: a `source_literal` non-type template parameter (copied, not shared, from the Scheme original -- see =docs/cl-limitations.md='s "Known internal duplications", DIV-0012) and a `lisp_program` class template that owns both the compiled program *and* the datum arena its names view into (=docs/cl-limitations.md=, DIV-0007), so that ordinary use of the public `compiled_lisp<Source>` variable never exposes the arena-lifetime requirement underneath it.
+
+#+transclude: [[file:../src/smd/smdlisp/smdlisp.hpp::54b5ce61-30e2-448d-b830-933d229b999e]] :lines 2- :src cpp :end "54b5ce61-30e2-448d-b830-933d229b999e end"
+
+#+transclude: [[file:../src/smd/smdlisp/smdlisp.hpp::fe65137c-94d0-4c11-bc1f-b0dae61e2190]] :lines 2- :src cpp :end "fe65137c-94d0-4c11-bc1f-b0dae61e2190 end"
+
+Two small Godbolt-extractable programs demonstrate the public surface end to end. The first shows the Lisp-2 environment's two independent namespaces doing real work: `x` is bound as a variable *and* as a function name at the same time, and both bindings are live in the same expression.
+
+#+transclude: [[file:../src/examples/godbolt_lisp.cpp::05b6b13a-69a8-4324-a056-2d754a038802]] :lines 2- :src cpp :end "05b6b13a-69a8-4324-a056-2d754a038802 end"
+
+The second shows the Foreign Function Interface: an ordinary C++ function reachable by pointer, taking and returning the same `value`/`result` types the evaluator already passes around, with no marshalling layer and no new core AST node required.
+
+#+transclude: [[file:../src/examples/godbolt_lisp_ffi.cpp::89fd04b3-d44b-4bcb-86f9-048297a36b7a]] :lines 2- :src cpp :end "89fd04b3-d44b-4bcb-86f9-048297a36b7a end"
+
+#+transclude: [[file:../src/examples/godbolt_lisp_ffi.cpp::c19f8ea7-df86-41a3-9586-ca2daf90d093]] :lines 2- :src cpp :end "c19f8ea7-df86-41a3-9586-ca2daf90d093 end"
+
+** Limitations
+
+This section states what the Common Lisp layer *is*; it deliberately does not restate everything it is not. [[file:cl-limitations.md][=docs/cl-limitations.md=]] is the single consolidated record of every ANSI Common Lisp divergence across the reader, the evaluation model, control flow, macros, multiple values, the sender backend, and build/constexpr limits -- consult it rather than this section for the full, itemized list.
