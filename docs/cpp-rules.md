@@ -83,6 +83,14 @@ Every source file opens with the repo-relative path and Emacs mode line, then SP
 - The first two moves in every test file: double-include the component header, then a bootstrap test that always passes.
 - Law tests — Functor, Applicative, Traversable identities, shape preservation, effect order — come before any other substantive test.
 - `constexpr` contracts get compile-time tests alongside the runtime ones.
+- **A contract is witnessed three ways, not two.**
+  A `static_assert`, an `-O0` run (`CONFIG=Debug`), and an optimized sanitizer run (`CONFIG=Asan`, which is `-O3`).
+  These are three evaluators with three bug classes and none subsumes another: constant evaluation lowers nothing to a builtin, `-O0` never folds, `-O3` is where the sanitizers have anything to trap and is also the only place a constant-folding defect appears.
+  Both of those have already cost this project a defect, in opposite directions — see `docs/verification-matrix.md`.
+  `make test-matrix` runs the pair; `make test` alone is the `Asan` leg only.
+- **Never leave the order of two side-effecting calls to argument evaluation.**
+  `g(f(a), f(b))` does not sequence the two `f` calls, and if effect order is part of a documented contract — as traversal order always is here — then the contract is being left to the optimizer.
+  Sequence them into named locals and combine those.
 - A test may pin a `scope-decision` divergence; a test must never pin a `defect` (decision D16).
 
 ## Final check on the code you just wrote

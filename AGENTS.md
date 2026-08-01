@@ -45,6 +45,10 @@ wrong contents.
 - Work only the next unchecked step in `checklist.md`.
 - Read your lane's step brief before editing (your Tier-2 handoff for this step).
 - Keep the step small and mergeable.
+- A step's merge criterion is `make test-matrix`, not `make test`. The default
+  `Asan` config is `-O3`; `Debug` is the `-O0` one, and each witnesses defects the
+  other cannot. Both have already cost this project a defect — see
+  `docs/verification-matrix.md`. Report which legs you ran.
 - Do not continue into later steps unless explicitly instructed.
 - Do not leave vague TODOs.
 - Document blockers in your lane's step brief.
