@@ -99,8 +99,8 @@ Supersedes the pivot's decision set with D11–D17.
 
 - [x] Step R0: decisions, divergence classification, plan
 - [x] Step R1: substrate — `src/smd/cl/foundation`, short-circuiting fold, topological folds, typeclass instances, law tests, the test matrix
-- [ ] Step R2: interned symbol table with value/function/macro slots (D12) (brief: `step-brief-r2.md`)
-- [ ] Step R3: reader and core AST — the tree as its own base functor's fixed point, with instances and schemes
+- [x] Step R2: interned symbol table with value/function/macro slots (D12) — `src/smd/cl/symbol`
+- [ ] Step R3: reader and core AST — the tree as its own base functor's fixed point, with instances and schemes (brief: `step-brief-r3.md`)
 - [ ] Step R4: elaborator as three schemes (D15) — `traverse` atoms, `scan_down` roles, `para_short` emission
 - [ ] Step R5: one evaluator, three channels (D13) — recursive `defun` is the acceptance witness
 - [ ] Step R6: conformance corpus and differential oracle (D16)
