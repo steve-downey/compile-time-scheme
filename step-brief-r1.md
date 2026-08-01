@@ -1,7 +1,7 @@
 # Step brief: R1 (rebuild substrate)
 
 Forward-only handoff for the next agent.
-Read `docs/codestyle.org`, `AGENTS.md`, `docs/CODING_RULES.md`, `CLAUDE.md`, and this file.
+Read `docs/codestyle.org`, `AGENTS.md`, `docs/CODING_RULES.md`, `CLAUDE.md`, this file, and — last, immediately before writing code — `docs/cpp-rules.md`.
 Nothing else, except the anchored sections named under "Dependencies" below.
 
 ## Next step's goal

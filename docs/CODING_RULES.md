@@ -67,8 +67,7 @@ When older slideware guidance conflicts with these defaults, this file wins.
 
 ## Language and Tooling
 
-- Prefer C++23 for new code.
-- Adopt C++26 facilities when the project toolchain supports them.
+- C++26 is the baseline; do not add fallback paths for older standards.
 - If an API can be meaningfully constexpr, make it constexpr and add compile-time tests.
 - Treat formatter and lint configuration as binding contract.
 - Assume clang-format, CMake formatting, spell check, and pre-commit checks are required.

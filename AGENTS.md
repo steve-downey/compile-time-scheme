@@ -9,7 +9,10 @@ across steps.** The failure mode this exists to prevent is a cumulative handoff 
 full plan re-read on every turn.
 
 1. **Tier 1 — always (rules pack, stable, cached):**
-   `docs/codestyle.org`, `AGENTS.md`, `docs/CODING_RULES.md`, `CLAUDE.md`.
+   `docs/codestyle.org`, `AGENTS.md`, `docs/CODING_RULES.md`, `CLAUDE.md` —
+   and read `docs/cpp-rules.md` **last**, immediately before writing code.
+   It is the terminal distillation of the C++ rules for execution agents; step
+   briefs reference it as the final item of their reading list.
 2. **Tier 2 — this step only:** your step brief + `checklist.md`. Steps run in
    parallel lanes, so each lane has its own brief (`step-brief-<lane>.md`, e.g.
    `step-brief-l13.md`); read only your lane's, never the others'.
@@ -104,6 +107,10 @@ Do not claim success unless required commands pass.
 - Do not edit the main working tree while the worktree is active.
 - Commit only when tests pass.
 - Do not commit partial work unless explicitly instructed.
+- Commit messages — on work branches and on main — and PR messages must be
+  reviewed by a clean agent running the `voice` skill before use. The reviewing
+  agent sees only the draft message and the diff, not the authoring
+  conversation.
 - Merge to main with `--no-ff`.
 - Do not push unless explicitly instructed.
 
