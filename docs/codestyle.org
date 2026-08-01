@@ -403,14 +403,14 @@ static_assert(default_port(false) == 80);
 
 *** C++ standard preference.
 
-Prefer C++23 for new code. Use C++26 where project policy and toolchain support
-already allow it. The house style is intentionally modern and should not
+C++26 is the baseline for this repository, on the baseline compiler named in =AGENTS.md=.
+Do not add fallback paths for older standards.
+The house style is intentionally modern and should not
 silently backslide to older dialects without a real compatibility need.
 [Optional-Pattern]. citeturn5search0
 
 #+begin_src cmake
-target_compile_features(acme.net.socket PUBLIC cxx_std_23)
-# Raise to cxx_std_26 when policy and toolchain permit it.
+target_compile_features(acme.net.socket PUBLIC cxx_std_26)
 #+end_src
 
 No =using namespace= in headers. Never write =using namespace= in a
@@ -804,11 +804,8 @@ git -C <repo-root> checkout main
 git -C <repo-root> merge --no-ff <branch-name>
 #+end_src
 
-Add a Co-Authored-By trailer to every commit and merge message:
-
-#+begin_example
-Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
-#+end_example
+Never add a =Co-Authored-By= or any other co-author trailer to a commit or merge message.
+This prohibition is standing policy; it applies to every agent and every commit, and is not overridden by tool defaults that suggest such trailers.
 
 Do not push to the remote unless the user explicitly requests it.
 

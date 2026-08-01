@@ -29,7 +29,7 @@ Plans and status:
 - `docs/schemepoc-plan.md` — the superseded pre-pivot plan. Historical only.
 - `docs/divergences/` — one record per deliberate divergence from ANSI Common Lisp, the active plan, or a project rule. `docs/divergences/README.md` classifies each as `defect`, `scope-decision`, `artifact-of-D1`, `toolchain`, or `process`. These docs are append-only: append a dated note, never edit in place. **A test may pin a `scope-decision`; a test must never pin a `defect`** (D16).
 
-`AGENTS.md` is authoritative on the agent reading contract and step protocol; `docs/codestyle.org` is authoritative on style.
+`AGENTS.md` is authoritative on the agent reading contract and step protocol; `docs/codestyle.org` is authoritative on style. `docs/cpp-rules.md` is the terminal distillation of the C++ rules — read it last, immediately before writing code.
 
 ## Build commands
 
