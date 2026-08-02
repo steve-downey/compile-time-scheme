@@ -115,7 +115,7 @@ R0–R4 landed before that was recorded; `docs/blog-backfill-plan.md` covers the
 Phases 23–27, for steps R0–R4, which landed without posts.
 B6–B10 are independent of each other and depend only on B5.
 
-- [ ] Step B5: UUID anchors for `src/smd/cl/**` on four per-step anchor branches; tags `blog/phase-24`–`blog/phase-27`
+- [x] Step B5: UUID anchors for `src/smd/cl/**` folded into each step commit by rewriting `main` from R1; tags `blog/phase-24`–`blog/phase-27`
 - [ ] Step B6: blog phase 23 — R0, why rebuild rather than refactor (no pin, no transclusions)
 - [ ] Step B7: blog phase 24 — R1, the substrate
 - [ ] Step B8: blog phase 25 — R2, interned symbols

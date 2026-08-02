@@ -36,27 +36,37 @@ So each post needs a pin whose tree is its own step's vintage.
 
 ## 3. The construction: an anchor branch per step
 
-Anchors cannot be added to history that is already written, and `main` is pushed, so rewriting is out.
-Instead, branch from each step's merge, add that step's anchors *there*, tag it, and merge the branch forward.
-The tag then names a commit carrying that step's code and its anchors and nothing later; `main` ends up with every anchor.
+Anchors are added to each step's own commit by rewriting `main` from R1 forward (authorised 2026-08-02, after the alternative of adding anchor branches was weighed and rejected as leaving four commits and four merges in the graph to say something history could say directly).
+Each step's merge therefore carries that step's code and its anchors and nothing later, which is what a vintage-correct pin needs.
 
 Nothing is published yet, so choosing a pin now is the normal case, not a repoint: `docs/blog/pins.md` fixes a pin only once the prose is out.
 
-| Post | Step | Branch from | Branch | Tag |
+**Done 2026-08-02.** `git rebase -i --rebase-merges 9444679`, stopping at each of the four step commits to place its anchors and amend.
+
+| Post | Step | Pin | Tag | Anchors visible |
 |---|---|---|---|---|
-| 23 | R0 | — | — | none (no transclusions) |
-| 24 | R1 | `35d5bd6` | `anchors-r1` | `blog/phase-24` |
-| 25 | R2 | `352a6ac` | `anchors-r2` | `blog/phase-25` |
-| 26 | R3 | `441a64c` | `anchors-r3` | `blog/phase-26` |
-| 27 | R4 | `34a835a` | `anchors-r4` | `blog/phase-27` |
+| 23 | R0 | — | none (no transclusions) | — |
+| 24 | R1 | `68300c2` | `blog/phase-24` | 4 |
+| 25 | R2 | `1a2e97a` | `blog/phase-25` | 8 |
+| 26 | R3 | `89ecc19` | `blog/phase-26` | 14 |
+| 27 | R4 | `8d902e6` | `blog/phase-27` | 18 |
 
 R0 is decisions and documents; it transcludes no code and therefore takes no pin, which is the established treatment for ten of the first twenty-one posts.
 
-Per branch: add anchors, confirm `make compile && make test` still pass at that vintage (anchors are comments, so a failure means something else is wrong), commit, tag the commit, merge into `main` with `--no-ff`, push the tag.
+"Anchors visible" is cumulative, because a later tag sees every earlier anchor too.
+A post is not obliged to draw only on its own step's: phase 21 used seven of the ten available to it.
 
-Merge `anchors-r1` first and work forward, so each merge resolves against a `main` that already has its predecessors.
-Expect one real conflict: `anchors-r3` adds anchors around `core_leaf` and `core_tag` in `core/ast.hpp`, and R4 added alternatives to both variants.
-Resolve it by keeping `main`'s code and the branch's anchors — never by moving an anchor pair onto different code, which would make the tag and `main` disagree about what a UUID names.
+Three things were verified rather than assumed, and a fourth is worth knowing.
+
+The rewrite is content-neutral: `git diff pre-anchor-rewrite-backup main` is 36 added lines across 12 files, every one of them an anchor marker, all under `src/smd/cl/`.
+Each of the four merges compiles and passes its whole suite at its own vintage — 100% passing at R1, and 944, 996 and 1005 tests at R2, R3 and R4.
+Every anchor pair is well formed at `HEAD`: one opening marker, one `end`, none nested.
+And the pinning does the work it exists to do — `01c40466` resolves to a five-alternative `core_leaf` at `blog/phase-26` and to the eight-alternative one at `blog/phase-27`, from the same UUID in the same file.
+
+The one conflict was the predicted one, in `core/ast.hpp`, where R4 extends both variants inside anchors R3 placed.
+It was resolved by keeping R4's alternatives *inside* R3's anchor pair, which is why that anchor grows between the two tags rather than naming different code at each.
+
+`pre-anchor-rewrite-backup` tags the pre-rewrite tip and should be deleted once the force-push has settled.
 
 ## 4. Choosing the anchors
 
@@ -64,12 +74,30 @@ One UUID block is one post concept (`docs/CODING_RULES.md`), and a block should 
 New anchors are real `uuidgen` output.
 Existing pairs are never deleted or nested; there are none in this tree, so every anchor here is new.
 
-Candidate regions, as the phase subjects in `docs/cl-rebuild-plan.md` §6 imply them — the drafting agent is not bound to use all of them, and phase 21 used seven of ten:
+The anchors that landed, by the tag each is first visible at:
 
-- **R1**: `fold_left_short` (the fold `std::ranges::fold_left` cannot be); one typeclass instance map showing variable-template selection; `result`.
-- **R2**: `symbol_id`; `symbol_table`'s three slots; `intern` and the uninterned-entry path.
-- **R3**: `readtable`'s dispatch; `tagged_tree`'s children-before-parent contract; `tagged_tree_instances`' traversal-order contract; `datum_atom` and `datum_branch`; `core_leaf`, `core_tag`, `core_tree`.
-- **R4**: the three-pass comment block at the head of `elaborate.hpp`; `atom_lowering`; `plan_children`; `emit_quoted_list`; `elaborate` itself.
+| Post | UUID | File | Region |
+|---|---|---|---|
+| 24 | `274e7d74-a6be-421c-8ecf-d0b4aeba74f6` | `foundation/fold_left_short.hpp` | `fold_left_short` — the fold `std::ranges::fold_left` cannot be |
+| 24 | `065a04a3-92d8-4537-bc38-f5c19ba9250b` | `foundation/result.hpp` | `result` |
+| 24 | `2c04510b-930c-4d2e-be6c-8733f844baa1` | `foundation/foldable.hpp` | `fold_left`, derived from the `fold_map` centre |
+| 24 | `51f97b89-0923-4b8f-94f1-166b79f6d70d` | `foundation/static_vector_instances.hpp` | instances selected by variable template |
+| 25 | `f84353ef-c765-455d-addf-27455bba15ea` | `symbol/symbol_id.hpp` | `symbol_id` — identity as an index, carrying no capacity |
+| 25 | `e8219367-476a-4b85-882a-87d179d1a271` | `symbol/symbol_table.hpp` | `entry` and the two storage vectors: a name pool and three slots |
+| 25 | `19c820e1-8305-4f63-a239-8234a827ca29` | `symbol/symbol_table.hpp` | `intern` |
+| 25 | `bc4cbac8-befd-44db-a89b-6b6be78b1714` | `symbol/symbol_table.hpp` | `find`, and why an uninterned entry is invisible to it |
+| 26 | `673865b0-7d8f-4e49-a11e-1bc747348df5` | `foundation/tagged_tree.hpp` | `tagged_tree` — children before parents |
+| 26 | `8fabe263-2634-4144-abed-f69013131e52` | `foundation/tagged_tree_instances.hpp` | the Traversable instance and its order contract |
+| 26 | `23ee18c4-af42-42b1-b97a-3513b932e5ef` | `reader/datum.hpp` | `datum_atom` and `datum_branch` |
+| 26 | `b803edcd-959d-4364-94f8-13fb256e7b9b` | `reader/read.hpp` | `read_node` — the readtable lookup as the reader's spine |
+| 26 | `01c40466-6b6c-4651-b7b6-98c7a289ef5d` | `core/ast.hpp` | the core's leaves (five at phase 26, eight at phase 27) |
+| 26 | `60da8def-db67-496e-9b36-6c544c60bc1e` | `core/ast.hpp` | the core's branch tags (three at phase 26, four at phase 27) |
+| 27 | `475cde6b-1633-44fe-96c7-02c60f4c9fd7` | `elaborator/elaborate.hpp` | `atom_lowering` — pass one |
+| 27 | `dc3ee031-e752-4420-a3e8-610face05838` | `elaborator/elaborate.hpp` | `plan_nodes` — pass two, descending |
+| 27 | `f1cd911b-1555-4d82-a97f-2044cd35cbf4` | `elaborator/elaborate.hpp` | `emit_quoted_list` — hermetic pairs via `fold_left_short` |
+| 27 | `53eabd7c-d0c2-4f0e-a63b-3260a0151044` | `elaborator/elaborate.hpp` | `elaborate` — the three passes composed |
+
+The two `core/ast.hpp` anchors are the interesting pair: the same UUID names the same declaration at both tags and shows different code, which is pinning working rather than pinning failing.
 
 ## 5. Drafting
 
@@ -91,7 +119,7 @@ Write what the step's own diff and brief show, including what they show as unres
 
 Numbering continues `docs/epistolary-pinning-plan.md`'s B-series, which owns B0–B4.
 
-- **B5** — anchors and tags. Four anchor branches per §3, `make compile`/`make test` green at each vintage, four `--no-ff` merges into `main`, four tags pushed. Nothing is drafted until this lands.
+- **B5** — anchors and tags. **Done 2026-08-02** (§3): `main` rewritten from R1 forward, 18 anchors, four tags. The force-push is pending; the tags are local until it happens.
 - **B6** — phase 23 (R0). No pin, no transclusions; the "why rebuild rather than refactor" essay, drawn from the plan's §1 and §3.
 - **B7** — phase 24 (R1), pinned to `blog/phase-24`.
 - **B8** — phase 25 (R2), pinned to `blog/phase-25`.
