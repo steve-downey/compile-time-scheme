@@ -34,7 +34,8 @@ That is a reasonable local discipline and a bad global one: editing such a suite
 **The intended style is already written down and was never adopted.**
 `docs/CODING_RULES.md` is Tier 1 and authoritative.
 It mandates `fold_map` as the semantic centre with `fold_left`/`fold_right` derived, `traverse` as the minimal Traversable operation preserving shape, typeclass instances selected by variable template, and law-focused tests before performance tests.
-`smdlisp` has 43 raw index loops across five headers, 26-arm `std::visit` switches, no Foldable or Traversable instance for either AST, one test file mentioning laws, and a `foundation::fold_fix` with no caller, no test, and an inverted `fmap` argument order.
+`smdlisp` has 79 raw index loops across eight headers, 23-arm `std::visit` switches, no Foldable or Traversable instance for either AST, one test file mentioning laws, and a `foundation::fold_fix` with no caller, no test, and an inverted `fmap` argument order.
+(Corrected 2026-08-02, during the phase-23 blog review. As first written this read "43 raw index loops across five headers" and "26-arm"; neither reproduced. `grep -rh 'for (int ' src/smd/smdlisp --include=*.hpp` gives 79 across eight headers, and the core variant in `elaborator/elaborated_core.hpp` has 23 alternatives, not 26. The argument is unaffected and the loop figure is worse than claimed; the numbers are corrected because a plan that cites evidence should cite evidence that reproduces.)
 
 The gap between `docs/CODING_RULES.md` and `src/smd/smdlisp/**` is this plan's specification.
 That brief is better than "make it nicer" and it is already ratified.
@@ -171,7 +172,7 @@ A Lisp in which `(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))` fails is n
 The remaining divergences fall to D13 (DIV-0011, DIV-0021), D14 (DIV-0019, DIV-0020), D11 (DIV-0012, DIV-0016) and D17 (DIV-0017, DIV-0018).
 
 One correction to a claim it would be easy to overstate.
-The three-backend structure looks expensive — `eval_direct` at 1084 lines, `cps_code` at 1068, `sender_eval` at 781, each an exhaustive visit over 26 core node kinds — but the pivot managed it better than those numbers suggest.
+The three-backend structure looks expensive — `eval_direct` at 1084 lines, `cps_code` at 1068, `sender_eval` at 781, each an exhaustive visit over 23 core node kinds — but the pivot managed it better than those numbers suggest.
 `docs/cl-limitations.md` records that as of step L23, multiple values is the **only** place the three backends disagree on the object language, and D18 above is how that was achieved.
 So D17 does not rest on parity being unattainable.
 It rests on parity being a tax that should be paid deliberately, on a backend with genuinely different evidence to offer.

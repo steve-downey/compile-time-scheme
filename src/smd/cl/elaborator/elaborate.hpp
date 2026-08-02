@@ -435,11 +435,6 @@ collect_emitted(IndexMap const &map, SourceChildren const &children, int skip)
     return leaf;
 }
 
-template <class Ctx>
-[[nodiscard]] constexpr auto emit_quoted(Ctx &ctx,
-                                         typename Ctx::index_map const &map,
-                                         int index) -> foundation::result<int>;
-
 // f1cd911b-1555-4d82-a97f-2044cd35cbf4
 /// Emits a proper list of @p elements as hermetic pairs, right to left from
 /// a fresh `NIL`. An empty element list is that `NIL`.

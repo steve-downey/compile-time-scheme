@@ -104,6 +104,26 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ The reflective finale. Most of decision D10's out-of-scope list — strings, floats, CLOS, ~format~, ~loop~ — is incidental to Phase 15's thesis about one-shot control; two gaps are not: the sender backend doesn't cover multiple values (DIV-0017/0018), and a nonlocal exit carries only its primary value even where every other exit path carries all of them (DIV-0019). Plus five sharper structural limits worth a paragraph each, including DIV-0015's warning not to call all three backends compile-time evaluators.
 
+** [[file:phase-23-why-rebuild.org][Phase 23 — Why Rebuild Rather Than Refactor]]
+
+/DRAFT — pending author revision./ The pivot works, and this is the argument for building it again anyway. Twenty divergence records, each locally correct and honestly written the same day, turn out on a single reading to be seven bills for one missing abstraction: a symbol is a ~std::string_view~ and so has nowhere to keep anything. Plus the freeze whose reason had evaporated, a test suite that had become a ratchet rather than a safety net, and a style document that was ratified and never adopted. Nothing is built; everything here is an argument, and arguments about software are cheap.
+
+** [[file:phase-24-substrate.org][Phase 24 — Two Copies and a Fold That Stops]]
+
+/DRAFT — pending author revision./ The new tree's ~foundation/~ starts as the reviewed union of two independent copies of the same code, and the merge is convincing mostly because there was nothing to merge — for five files the entire difference is the include guard, the namespace, and a comment saying it was adapted by copy. New in neither copy: a left fold that stops on the first failure, which ~std::ranges::fold_left~ can't do, and the Foldable and Traversable typeclasses the coding rules had required all along. The substrate has no behaviour of its own, so the law tests are the evidence.
+
+** [[file:phase-25-symbols.org][Phase 25 — Interning Symbols, and Seven Divergences That Were One]]
+
+/DRAFT — pending author revision./ The keystone. A symbol becomes an entry in a table with a name and three independently writable slots, identity becomes id comparison, and the table owns its characters so a compiled program stops pointing into the reader's arena. Six of the seven divergences close by construction and a seventh partly — in a component with no callers, since this tree has no reader and no evaluator yet. Also settles a question the plan left open: the table rides along into the running program.
+
+** [[file:phase-26-reader-core-ast.org][Phase 26 — Reading More Than It Can Run]]
+
+/DRAFT — pending author revision./ A readtable-shaped reader that implements full ANSI atom syntax before the evaluator can run any of it: strings, characters, ~#(...)~ vectors and every numeric-tower spelling read without complaint, and a literal with no machine representation yet is carried as its spelling. The datum tree and the core AST become instantiations of one container, so the Foldable and Traversable instances are written once and law-tested once. Plus an oracle test against the frozen pivot reader, three cases excluded because the oracle is the wrong answer there, and a GCC trunk misfold that the compile-time half of a twin test could not see.
+
+** [[file:phase-27-elaboration.org][Phase 27 — The Elaborator Never Recurses]]
+
+/DRAFT — pending author revision./ A tree built children-before-parent has node indices in topological order, so ascending index order is a bottom-up catamorphism and descending order is top-down propagation. Elaboration becomes three index loops — atoms by ~traverse~, roles by a descending pass, emission by a fold that stops on the first error — with no stack, no visitor that calls itself, and no bound on nesting depth. Plus the Lisp-2 rule as a consequence rather than a special case, and the one new node kind that decision D18's own exception licenses.
+
 * Table of Contents
 
 #+toc: headlines 1

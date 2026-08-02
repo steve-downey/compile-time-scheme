@@ -116,9 +116,9 @@ Phases 23–27, for steps R0–R4, which landed without posts.
 B6–B10 are independent of each other and depend only on B5.
 
 - [x] Step B5: UUID anchors for `src/smd/cl/**` folded into each step commit by rewriting `main` from R1; tags `blog/phase-24`–`blog/phase-27`
-- [ ] Step B6: blog phase 23 — R0, why rebuild rather than refactor (no pin, no transclusions)
-- [ ] Step B7: blog phase 24 — R1, the substrate
-- [ ] Step B8: blog phase 25 — R2, interned symbols
-- [ ] Step B9: blog phase 26 — R3, reader and core AST
-- [ ] Step B10: blog phase 27 — R4, elaboration as three index folds
-- [ ] Step B11: `docs/blog/index.org` entries, `docs/blog/pins.md` rows and third-era note, `make blog-md` and transclusion verification green
+- [x] Step B6: blog phase 23 — R0, why rebuild rather than refactor (no pin, no transclusions)
+- [x] Step B7: blog phase 24 — R1, the substrate
+- [x] Step B8: blog phase 25 — R2, interned symbols
+- [x] Step B9: blog phase 26 — R3, reader and core AST
+- [x] Step B10: blog phase 27 — R4, elaboration as three index folds
+- [x] Step B11: `docs/blog/index.org` entries, `docs/blog/pins.md` rows and third-era note, `make blog-md` and transclusion verification green

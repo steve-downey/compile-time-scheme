@@ -1,0 +1,164 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+bibliography: references.bib
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 23 - Why Rebuild Rather Than Refactor
+#+AUTHOR: Steve Downey
+#+DATE: 2026-08-02
+
+*DRAFT --- pending author revision*
+
+#+begin_abstract
+Phase 22 ended the series.
+This one starts it again, in a new tree, because ~smdlisp~ is going to be rebuilt rather than refactored.
+Three things make this the moment: the freeze that shaped the design stopped applying a week ago, the test suite has turned into a ratchet that makes fixing a bug cost a test deletion, and the style document this project ratified was never adopted by any of the code it governs.
+Behind all three is something I only saw by reading twenty divergence documents in one sitting instead of one at a time.
+Seven of them are the same missing abstraction, billed seven times.
+#+end_abstract
+
+#+MACRO: TEASER_END
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-22-limitations.org][Phase 22 - What We Left Out, and Why It Matters ←]]
+#+html: </nav>
+
+
+* The last post was the last post
+
+Phase 22 closed with a line saying the series ended there, and it did end there.
+What follows isn't a continuation of the pivot.
+It's a decision to build the thing again, in a new tree, using decisions I didn't have when I started.
+
+~smdlisp~ works.
+Three backends, two dozen steps, ~block~ and ~tagbody~ and ~unwind-protect~ and ~defmacro~ and multiple values, all of it constant-evaluable on two of the three.
+Nothing about its architecture was designed up front; it emerged, which isn't a complaint about how it was built.
+Small-step TDD under ground rules fixed before you know the destination is a perfectly good way of getting somewhere.
+But the destination is now known, and the rules were fixed for a trip to somewhere else.
+
+Phase 23 landed no code at all.
+It is ~docs/cl-rebuild-plan.md~, a classification of all twenty divergence records, and some checklist entries.
+There's nothing to show running, and the plan might be wrong.
+
+* Reading them all at once
+
+The divergence discipline in this project is simple.
+When you accept a limit, you write a document: what the behaviour is, why it happened, what would have to be true to remove it.
+One document per divergence, appended to and never edited in place.
+It works.
+All of the twenty documents are accurate, and each was written by whoever hit the thing, in the step that hit it.
+
+I read them end to end for the first time while writing the rebuild plan, and seven of them turned out to be the same sentence.
+
+A symbol in ~smdlisp~ is a ~std::string_view~ wrapper over the datum arena.
+That's the whole absence.
+
+A string has no function slot, so a self-call inside a ~defun~ body has nowhere to look for the function being defined (DIV-0009).
+It has no value cell, no macro slot, and no identity apart from its spelling, which is DIV-0014, DIV-0010 and DIV-0002.
+There is no way to unintern it, so ~gensym~ becomes a reserved-prefix naming convention like ~%OR-TEMP~, which is a capture bug wearing a disguise (DIV-0006).
+And it points into somebody else's arena, so a compiled program can not outlive the text it was read from (DIV-0007).
+A package is a symbol table, so there isn't one of those either (DIV-0001).
+
+DIV-0009 is the headline.
+~(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))~ fails.
+A Lisp in which that doesn't work is not yet a Lisp [cite:@steele1990cltl2], and step L14's ~block~ tests were rewritten to avoid recursion because of it, which is the kind of accommodation you make once and then stop noticing you made.
+
+The interesting part is an argument against the process I was running, not for it.
+Every one of those seven decisions was locally correct.
+Each was the right call for its step, taken with the alternatives visible, and written down honestly the same day.
+There is no moment where somebody got it wrong.
+The aggregate is still wrong, and no individual record could have shown that, because a divergence document's entire job is to describe one divergence.
+Twenty accurate documents add up to something none of them says.
+
+* Three reasons it's now
+
+** The freeze that shaped the design stopped applying a week ago
+
+Decision D1 froze ~src/smd/smdscheme/**~ because the published posts transclude its code by UUID anchor, and an in-place pivot would silently rewrite prose that had already gone out.
+That was a real constraint under worktree-path transclusion, where the transclusion resolves against whatever happens to be in the working tree, so editing the tree edits the post.
+It stopped being true on the 25th of July, when the posts moved onto ~orgit-file:~ links pinned to ~blog/phase-NN~ tags and resolved with ~git show TAG:PATH~.
+DIV-0004's own supersede note says exactly that, in writing, and I went on paying the freeze for another week anyway.
+Four recorded compromises (DIV-0011, DIV-0012, DIV-0016, DIV-0021) were being held in place by a rule whose reason had evaporated.
+
+The anchor rules themselves don't change, and neither does ~smdscheme~'s job.
+What changes is that fixing shared ~foundation~ code becomes an ordinary edit instead of a divergence-doc event.
+
+** The test suite has turned into a ratchet
+
+Roughly 26 tests pin divergent behaviour.
+Two of the divergence docs say outright why: DIV-0021 and DIV-0018 record that the test exists so that closing the underlying bug forces someone to delete a test.
+As a local discipline that's fine.
+It makes a limitation impossible to fix by accident and impossible to forget.
+As a global property of a suite it is the wrong shape.
+
+~EvalDirectTest - DynamicBindingOfUnboundSpecialIsDiagnosedError~ asserts that ANSI-conforming behaviour is an error.
+In order to fix the conformance bug you have to delete a green test, and every incentive in a test-driven loop pushes the other way: relax the assertion, write a divergence doc, move on.
+What that loop never asks is whether the facility under test has the right shape at all.
+
+~docs/divergences/README.md~ now classifies each divergence as ~defect~, ~scope-decision~, ~artifact-of-D1~, ~toolchain~ or ~process~, and the rule that falls out is one line.
+A test may pin a ~scope-decision~; a test must never pin a ~defect~.
+Four tests are named as pinning defects.
+They stay exactly where they are, untouched, in a tree that is never edited again; they simply don't come along.
+
+** The style was written down and the code never adopted it
+
+~docs/CODING_RULES.md~ is Tier 1 and authoritative in this repository.
+It says ~fold_map~ is the semantic centre with ~fold_left~ and ~fold_right~ derived from it; ~traverse~ is the minimal Traversable operation and preserves shape; typeclass instances are selected by variable template; traversal order is part of the instance contract and gets documented; law-focused tests come before performance tests.
+That is a description of the tree I meant to have.
+
+The tree I have contains raw index loops in every closure and elaborator header, a 23-arm ~std::visit~ restated once per backend across 1084, 1068 and 781 lines [cite:@meijer1991functional], no Foldable or Traversable instance for either AST, exactly one test file that mentions a law at all, and a ~foundation::fold_fix~ with no caller, no test, and an ~fmap~ argument order that is backwards.
+
+The gap between that document and that tree is the specification for the rebuild.
+It's a considerably better brief than "make it nicer", and it has the useful property of being ratified already, so there is nobody left to argue with about it, including me.
+
+* You can not argue with an oracle
+
+The ratchet has a structural answer, and I'm taking it from ~compile-time-forth~ instead of inventing one.
+That project gets its correctness evidence from outside itself.
+~conformance/ttester_corpus.hpp~ is adapted from John Hayes' TESTER.FR and Anton Ertl's ttester.fs, which is the standard's own corpus; ~conformance/gforth_diff.cpp~ runs the same program through the image and through real gforth, diffs the stacks and the output, and records the oracle's version so that a reported divergence is attributable to a specific build.
+
+The property that matters is that you can not relax a test that came from the standard's corpus, and you can not argue with an oracle.
+Willpower is not in the loop.
+
+For Common Lisp that means a subset of Paul Dietz's ~ansi-test~ and a differential harness against SBCL.
+Neither is verified yet.
+~ansi-test~ leans heavily on strings, characters and the numeric tower, so the subset we'd be able to use directly may be small enough that the corpus tier degrades to cases hand-derived from the specification, with the oracle carrying most of the weight.
+~compile-time-forth~ hit that same wall, which is why its corpus is "adapted (not copied verbatim)".
+So I'm planning for the degraded version instead of treating it as a fallback.
+SBCL isn't installed in the development environment either; it is one ~apt install~ away, and the pinned oracle version will be whatever is current when the harness lands.
+
+~smdlisp~ itself stays, as the fourth tier.
+It keeps building and running, it is never edited, and a disagreement between it and the new tree is evidence that has to be explained.
+However, there's one case that's easy to get backwards: where the old tree pins a defect, it is a wrong oracle by construction, and an informal hand-run SBCL check wins.
+
+* What could go wrong
+
+Nothing is built.
+Everything above is an argument, and arguments about software are cheap.
+
+The obvious way to lose is to rebuild the same architecture with better names.
+Interning symbols is the keystone decision, and it either closes those seven divergences or it doesn't.
+The phase that would show it has a criterion I can't talk my way around: R5 is done when ~(defun len ...)~ runs, and otherwise R5 is not done.
+
+The second way to lose is scope.
+The pivot proved a pipeline on a deliberately small core, and whether D10's out-of-scope list carries over unchanged is written down as an open question rather than answered.
+Two of its entries already argue with decisions taken: conditions are out of scope, which is the sole reason DIV-0011 can not be fixed, and D13 is exactly the change that would make a minimal ~signal~ / ~handler-case~ expressible.
+So I do not yet know how much of Phase 22's list --- the numeric tower, conditions and restarts, CLOS, readtables, ~format~ --- is "not yet" and how much is "never".
+Whichever way that goes is the decision most likely to look foolish in a year.
+
+And R0 has a hole in it that should be stated plainly.
+The container this analysis ran in had no gcc-16, so none of it is compile-verified.
+The dead ~fold_fix~, the loop counts, the GCC sanitizer defect recorded in DIV-0013: all of that came out of reading the tree, and nothing was built to check it.
+R1's brief says to confirm the findings against a real toolchain before acting on them.
+It would be a good joke on the whole exercise if the specification for the rebuild turned out to rest on a fact that isn't true.
+
+R1 is the substrate.
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-22-limitations.org][← Phase 22 - What We Left Out, and Why It Matters]]
+#+html: </nav>
+
+* References
+
+#+print_bibliography:
