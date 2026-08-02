@@ -24,6 +24,8 @@ target_sources(
                 source_span.hpp
                 static_vector.hpp
                 static_vector_instances.hpp
+                tagged_tree.hpp
+                tagged_tree_instances.hpp
                 traversable.hpp
 )
 
@@ -49,6 +51,8 @@ if(SCHEMEPOC_ENABLE_TESTING)
             source_span.test.cpp
             static_vector.test.cpp
             static_vector_instances.test.cpp
+            tagged_tree.test.cpp
+            tagged_tree_instances.test.cpp
             traversable.test.cpp
     )
     target_link_libraries(
