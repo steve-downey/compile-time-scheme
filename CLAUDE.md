@@ -25,6 +25,7 @@ Plans and status:
 - `checklist.md` — step-by-step status for the original steps, the Common Lisp pivot, and the rebuild.
 - `docs/cl-rebuild-plan.md` — the active plan, its decision records (D11–D17), and the phase list R0–R8.
 - `docs/cl-pivot-plan.md` — the pivot plan (decision records D1–D10). Still authoritative for how the current `smdlisp` got its shape; its step list is finished. Read by named section on demand, never wholesale.
+- `docs/blog-backfill-plan.md` — the arrears: phases 23–27, for steps R0–R4, which landed without posts. Steps B5–B11.
 - `docs/backlog/` — identified-but-unscheduled work, one file per item. Not a plan and not an agent read path; consult it only when deciding what to schedule next.
 - `docs/schemepoc-plan.md` — the superseded pre-pivot plan. Historical only.
 - `docs/divergences/` — one record per deliberate divergence from ANSI Common Lisp, the active plan, or a project rule. `docs/divergences/README.md` classifies each as `defect`, `scope-decision`, `artifact-of-D1`, `toolchain`, or `process`. These docs are append-only: append a dated note, never edit in place. **A test may pin a `scope-decision`; a test must never pin a `defect`** (D16).

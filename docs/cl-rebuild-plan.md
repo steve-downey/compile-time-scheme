@@ -113,7 +113,7 @@ Step L20 added multiple values with **no** `core_values` node: `values` is an or
 This is the standing mitigation for node-kind growth, and it is why the backend-multiplication cost stayed manageable across three evaluators.
 
 **D19 — Full ANSI Common Lisp is the aim.**
-Recorded 2026-08-01, resolving the first open question of §7.
+Recorded 2026-08-01, resolving the first open question of §8.
 D10's out-of-scope list carries into the rebuild as a staging roadmap, not a fence: every entry is "not yet", none is "never".
 The pivot proved the pipeline on a deliberately small core; the rebuild does not re-prove it — it aims at the language.
 Three consequences bind the phases.
@@ -128,6 +128,27 @@ The reader is readtable-shaped from the start.
 Character-dispatch-driven, so `*readtable*` and `set-macro-character` are a later exposure of structure that already exists rather than a rewrite.
 
 Conditions and restarts enter at R5 on D13's channels, which were designed for them; CLOS enters through a static-dispatch subset before the full protocol; `loop` and `format` are library-shaped work once the substrate is right.
+
+**D20 — Every phase ships a post, and its author is not its implementer.**
+Recorded 2026-08-02, repairing an omission rather than changing a policy.
+
+The pivot made a blog post a named deliverable of the step it describes.
+This plan's phase list dropped it, and R0–R4 landed without one; §7 restores it and states the authorship rule that was previously assumed rather than written down.
+
+A post is drafted by a fresh agent reading the *merged work* — the step's diff, its commit message, its retired step brief — and never the conversation that produced it.
+There are two reasons, and the second is the load-bearing one.
+
+The implementing agent is at its most expensive exactly when the step ends, and the post is the cheapest deliverable to move off that context.
+
+More importantly, `docs/cl-pivot-plan.md` already records what a post is: "a real-time, non-omniscient diary entry."
+An agent that has just spent a step's worth of context on the work knows every path it did not take, and writes omnisciently about a result that was not obvious at the time.
+An agent reading the merge sees what the work actually shows, which is what a reader of the post will see.
+Authorship distance is therefore a property of the genre, not a cost optimisation that happens to be convenient.
+
+The draft is then reviewed by a second, clean agent running the `voice` skill, seeing only the draft and the diff.
+That rule is already in force for commit and PR messages (`AGENTS.md`); a post is longer prose with more room to drift, so it is not the place to relax it.
+
+Three agents, none reading another's conversation: implement, draft, review.
 
 ---
 
@@ -228,6 +249,10 @@ Until then the substrate is developed in place with kit-shaped seams, meaning it
 Each phase is independently mergeable.
 No time estimates: this is hobby work, and getting it right is the point.
 
+Every phase carries a blog post as a deliverable of the phase, per D20, numbered continuing the existing series (0–22 are the Scheme pipeline and the Common Lisp pivot).
+The post is not written by the agent that did the work, and the phase is not finished when the code merges — it is finished when the post lands.
+§7 has the mechanics.
+
 **R0 — decisions.**
 This document, `docs/divergences/README.md`, the classification of every existing divergence, and the checklist entries.
 Docs only, no code.
@@ -273,9 +298,61 @@ Only once the object language is settled, per D17.
 **R8 — extract the kit.**
 Once Common Lisp is the third working client.
 
+## Posts
+
+| Phase | Post | Subject |
+|---|---|---|
+| R0 | 23 | why rebuild rather than refactor; what twenty divergences turned out to say |
+| R1 | 24 | the substrate, and what two independent copies of a file tell you |
+| R2 | 25 | symbols as interned objects with slots; the keystone (D12) |
+| R3 | 26 | a readtable-shaped reader, and one arena tree with instances from the start |
+| R4 | 27 | elaboration as three index folds; why a catamorphism needs no stack |
+| R5 | 28 | one evaluator, three channels; recursive `defun` at last |
+| R6 | 29 | conformance against external authority |
+| R7 | 30 | the sender backend, second time around |
+| R8 | 31 | extracting the kit |
+
+Titles and framing belong to whoever drafts each post; the subjects above are the phase's own claim on a reader's attention, not a brief.
+
 ---
 
-# 7. Open questions
+# 7. The blog
+
+Each phase's post is a diary entry about that phase, transcluding live code by UUID anchor rather than quoting it.
+The pinning machinery is `docs/epistolary-pinning-plan.md`, the post-to-tag mapping is `docs/blog/pins.md`, and neither is restated here.
+What follows is only the per-phase sequence, which D20 fixes.
+
+**1. The implementing step lands its own UUID anchors.**
+An anchored region must exist at the commit its post pins to, and the post pins to the step's merge, so the anchors have to arrive with the code.
+The implementer is also the one who knows which regions are the step's centre.
+Anchors are real `uuidgen` output; an existing pair is never deleted or nested; the step brief records which regions got them.
+A step that lands no anchors leaves its post nothing to transclude, which is how R1–R4 ended up needing the backfill in `docs/blog-backfill-plan.md`.
+
+**2. The orchestrator tags the `--no-ff` merge, before dispatching anyone.**
+
+```sh
+git tag -a blog/phase-NN -m "Phase NN: <title> (step RN)" <merge-sha>
+git push origin blog/phase-NN
+```
+
+The tag must exist first, because the drafting agent writes `orgit-file:` links naming it.
+A pin may move only for an anchor absent at the pin, and only before the post is published; once the prose is out, moving the tag is what pinning exists to prevent.
+
+**3. A fresh agent drafts the post.**
+Its reading list is the merged work — `git show <merge-sha>`, the step's commit message, the retired step brief, `docs/blog/` for the house format, and the preceding post for continuity — plus the `voice` skill.
+It does not read the implementing agent's conversation, and there is no handoff between them (D20).
+It writes `docs/blog/phase-NN-slug.org`, adds the index entry, and leaves `make blog-md` and `scripts/verify-transclusions.sh` green.
+
+**4. A second, clean agent reviews the draft with the `voice` skill.**
+It sees the draft and the diff, and nothing else — the same rule `AGENTS.md` sets for commit and PR messages.
+
+**5. The orchestrator lands the post and records the pin** in `docs/blog/pins.md`.
+
+The phase is done at step 5, not at the merge.
+
+---
+
+# 8. Open questions
 
 Recorded rather than answered, to be settled in the phase that reaches them.
 

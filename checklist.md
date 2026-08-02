@@ -97,12 +97,28 @@
 Supersedes the pivot's decision set with D11–D17.
 `src/smd/smdlisp/**` is frozen as a behavioural oracle from R1 onward and is never edited.
 
+Every phase ships a blog post as a deliverable (D20), drafted by an agent that did not do the work and reviewed by a clean agent running the `voice` skill.
+R0–R4 landed before that was recorded; `docs/blog-backfill-plan.md` covers the arrears as steps B5–B11.
+
 - [x] Step R0: decisions, divergence classification, plan
 - [x] Step R1: substrate — `src/smd/cl/foundation`, short-circuiting fold, topological folds, typeclass instances, law tests, the test matrix
 - [x] Step R2: interned symbol table with value/function/macro slots (D12) — `src/smd/cl/symbol`
 - [x] Step R3: reader and core AST — the tree as its own base functor's fixed point, with instances and schemes — `src/smd/cl/reader`, `src/smd/cl/core`, `foundation/tagged_tree`
 - [x] Step R4: elaborator as three schemes (D15) — `traverse` atoms, `scan_down` roles, `para_short` emission — `src/smd/cl/elaborator`, `foundation::and_then`
-- [ ] Step R5: one evaluator, three channels (D13) — recursive `defun` is the acceptance witness (brief: `step-brief-r5.md`)
-- [ ] Step R6: conformance corpus and differential oracle (D16)
-- [ ] Step R7: sender backend (D17)
-- [ ] Step R8: extract the kit
+- [ ] Step R5: one evaluator, three channels (D13) — recursive `defun` is the acceptance witness (brief: `step-brief-r5.md`) (+ phase 28)
+- [ ] Step R6: conformance corpus and differential oracle (D16) (+ phase 29)
+- [ ] Step R7: sender backend (D17) (+ phase 30)
+- [ ] Step R8: extract the kit (+ phase 31)
+
+## Blog backfill (docs/blog-backfill-plan.md)
+
+Phases 23–27, for steps R0–R4, which landed without posts.
+B6–B10 are independent of each other and depend only on B5.
+
+- [ ] Step B5: UUID anchors for `src/smd/cl/**` on four per-step anchor branches; tags `blog/phase-24`–`blog/phase-27`
+- [ ] Step B6: blog phase 23 — R0, why rebuild rather than refactor (no pin, no transclusions)
+- [ ] Step B7: blog phase 24 — R1, the substrate
+- [ ] Step B8: blog phase 25 — R2, interned symbols
+- [ ] Step B9: blog phase 26 — R3, reader and core AST
+- [ ] Step B10: blog phase 27 — R4, elaboration as three index folds
+- [ ] Step B11: `docs/blog/index.org` entries, `docs/blog/pins.md` rows and third-era note, `make blog-md` and transclusion verification green
