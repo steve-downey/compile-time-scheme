@@ -100,8 +100,8 @@ Supersedes the pivot's decision set with D11–D17.
 - [x] Step R0: decisions, divergence classification, plan
 - [x] Step R1: substrate — `src/smd/cl/foundation`, short-circuiting fold, typeclass instances, law tests
 - [x] Step R2: interned symbol table with value/function/macro slots (D12) — `src/smd/cl/symbol`
-- [ ] Step R3: reader and core AST with Foldable/Traversable instances (brief: `step-brief-r3.md`)
-- [ ] Step R4: elaborator as `traverse` over the result applicative (D15)
+- [x] Step R3: reader and core AST with Foldable/Traversable instances — `src/smd/cl/reader`, `src/smd/cl/core`, `foundation/tagged_tree`
+- [ ] Step R4: elaborator as `traverse` over the result applicative (D15) (brief: `step-brief-r4.md`)
 - [ ] Step R5: one evaluator, three channels (D13) — recursive `defun` is the acceptance witness
 - [ ] Step R6: conformance corpus and differential oracle (D16)
 - [ ] Step R7: sender backend (D17)
