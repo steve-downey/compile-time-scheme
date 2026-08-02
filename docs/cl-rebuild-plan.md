@@ -112,6 +112,23 @@ Step L20 added multiple values with **no** `core_values` node: `values` is an or
 `multiple-value-bind` lowers to a `core_lambda` application, which is how it inherits implicit progn, arity checking, closure capture and the special-variable dynamic-binding rule "without restating any of them" (DIV-0020).
 This is the standing mitigation for node-kind growth, and it is why the backend-multiplication cost stayed manageable across three evaluators.
 
+**D19 — Full ANSI Common Lisp is the aim.**
+Recorded 2026-08-01, resolving the first open question of §7.
+D10's out-of-scope list carries into the rebuild as a staging roadmap, not a fence: every entry is "not yet", none is "never".
+The pivot proved the pipeline on a deliberately small core; the rebuild does not re-prove it — it aims at the language.
+Three consequences bind the phases.
+
+Reader syntax may lead semantics.
+An atom kind may be readable before it is executable, so the reader implements full ANSI atom syntax from R3 — strings, characters, the numeric tower's spellings, `#(...)` vectors — and the datum model carries what cannot yet be evaluated: a tower literal whose machine representation does not exist yet is still a valid datum, carried as its spelling (digits and radix).
+
+The numeric tower is a fan-out.
+Syntax lands at once in R3; semantic support arrives per tower member — fixnums first, then floats, ratios, bignums — in parallel lanes gated on the evaluator, each lane with its own conformance evidence.
+
+The reader is readtable-shaped from the start.
+Character-dispatch-driven, so `*readtable*` and `set-macro-character` are a later exposure of structure that already exists rather than a rewrite.
+
+Conditions and restarts enter at R5 on D13's channels, which were designed for them; CLOS enters through a static-dispatch subset before the full protocol; `loop` and `format` are library-shaped work once the substrate is right.
+
 ---
 
 # 3. What the divergences actually say
@@ -225,8 +242,11 @@ The interned symbol table of D12.
 The keystone; everything downstream depends on it.
 
 **R3 — reader and core AST.**
-The reader design carries over largely intact.
+The reader's staging carries over; its scope does not (D19, 2026-08-01).
+The reader is readtable-shaped — character-dispatch-driven — and implements full ANSI atom syntax: strings, characters, the numeric tower's spellings, `#(...)` vectors, alongside the pivot's symbols, fixnums and lists.
+Tower atoms beyond fixnums are readable but not yet executable; the datum carries their spelling per D19.
 DIV-0003 (whole-token classification, so `1+` reads as the symbol it is) is correct ANSI behaviour, accepted-permanent, and must not be regressed.
+The `smdlisp` reader is the behavioural oracle only for the syntax the pivot implemented; new atom kinds take their tests from the specification and the informal SBCL differential check (§4).
 The tree both ASTs instantiate stores its own base functor — children as `int` indices, the knot tied at `R = int` — and maintains the transpose of its child lists as a parent column, so a descending pass can ask instead of being told.
 The core AST gets Foldable, Traversable, and the recursion schemes from the start rather than retrofitted.
 
@@ -264,9 +284,12 @@ Recorded rather than answered, to be settled in the phase that reaches them.
   Two entries now interact with decisions already taken, so this is a live question rather than an inherited given.
   Conditions being out of scope is the *sole* reason DIV-0011 cannot be fixed — there is no "signal without unwinding" channel to signal into — and D13 is precisely the change that makes a minimal `signal`/`handler-case` expressible.
   The absence of strings is what constrains R6.
-  Settle this before R3, since it determines what the reader and value model must carry.
+  **Resolved 2026-08-01: it does not carry over.**
+  D19 makes full ANSI Common Lisp the aim and turns the list into a staging roadmap; R6's expected corpus subset grows accordingly as tower and string semantics land.
 - Whether `ansi-test` is usable directly, needs adaptation as `ttester_corpus.hpp` did, or must be hand-derived from the specification. R6.
 - Whether the symbol table is a compile-time-only structure or survives into the runtime program, which interacts with D14 and with BL-0002's footprint work. R2.
+  **Resolved by R2, 2026-08-01: the table survives into the runtime program.**
+  The slots are runtime state (`setq` mutates the value slot under the evaluator) and names must travel with the program for `symbol-name`, printing, and diagnostics; D14 holds because programs traffic in capacity-free `symbol_id` while capacities parameterise only the table.
 - Whether `smdlisp` is eventually retired or kept permanently as the pivot's artefact.
   Not urgent; it must survive at least until R6 can replace it as the behavioural oracle.
 - Whether the second, Lisp-family layer of the kit (AST, recursion schemes) is worth extracting at all, given it would have exactly one client until a third Lisp-family front end exists.

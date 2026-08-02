@@ -74,3 +74,8 @@ Closed when GCC folds null comparisons against addresses of subobjects of
 constexpr objects under `-fsanitize=null` (verify with the minimal
 reproduction above), or when `cps_code.hpp`'s closure guard stops comparing a
 program-internal pointer against null.
+
+## 2026-08-01: re-verified during rebuild step R1
+
+Still reproduces at GCC 16.0.1 20260322 (trunk r16-8246) with this doc's five-line reproduction: clean without sanitizers, rejected under `-fsanitize=null` with `'(((const Node*)(& h.Holder::n)) != 0)' is not a constant expression`.
+The rebuild carries the constraint forward: `src/smd/cl/` code keeps null-pointer comparisons off the constant-evaluation path for namespace-scope `constexpr` program objects (R2's `symbol_table::find` reports absence with `std::optional`, not a sentinel pointer).
