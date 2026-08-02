@@ -18,6 +18,8 @@ The orchestrator pastes the plan's R5 phase section (`docs/cl-rebuild-plan.md` �
 Recursive `defun` works at the end of this phase or the phase is not done — it is DIV-0009, the headline divergence D12 exists to close.
 Everything meaningfully constant-evaluable is constexpr with compile-time twins.
 Law tests come before substantive tests for any new instance.
+UUID anchors are landed around the regions that are this step's centre, and named at the end of the successor brief — phase 28's post pins to this step's merge and transcludes what is anchored there (D20; `AGENTS.md`, "The blog deliverable").
+You do not write the post.
 
 ## Files this step owns
 
@@ -88,7 +90,7 @@ Do not touch anything else.
   R5 needs interning too, for `gensym` and for `defun`'s function slot, so decide there rather than growing a fourth copy.
 - **Flag for the next docs-owning step**, none of which R4 edited, per its own file list.
   Still pending from R3: a toolchain divergence record for the GCC trunk r16-8246 memchr misfold, still worked around in `reader/number.hpp`.
-  Still pending from R2: the plan §7 answer that the symbol table survives into the runtime program, and the DIV-0013 dated note that it still reproduces at r16-8246.
+  Still pending from R2: the plan §8 answer that the symbol table survives into the runtime program, and the DIV-0013 dated note that it still reproduces at r16-8246.
   New from R4: `core_cons` as a deliberate D18 exception, and elaborator diagnostics carrying no source position.
 - **The informal SBCL differential check is still pending.**
   No CL implementation is installed in this environment, so R3's new reader syntax and R4's elaboration decisions were derived from the specification and pinned by tests.

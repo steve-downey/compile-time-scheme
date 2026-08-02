@@ -52,6 +52,10 @@ wrong contents.
 - Record durable cross-step facts in `docs/compiler_architecture.org` in place (by
   UUID anchor), keeping its transcluded code annotations current — not in any growing
   handoff or log.
+- Land the UUID anchors your step's blog post will transclude, around the regions
+  that are the step's centre, and name them in your step brief. You do not write
+  the post — see "The blog deliverable" below — but the anchors must exist at your
+  merge commit, because that is what the post pins to.
 - Rewrite your lane's step brief for the next clean agent, per the step-brief contract
   above.
 
@@ -75,6 +79,30 @@ rules apply to them, and they are routinely conflated.
 Do not restate this rule in a step brief in stronger form than it is written here.
 An over-broad "never edit inside a UUID anchor block" has twice caused a worker to
 design around a constraint that does not exist.
+
+## The blog deliverable
+
+Every step ships a post, and three agents touch it, none reading another's
+conversation (decision D20, `docs/cl-rebuild-plan.md` §2 and §7).
+
+1. **The implementing agent** lands the code and its UUID anchors, and stops.
+   It does not draft the post.
+2. **A fresh drafting agent** reads the merged work — the step's diff, its commit
+   message, its retired step brief — plus `docs/blog/` for house format, the
+   preceding post, and the `voice` skill. It never reads the implementing agent's
+   conversation, and there is no handoff between them.
+3. **A second clean agent** reviews the draft with the `voice` skill, seeing only
+   the draft and the diff. This is the rule already in force for commit and PR
+   messages; longer prose is not where to relax it.
+
+The distance in step 2 is a property of the genre, not a cost saving. A post is a
+real-time, non-omniscient diary entry (`docs/cl-pivot-plan.md`); an agent that just
+spent a step's context on the work knows every path it did not take and writes
+omnisciently about a result that was not obvious at the time.
+
+Between steps 1 and 2 the orchestrator tags the `--no-ff` merge `blog/phase-NN`
+and pushes it, because the drafting agent writes `orgit-file:` links naming that
+tag. The step is complete when the post lands, not when the code merges.
 
 ## Required commands
 
@@ -348,6 +376,7 @@ make test passed
 make lint passed
 checklist.md updated
 durable cross-step facts recorded in docs/compiler_architecture.org (in place, by anchor)
+UUID anchors landed for the regions this step's post will transclude, and named in the brief
 step brief rewritten per the step-brief contract
 no unrelated files changed
 no unexplained generated files changed
