@@ -7,9 +7,20 @@
 #include <smd/cl/foundation/tagged_tree_instances.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
 
+#include <array>
+#include <cstddef>
+#include <string_view>
 #include <variant>
 
 namespace smd::cl::core {
+
+/// Maximum length, in characters, of a string literal the core can carry.
+///
+/// Deliberately not shared with the reader's @c reader::max_string_chars:
+/// the core does not depend on the reader, and the elaborator diagnoses a
+/// literal that does not fit rather than truncating it, so the two may
+/// differ without anything being silently lost.
+inline constexpr int max_string_chars = 128;
 
 /// A fixnum literal in the elaborated core.
 struct core_fixnum {
@@ -59,9 +70,56 @@ struct core_t {
     friend constexpr auto operator==(core_t, core_t) -> bool = default;
 };
 
+/// A self-evaluating character literal.
+struct core_character {
+    char value = 0; ///< The character.
+
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(core_character, core_character)
+        -> bool = default;
+};
+
+/// A self-evaluating string literal, carrying its own characters.
+///
+/// The storage is the core's, not the reader's: a compiled program holds no
+/// view into the datum arena, for the same reason @ref core_variable holds a
+/// @ref symbol::symbol_id rather than a name (decision D12). The fixed
+/// capacity is storage, not type identity, so decision D14 is untouched —
+/// @ref max_string_chars is a constant, never a template parameter.
+struct core_string {
+    std::array<char, max_string_chars> storage{}; ///< The characters.
+    int length = 0; ///< Number of valid characters in storage.
+
+    /// Returns the contents as a view into this object's own storage,
+    /// valid while this @c core_string (or the copy it was taken from) is
+    /// alive.
+    [[nodiscard]] constexpr auto view() const -> std::string_view {
+        return std::string_view(storage.data(),
+                                static_cast<std::size_t>(length));
+    }
+
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(core_string const &, core_string const &)
+        -> bool = default;
+};
+
+/// A symbol used as *data* rather than as a variable reference: what
+/// `'foo` denotes. Distinct from @ref core_variable because the position
+/// decides the namespace, not the atom — the same interned
+/// @ref symbol::symbol_id reaches the evaluator as a value here and as a
+/// lookup there.
+struct core_quoted_symbol {
+    symbol::symbol_id id{}; ///< The symbol, as a value.
+
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(core_quoted_symbol, core_quoted_symbol)
+        -> bool = default;
+};
+
 /// A core-tree leaf: one expression that has no subexpressions.
 using core_leaf =
-    std::variant<core_fixnum, core_variable, core_keyword, core_nil, core_t>;
+    std::variant<core_fixnum, core_variable, core_keyword, core_nil, core_t,
+                 core_character, core_string, core_quoted_symbol>;
 // 01c40466-6b6c-4651-b7b6-98c7a289ef5d end
 
 // 60da8def-db67-496e-9b36-6c544c60bc1e
@@ -89,11 +147,26 @@ struct core_progn {
     friend constexpr auto operator==(core_progn, core_progn) -> bool = default;
 };
 
+/// Hermetic pair construction, used only to build quoted list data;
+/// children are the car and the cdr.
+///
+/// Decision D18 says lower onto existing forms before adding a tag, and the
+/// existing form here would be @ref core_call to `cons` — which is wrong,
+/// not merely inelegant. ANSI quoted data is a literal, not a call, so
+/// `'(1 2)` must not depend on what the function slot of `CONS` holds; a
+/// program that redefines `cons` still gets pairs from its quoted lists.
+/// That is a semantics no existing tag expresses, which is exactly D18's
+/// stated exception.
+struct core_cons {
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(core_cons, core_cons) -> bool = default;
+};
+
 /// A core-tree branch tag: what a compound expression is. Step R4 (the
 /// elaborator) grows this variant as it lowers more special operators;
 /// decision D18 keeps that growth slow — prefer lowering onto existing
 /// forms over new tags.
-using core_tag = std::variant<core_call, core_if, core_progn>;
+using core_tag = std::variant<core_call, core_if, core_progn, core_cons>;
 // 60da8def-db67-496e-9b36-6c544c60bc1e end
 
 /// The elaborated core tree: a self-contained @ref foundation::tagged_tree
