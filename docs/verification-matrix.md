@@ -3,7 +3,7 @@
 # Three semantics, three witnesses
 
 A contract in this project can be evaluated three different ways, by three different implementations, with three different bug classes.
-No one of them subsumes another, and this project has now been bitten by the one nobody runs.
+No one of them subsumes another, and this project has now been bitten in two opposite directions.
 
 1. **Constant evaluation** — `static_assert`, `constexpr` variable initialisation.
    The compiler's own interpreter.
@@ -14,7 +14,15 @@ No one of them subsumes another, and this project has now been bitten by the one
 3. **Optimized runtime** — `CONFIG=Asan` (`-O3 -g -fsanitize=address,undefined,leak`) and `CONFIG=RelWithDebInfo` (`-O3 -g -DNDEBUG`).
    Constant folding, lowering of library calls to builtins, inlining, reassociation.
 
-## The defect, and the direction it came from
+## The two defects, one from each end
+
+**Only the optimizer sees it.**
+`reader/number.hpp` needs to find a `/` in a token.
+Spelled `text.find('/')`, that lowers to `memchr`, and GCC trunk r16-8246 constant-folds the `memchr` call against the *original* string literal rather than the offset `string_view`, so a `remove_prefix(1)` upstream is enough to be off by one.
+Every `static_assert` passed, because the constant evaluator does not lower anything to `memchr`.
+An `-O0` build would not have folded it either.
+The Asan run is what failed, and it failed because Asan is `-O3`.
+The workaround is to spell the search as `std::ranges::find_if`, which is not lowered to `memchr`; both `find_char` and `find_exponent_marker` carry a comment saying so.
 
 **Only the unoptimized build sees it.**
 `foundation/foldable.test.cpp`'s `pair_box_foldable_impl::fold_map` returned `m.combine(f(pb.first), f(pb.second))`.
@@ -32,13 +40,6 @@ Measured with `g++-16 -std=c++26`, the derived `fold_left` over `pair_box<int>{1
 The compile-time twin passed.
 The default `make test` passed.
 The contract was still wrong, and the only witness that could say so was the one nobody ran.
-
-What the table predicts is the mirror-image defect: one only the
-*optimized* build can see — a constant-folding or builtin-lowering bug, the
-class where the constant evaluator lowers nothing and `-O0` folds nothing,
-so both pass while `-O3` is wrong. Nothing here has been bitten from that
-direction yet. The matrix exists so that when it arrives, a witness is
-already running.
 
 ## Why `Asan` is not the careful build
 

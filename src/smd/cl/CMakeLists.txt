@@ -3,3 +3,5 @@
 
 add_subdirectory(foundation)
 add_subdirectory(symbol)
+add_subdirectory(reader)
+add_subdirectory(core)
