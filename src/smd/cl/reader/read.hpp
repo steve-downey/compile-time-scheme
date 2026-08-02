@@ -33,19 +33,17 @@ inline constexpr int default_max_list = 32;
 
 namespace detail {
 
-/// Monadic sequencing for parse steps: applies @p f to the success value
-/// of @p step, or passes the error through. The reader's counterpart of
-/// D15's rule that error propagation is not a check ladder: a parse is an
-/// unfold — there is no structure to @c traverse until the reader has
-/// built it — so sequential steps chain through this bind instead.
-template <class T, class F>
-constexpr auto and_then(foundation::result<T> const &step, F &&f) {
-    using out_type = std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
-    if (!step.has_value()) {
-        return out_type{step.error()};
-    }
-    return std::invoke(std::forward<F>(f), step.value());
-}
+/// Monadic sequencing for parse steps. The reader's counterpart of D15's
+/// rule that error propagation is not a check ladder: a parse is an unfold
+/// — there is no structure to @c traverse until the reader has built it —
+/// so sequential steps chain through this bind instead.
+///
+/// It lived here until the elaborator needed the same shape; it is now
+/// @ref foundation::and_then, named here because the two calls in this
+/// header's public entry points spell it @c detail::and_then. The calls
+/// inside this namespace would find it by argument-dependent lookup
+/// regardless — @c result is a @c foundation type.
+using foundation::and_then;
 
 /// Everything one read shares: the tree being built, the symbol table
 /// names are interned into, and the readtable driving dispatch. The
