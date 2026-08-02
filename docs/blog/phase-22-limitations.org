@@ -132,6 +132,10 @@ A structured-concurrency backend earns its keep on the completions it has to mak
 This is the last post in the series.
 ~docs/cl-limitations.md~ and the individual ~docs/divergences/DIV-*.md~ files stay current after this; the series itself does not.
 
+/Added 2026-08-02: it wasn't./
+/Reading the twenty divergence records end to end turned out to be an argument for building the thing again rather than patching it, and the series picks up at [[file:phase-23-why-rebuild.org][Phase 23]]./
+/The sentence above stood when it was written, and it stays as written./
+
 * References
 
 #+print_bibliography:

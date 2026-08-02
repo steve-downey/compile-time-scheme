@@ -27,8 +27,12 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-20-defmacro.org` | `c7deeb1` | `blog/phase-20` | `Merge step L19` (P4 method 1) |
 | `phase-21-sender-graphs.org` | `c11ac23` | `blog/phase-21` | `Merge step L21` (tag created at the merge, before the post) |
 | `phase-22-limitations.org` | `d10efe7` | `blog/phase-22` | `Merge step L24` (tag created at the merge, before the post) |
+| `phase-24-substrate.org` | `8483506` | `blog/phase-24` | `Merge step R1`, tagged retroactively (era 3) |
+| `phase-25-symbols.org` | `7b1009c` | `blog/phase-25` | `Merge step R2`, tagged retroactively (era 3) |
+| `phase-26-reader-core-ast.org` | `57ce8ea` | `blog/phase-26` | `Merge step R3`, tagged retroactively (era 3) |
+| `phase-27-elaboration.org` | `47d2094` | `blog/phase-27` | `Merge step R4`, tagged retroactively (era 3) |
 
-57 transclusions across 13 posts. Every row passes the anchor test at its pin,
+78 transclusions across 17 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
@@ -38,6 +42,38 @@ no link ever needs repointing. It draws on seven of the ten anchors available in
 `src/smd/smdlisp/sender/` at that tag; the three it does not use are
 `sender_v.hpp`'s vocabulary aliases, `sender_eval.hpp`'s `mendler_para` bridge,
 and `sender_eval.hpp`'s `core_cons`/`when_all` arm.
+
+## A third authorship era: the rebuild's backfill
+
+Phases 23–27 describe steps R0–R4, which merged without posts because the rebuild plan's
+phase list carried no blog deliverable. Decision D20 repaired that, and
+`docs/blog-backfill-plan.md` covers the arrears.
+
+These five are retrospective like posts 5–12, but their pins are constructed rather than
+found, and the construction is the point. The rebuild tree carried **no UUID anchors at
+all**, so there was nothing for any of the five to transclude. Anchors cannot be added to
+a commit after the fact without rewriting it, and a single anchor commit on today's `main`
+would have pinned all four code posts to one revision — reintroducing exactly the leak
+this document exists to measure, since R4 alone rewrote three headers that R1 and R3
+created.
+
+Each step landed its own anchors at its merge, per the rule in
+`AGENTS.md`, so the pins needed no construction beyond naming: four
+annotated tags, one per step merge, placed retroactively when the
+posts were written. Each merge passes its whole suite at its own
+vintage, and every anchor pair is well formed at its tag.
+
+Phase 23 takes no pin. It is decisions and documents and transcludes nothing, like ten of
+the first twenty-one posts.
+
+The construction produced one artifact worth keeping in mind when reading the two posts
+about the core AST. `01c40466-6b6c-4651-b7b6-98c7a289ef5d` names the core's leaf variant,
+and R4 extended that variant inside the anchor pair R3 placed. It resolves to five
+alternatives at `blog/phase-26` and eight at `blog/phase-27` — the same UUID, in the same
+file, naming the same declaration, showing different code at each tag. `60da8def` does the
+same for the branch tags, three and four. That is what an anchor names: the declaration,
+not a revision of it.
+
 
 ## Two authorship eras
 
