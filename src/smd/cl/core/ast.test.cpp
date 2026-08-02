@@ -14,11 +14,15 @@
 #include <variant>
 
 using smd::cl::core::core_call;
+using smd::cl::core::core_character;
+using smd::cl::core::core_cons;
 using smd::cl::core::core_fixnum;
 using smd::cl::core::core_if;
 using smd::cl::core::core_keyword;
 using smd::cl::core::core_leaf;
 using smd::cl::core::core_nil;
+using smd::cl::core::core_quoted_symbol;
+using smd::cl::core::core_string;
 using smd::cl::core::core_t;
 using smd::cl::core::core_tag;
 using smd::cl::core::core_tree;
@@ -61,7 +65,59 @@ constexpr auto leaves_are_comparable_values() -> bool {
            core_keyword{symbol_id{3}} == core_keyword{symbol_id{3}} &&
            core_nil{} == core_nil{} && core_t{} == core_t{} &&
            core_call{symbol_id{2}} == core_call{symbol_id{2}} &&
-           !(core_call{symbol_id{2}} == core_call{symbol_id{4}});
+           !(core_call{symbol_id{2}} == core_call{symbol_id{4}}) &&
+           core_character{'a'} == core_character{'a'} &&
+           !(core_character{'a'} == core_character{'b'}) &&
+           core_cons{} == core_cons{};
+}
+
+// A symbol as data and the same symbol as a variable reference are
+// different leaves carrying one id: the position picks the namespace, and
+// the leaf records which one won.
+constexpr auto a_quoted_symbol_is_not_a_variable() -> bool {
+    return core_quoted_symbol{symbol_id{1}} ==
+               core_quoted_symbol{symbol_id{1}} &&
+           !(core_quoted_symbol{symbol_id{1}} ==
+             core_quoted_symbol{symbol_id{2}}) &&
+           !(core_leaf{core_quoted_symbol{symbol_id{1}}} ==
+             core_leaf{core_variable{symbol_id{1}}});
+}
+
+// A string leaf owns its characters, so it survives the source text it was
+// read from — the dangling-view failure the old tree's core_symbol records
+// cannot arise here.
+constexpr auto a_string_leaf_owns_its_characters() -> bool {
+    auto const copied = [] {
+        core_string original{};
+        original.length = 2;
+        original.storage[0] = 'h';
+        original.storage[1] = 'i';
+        return original;
+    }();
+    core_string other{};
+    other.length = 2;
+    other.storage[0] = 'h';
+    other.storage[1] = 'i';
+    return copied.view() == "hi" && copied == other &&
+           copied.view().data() != other.view().data();
+}
+
+// The shape 'a elaborates to: one hermetic pair, car a symbol as data,
+// cdr the empty list. core_cons exists because this must not be a call to
+// whatever the function slot of CONS holds.
+constexpr auto quoted_data_composes() -> bool {
+    using pair_tree = core_tree<8, 2>;
+    pair_tree t;
+    int const car = t.add_leaf(core_leaf{core_quoted_symbol{symbol_id{1}}});
+    int const cdr = t.add_leaf(core_leaf{core_nil{}});
+    pair_tree::child_list halves;
+    halves.push_back(car);
+    halves.push_back(cdr);
+    t.set_root(t.add_branch(core_tag{core_cons{}}, halves));
+    auto const &root = t.branch(t.root());
+    return t.size() == 3 && std::holds_alternative<core_cons>(root.tag) &&
+           root.children.size() == 2 &&
+           std::holds_alternative<core_quoted_symbol>(t.leaf(root.children[0]));
 }
 
 constexpr auto core_tree_composes() -> bool {
@@ -123,6 +179,9 @@ constexpr auto core_tree_is_traversable() -> bool {
 } // namespace
 
 static_assert(leaves_are_comparable_values());
+static_assert(a_quoted_symbol_is_not_a_variable());
+static_assert(a_string_leaf_owns_its_characters());
+static_assert(quoted_data_composes());
 static_assert(core_tree_composes());
 static_assert(core_tree_is_foldable());
 static_assert(core_tree_is_functorial());
@@ -132,7 +191,11 @@ TEST_CASE("AstTest - HeaderIsIdempotent") { REQUIRE(true); }
 
 TEST_CASE("AstTest - LeavesAreComparableValues") {
     CHECK(leaves_are_comparable_values());
+    CHECK(a_quoted_symbol_is_not_a_variable());
+    CHECK(a_string_leaf_owns_its_characters());
 }
+
+TEST_CASE("AstTest - QuotedDataComposes") { CHECK(quoted_data_composes()); }
 
 TEST_CASE("AstTest - CoreTreeComposes") { CHECK(core_tree_composes()); }
 
