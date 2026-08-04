@@ -13,20 +13,26 @@
 
 #include <variant>
 
+using smd::cl::core::core_block;
 using smd::cl::core::core_call;
 using smd::cl::core::core_character;
 using smd::cl::core::core_cons;
+using smd::cl::core::core_defun;
 using smd::cl::core::core_fixnum;
 using smd::cl::core::core_if;
 using smd::cl::core::core_keyword;
+using smd::cl::core::core_lambda;
 using smd::cl::core::core_leaf;
 using smd::cl::core::core_nil;
 using smd::cl::core::core_quoted_symbol;
+using smd::cl::core::core_return_from;
 using smd::cl::core::core_string;
 using smd::cl::core::core_t;
 using smd::cl::core::core_tag;
 using smd::cl::core::core_tree;
+using smd::cl::core::core_unwind_protect;
 using smd::cl::core::core_variable;
+using smd::cl::core::max_lambda_params;
 using smd::cl::foundation::fmap;
 using smd::cl::foundation::fold_left;
 using smd::cl::foundation::length;
@@ -120,6 +126,68 @@ constexpr auto quoted_data_composes() -> bool {
            std::holds_alternative<core_quoted_symbol>(t.leaf(root.children[0]));
 }
 
+// The five tags step R5 added, and the one thing each says that no other
+// tag does — decision D18's bar, restated as a test.
+constexpr auto the_control_tags_are_comparable_values() -> bool {
+    return core_defun{symbol_id{1}} == core_defun{symbol_id{1}} &&
+           !(core_defun{symbol_id{1}} == core_defun{symbol_id{2}}) &&
+           core_block{symbol_id{1}} == core_block{symbol_id{1}} &&
+           !(core_block{symbol_id{1}} == core_block{symbol_id{2}}) &&
+           core_return_from{symbol_id{1}} == core_return_from{symbol_id{1}} &&
+           core_unwind_protect{} == core_unwind_protect{} &&
+           core_lambda{} == core_lambda{};
+}
+
+// A block and a return-from that name the same symbol are still different
+// tags: one is where an unwind lands, the other is where it starts. That
+// distinction is why the two ids being equal does not make the tags equal.
+constexpr auto naming_a_block_is_not_leaving_it() -> bool {
+    return !(core_tag{core_block{symbol_id{1}}} ==
+             core_tag{core_return_from{symbol_id{1}}});
+}
+
+// A lambda's parameters are storage inside the node, so max_lambda_params is
+// a constant rather than a template parameter — the same reason
+// max_string_chars is one, and the same rule (decision D14).
+constexpr auto a_lambda_carries_its_parameters() -> bool {
+    core_lambda one_parameter{};
+    one_parameter.params.push_back(symbol_id{5});
+    core_lambda same{};
+    same.params.push_back(symbol_id{5});
+    return max_lambda_params > 0 && one_parameter.params.size() == 1 &&
+           one_parameter.params[0] == symbol_id{5} && one_parameter == same &&
+           !(one_parameter == core_lambda{});
+}
+
+// The shape (defun f (x) x) elaborates to: a defun over a lambda over a
+// block over the body. Three nested nodes, because each says exactly one
+// thing — install in a function slot, bind parameters, catch an unwind.
+constexpr auto a_definition_nests_three_tags() -> bool {
+    using definition_tree = core_tree<8, 2>;
+    constexpr symbol_id f{1};
+    constexpr symbol_id x{2};
+    definition_tree t;
+    int const body = t.add_leaf(core_leaf{core_variable{x}});
+    definition_tree::child_list one;
+    one.push_back(body);
+    int const block = t.add_branch(core_tag{core_block{f}}, one);
+    core_lambda parameters{};
+    parameters.params.push_back(x);
+    definition_tree::child_list wrapped;
+    wrapped.push_back(block);
+    int const lambda = t.add_branch(core_tag{core_lambda{parameters}}, wrapped);
+    definition_tree::child_list installed;
+    installed.push_back(lambda);
+    t.set_root(t.add_branch(core_tag{core_defun{f}}, installed));
+    auto const &root = t.branch(t.root());
+    return std::get<core_defun>(root.tag).name == f &&
+           std::get<core_lambda>(t.branch(root.children[0]).tag)
+                   .params.size() == 1 &&
+           std::get<core_block>(
+               t.branch(t.branch(root.children[0]).children[0]).tag)
+                   .name == f;
+}
+
 constexpr auto core_tree_composes() -> bool {
     auto const t = sample_core();
     auto const &root = t.branch(t.root());
@@ -182,6 +250,10 @@ static_assert(leaves_are_comparable_values());
 static_assert(a_quoted_symbol_is_not_a_variable());
 static_assert(a_string_leaf_owns_its_characters());
 static_assert(quoted_data_composes());
+static_assert(the_control_tags_are_comparable_values());
+static_assert(naming_a_block_is_not_leaving_it());
+static_assert(a_lambda_carries_its_parameters());
+static_assert(a_definition_nests_three_tags());
 static_assert(core_tree_composes());
 static_assert(core_tree_is_foldable());
 static_assert(core_tree_is_functorial());
@@ -196,6 +268,13 @@ TEST_CASE("AstTest - LeavesAreComparableValues") {
 }
 
 TEST_CASE("AstTest - QuotedDataComposes") { CHECK(quoted_data_composes()); }
+
+TEST_CASE("AstTest - ControlTags") {
+    CHECK(the_control_tags_are_comparable_values());
+    CHECK(naming_a_block_is_not_leaving_it());
+    CHECK(a_lambda_carries_its_parameters());
+    CHECK(a_definition_nests_three_tags());
+}
 
 TEST_CASE("AstTest - CoreTreeComposes") { CHECK(core_tree_composes()); }
 

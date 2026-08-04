@@ -15,6 +15,7 @@
 #include <smd/cl/foundation/traversable.hpp>
 #include <smd/cl/reader/datum.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
+#include <smd/cl/symbol/symbol_table.hpp>
 
 #include <algorithm>
 #include <ranges>
@@ -173,24 +174,14 @@ template <class SymbolTable>
     return found ? *found : symbol::symbol_id{};
 }
 
-/// Interns @p name, surfacing a full symbol table or name pool as a @ref
-/// foundation::parse_error rather than tripping the table's asserts.
-template <class SymbolTable>
-[[nodiscard]] constexpr auto intern_checked(SymbolTable &symbols,
-                                            std::string_view name)
-    -> foundation::result<symbol::symbol_id> {
-    if (auto const existing = symbols.find(name)) {
-        return *existing;
-    }
-    if (symbols.size() >= symbols.capacity()) {
-        return foundation::parse_error{{}, "symbol table full"};
-    }
-    if (symbols.name_chars_used() + static_cast<int>(name.size()) >
-        symbols.name_chars_capacity()) {
-        return foundation::parse_error{{}, "symbol name storage full"};
-    }
-    return symbols.intern(name);
-}
+/// Interning that diagnoses a full table rather than asserting.
+///
+/// It lived here until the evaluator wanted a third copy of it; it is now
+/// @ref symbol::intern_checked. The calls below would find it by
+/// argument-dependent lookup anyway — a table is a @c symbol type — so this
+/// declaration is here to say where it went, and it is also why the two
+/// definitions could not have coexisted.
+using symbol::intern_checked;
 
 /// Lowers every atom of @p form, leftmost bad atom winning.
 template <int MaxNodes, int MaxList, class SymbolTable>
@@ -224,8 +215,53 @@ enum class form_kind : unsigned char {
     call,        ///< An ordinary function call.
     conditional, ///< `if`.
     sequence,    ///< `progn`.
-    quotation    ///< `quote`.
+    quotation,   ///< `quote`.
+    definition,  ///< `defun`.
+    named_block, ///< `block`.
+    block_exit,  ///< `return-from`.
+    protection   ///< `unwind-protect`.
 };
+
+// 20b081ea-5806-495c-8476-d89fee98acdc
+/// How a form reads the children after its head: how many of them are
+/// *names* rather than subforms, and what every later child is.
+///
+/// This is the whole of what the new special operators add to the role pass.
+/// `defun` reads two names — the function's, and its lambda list — and
+/// `block` and `return-from` read one; a name is left @ref
+/// node_role::unreachable so that no pass treats it as an expression, and
+/// the emission pass reads it straight out of the source tree. Nothing here
+/// bounds nesting or needs a stack, because the pass is still one descending
+/// sweep of the node array.
+struct child_roles {
+    int names = 0; ///< Children after the head that are names, not subforms.
+    node_role rest =
+        node_role::evaluate; ///< What every child past the names is.
+
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(child_roles, child_roles)
+        -> bool = default;
+};
+
+/// Returns how @p form reads its children.
+[[nodiscard]] constexpr auto roles_of(form_kind form) -> child_roles {
+    switch (form) {
+    case form_kind::quotation:
+        return child_roles{0, node_role::quote_datum};
+    case form_kind::definition:
+        return child_roles{2, node_role::evaluate};
+    case form_kind::named_block:
+    case form_kind::block_exit:
+        return child_roles{1, node_role::evaluate};
+    case form_kind::call:
+    case form_kind::conditional:
+    case form_kind::sequence:
+    case form_kind::protection:
+        break;
+    }
+    return child_roles{0, node_role::evaluate};
+}
+// 20b081ea-5806-495c-8476-d89fee98acdc end
 
 /// What one pass has decided about one node, for the next pass to use.
 struct node_plan {
@@ -242,6 +278,10 @@ struct operator_ids {
     symbol::symbol_id quote{};       ///< `QUOTE`.
     symbol::symbol_id conditional{}; ///< `IF`.
     symbol::symbol_id sequence{};    ///< `PROGN`.
+    symbol::symbol_id definition{};  ///< `DEFUN`.
+    symbol::symbol_id named_block{}; ///< `BLOCK`.
+    symbol::symbol_id block_exit{};  ///< `RETURN-FROM`.
+    symbol::symbol_id protection{};  ///< `UNWIND-PROTECT`.
 };
 
 /// Resolves the recognized special operators against @p symbols.
@@ -250,7 +290,11 @@ template <class SymbolTable>
     -> operator_ids {
     return operator_ids{find_or_invalid(symbols, "QUOTE"),
                         find_or_invalid(symbols, "IF"),
-                        find_or_invalid(symbols, "PROGN")};
+                        find_or_invalid(symbols, "PROGN"),
+                        find_or_invalid(symbols, "DEFUN"),
+                        find_or_invalid(symbols, "BLOCK"),
+                        find_or_invalid(symbols, "RETURN-FROM"),
+                        find_or_invalid(symbols, "UNWIND-PROTECT")};
 }
 
 /// Returns the symbol at the head of @p children, or the invalid id when
@@ -284,6 +328,18 @@ head_symbol(lowered_tree<MaxNodes, MaxList> const &tree,
     }
     if (head == operators.sequence) {
         return form_kind::sequence;
+    }
+    if (head == operators.definition) {
+        return form_kind::definition;
+    }
+    if (head == operators.named_block) {
+        return form_kind::named_block;
+    }
+    if (head == operators.block_exit) {
+        return form_kind::block_exit;
+    }
+    if (head == operators.protection) {
+        return form_kind::protection;
     }
     return form_kind::call;
 }
@@ -333,8 +389,14 @@ role_of(lowered_tree<MaxNodes, MaxList> const &tree, int index,
     if (link.ordinal == 0) {
         return node_role::operator_name;
     }
-    return parent_plan.form == form_kind::quotation ? node_role::quote_datum
-                                                    : node_role::evaluate;
+    auto const shape = roles_of(parent_plan.form);
+    if (link.ordinal <= shape.names) {
+        // A name stays unreachable — the default — so nothing downstream
+        // treats it as an expression; the emission pass reads it straight
+        // from the source tree.
+        return node_role::unreachable;
+    }
+    return shape.rest;
 }
 
 /// Which compound form @p index is, given the @p role it plays.
@@ -629,6 +691,194 @@ emit_call(Ctx &ctx, typename Ctx::source_children const &source_children,
         });
 }
 
+/// Returns the symbol the source leaf at @p index names, or the invalid id
+/// if that node is not a symbol.
+///
+/// The atom pass read every symbol in value position as a
+/// @ref core::core_variable, so this is where a *name* — a block's, a
+/// function's, a parameter's — is recovered. `NIL` and `T` became constants
+/// there and so are not names here, which is why `(block nil ...)` is
+/// diagnosed rather than accepted.
+template <class Ctx>
+[[nodiscard]] constexpr auto name_at(Ctx const &ctx, int index)
+    -> symbol::symbol_id {
+    if (!ctx.source.is_leaf(index)) {
+        return symbol::symbol_id{};
+    }
+    auto const *named =
+        std::get_if<core::core_variable>(&ctx.source.leaf(index));
+    return named ? named->id : symbol::symbol_id{};
+}
+
+/// A lambda list's parameter names.
+using parameter_list =
+    foundation::static_vector<symbol::symbol_id, core::max_lambda_params>;
+
+/// Reads the lambda list at @p index as parameter names.
+///
+/// Required-parameters only: a lambda list keyword is a symbol like any
+/// other, so it would otherwise be bound as an ordinary parameter, which is
+/// the kind of silence decision D19 rules out.
+template <class Ctx>
+[[nodiscard]] constexpr auto read_lambda_list(Ctx const &ctx, int index)
+    -> foundation::result<parameter_list> {
+    if (ctx.source.is_leaf(index) ||
+        ctx.source.branch(index).tag != reader::datum_branch::list) {
+        return foundation::parse_error{
+            {}, "a lambda list must be a list of parameter names"};
+    }
+    return foundation::fold_left_short(
+        ctx.source.branch(index).children, parameter_list{},
+        [&ctx](parameter_list params,
+               int child) -> foundation::result<parameter_list> {
+            auto const name = name_at(ctx, child);
+            if (!name.valid()) {
+                return foundation::parse_error{{},
+                                               "a parameter must be a symbol"};
+            }
+            if (ctx.symbols.name(name).starts_with('&')) {
+                return foundation::parse_error{
+                    {}, "lambda list keywords are not yet supported"};
+            }
+            if (params.size() >= params.capacity()) {
+                return foundation::parse_error{{}, "too many parameters"};
+            }
+            params.push_back(name);
+            return params;
+        });
+}
+
+/// Emits a branch with exactly one child.
+template <class Ctx>
+[[nodiscard]] constexpr auto emit_wrapper(Ctx &ctx, core::core_tag tag,
+                                          int child)
+    -> foundation::result<int> {
+    typename Ctx::out_children one;
+    one.push_back(child);
+    return add_branch_checked(ctx, std::move(tag), std::move(one));
+}
+
+/// Emits `(block name form...)`.
+template <class Ctx>
+[[nodiscard]] constexpr auto
+emit_named_block(Ctx &ctx, typename Ctx::source_children const &children,
+                 int skip, symbol::symbol_id name) -> foundation::result<int> {
+    return foundation::and_then(
+        collect_emitted<typename Ctx::out_children>(children, skip),
+        [&ctx, name](typename Ctx::out_children body) {
+            return add_branch_checked(
+                ctx, core::core_tag{core::core_block{name}}, std::move(body));
+        });
+}
+
+// d398d3f2-8862-4663-9e03-28262372feae
+/// Emits `(defun name (parameter...) form...)`.
+///
+/// Three nodes, and the nesting is the whole of what `defun` means: the body
+/// goes inside a @ref core::core_block named for the function, which is the
+/// implicit block ANSI 3.1.2.1.2.2 requires and which is what makes
+/// `return-from` usable in a function body without a `block` of its own; the
+/// block goes inside a @ref core::core_lambda, which binds the parameters;
+/// and the lambda goes inside a @ref core::core_defun, which puts it in the
+/// symbol's function slot.
+///
+/// Nothing here captures the function under its own name, and that is the
+/// point. The recursive call in the body is an ordinary
+/// @ref core::core_call, which the machine resolves through the function
+/// slot at the moment of the call — so a body that names itself finds the
+/// definition being installed. That is DIV-0009 closed.
+template <class Ctx>
+[[nodiscard]] constexpr auto
+emit_definition(Ctx &ctx, typename Ctx::source_children const &source_children,
+                typename Ctx::source_children const &children)
+    -> foundation::result<int> {
+    if (children.size() < 3) {
+        return foundation::parse_error{
+            {}, "defun takes a name, a lambda list, and a body"};
+    }
+    auto const name = name_at(ctx, source_children[1]);
+    if (!name.valid()) {
+        return foundation::parse_error{{}, "a function name must be a symbol"};
+    }
+    return foundation::and_then(
+        read_lambda_list(ctx, source_children[2]),
+        [&ctx, &children, name](parameter_list const &params) {
+            return foundation::and_then(
+                emit_named_block(ctx, children, 3, name),
+                [&ctx, &params, name](int body) {
+                    return foundation::and_then(
+                        emit_wrapper(ctx,
+                                     core::core_tag{core::core_lambda{params}},
+                                     body),
+                        [&ctx, name](int function) {
+                            return emit_wrapper(
+                                ctx, core::core_tag{core::core_defun{name}},
+                                function);
+                        });
+                });
+        });
+}
+// d398d3f2-8862-4663-9e03-28262372feae end
+
+/// Emits `(block name form...)`, the source form.
+template <class Ctx>
+[[nodiscard]] constexpr auto
+emit_block(Ctx &ctx, typename Ctx::source_children const &source_children,
+           typename Ctx::source_children const &children)
+    -> foundation::result<int> {
+    if (children.size() < 2) {
+        return foundation::parse_error{{}, "block takes a name and a body"};
+    }
+    auto const name = name_at(ctx, source_children[1]);
+    if (!name.valid()) {
+        return foundation::parse_error{{}, "a block name must be a symbol"};
+    }
+    return emit_named_block(ctx, children, 2, name);
+}
+
+/// Emits `(return-from name)` or `(return-from name value)`.
+template <class Ctx>
+[[nodiscard]] constexpr auto
+emit_block_exit(Ctx &ctx, typename Ctx::source_children const &source_children,
+                typename Ctx::source_children const &children)
+    -> foundation::result<int> {
+    if (children.size() < 2 || children.size() > 3) {
+        return foundation::parse_error{
+            {}, "return-from takes a block name and an optional value"};
+    }
+    auto const name = name_at(ctx, source_children[1]);
+    if (!name.valid()) {
+        return foundation::parse_error{{}, "a block name must be a symbol"};
+    }
+    return foundation::and_then(
+        collect_emitted<typename Ctx::out_children>(children, 2),
+        [&ctx, name](typename Ctx::out_children carried) {
+            return add_branch_checked(
+                ctx, core::core_tag{core::core_return_from{name}},
+                std::move(carried));
+        });
+}
+
+/// Emits `(unwind-protect protected cleanup...)`.
+template <class Ctx>
+[[nodiscard]] constexpr auto
+emit_protection(Ctx &ctx, typename Ctx::source_children const &children)
+    -> foundation::result<int> {
+    if (children.size() < 2) {
+        // ANSI's grammar is `unwind-protect protected-form cleanup-form*`:
+        // no cleanup at all is legal, no protected form is not.
+        return foundation::parse_error{
+            {}, "unwind-protect takes a protected form and cleanup forms"};
+    }
+    return foundation::and_then(
+        collect_emitted<typename Ctx::out_children>(children, 1),
+        [&ctx](typename Ctx::out_children forms) {
+            return add_branch_checked(
+                ctx, core::core_tag{core::core_unwind_protect{}},
+                std::move(forms));
+        });
+}
+
 /// Emits a parenthesized form in an expression position.
 template <class Ctx>
 [[nodiscard]] constexpr auto
@@ -653,6 +903,14 @@ emit_compound(Ctx &ctx, node_plan const &plan,
         return emit_conditional(ctx, children);
     case form_kind::sequence:
         return emit_sequence(ctx, children);
+    case form_kind::definition:
+        return emit_definition(ctx, source_children, children);
+    case form_kind::named_block:
+        return emit_block(ctx, source_children, children);
+    case form_kind::block_exit:
+        return emit_block_exit(ctx, source_children, children);
+    case form_kind::protection:
+        return emit_protection(ctx, children);
     case form_kind::call:
         return emit_call(ctx, source_children, children);
     }
@@ -714,19 +972,17 @@ emit_node(Ctx &ctx, typename Ctx::source_tree const &tree, int index,
 
 } // namespace detail
 
-/// Elaborates one datum @p form into the core tree it means, interning into
-/// @p symbols the quote-family operators that quoted data needs and the
-/// reader never spelled.
+/// Elaborates one datum @p form into @p out, which may already hold earlier
+/// forms, and returns the index of the node that is this form's root.
 ///
-/// Recognizes `quote` (spelled either way), `if` and `progn`; every other
-/// compound form in an expression position is a call, with the callee
-/// resolved in the function namespace (Lisp-2). Self-evaluating atoms are
-/// fixnums, characters, strings, keywords, `NIL` and `T`; a numeric-tower
-/// literal is readable but not yet executable (decision D19), as are
-/// vectors, `#'f` and the backquote family.
+/// The root is *returned* rather than set, because a program is a sequence
+/// of top-level forms sharing one arena: whoever reads them decides what
+/// joins them, and a closure made by an earlier form must still be able to
+/// name a node an equally long-lived tree owns. @ref elaborate is this with
+/// one form and the root set.
 ///
-/// @tparam MaxNodes    Core-tree node capacity.
-/// @tparam MaxChildren Maximum subexpressions per core node.
+/// @tparam MaxNodes    Core-tree node capacity (deduced from @p out).
+/// @tparam MaxChildren Maximum subexpressions per core node (deduced).
 /// @tparam DatumNodes  The form's node capacity (deduced).
 /// @tparam DatumList   The form's per-list capacity (deduced).
 /// @tparam SymbolTable The symbol table instantiation; needs @c find,
@@ -734,8 +990,67 @@ emit_node(Ctx &ctx, typename Ctx::source_tree const &tree, int index,
 ///                     @c symbol::symbol_table.
 /// @param  form    The datum to lower; must have a root.
 /// @param  symbols The table @p form's names were interned into.
-/// @return The core tree, or the leftmost failure.
+/// @param  out     The arena to emit into.
+/// @return The emitted form's root index in @p out, or the leftmost failure.
 // 53eabd7c-d0c2-4f0e-a63b-3260a0151044
+template <int MaxNodes, int MaxChildren, int DatumNodes, int DatumList,
+          class SymbolTable>
+[[nodiscard]] constexpr auto
+elaborate_into(reader::datum_tree<DatumNodes, DatumList> const &form,
+               SymbolTable &symbols,
+               core::core_tree<MaxNodes, MaxChildren> &out)
+    -> foundation::result<int> {
+    static_assert(MaxChildren >= 3,
+                  "a core node must hold an if's three arms and a pair's two "
+                  "halves");
+    using context = detail::emit_context<MaxNodes, MaxChildren, DatumNodes,
+                                         DatumList, SymbolTable>;
+    return foundation::and_then(
+        detail::lower_atoms(form, symbols),
+        [&symbols,
+         &out](detail::lowered_tree<DatumNodes, DatumList> const &lowered)
+            -> foundation::result<int> {
+            if (lowered.root() < 0) {
+                return foundation::parse_error{{}, "form has no root"};
+            }
+            auto const plans =
+                detail::plan_nodes(lowered, detail::resolve_operators(symbols));
+            context ctx{lowered, plans, symbols, out};
+            // The paramorphism: bottom-up over the source, each node's
+            // carrier its emitted core index, each layer arriving with
+            // its child slots already emitted. Its return value is the
+            // root's index, which is the one fact the caller needs.
+            // para_short's value is the root's carrier: the emitted
+            // form's root index, which is the one fact the caller needs.
+            return foundation::para_short<int>(
+                lowered,
+                [&ctx](typename context::source_tree const &tree, int index,
+                       typename context::layer const &layer) {
+                    return detail::emit_node(ctx, tree, index, layer);
+                });
+        });
+}
+
+/// Elaborates one datum @p form into the core tree it means, interning into
+/// @p symbols the quote-family operators that quoted data needs and the
+/// reader never spelled.
+///
+/// Recognizes `quote` (spelled either way), `if`, `progn`, `defun`, `block`,
+/// `return-from` and `unwind-protect`; every other compound form in an
+/// expression position is a call, with the callee resolved in the function
+/// namespace (Lisp-2). Self-evaluating atoms are fixnums, characters,
+/// strings, keywords, `NIL` and `T`; a numeric-tower literal is readable but
+/// not yet executable (decision D19), as are vectors, `#'f` and the
+/// backquote family.
+///
+/// @tparam MaxNodes    Core-tree node capacity.
+/// @tparam MaxChildren Maximum subexpressions per core node.
+/// @tparam DatumNodes  The form's node capacity (deduced).
+/// @tparam DatumList   The form's per-list capacity (deduced).
+/// @tparam SymbolTable The symbol table instantiation.
+/// @param  form    The datum to lower; must have a root.
+/// @param  symbols The table @p form's names were interned into.
+/// @return The core tree, or the leftmost failure.
 template <int MaxNodes = default_max_nodes,
           int MaxChildren = default_max_children, int DatumNodes, int DatumList,
           class SymbolTable>
@@ -743,38 +1058,13 @@ template <int MaxNodes = default_max_nodes,
 elaborate(reader::datum_tree<DatumNodes, DatumList> const &form,
           SymbolTable &symbols)
     -> foundation::result<core::core_tree<MaxNodes, MaxChildren>> {
-    static_assert(MaxChildren >= 3,
-                  "a core node must hold an if's three arms and a pair's two "
-                  "halves");
     using out_tree = core::core_tree<MaxNodes, MaxChildren>;
-    using context = detail::emit_context<MaxNodes, MaxChildren, DatumNodes,
-                                         DatumList, SymbolTable>;
+    out_tree out;
     return foundation::and_then(
-        detail::lower_atoms(form, symbols),
-        [&symbols](detail::lowered_tree<DatumNodes, DatumList> const &lowered)
-            -> foundation::result<out_tree> {
-            if (lowered.root() < 0) {
-                return foundation::parse_error{{}, "form has no root"};
-            }
-            auto const plans =
-                detail::plan_nodes(lowered, detail::resolve_operators(symbols));
-            out_tree out;
-            context ctx{lowered, plans, symbols, out};
-            // The paramorphism: bottom-up over the source, each node's
-            // carrier its emitted core index, each layer arriving with
-            // its child slots already emitted. Its return value is the
-            // root's index, which is the one fact the caller needs.
-            return foundation::and_then(
-                foundation::para_short<int>(
-                    lowered,
-                    [&ctx](typename context::source_tree const &tree, int index,
-                           typename context::layer const &layer) {
-                        return detail::emit_node(ctx, tree, index, layer);
-                    }),
-                [&out](int root) -> foundation::result<out_tree> {
-                    out.set_root(root);
-                    return out;
-                });
+        elaborate_into(form, symbols, out),
+        [&out](int root) -> foundation::result<out_tree> {
+            out.set_root(root);
+            return out;
         });
 }
 // 53eabd7c-d0c2-4f0e-a63b-3260a0151044 end

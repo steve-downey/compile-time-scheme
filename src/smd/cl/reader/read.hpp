@@ -12,6 +12,7 @@
 #include <smd/cl/reader/readtable.hpp>
 #include <smd/cl/reader/token.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
+#include <smd/cl/symbol/symbol_table.hpp>
 
 #include <algorithm>
 #include <array>
@@ -137,26 +138,16 @@ add_branch_checked(Ctx &ctx, datum_branch kind,
     return ctx.tree.add_branch(kind, std::move(children));
 }
 
-/// Interns @p name, surfacing a full symbol table or name pool as a @ref
-/// foundation::parse_error rather than tripping the table's asserts.
-/// Reading a name that is already interned needs no capacity and always
-/// succeeds with the existing id.
-template <class Ctx>
-[[nodiscard]] constexpr auto intern_checked(Ctx &ctx, std::string_view name,
-                                            foundation::source_pos where)
-    -> foundation::result<symbol::symbol_id> {
-    if (auto const existing = ctx.symbols.find(name)) {
-        return *existing;
-    }
-    if (ctx.symbols.size() >= ctx.symbols.capacity()) {
-        return foundation::parse_error{where, "symbol table full"};
-    }
-    if (ctx.symbols.name_chars_used() + static_cast<int>(name.size()) >
-        ctx.symbols.name_chars_capacity()) {
-        return foundation::parse_error{where, "symbol name storage full"};
-    }
-    return ctx.symbols.intern(name);
-}
+/// Interning that diagnoses a full table or name pool rather than tripping
+/// the table's asserts.
+///
+/// It lived here until the elaborator and then the evaluator wanted copies
+/// of it; it is now @ref symbol::intern_checked, and takes the table rather
+/// than a read context. Note that the two definitions could not coexist —
+/// while both existed, every call here was ambiguous, because the context's
+/// own template argument puts @c smd::cl::symbol among its associated
+/// namespaces.
+using symbol::intern_checked;
 
 template <class Ctx>
 [[nodiscard]] constexpr auto read_node(cursor cur, Ctx &ctx)
@@ -479,7 +470,7 @@ template <class Ctx>
             auto const view = token.value.view();
             bool const keyword = !token.value.has_escape && view.size() > 1 &&
                                  view.front() == ':';
-            return and_then(intern_checked(ctx, view, where),
+            return and_then(intern_checked(ctx.symbols, view, where),
                             [&](symbol::symbol_id id)
                                 -> foundation::result<parse_state<int>> {
                                 return finish(

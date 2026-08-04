@@ -51,6 +51,13 @@ class static_vector {
         requires std::convertible_to<std::ranges::range_reference_t<R>, T>
     constexpr auto append_range(R &&range) -> void;
 
+    /// Removes the last element.
+    ///
+    /// Added in step R5 for the evaluator's continuation stack, which is the
+    /// first client that pops: every earlier client only grew.
+    /// @pre !empty()
+    constexpr auto pop_back() -> void;
+
     /// Returns the current number of elements.
     [[nodiscard]] constexpr auto size() const -> int;
 
@@ -111,6 +118,12 @@ constexpr auto static_vector<T, Capacity>::append_range(R &&range) -> void {
     for (auto &&element : range) { // substrate generic algorithm
         push_back(std::forward<decltype(element)>(element));
     }
+}
+
+template <class T, int Capacity>
+constexpr auto static_vector<T, Capacity>::pop_back() -> void {
+    assert(size_ > 0);
+    --size_;
 }
 
 template <class T, int Capacity>

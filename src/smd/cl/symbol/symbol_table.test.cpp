@@ -186,3 +186,53 @@ static_assert([] {
            t.function(a) == std::optional{function_slot{2}} &&
            t.macro(a) == std::optional{macro_slot{3}};
 }());
+
+// ------------------------------------------------------------------
+// intern_checked: the same operation, diagnosing instead of asserting
+// ------------------------------------------------------------------
+
+namespace {
+
+// A table with room for exactly two short names.
+using tiny =
+    smd::cl::symbol::symbol_table<value_slot, function_slot, macro_slot, 2, 4>;
+
+// Interning a name the table already holds needs no capacity, so it succeeds
+// even when the table is full — which is what makes the checked form usable
+// on every symbol a form mentions rather than only on new ones.
+constexpr auto rejects_only_what_needs_room() -> bool {
+    tiny t;
+    auto const first = smd::cl::symbol::intern_checked(t, "ab");
+    auto const second = smd::cl::symbol::intern_checked(t, "cd");
+    auto const again = smd::cl::symbol::intern_checked(t, "ab");
+    auto const third = smd::cl::symbol::intern_checked(t, "ef");
+    return first.has_value() && second.has_value() && again.has_value() &&
+           again.value() == first.value() && !third.has_value();
+}
+
+// The two capacities are separate, and each is diagnosed on its own.
+constexpr auto a_full_name_pool_is_diagnosed() -> bool {
+    tiny t;
+    return !smd::cl::symbol::intern_checked(t, "abcde").has_value();
+}
+
+// The position it was given travels with the diagnosis, so a reader-level
+// failure keeps its place in the source.
+constexpr auto the_position_survives() -> bool {
+    tiny t;
+    auto const where = smd::cl::foundation::source_pos{7, 1, 8};
+    auto const failed = smd::cl::symbol::intern_checked(t, "abcde", where);
+    return !failed.has_value() && failed.error().where == where;
+}
+
+} // namespace
+
+static_assert(rejects_only_what_needs_room());
+static_assert(a_full_name_pool_is_diagnosed());
+static_assert(the_position_survives());
+
+TEST_CASE("SymbolTableTest - InternCheckedDiagnosesCapacity") {
+    CHECK(rejects_only_what_needs_room());
+    CHECK(a_full_name_pool_is_diagnosed());
+    CHECK(the_position_survives());
+}

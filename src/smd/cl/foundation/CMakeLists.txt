@@ -29,6 +29,7 @@ target_sources(
                 tagged_tree_instances.hpp
                 tagged_tree_schemes.hpp
                 topo_fold.hpp
+                trampoline.hpp
                 traversable.hpp
 )
 
@@ -59,6 +60,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             tagged_tree_instances.test.cpp
             tagged_tree_schemes.test.cpp
             topo_fold.test.cpp
+            trampoline.test.cpp
             traversable.test.cpp
     )
     target_link_libraries(
