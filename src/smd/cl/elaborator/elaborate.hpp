@@ -32,9 +32,11 @@
 /// them is a recursive descent. A @ref smd::cl::foundation::tagged_tree is
 /// built children-before-parent, so its node indices are a topological
 /// order: ascending index order is a bottom-up catamorphism and descending
-/// index order is a top-down propagation. Both are folds over
-/// @c std::views::iota, which is why no pass needs a stack, a visitor that
-/// recurses, or a bound on nesting depth.
+/// index order is a top-down propagation. Both are folds — over the tree's
+/// own node sequence where a pass needs only the nodes, over an index range
+/// where it also has to address a parallel table by node index — which is
+/// why no pass needs a stack, a visitor that recurses, or a bound on
+/// nesting depth.
 ///
 /// - **Atoms** (ascending, @c traverse over the result applicative). Every
 ///   datum atom becomes a @ref smd::cl::core::core_leaf, shape preserved.
@@ -327,9 +329,8 @@ template <int MaxNodes, int MaxList>
 plan_nodes(lowered_tree<MaxNodes, MaxList> const &tree,
            operator_ids const &operators)
     -> foundation::static_vector<node_plan, MaxNodes> {
-    foundation::static_vector<node_plan, MaxNodes> plans;
-    std::ranges::for_each(std::views::iota(0, tree.size()),
-                          [&plans](int) { plans.push_back(node_plan{}); });
+    auto plans = foundation::static_vector<node_plan, MaxNodes>::filled(
+        tree.size(), node_plan{});
     if (tree.root() < 0) {
         return plans;
     }
@@ -657,10 +658,7 @@ template <class Ctx>
 /// A map in which nothing has been emitted yet.
 template <class IndexMap>
 [[nodiscard]] constexpr auto unmapped(int count) -> IndexMap {
-    IndexMap map;
-    std::ranges::for_each(std::views::iota(0, count),
-                          [&map](int) { map.push_back(-1); });
-    return map;
+    return IndexMap::filled(count, -1);
 }
 
 } // namespace detail

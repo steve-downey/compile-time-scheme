@@ -17,37 +17,47 @@
 #include <smd/cl/foundation/applicative.hpp>
 #include <smd/cl/foundation/foldable.hpp>
 #include <smd/cl/foundation/functor.hpp>
+#include <smd/cl/foundation/static_vector.hpp>
 #include <smd/cl/foundation/tagged_tree.hpp>
 #include <smd/cl/foundation/traversable.hpp>
 
+#include <algorithm>
 #include <functional>
 #include <ranges>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 namespace smd::cl::foundation {
 
 /// Functor @c Impl for @ref tagged_tree: maps @p f over the leaf payloads
 /// in ascending node-index order, copying branch tags, child indices, and
 /// the root unchanged, so the mapped tree has identical structure.
+///
+/// Written as what it is — a map over the node sequence — so shape
+/// preservation is structural rather than something the code has to be
+/// read for: @c from_nodes takes the mapped sequence and the same root,
+/// and a @c transform cannot change a sequence's length.
 struct tagged_tree_functor_impl {
     template <class F, class Leaf, class Tag, int MaxNodes, int MaxChildren>
     constexpr auto
     fmap(this auto &&, F &&f,
          tagged_tree<Leaf, Tag, MaxNodes, MaxChildren> const &tree) {
         using B = std::remove_cvref_t<std::invoke_result_t<F &, Leaf const &>>;
-        tagged_tree<B, Tag, MaxNodes, MaxChildren> mapped;
-        std::ranges::for_each(std::views::iota(0, tree.size()), [&](int i) {
-            if (tree.is_leaf(i)) {
-                mapped.add_leaf(std::invoke(f, tree.leaf(i)));
-            } else {
-                mapped.add_branch(tree.branch(i).tag, tree.branch(i).children);
+        using out_tree = tagged_tree<B, Tag, MaxNodes, MaxChildren>;
+        using out_node = typename out_tree::node_type;
+        using in_node =
+            typename tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::node_type;
+        // Dispatches one node's alternatives inside the algebra; it does
+        // not drive the walk, which is the transform below.
+        auto const map_node = [&f](in_node const &node) -> out_node {
+            if (auto const *payload = std::get_if<Leaf>(&node)) {
+                return std::invoke(f, *payload);
             }
-        });
-        if (tree.root() >= 0) {
-            mapped.set_root(tree.root());
-        }
-        return mapped;
+            return std::get<tree_branch<Tag, MaxChildren>>(node);
+        };
+        return out_tree::from_nodes(
+            tree.nodes() | std::views::transform(map_node), tree.root());
     }
 };
 
@@ -69,13 +79,10 @@ struct tagged_tree_foldable_impl {
     fold_map(this auto &&, F &&f,
              tagged_tree<Leaf, Tag, MaxNodes, MaxChildren> const &tree,
              M const &m) {
-        auto acc = m.empty();
-        std::ranges::for_each(std::views::iota(0, tree.size()), [&](int i) {
-            if (tree.is_leaf(i)) {
-                acc = m.combine(std::move(acc), std::invoke(f, tree.leaf(i)));
-            }
-        });
-        return acc;
+        return std::ranges::fold_left(
+            tree.leaves(), m.empty(), [&f, &m](auto acc, Leaf const &payload) {
+                return m.combine(std::move(acc), std::invoke(f, payload));
+            });
     }
 
     template <class F, class Acc, class Leaf, class Tag, int MaxNodes,
@@ -84,13 +91,11 @@ struct tagged_tree_foldable_impl {
     fold_right(this auto &&, F &&f, Acc init,
                tagged_tree<Leaf, Tag, MaxNodes, MaxChildren> const &tree)
         -> Acc {
-        std::ranges::for_each(
-            std::views::iota(0, tree.size()) | std::views::reverse, [&](int i) {
-                if (tree.is_leaf(i)) {
-                    init = f(tree.leaf(i), std::move(init));
-                }
-            });
-        return init;
+        // f is already (element, accumulator) -> accumulator, which is
+        // std::ranges::fold_right's own step signature, so the right fold
+        // is the standard algorithm and not a reversed walk.
+        return std::ranges::fold_right(tree.leaves(), std::move(init),
+                                       std::forward<F>(f));
     }
 };
 
@@ -124,33 +129,42 @@ struct tagged_tree_traversable_impl {
             std::remove_cvref_t<std::invoke_result_t<F &, Leaf const &>>;
         using B = typename effect_type::value_type;
         using out_tree = tagged_tree<B, Tag, MaxNodes, MaxChildren>;
+        using out_node = typename out_tree::node_type;
+        using in_node =
+            typename tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::node_type;
+        using out_nodes = static_vector<out_node, MaxNodes>;
         auto const &tc = applicative_typeclass<effect_type>;
-        auto accumulated = tc.pure(out_tree{});
-        auto const append_leaf = [](out_tree out, B mapped) {
-            out.add_leaf(std::move(mapped));
-            return out;
-        };
-        std::ranges::for_each(std::views::iota(0, tree.size()), [&](int i) {
-            if (tree.is_leaf(i)) {
-                accumulated = tc.invoke(append_leaf, std::move(accumulated),
-                                        std::invoke(f, tree.leaf(i)));
-            } else {
-                accumulated = tc.invoke(
-                    [&branch = tree.branch(i)](out_tree out) {
-                        out.add_branch(branch.tag, branch.children);
-                        return out;
-                    },
-                    std::move(accumulated));
+
+        // Every node maps to an effect carrying its image: a leaf runs f,
+        // a branch is carried by pure, which has no effect of its own. The
+        // two arms are uniform, so the walk below is one fold and not a
+        // conditional.
+        auto const wrap = [](B mapped) { return out_node{std::move(mapped)}; };
+        auto const node_effect = [&f, &tc, &wrap](in_node const &node) {
+            if (auto const *payload = std::get_if<Leaf>(&node)) {
+                return tc.invoke(wrap, std::invoke(f, *payload));
             }
-        });
+            return tc.pure(
+                out_node{std::get<tree_branch<Tag, MaxChildren>>(node)});
+        };
+        auto const append = [](out_nodes acc, out_node node) {
+            acc.push_back(std::move(node));
+            return acc;
+        };
+        // Sequencing the node effects left to right is a left fold in the
+        // applicative — the accumulator is an effect, so effect order is
+        // fold order and nothing else has to state it.
+        auto sequenced = std::ranges::fold_left(
+            tree.nodes(), tc.pure(out_nodes{}),
+            [&](auto accumulated, in_node const &node) {
+                return tc.invoke(append, std::move(accumulated),
+                                 node_effect(node));
+            });
         return tc.invoke(
-            [root = tree.root()](out_tree out) {
-                if (root >= 0) {
-                    out.set_root(root);
-                }
-                return out;
+            [root = tree.root()](out_nodes sequenced_nodes) {
+                return out_tree::from_nodes(sequenced_nodes, root);
             },
-            std::move(accumulated));
+            std::move(sequenced));
     }
 };
 // 8fabe263-2634-4144-abed-f69013131e52 end

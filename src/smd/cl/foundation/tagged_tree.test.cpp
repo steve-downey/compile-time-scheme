@@ -6,6 +6,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <ranges>
+
 using smd::cl::foundation::tagged_tree;
 
 namespace {
@@ -48,11 +53,61 @@ constexpr auto equality_is_structural() -> bool {
     return sample_tree() == sample_tree() && !(sample_tree() == tree{});
 }
 
+constexpr auto nodes_are_the_index_order() -> bool {
+    auto const t = sample_tree();
+    auto const by_index =
+        std::views::iota(0, t.size()) |
+        std::views::transform(
+            [&t](int i) -> tree::node_type const & { return t.node(i); });
+    return std::ranges::size(t.nodes()) == static_cast<std::size_t>(t.size()) &&
+           std::ranges::equal(t.nodes(), by_index);
+}
+
+constexpr auto leaves_are_the_leaf_payloads_in_order() -> bool {
+    // Branches are structure, not elements: (L 1 2 (Q 3)) has three.
+    auto const t = sample_tree();
+    return std::ranges::equal(t.leaves(), std::array{1, 2, 3});
+}
+
+constexpr auto leaves_of_a_branchless_tree() -> bool {
+    tree t;
+    t.set_root(t.add_leaf(42));
+    return std::ranges::equal(t.leaves(), std::array{42});
+}
+
+constexpr auto leaves_of_a_leafless_tree_is_empty() -> bool {
+    tree t;
+    t.set_root(t.add_branch('L', tree::child_list{}));
+    return std::ranges::empty(t.leaves()) && t.size() == 1;
+}
+
+constexpr auto from_nodes_round_trips() -> bool {
+    auto const t = sample_tree();
+    return tree::from_nodes(t.nodes(), t.root()) == t;
+}
+
+constexpr auto from_nodes_without_a_root() -> bool {
+    auto const t = sample_tree();
+    auto const rootless = tree::from_nodes(t.nodes(), -1);
+    return rootless.root() == -1 && rootless.size() == t.size();
+}
+
+constexpr auto from_nodes_of_nothing_is_the_default_tree() -> bool {
+    return tree::from_nodes(tree{}.nodes(), -1) == tree{};
+}
+
 } // namespace
 
 static_assert(builds_and_reads_back());
 static_assert(default_tree_is_empty_and_rootless());
 static_assert(equality_is_structural());
+static_assert(nodes_are_the_index_order());
+static_assert(leaves_are_the_leaf_payloads_in_order());
+static_assert(leaves_of_a_branchless_tree());
+static_assert(leaves_of_a_leafless_tree_is_empty());
+static_assert(from_nodes_round_trips());
+static_assert(from_nodes_without_a_root());
+static_assert(from_nodes_of_nothing_is_the_default_tree());
 
 TEST_CASE("TaggedTreeTest - HeaderIsIdempotent") { REQUIRE(true); }
 
@@ -77,4 +132,20 @@ TEST_CASE("TaggedTreeTest - TreesAreSelfContainedValues") {
     CHECK(original.root() == 4);
     CHECK(copy.root() == 0);
     CHECK(!(copy == original));
+}
+
+TEST_CASE("TaggedTreeTest - NodesAreTheIndexOrder") {
+    CHECK(nodes_are_the_index_order());
+}
+
+TEST_CASE("TaggedTreeTest - LeavesAreTheLeafPayloadsInOrder") {
+    CHECK(leaves_are_the_leaf_payloads_in_order());
+    CHECK(leaves_of_a_branchless_tree());
+    CHECK(leaves_of_a_leafless_tree_is_empty());
+}
+
+TEST_CASE("TaggedTreeTest - FromNodesRoundTrips") {
+    CHECK(from_nodes_round_trips());
+    CHECK(from_nodes_without_a_root());
+    CHECK(from_nodes_of_nothing_is_the_default_tree());
 }

@@ -11,6 +11,9 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <concepts>
+#include <ranges>
+#include <utility>
 
 namespace smd::cl::foundation {
 
@@ -26,11 +29,27 @@ namespace smd::cl::foundation {
 template <class T, int Capacity>
 class static_vector {
   public:
+    /// The element type, named for element-generic code.
+    using value_type = T;
+
     constexpr static_vector() = default;
+
+    /// Returns @p count copies of @p value — the whole of "a vector of
+    /// @p count somethings", so a caller never spells that as a loop or as
+    /// a @c for_each over an index range it then ignores.
+    /// @pre 0 <= count <= Capacity
+    [[nodiscard]] static constexpr auto filled(int count, T value)
+        -> static_vector;
 
     /// Appends @p value to the end.
     /// @pre size() < Capacity
     constexpr auto push_back(T value) -> void;
+
+    /// Appends the elements of @p range, in order.
+    /// @pre size() + the range's length <= Capacity
+    template <std::ranges::input_range R>
+        requires std::convertible_to<std::ranges::range_reference_t<R>, T>
+    constexpr auto append_range(R &&range) -> void;
 
     /// Returns the current number of elements.
     [[nodiscard]] constexpr auto size() const -> int;
@@ -69,10 +88,29 @@ class static_vector {
 };
 
 template <class T, int Capacity>
+constexpr auto static_vector<T, Capacity>::filled(int count, T value)
+    -> static_vector {
+    assert(count >= 0 && count <= Capacity);
+    static_vector result;
+    result.size_ = count;
+    std::ranges::fill(result, std::move(value));
+    return result;
+}
+
+template <class T, int Capacity>
 constexpr auto static_vector<T, Capacity>::push_back(T value) -> void {
     assert(size_ < Capacity);
     storage_[size_] = std::move(value);
     ++size_;
+}
+
+template <class T, int Capacity>
+template <std::ranges::input_range R>
+    requires std::convertible_to<std::ranges::range_reference_t<R>, T>
+constexpr auto static_vector<T, Capacity>::append_range(R &&range) -> void {
+    for (auto &&element : range) { // substrate generic algorithm
+        push_back(std::forward<decltype(element)>(element));
+    }
 }
 
 template <class T, int Capacity>

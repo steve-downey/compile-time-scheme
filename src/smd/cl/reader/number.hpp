@@ -97,17 +97,15 @@ namespace detail {
                                                 int radix, bool negative)
     -> classified_number {
     constexpr long long fixnum_limit = 2147483648LL; // |INT_MIN|
-    long long magnitude = 0;
-    bool big = false;
-    std::ranges::for_each(text, [&](char c) {
-        if (!big) {
-            magnitude = magnitude * radix + digit_value(c);
-            if (magnitude > fixnum_limit) {
-                big = true;
-            }
-        }
-    });
-    if (big || (magnitude == fixnum_limit && !negative)) {
+    // Horner's rule is a left fold. The accumulator saturates rather than
+    // carrying a separate overflow flag: once it is past the fixnum limit
+    // the answer is `bignum` whatever the remaining digits say, and
+    // freezing it there is also what keeps the multiply from overflowing.
+    long long const magnitude =
+        std::ranges::fold_left(text, 0LL, [radix](long long acc, char c) {
+            return acc > fixnum_limit ? acc : acc * radix + digit_value(c);
+        });
+    if (magnitude > fixnum_limit || (magnitude == fixnum_limit && !negative)) {
         return classified_number{number_class::bignum, 0};
     }
     return classified_number{

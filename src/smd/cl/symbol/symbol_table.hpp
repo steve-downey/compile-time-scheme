@@ -296,7 +296,7 @@ constexpr auto symbol_table<ValueSlot, FunctionSlot, MacroSlot, MaxSymbols,
     e.name_offset = chars_.size();
     e.name_length = static_cast<int>(name.size());
     e.interned = interned;
-    std::ranges::for_each(name, [this](char c) { chars_.push_back(c); });
+    chars_.append_range(name);
     entries_.push_back(std::move(e));
     return symbol_id{entries_.size() - 1};
 }

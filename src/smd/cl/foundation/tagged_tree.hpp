@@ -10,6 +10,9 @@
 #include <smd/cl/foundation/static_vector.hpp>
 
 #include <cassert>
+#include <concepts>
+#include <ranges>
+#include <span>
 #include <utility>
 #include <variant>
 
@@ -71,6 +74,23 @@ class tagged_tree {
 
     constexpr tagged_tree() = default;
 
+    /// Builds a tree from a node sequence and a root index, in that order.
+    ///
+    /// This is the assembly half of every shape-preserving algorithm over a
+    /// tree: map @ref nodes to a new node sequence, hand it back here with
+    /// the same root, and the result has the same shape by construction —
+    /// same node count, same indices, so the copied child lists still name
+    /// the nodes they named before. Nothing has to walk an index range to
+    /// arrange that.
+    ///
+    /// @pre the range's length is <= @p MaxNodes
+    /// @pre @p root is -1 (no root) or an index into the range
+    template <std::ranges::input_range R>
+        requires std::convertible_to<std::ranges::range_reference_t<R>,
+                                     node_type>
+    [[nodiscard]] static constexpr auto from_nodes(R &&node_range, int root)
+        -> tagged_tree;
+
     /// Appends a leaf node and returns its index.
     /// @pre size() < capacity()
     constexpr auto add_leaf(Leaf leaf) -> int;
@@ -97,6 +117,22 @@ class tagged_tree {
     /// Returns @p MaxChildren, the per-branch child capacity.
     [[nodiscard]] constexpr auto max_children() const -> int;
 
+    /// Returns the nodes in index order.
+    ///
+    /// This is the sequence an algorithm over a whole tree is written
+    /// against, and the reason none of them needs an index range of its
+    /// own: construction is children-before-parent, so index order is a
+    /// topological order, and a walk in that order is an ascending walk.
+    [[nodiscard]] constexpr auto nodes() const -> std::span<node_type const>;
+
+    /// Returns the leaf payloads in index order, as a view over @ref nodes.
+    ///
+    /// This is the element sequence of the Foldable and Traversable
+    /// instances in <smd/cl/foundation/tagged_tree_instances.hpp>: a fold
+    /// sees leaves, because branches are structure and not elements. The
+    /// documented traversal order is this view's order.
+    [[nodiscard]] constexpr auto leaves() const;
+
     /// Returns the node at @p index.
     /// @pre 0 <= index < size()
     [[nodiscard]] constexpr auto node(int index) const -> node_type const &;
@@ -122,6 +158,21 @@ class tagged_tree {
     int root_{-1};
 };
 // 673865b0-7d8f-4e49-a11e-1bc747348df5 end
+
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+template <std::ranges::input_range R>
+    requires std::convertible_to<
+        std::ranges::range_reference_t<R>,
+        std::variant<Leaf, tree_branch<Tag, MaxChildren>>>
+constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::from_nodes(
+    R &&node_range, int root) -> tagged_tree {
+    tagged_tree built;
+    built.nodes_.append_range(std::forward<R>(node_range));
+    if (root >= 0) {
+        built.set_root(root);
+    }
+    return built;
+}
 
 template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
 constexpr auto
@@ -169,6 +220,22 @@ template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
 constexpr auto
 tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::max_children() const -> int {
     return MaxChildren;
+}
+
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::nodes() const
+    -> std::span<node_type const> {
+    return std::span<node_type const>{nodes_.begin(), nodes_.end()};
+}
+
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::leaves() const {
+    return nodes() | std::views::filter([](node_type const &n) {
+               return std::holds_alternative<Leaf>(n);
+           }) |
+           std::views::transform([](node_type const &n) -> Leaf const & {
+               return std::get<Leaf>(n);
+           });
 }
 
 template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
