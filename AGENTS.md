@@ -68,10 +68,19 @@ rules apply to them, and they are routinely conflated.
   Every blog post resolves its transclusions against its own `blog/phase-NN` tag
   (`docs/blog/pins.md`), so a later step may move, rename, reformat, or delete an
   anchored region without owing anything to already-published prose.
-- Never delete or nest an existing anchor pair. That is the whole of the anchor
-  rule; there is no prohibition on editing between the markers.
+- An anchor set belongs to the step that lands it (decision D21). You may delete,
+  move, split, merge or nest any existing pair in a file you own, whenever that
+  serves the code. There is no duty of care toward an anchor just because it is
+  already there, and none toward already-published prose, which resolves against
+  its own tag.
+- The whole of the anchor rule is now empirical: the set must **parse at your
+  merge commit**, meaning `scripts/verify-transclusions.sh` is green there.
+  Nesting is not checked and is not an error; it only puts the inner markers
+  inside the outer region's transcluded text, which is the post drafter's
+  legibility problem, not a violation.
 - New anchors must be real `uuidgen` output, and must exist at the step's merge
   commit — a post pinned to that tag can only transclude anchors present there.
+  A later post wanting a region nobody anchored places its own anchors.
 - `src/smd/smdscheme/**` is frozen for semantic changes (decision D1), anchored or
   not. Read it, copy from it, link it; do not edit it. A frozen-tree edit needs a
   divergence doc and orchestrator sign-off.
