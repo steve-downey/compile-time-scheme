@@ -114,7 +114,7 @@ When older slideware guidance conflicts with these defaults, this file wins.
 - Do not transclude include guards, duplicate includes, or physical boilerplate.
 - Prefer short executable examples for transclusion.
 - One UUID block should represent one slide concept.
-- Do not nest UUID blocks.
+- Prefer not to nest UUID blocks, since the inner markers show up inside the outer region's transcluded text. In this repository this is a legibility preference and not a rule: decision D21 (`docs/cl-rebuild-plan.md`) makes the anchor set the property of the step that lands it, obliging only that it parses at that step's merge.
 - Do not invent illustrative code that does not compile.
 - Prefer example files under `src/smd/typeclass/examples/` for slide snippets over transcluding production headers directly.
 

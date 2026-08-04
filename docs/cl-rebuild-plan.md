@@ -48,6 +48,7 @@ Overturning one requires a divergence doc and orchestrator sign-off, as with D1�
 **D11 — The `smdscheme` freeze is retired.**
 D1's semantic freeze on `src/smd/smdscheme/**` is lifted.
 Its rationale was superseded by per-post tag pinning; the anchor rules themselves are unchanged (do not delete or nest an existing anchor pair, new anchors must be real `uuidgen` output).
+(The delete-or-nest half of that parenthesis is itself retired by D21, 2026-08-03; only the `uuidgen` requirement survives.)
 `smdscheme` is still not a dumping ground: it remains the Scheme front end, and the rebuild happens in a new tree.
 What changes is that a fix to shared `foundation` code is now an ordinary change rather than a divergence-doc event.
 DIV-0012 and DIV-0016 close as a consequence.
@@ -149,6 +150,23 @@ The draft is then reviewed by a second, clean agent running the `voice` skill, s
 That rule is already in force for commit and PR messages (`AGENTS.md`); a post is longer prose with more room to drift, so it is not the place to relax it.
 
 Three agents, none reading another's conversation: implement, draft, review.
+
+**D21 — An anchor set belongs to the step that lands it, not to the steps before it.**
+Recorded 2026-08-03, retiring the "never delete or nest an existing anchor pair" rule that D11 carried forward unchanged.
+
+The prohibition dates from the era when transclusions resolved against the worktree, where moving an anchor silently rewrote a published post.
+Per-post tag pinning ended that on 2026-07-25, and `scripts/verify-transclusions.sh` has said so in its own header ever since: a post's code is frozen at the revision its prose was written against, "so later refactors may freely move or delete anchors without owing the published past anything."
+The rule outlived its reason by two decisions.
+`AGENTS.md` already records that an over-broad reading of it caused a worker twice to design around a constraint that does not exist, which is the cost of leaving a dead rule standing in a document agents are required to read.
+
+A step may therefore delete, move, split, merge or nest any anchor pair in the files it owns, whenever that serves the code.
+One obligation replaces the prohibition, and it is empirical rather than editorial: **the anchor set must parse at the step's own merge commit**, which means `scripts/verify-transclusions.sh` is green there.
+Nesting is not checked and is not an error — a nested pair merely puts the inner markers inside the outer region's transcluded text, which is a legibility question for whoever drafts the post rather than a rule violation.
+
+Two things are unchanged.
+New anchors are real `uuidgen` output.
+Every phase still lands anchors around the regions that are its centre and names them in its successor brief (D20), because a post pinned to a merge can only transclude what is anchored there.
+A later post that wants to discuss a region nobody anchored places its own anchors and transcludes those.
 
 ---
 
@@ -325,7 +343,7 @@ What follows is only the per-phase sequence, which D20 fixes.
 **1. The implementing step lands its own UUID anchors.**
 An anchored region must exist at the commit its post pins to, and the post pins to the step's merge, so the anchors have to arrive with the code.
 The implementer is also the one who knows which regions are the step's centre.
-Anchors are real `uuidgen` output; an existing pair is never deleted or nested; the step brief records which regions got them.
+Anchors are real `uuidgen` output; the step brief records which regions got them; the set must leave `scripts/verify-transclusions.sh` green at the merge (D21, which retired the older rule that an existing pair is never deleted or nested).
 A step that lands no anchors leaves its post nothing to transclude, which is how R1–R4 ended up needing the backfill in `docs/blog-backfill-plan.md`.
 
 **2. The orchestrator tags the `--no-ff` merge, before dispatching anyone.**

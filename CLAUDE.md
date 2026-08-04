@@ -18,7 +18,7 @@ source string -> reader datum tree -> elaborated core tree
 
 The reader parses data but does not classify special forms. The elaborator recognizes the language's special operators. CPS is the semantic center. The closure backend is the stable demo path. The sender backend uses Beman Execution vendored as a git submodule at `vendor/execution`. Reflection is isolated until explicitly integrated.
 
-**The D1 freeze on `src/smd/smdscheme/**` is retired** by decision D11 (`docs/cl-rebuild-plan.md`). Its rationale — that published blog phases transclude live code — was superseded when posts moved to `orgit-file:` links pinned to `blog/phase-NN` tags (`docs/blog/pins.md`). The UUID anchor rules are unchanged: do not delete or nest an existing anchor pair. `src/smd/smdlisp/**` is frozen from step R1 onward for a different reason — it is the behavioural oracle for the rebuild — and is never edited.
+**The D1 freeze on `src/smd/smdscheme/**` is retired** by decision D11 (`docs/cl-rebuild-plan.md`). Its rationale — that published blog phases transclude live code — was superseded when posts moved to `orgit-file:` links pinned to `blog/phase-NN` tags (`docs/blog/pins.md`). The UUID anchor rules have since been relaxed too, by decision D21: an anchor set belongs to the step that lands it, and the only surviving obligation is that it parses at that step's merge. `src/smd/smdlisp/**` is frozen from step R1 onward for a different reason — it is the behavioural oracle for the rebuild — and is never edited.
 
 Plans and status:
 
@@ -117,9 +117,9 @@ Do not create split `include/`, `src/`, and `tests/` trees.
 
 ## UUID anchors and org-transclusion
 
-Source files contain UUID-delimited blocks (e.g., `// 44cc988c-7353-43aa-a7d3-8840f92371a6`) used by org-transclusion to embed live code in `schemepoc.org` and in the blog posts under `docs/blog/`. Do not delete or nest existing UUID anchor pairs; new anchors must be real `uuidgen` output.
+Source files contain UUID-delimited blocks (e.g., `// 44cc988c-7353-43aa-a7d3-8840f92371a6`) used by org-transclusion to embed live code in `schemepoc.org` and in the blog posts under `docs/blog/`. New anchors must be real `uuidgen` output.
 
-Editing *between* the markers is allowed — the prohibition is only on deleting or nesting the pairs themselves. Blog posts resolve transclusions against their own `blog/phase-NN` tag (`docs/blog/pins.md`), so an anchored region can be changed later. The binding constraint on `src/smd/smdscheme/**` is the D1 frozen-tree rule above, not the anchors. See `AGENTS.md` for the full statement; do not restate either rule in stronger form.
+An anchor set belongs to the step that lands it (decision D21). A step may delete, move, split, merge or nest any existing pair in a file it owns; there is no duty of care toward an anchor because it already exists. Blog posts resolve transclusions against their own `blog/phase-NN` tag (`docs/blog/pins.md`), so no edit here can reach published prose, and a later post wanting a region nobody anchored places its own anchors. The one surviving obligation is empirical: the anchor set must parse at the step's merge, meaning `scripts/verify-transclusions.sh` is green there. See `AGENTS.md` for the full statement; do not restate it in stronger form.
 
 ## Infrastructure
 
