@@ -3,6 +3,9 @@
 #ifndef SRC_SMD_CL_SYMBOL_SYMBOL_TABLE_HPP
 #define SRC_SMD_CL_SYMBOL_SYMBOL_TABLE_HPP
 
+#include <smd/cl/foundation/parse_error.hpp>
+#include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/source_pos.hpp>
 #include <smd/cl/foundation/static_vector.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
 
@@ -317,6 +320,41 @@ constexpr auto symbol_table<ValueSlot, FunctionSlot, MacroSlot, MaxSymbols,
     assert(id.valid() && id.index() < entries_.size());
     return entries_[id.index()];
 }
+
+// c589354c-b5fe-4109-9eb9-31c9929ae887
+/// Interns @p name in @p symbols, surfacing a full table or a full name pool
+/// as a @ref foundation::parse_error at @p where rather than tripping
+/// @ref symbol_table's capacity asserts. Interning a name the table already
+/// holds needs no capacity and always succeeds.
+///
+/// Promoted here in step R5. The reader and the elaborator had each grown a
+/// private copy and the evaluator wanted a third, which is the same signal
+/// that promoted `foundation/` in R1. It belongs beside the table because
+/// only the table knows what "full" means, and it is a free function rather
+/// than a member because the checked form is a policy — diagnose, do not
+/// assert — and the unchecked member is still the right call once a caller
+/// has established there is room.
+///
+/// @tparam SymbolTable A table offering @c find, @c intern and the capacity
+///                     observers of @ref symbol_table.
+template <class SymbolTable>
+[[nodiscard]] constexpr auto intern_checked(SymbolTable &symbols,
+                                            std::string_view name,
+                                            foundation::source_pos where = {})
+    -> foundation::result<symbol_id> {
+    if (auto const existing = symbols.find(name)) {
+        return *existing;
+    }
+    if (symbols.size() >= symbols.capacity()) {
+        return foundation::parse_error{where, "symbol table full"};
+    }
+    if (symbols.name_chars_used() + static_cast<int>(name.size()) >
+        symbols.name_chars_capacity()) {
+        return foundation::parse_error{where, "symbol name storage full"};
+    }
+    return symbols.intern(name);
+}
+// c589354c-b5fe-4109-9eb9-31c9929ae887 end
 
 } // namespace smd::cl::symbol
 
