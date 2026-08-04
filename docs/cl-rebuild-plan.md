@@ -53,6 +53,12 @@ Its rationale was superseded by per-post tag pinning; the anchor rules themselve
 What changes is that a fix to shared `foundation` code is now an ordinary change rather than a divergence-doc event.
 DIV-0012 and DIV-0016 close as a consequence.
 
+Practical status, recorded 2026-08-03: lifting the freeze did not make the tree editable in fact.
+`smdscheme` is dead-ended and will be deleted from trunk at some point.
+A bug found there is fixed in `src/smd/cl/**`; reuse is by copy out of `smdscheme`, never by refactoring in place.
+The difference D11 still makes is that none of this needs a divergence doc — the reason not to edit the tree is that there is no good reason to, which is a weaker and more honest thing than a freeze.
+`AGENTS.md` § "Which trees you may edit" carries the operative statement for all three trees.
+
 **D12 — Symbols are interned objects with slots.**
 A symbol is an entry in a symbol table, referred to by a stable id, carrying a name, a value slot, a function slot, and a macro slot.
 Identity is id comparison, not string comparison.

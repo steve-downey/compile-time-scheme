@@ -63,20 +63,15 @@ wrong contents.
 - Rewrite your lane's step brief for the next clean agent, per the step-brief contract
   above.
 
-## UUID anchors and the frozen Scheme tree
+## UUID anchors
 
-Source files carry UUID-delimited blocks used by org-transclusion. Two different
-rules apply to them, and they are routinely conflated.
+Source files carry UUID-delimited blocks used by org-transclusion.
 
-- Inside `src/smd/smdlisp/**`, you **may** edit the contents of an anchored region.
-  Every blog post resolves its transclusions against its own `blog/phase-NN` tag
-  (`docs/blog/pins.md`), so a later step may move, rename, reformat, or delete an
-  anchored region without owing anything to already-published prose.
 - An anchor set belongs to the step that lands it (decision D21). You may delete,
   move, split, merge or nest any existing pair in a file you own, whenever that
   serves the code. There is no duty of care toward an anchor just because it is
   already there, and none toward already-published prose, which resolves against
-  its own tag.
+  its own `blog/phase-NN` tag (`docs/blog/pins.md`).
 - The whole of the anchor rule is now empirical: the set must **parse at your
   merge commit**, meaning `scripts/verify-transclusions.sh` is green there.
   Nesting is not checked and is not an error; it only puts the inner markers
@@ -85,13 +80,25 @@ rules apply to them, and they are routinely conflated.
 - New anchors must be real `uuidgen` output, and must exist at the step's merge
   commit — a post pinned to that tag can only transclude anchors present there.
   A later post wanting a region nobody anchored places its own anchors.
-- `src/smd/smdscheme/**` is frozen for semantic changes (decision D1), anchored or
-  not. Read it, copy from it, link it; do not edit it. A frozen-tree edit needs a
-  divergence doc and orchestrator sign-off.
-
-Do not restate this rule in a step brief in stronger form than it is written here.
+Do not restate these in a step brief in stronger form than they are written here.
 An over-broad "never edit inside a UUID anchor block" has twice caused a worker to
 design around a constraint that does not exist.
+
+## Which trees you may edit
+
+Three trees, three different reasons, and only one of them is a rule.
+
+- `src/smd/cl/**` is the live tree. The rebuild happens here, and this is where a
+  fix belongs whatever tree the bug was found in.
+- `src/smd/smdlisp/**` is the behavioural oracle for the rebuild and is **never
+  edited**, from step R1 onward. That one is the rule. A disagreement between it
+  and `cl` is evidence to be explained, not a merge conflict to be resolved.
+- `src/smd/smdscheme/**` is no longer frozen by rule — decision D1 was retired by
+  D11 — but do not edit it. It is dead-ended and will be deleted from trunk at some
+  point. Read it, link it, copy from it; reuse is by copy into `cl`, never by
+  refactoring in place. If you find a bug in it, fix the bug in `cl` and leave
+  `smdscheme` as it stands. There is no divergence doc to file here, because there
+  is no good reason to touch it in the first place.
 
 ## The blog deliverable
 

@@ -18,12 +18,14 @@ source string -> reader datum tree -> elaborated core tree
 
 The reader parses data but does not classify special forms. The elaborator recognizes the language's special operators. CPS is the semantic center. The closure backend is the stable demo path. The sender backend uses Beman Execution vendored as a git submodule at `vendor/execution`. Reflection is isolated until explicitly integrated.
 
-**The D1 freeze on `src/smd/smdscheme/**` is retired** by decision D11 (`docs/cl-rebuild-plan.md`). Its rationale — that published blog phases transclude live code — was superseded when posts moved to `orgit-file:` links pinned to `blog/phase-NN` tags (`docs/blog/pins.md`). The UUID anchor rules have since been relaxed too, by decision D21: an anchor set belongs to the step that lands it, and the only surviving obligation is that it parses at that step's merge. `src/smd/smdlisp/**` is frozen from step R1 onward for a different reason — it is the behavioural oracle for the rebuild — and is never edited.
+**The D1 freeze on `src/smd/smdscheme/**` is retired** by decision D11 (`docs/cl-rebuild-plan.md`). Its rationale — that published blog phases transclude live code — was superseded when posts moved to `orgit-file:` links pinned to `blog/phase-NN` tags (`docs/blog/pins.md`). The UUID anchor rules have since been relaxed too, by decision D21: an anchor set belongs to the step that lands it, and the only surviving obligation is that it parses at that step's merge.
+
+Retiring the freeze did not make `smdscheme` editable in practice, and `AGENTS.md` § "Which trees you may edit" is authoritative on all three trees. `src/smd/cl/**` is the live tree. `src/smd/smdlisp/**` is the behavioural oracle for the rebuild, from step R1 onward, and is never edited — that one is a rule. `src/smd/smdscheme/**` is dead-ended and slated for deletion from trunk: read it, link it, copy from it, but fix bugs in `cl` rather than there.
 
 Plans and status:
 
 - `checklist.md` — step-by-step status for the original steps, the Common Lisp pivot, and the rebuild.
-- `docs/cl-rebuild-plan.md` — the active plan, its decision records (D11–D17), and the phase list R0–R8.
+- `docs/cl-rebuild-plan.md` — the active plan, its decision records (D11–D21), and the phase list R0–R8.
 - `docs/cl-pivot-plan.md` — the pivot plan (decision records D1–D10). Still authoritative for how the current `smdlisp` got its shape; its step list is finished. Read by named section on demand, never wholesale.
 - `docs/blog-backfill-plan.md` — the arrears: phases 23–27, for steps R0–R4, which landed without posts. Steps B5–B11.
 - `docs/backlog/` — identified-but-unscheduled work, one file per item. Not a plan and not an agent read path; consult it only when deciding what to schedule next.
