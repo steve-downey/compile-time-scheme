@@ -42,6 +42,7 @@ The top-level Makefile drives all workflow. Do not bypass it for normal work.
 make                    # default: build and run all tests (Asan config)
 make compile            # compile only
 make test               # rebuild and run tests
+make test-matrix        # rebuild and run tests in Debug (-O0) then Asan (-O3)
 make ctest              # run CTest on current build without rebuilding
 make lint               # run pre-commit linters (clang-format, gersemi, markdownlint, codespell, etc.)
 make coverage           # build with Gcov profile and generate coverage report
@@ -54,6 +55,8 @@ make help               # show all targets
 Selecting a different compiler: `make TOOLCHAIN=gcc-17` or `make TOOLCHAIN=clang-23`. Default is `gcc-16`. Prefer the newest available toolchains (trunk is fine) over compromising on technique; toolchain files live in `etc/`.
 
 Selecting a build config: `make CONFIG=RelWithDebInfo` (default is `Asan`). Available: `RelWithDebInfo`, `Debug`, `Tsan`, `Asan`, `Gcov`.
+
+Note that `Asan` is `-O3 -g -fsanitize=address,undefined,leak` — the most optimized configuration routinely run, not a debug build. `Debug` is the `-O0` one. The two witness different defect classes and neither subsumes the other, so a step merges on `make test-matrix`, not `make test`. `docs/verification-matrix.md` is the reasoning and the evidence.
 
 Tooling (cmake, ninja, pre-commit, clang-format, gcovr) is managed by `uv` and installed into a local `.venv`.
 

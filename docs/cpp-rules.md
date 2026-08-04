@@ -39,6 +39,11 @@ Every source file opens with the repo-relative path and Emacs mode line, then SP
 - **An iteration is an algorithm.**
   Use `std::ranges` algorithms, views, and folds, or the foundation's short-circuiting fold when early exit is needed.
   A raw `for`/`while` loop is permitted only inside the substrate's own generic algorithms; anywhere else it is a defect, not a style nit.
+- **An index range is not a loop counter, and `for_each` is rarely the algorithm.**
+  `for_each(views::iota(0, c.size()), ...)` that only indexes back into `c` is a hand-written loop wearing an algorithm's clothes, and it is usually a symptom: the container is not a range.
+  Fix the container first — give it the sequence the algorithms want (`nodes()`, `leaves()`) — and the callers become `transform`, `fold_left`, `fold_right`.
+  Reach for `iota` only where the index is itself data, such as an address into a parallel table.
+  Two more tells: a `for_each` whose lambda ignores its parameter is a fill, and a `for_each` that mutates a captured accumulator is a fold.
 - **A recursion over a tree is a catamorphism.**
   Consume recursive structure by passing an algebra to the substrate's fold (`mendler_para`, the Foldable and Traversable instances), not by hand-written recursive descent.
   A new operation over an AST is a new algebra, not a new `switch` or another wide `std::visit` ladder.
@@ -69,6 +74,14 @@ Every source file opens with the repo-relative path and Emacs mode line, then SP
 - The first two moves in every test file: double-include the component header, then a bootstrap test that always passes.
 - Law tests — Functor, Applicative, Traversable identities, shape preservation, effect order — come before any other substantive test.
 - `constexpr` contracts get compile-time tests alongside the runtime ones.
+- **A contract is witnessed three ways, not two.**
+  A `static_assert`, an `-O0` run (`CONFIG=Debug`), and an optimized sanitizer run (`CONFIG=Asan`, which is `-O3`).
+  These are three evaluators with three bug classes and none subsumes another: constant evaluation lowers nothing to a builtin, `-O0` never folds, `-O3` is where the sanitizers have anything to trap and is also the only place a constant-folding defect appears.
+  Both of those have already cost this project a defect, in opposite directions — see `docs/verification-matrix.md`.
+  `make test-matrix` runs the pair; `make test` alone is the `Asan` leg only.
+- **Never leave the order of two side-effecting calls to argument evaluation.**
+  `g(f(a), f(b))` does not sequence the two `f` calls, and if effect order is part of a documented contract — as traversal order always is here — then the contract is being left to the optimizer.
+  Sequence them into named locals and combine those.
 - A test may pin a `scope-decision` divergence; a test must never pin a `defect` (decision D16).
 
 ## Final check on the code you just wrote

@@ -76,3 +76,14 @@ jobs:
         run: |
           source .venv/bin/activate
           make ctest
+
+      # Debug is -O0, the default Asan config is -O3, and neither witnesses
+      # what the other does. The step above is the Asan leg; without this one
+      # nothing on the Makefile path ever runs unoptimized, and an unspecified
+      # evaluation order that the optimizer happens to resolve correctly is
+      # invisible. See docs/verification-matrix.md.
+      - name: Test (Debug, -O0)
+        shell: bash
+        run: |
+          source .venv/bin/activate
+          make CONFIG=Debug test
