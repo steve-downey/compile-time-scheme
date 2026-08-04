@@ -43,7 +43,17 @@ struct pair_box_foldable_impl {
     template <class F, class T, class M>
     constexpr auto fold_map(this auto &&, F &&f, pair_box<T> const &pb,
                             M const &m) {
-        return m.combine(f(pb.first), f(pb.second));
+        // Sequenced deliberately. As arguments to one call the two f
+        // invocations are unsequenced, and the derived fold_left observes
+        // their order — it passes fold_map an f that updates an
+        // accumulator. gcc-14 -O0 ran them right to left and fold_left
+        // yielded 21 where the documented order says 12, while -O1, clang,
+        // and every constant evaluation ran them left to right. Traversal
+        // order is part of the instance contract, so it is stated here
+        // rather than left to the compiler.
+        auto first_image = f(pb.first);
+        auto second_image = f(pb.second);
+        return m.combine(std::move(first_image), std::move(second_image));
     }
 
     template <class F, class Acc, class T>
