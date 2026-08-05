@@ -32,6 +32,13 @@ class static_vector {
     /// @pre size() < Capacity
     constexpr auto push_back(T value) -> void;
 
+    /// Removes the last element.
+    ///
+    /// Added in step R5 for the evaluator's continuation stack, which is the
+    /// first client that pops: every earlier client only grew.
+    /// @pre !empty()
+    constexpr auto pop_back() -> void;
+
     /// Returns the current number of elements.
     [[nodiscard]] constexpr auto size() const -> int;
 
@@ -73,6 +80,12 @@ constexpr auto static_vector<T, Capacity>::push_back(T value) -> void {
     assert(size_ < Capacity);
     storage_[size_] = std::move(value);
     ++size_;
+}
+
+template <class T, int Capacity>
+constexpr auto static_vector<T, Capacity>::pop_back() -> void {
+    assert(size_ > 0);
+    --size_;
 }
 
 template <class T, int Capacity>

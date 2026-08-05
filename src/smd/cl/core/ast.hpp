@@ -3,6 +3,7 @@
 #ifndef SRC_SMD_CL_CORE_AST_HPP
 #define SRC_SMD_CL_CORE_AST_HPP
 
+#include <smd/cl/foundation/static_vector.hpp>
 #include <smd/cl/foundation/tagged_tree.hpp>
 #include <smd/cl/foundation/tagged_tree_instances.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
@@ -21,6 +22,13 @@ namespace smd::cl::core {
 /// literal that does not fit rather than truncating it, so the two may
 /// differ without anything being silently lost.
 inline constexpr int max_string_chars = 128;
+
+/// Maximum number of parameters a @ref core_lambda can name.
+///
+/// A constant rather than a template parameter, for the same reason
+/// @ref max_string_chars is one: a lambda's parameter list is storage
+/// inside a node, and decision D14 keeps capacities out of type identity.
+inline constexpr int max_lambda_params = 16;
 
 /// A fixnum literal in the elaborated core.
 struct core_fixnum {
@@ -162,12 +170,84 @@ struct core_cons {
     friend constexpr auto operator==(core_cons, core_cons) -> bool = default;
 };
 
-/// A core-tree branch tag: what a compound expression is. Step R4 (the
-/// elaborator) grows this variant as it lowers more special operators;
-/// decision D18 keeps that growth slow — prefer lowering onto existing
-/// forms over new tags.
-using core_tag = std::variant<core_call, core_if, core_progn, core_cons>;
 // 60da8def-db67-496e-9b36-6c544c60bc1e end
+
+// 7d0ac0a1-9c4e-4f2b-8a2e-3f4b6d1e5c07
+/// A function definition: the parameters it binds, and one child, the body
+/// it evaluates with them bound.
+///
+/// Not an expression yet. Nothing in the R5 object language evaluates a
+/// @c core_lambda — @ref core_defun reads this node without evaluating it,
+/// which is why there is no function object among the evaluator's values.
+/// The step that makes `lambda` an expression and `#'f` executable gives
+/// this node an evaluation rule and adds that value alternative; it does
+/// not change this node.
+struct core_lambda {
+    foundation::static_vector<symbol::symbol_id, max_lambda_params>
+        params{}; ///< The parameter names, left to right.
+
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(core_lambda const &, core_lambda const &)
+        -> bool = default;
+};
+
+/// Installs its one child — a @ref core_lambda — in a symbol's function
+/// slot, and evaluates to that symbol.
+///
+/// This is the node that closes DIV-0009. The recursion works because the
+/// name is resolved in the function slot at *call* time rather than
+/// captured at definition time, so a body that calls its own name finds the
+/// definition that is being installed. Decision D18 asks for a lowering
+/// before a tag: there is none to be had, because "put this function in
+/// that symbol's function slot" is not something any other core form says.
+struct core_defun {
+    symbol::symbol_id name{}; ///< The symbol whose function slot to set.
+
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(core_defun, core_defun) -> bool = default;
+};
+
+/// A named exit point; children are the body forms, evaluated for the last
+/// one's value.
+///
+/// A block is where the question "is this unwind aimed at me?" is asked,
+/// and it is asked against this node's own name (decision D13).
+struct core_block {
+    symbol::symbol_id name{}; ///< The block's name.
+
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(core_block, core_block) -> bool = default;
+};
+
+/// Puts an unwind in flight toward the named block, carrying its one
+/// child's value, or `nil` if it has no child.
+struct core_return_from {
+    symbol::symbol_id name{}; ///< The block to return from.
+
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(core_return_from, core_return_from)
+        -> bool = default;
+};
+
+/// Evaluates its first child, then its remaining children as cleanup —
+/// whichever way the first child completed.
+///
+/// The one form whose meaning is stated in terms of all three channels at
+/// once, which is why it arrives in the phase that split them.
+struct core_unwind_protect {
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(core_unwind_protect, core_unwind_protect)
+        -> bool = default;
+};
+
+/// A core-tree branch tag: what a compound expression is. The elaborator
+/// grows this variant as it lowers more special operators; decision D18
+/// keeps that growth slow — prefer lowering onto existing forms over new
+/// tags.
+using core_tag =
+    std::variant<core_call, core_if, core_progn, core_cons, core_lambda,
+                 core_defun, core_block, core_return_from, core_unwind_protect>;
+// 7d0ac0a1-9c4e-4f2b-8a2e-3f4b6d1e5c07 end
 
 /// The elaborated core tree: a self-contained @ref foundation::tagged_tree
 /// value whose leaves are @ref core_leaf and whose branches are

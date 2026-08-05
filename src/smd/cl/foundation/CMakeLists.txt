@@ -26,6 +26,7 @@ target_sources(
                 static_vector_instances.hpp
                 tagged_tree.hpp
                 tagged_tree_instances.hpp
+                trampoline.hpp
                 traversable.hpp
 )
 
@@ -53,6 +54,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             static_vector_instances.test.cpp
             tagged_tree.test.cpp
             tagged_tree_instances.test.cpp
+            trampoline.test.cpp
             traversable.test.cpp
     )
     target_link_libraries(

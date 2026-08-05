@@ -105,8 +105,8 @@ R0–R4 landed before that was recorded; `docs/blog-backfill-plan.md` covers the
 - [x] Step R2: interned symbol table with value/function/macro slots (D12) — `src/smd/cl/symbol`
 - [x] Step R3: reader and core AST with Foldable/Traversable instances — `src/smd/cl/reader`, `src/smd/cl/core`, `foundation/tagged_tree`
 - [x] Step R4: elaborator as `traverse` over the result applicative (D15) — `src/smd/cl/elaborator`, `foundation::and_then`
-- [ ] Step R5: one evaluator, three channels (D13) — recursive `defun` is the acceptance witness (brief: `step-brief-r5.md`) (+ phase 28)
-- [ ] Step R6: conformance corpus and differential oracle (D16) (+ phase 29)
+- [x] Step R5: one evaluator, three channels (D13) — recursive `defun` is the acceptance witness — `src/smd/cl/eval`, `foundation/trampoline`, `symbol::intern_checked` (+ phase 28)
+- [ ] Step R6: conformance corpus and differential oracle (D16) (brief: `step-brief-r6.md`) (+ phase 29)
 - [ ] Step R7: sender backend (D17) (+ phase 30)
 - [ ] Step R8: extract the kit (+ phase 31)
 

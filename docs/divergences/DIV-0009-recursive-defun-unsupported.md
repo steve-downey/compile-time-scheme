@@ -66,3 +66,17 @@ Appended, not edited in place, per the append-only rule for these docs.
 **Class: `defect`. The headline defect of the pivot implementation.**
 A Lisp in which a function cannot call itself is not yet a Lisp, and this doc records that L14's block tests were rewritten to avoid recursion because of it.
 Closes under D12 (function slot resolved at call time) and is the named acceptance witness for phase R5: `(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))`.
+
+## Resolution (2026-08-04, step R5)
+
+Appended, not edited in place, per the append-only rule for these docs.
+The `Status: open` field above is left as written; this section is the current status.
+
+**Closed for `src/smd/cl/**`. Permanently open for the pivot tree.**
+R5's evaluator resolves a callee in the interned symbol's function slot at the moment of the call, rather than capturing the environment at definition time, so a body that names itself finds the definition being installed.
+The witness this doc named is now a compile-time `static_assert` in `src/smd/cl/eval/machine.test.cpp`, which is stronger than the runtime demonstration the revisit condition asked for: `(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))` followed by `(len '(a b c))` constant-evaluates to `3`.
+That is D12's function slot doing the job D12 was recorded for.
+
+Nothing here is fixed in `src/smd/smdlisp/**`, and nothing will be.
+That tree is the rebuild's behavioural oracle and is never edited (`AGENTS.md` § "Which trees you may edit"), so everything above the classification section goes on describing it accurately.
+Where the two trees disagree about recursion the old one is a wrong oracle by design: this is a `defect`, which a test must never pin (D16).
