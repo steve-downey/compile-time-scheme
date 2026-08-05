@@ -356,6 +356,12 @@ template <int MaxNodes, int MaxChildren, int DatumNodes, int DatumList,
 struct emit_context {
     /// The atom-lowered source tree.
     using source_tree = lowered_tree<DatumNodes, DatumList>;
+    /// One source node: the emission fold's element, paired with its plan.
+    using source_node = typename source_tree::node_type;
+    /// A source leaf's payload.
+    using source_leaf = typename source_tree::leaf_type;
+    /// A source branch.
+    using source_branch = typename source_tree::branch_type;
     /// The core tree being built.
     using out_tree = core::core_tree<MaxNodes, MaxChildren>;
     /// A source branch's child-index list.
@@ -363,7 +369,12 @@ struct emit_context {
     /// A core branch's child-index list.
     using out_children = typename out_tree::child_list;
     /// Source node index to emitted core node index, -1 where nothing was
-    /// emitted. This is the emission fold's accumulator.
+    /// emitted. This is the emission fold's accumulator, and it is grown by
+    /// appending: the fold visits source nodes in index order and every node
+    /// contributes exactly one entry, so entry @c i is node @c i's without
+    /// anything having to index the write. A child's index is therefore
+    /// always less than the accumulator's size when the parent reads it,
+    /// which is the pass's whole precondition, structurally.
     using index_map = foundation::static_vector<int, DatumNodes>;
 
     source_tree const &source; ///< What is being lowered.
@@ -493,11 +504,12 @@ emit_quoted_operator(Ctx &ctx, typename Ctx::index_map const &map,
 template <class Ctx>
 [[nodiscard]] constexpr auto emit_quoted(Ctx &ctx,
                                          typename Ctx::index_map const &map,
-                                         int index) -> foundation::result<int> {
-    if (ctx.source.is_leaf(index)) {
-        return add_leaf_checked(ctx, quoted_image(ctx.source.leaf(index)));
+                                         typename Ctx::source_node const &node)
+    -> foundation::result<int> {
+    if (auto const *payload = std::get_if<typename Ctx::source_leaf>(&node)) {
+        return add_leaf_checked(ctx, quoted_image(*payload));
     }
-    auto const &branch = ctx.source.branch(index);
+    auto const &branch = std::get<typename Ctx::source_branch>(node);
     switch (branch.tag) {
     case reader::datum_branch::list:
         return emit_quoted_list(ctx, map, branch.children);
@@ -579,13 +591,14 @@ emit_call(Ctx &ctx, typename Ctx::index_map const &map,
 /// Emits a parenthesized form in an expression position.
 template <class Ctx>
 [[nodiscard]] constexpr auto
-emit_compound(Ctx &ctx, typename Ctx::index_map const &map, int index,
+emit_compound(Ctx &ctx, typename Ctx::index_map const &map,
+              node_plan const &plan,
               typename Ctx::source_children const &children)
     -> foundation::result<int> {
     if (children.empty()) {
         return add_leaf_checked(ctx, core::core_leaf{core::core_nil{}});
     }
-    switch (ctx.plans[index].form) {
+    switch (plan.form) {
     case form_kind::quotation:
         if (children.size() != 2) {
             return foundation::parse_error{{},
@@ -607,15 +620,16 @@ emit_compound(Ctx &ctx, typename Ctx::index_map const &map, int index,
 
 template <class Ctx>
 [[nodiscard]] constexpr auto
-emit_evaluated(Ctx &ctx, typename Ctx::index_map const &map, int index)
+emit_evaluated(Ctx &ctx, typename Ctx::index_map const &map,
+               typename Ctx::source_node const &node, node_plan const &plan)
     -> foundation::result<int> {
-    if (ctx.source.is_leaf(index)) {
-        return add_leaf_checked(ctx, ctx.source.leaf(index));
+    if (auto const *payload = std::get_if<typename Ctx::source_leaf>(&node)) {
+        return add_leaf_checked(ctx, *payload);
     }
-    auto const &branch = ctx.source.branch(index);
+    auto const &branch = std::get<typename Ctx::source_branch>(node);
     switch (branch.tag) {
     case reader::datum_branch::list:
-        return emit_compound(ctx, map, index, branch.children);
+        return emit_compound(ctx, map, plan, branch.children);
     case reader::datum_branch::quote:
         return map[branch.children[0]];
     case reader::datum_branch::vector:
@@ -631,34 +645,35 @@ emit_evaluated(Ctx &ctx, typename Ctx::index_map const &map, int index)
     return foundation::parse_error{{}, "unsupported form"};
 }
 
-/// One step of the emission fold: emits the core for @p index and records
-/// where it landed.
+/// One step of the emission fold: emits the core for @p node, which plays
+/// the role @p plan gave it, and records where it landed.
+///
+/// Every arm appends exactly one entry, including the two that emit
+/// nothing, because it is the one-entry-per-node discipline that keeps
+/// entry @c i node @c i's — see @c Ctx::index_map.
 template <class Ctx>
 [[nodiscard]] constexpr auto emit_node(Ctx &ctx, typename Ctx::index_map map,
-                                       int index)
+                                       typename Ctx::source_node const &node,
+                                       node_plan const &plan)
     -> foundation::result<typename Ctx::index_map> {
     using index_map = typename Ctx::index_map;
-    auto record =
-        [map, index](int emitted) mutable -> foundation::result<index_map> {
-        map[index] = emitted;
+    auto record = [map](int emitted) mutable -> foundation::result<index_map> {
+        map.push_back(emitted);
         return map;
     };
-    switch (ctx.plans[index].role) {
+    switch (plan.role) {
     case node_role::unreachable:
     case node_role::operator_name:
+        map.push_back(-1);
         return map;
     case node_role::evaluate:
-        return foundation::and_then(emit_evaluated(ctx, map, index), record);
+        return foundation::and_then(emit_evaluated(ctx, map, node, plan),
+                                    record);
     case node_role::quote_datum:
-        return foundation::and_then(emit_quoted(ctx, map, index), record);
+        return foundation::and_then(emit_quoted(ctx, map, node), record);
     }
+    map.push_back(-1);
     return map;
-}
-
-/// A map in which nothing has been emitted yet.
-template <class IndexMap>
-[[nodiscard]] constexpr auto unmapped(int count) -> IndexMap {
-    return IndexMap::filled(count, -1);
 }
 
 } // namespace detail
@@ -712,10 +727,11 @@ elaborate(reader::datum_tree<DatumNodes, DatumList> const &form,
             context ctx{lowered, plans, symbols, out};
             return foundation::and_then(
                 foundation::fold_left_short(
-                    std::views::iota(0, lowered.size()),
-                    detail::unmapped<index_map>(lowered.size()),
-                    [&ctx](index_map map, int index) {
-                        return detail::emit_node(ctx, std::move(map), index);
+                    std::views::zip(lowered.nodes(), plans), index_map{},
+                    [&ctx](index_map map, auto const &node_and_plan) {
+                        auto const &[node, plan] = node_and_plan;
+                        return detail::emit_node(ctx, std::move(map), node,
+                                                 plan);
                     }),
                 [&out, root = lowered.root()](
                     index_map const &emitted) -> foundation::result<out_tree> {

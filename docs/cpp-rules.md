@@ -42,8 +42,16 @@ Every source file opens with the repo-relative path and Emacs mode line, then SP
 - **An index range is not a loop counter, and `for_each` is rarely the algorithm.**
   `for_each(views::iota(0, c.size()), ...)` that only indexes back into `c` is a hand-written loop wearing an algorithm's clothes, and it is usually a symptom: the container is not a range.
   Fix the container first — give it the sequence the algorithms want (`nodes()`, `leaves()`) — and the callers become `transform`, `fold_left`, `fold_right`.
-  Reach for `iota` only where the index is itself data, such as an address into a parallel table.
   Two more tells: a `for_each` whose lambda ignores its parameter is a fill, and a `for_each` that mutates a captured accumulator is a fold.
+- **Two sequences walked together is `views::zip`, not `iota` plus two subscripts.**
+  What decides whether an index survives is *where the pass writes*, not whether it happens to mention one:
+  a read at the current position is a zip element;
+  a write at the current position is an append, so the accumulator starts empty rather than prefilled with a sentinel;
+  a read at another position is ordinary random access and is fine;
+  and only a **write** at another position — a scatter — actually needs the index.
+  The elaborator is one of each. Emission reads the node and its plan at the current position and appends its result, so it is a zip over `(nodes, plans)`.
+  The role pass assigns each node's children their roles, which is a scatter, and stays indexed: zipping the table it writes into would alias it against its own iteration and still need the table by reference.
+  A scatter is a scatter because of the representation — `tree_branch` names children and not a parent — not because of the loop.
 - **A recursion over a tree is a catamorphism.**
   Consume recursive structure by passing an algebra to the substrate's fold (`mendler_para`, the Foldable and Traversable instances), not by hand-written recursive descent.
   A new operation over an AST is a new algebra, not a new `switch` or another wide `std::visit` ladder.
