@@ -81,6 +81,50 @@ constexpr auto leaves_of_a_leafless_tree_is_empty() -> bool {
     return std::ranges::empty(t.leaves()) && t.size() == 1;
 }
 
+// The tree for (L 1 2 (Q 3)) again: leaves 0,1,2, branch 3 = (Q 3),
+// branch 4 = the root. So 0 and 1 are the root's children 0 and 1, the
+// quote branch is its child 2, and leaf 2 is the quote branch's child 0.
+constexpr auto links_are_the_transpose_of_the_child_lists() -> bool {
+    auto const t = sample_tree();
+    using link = smd::cl::foundation::tree_link;
+    return t.link(0) == link{4, 0} && t.link(1) == link{4, 1} &&
+           t.link(2) == link{3, 0} && t.link(3) == link{4, 2} &&
+           t.link(4) == link{-1, -1};
+}
+
+// Every edge appears in both directions and agrees with itself.
+constexpr auto links_agree_with_the_child_lists() -> bool {
+    auto const t = sample_tree();
+    return std::ranges::all_of(std::views::iota(0, t.size()), [&t](int parent) {
+        if (t.is_leaf(parent)) {
+            return true;
+        }
+        auto const &children = t.branch(parent).children;
+        return std::ranges::all_of(
+            std::views::iota(0, children.size()), [&](int ordinal) {
+                auto const l = t.link(children[ordinal]);
+                return l.parent == parent && l.ordinal == ordinal;
+            });
+    });
+}
+
+constexpr auto a_node_no_branch_names_has_no_link() -> bool {
+    tree t;
+    t.add_leaf(7); // built, never referenced
+    t.set_root(t.add_leaf(8));
+    return t.link(0) == smd::cl::foundation::tree_link{} &&
+           t.link(1) == smd::cl::foundation::tree_link{};
+}
+
+// from_nodes rebuilds the links, so a rebuilt tree equals the original —
+// which is also what keeps fmap and traverse, both of which assemble
+// through from_nodes, from producing a tree with a stale link column.
+constexpr auto from_nodes_rebuilds_links() -> bool {
+    auto const t = sample_tree();
+    auto const rebuilt = tree::from_nodes(t.nodes(), t.root());
+    return std::ranges::equal(rebuilt.links(), t.links());
+}
+
 constexpr auto from_nodes_round_trips() -> bool {
     auto const t = sample_tree();
     return tree::from_nodes(t.nodes(), t.root()) == t;
@@ -105,6 +149,10 @@ static_assert(nodes_are_the_index_order());
 static_assert(leaves_are_the_leaf_payloads_in_order());
 static_assert(leaves_of_a_branchless_tree());
 static_assert(leaves_of_a_leafless_tree_is_empty());
+static_assert(links_are_the_transpose_of_the_child_lists());
+static_assert(links_agree_with_the_child_lists());
+static_assert(a_node_no_branch_names_has_no_link());
+static_assert(from_nodes_rebuilds_links());
 static_assert(from_nodes_round_trips());
 static_assert(from_nodes_without_a_root());
 static_assert(from_nodes_of_nothing_is_the_default_tree());
@@ -148,4 +196,11 @@ TEST_CASE("TaggedTreeTest - FromNodesRoundTrips") {
     CHECK(from_nodes_round_trips());
     CHECK(from_nodes_without_a_root());
     CHECK(from_nodes_of_nothing_is_the_default_tree());
+}
+
+TEST_CASE("TaggedTreeTest - LinksAreTheTransposeOfTheChildLists") {
+    CHECK(links_are_the_transpose_of_the_child_lists());
+    CHECK(links_agree_with_the_child_lists());
+    CHECK(a_node_no_branch_names_has_no_link());
+    CHECK(from_nodes_rebuilds_links());
 }

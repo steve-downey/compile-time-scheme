@@ -34,6 +34,28 @@ struct tree_branch {
         -> bool = default;
 };
 
+/// Where a node sits beneath its parent: the parent's index, and the node's
+/// position in that parent's child list.
+///
+/// This is the transpose of a branch's child list — the same edge relation
+/// read the other way — and a tree maintains both. Which direction a pass
+/// has decides its shape: with children only, giving every node a property
+/// derived from its parent is a scatter, because each node must write its
+/// children's entries. With the parent link, the same pass is a fold, because
+/// each node reads its parent's entry and writes only its own. Construction
+/// is children-before-parent, so a parent's index always exceeds its
+/// children's and descending index order visits every parent first.
+///
+/// Both fields are -1 for a node no branch names: the root, and any node
+/// that was built but never referenced.
+struct tree_link {
+    int parent{-1};  ///< The parent node's index, or -1.
+    int ordinal{-1}; ///< Position among the parent's children, or -1.
+
+    // HIDDEN FRIEND
+    friend constexpr auto operator==(tree_link, tree_link) -> bool = default;
+};
+
 /// A self-contained arena tree whose nodes are either leaves of type
 /// @p Leaf or branches carrying a @p Tag and child indices.
 ///
@@ -149,12 +171,30 @@ class tagged_tree {
     /// @pre !is_leaf(index)
     [[nodiscard]] constexpr auto branch(int index) const -> branch_type const &;
 
+    /// Returns where the node at @p index sits beneath its parent.
+    /// @pre 0 <= index < size()
+    [[nodiscard]] constexpr auto link(int index) const -> tree_link const &;
+
+    /// Returns the parent links in index order, parallel to @ref nodes —
+    /// the column to zip against when a pass reads both.
+    [[nodiscard]] constexpr auto links() const -> std::span<tree_link const>;
+
     // HIDDEN FRIEND
     friend constexpr auto operator==(tagged_tree const &, tagged_tree const &)
         -> bool = default;
 
   private:
+    /// Points @p children at @p index, their parent. The only scatter left
+    /// in the design, and it is the container's own: it happens once, when
+    /// the edge is created, rather than once per pass that needs it.
+    constexpr auto link_children(int index, child_list const &children) -> void;
+
+    /// Recomputes every link from the nodes. Used where nodes arrive
+    /// already assembled (@ref from_nodes) rather than an edge at a time.
+    constexpr auto relink() -> void;
+
     static_vector<node_type, MaxNodes> nodes_{};
+    static_vector<tree_link, MaxNodes> links_{};
     int root_{-1};
 };
 // 673865b0-7d8f-4e49-a11e-1bc747348df5 end
@@ -168,6 +208,7 @@ constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::from_nodes(
     R &&node_range, int root) -> tagged_tree {
     tagged_tree built;
     built.nodes_.append_range(std::forward<R>(node_range));
+    built.relink();
     if (root >= 0) {
         built.set_root(root);
     }
@@ -175,10 +216,32 @@ constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::from_nodes(
 }
 
 template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::link_children(
+    int index, child_list const &children) -> void {
+    for (int ordinal = 0; ordinal < children.size();
+         ++ordinal) { // substrate generic algorithm
+        links_[children[ordinal]] = tree_link{index, ordinal};
+    }
+}
+
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::relink() -> void {
+    links_ =
+        static_vector<tree_link, MaxNodes>::filled(nodes_.size(), tree_link{});
+    for (int index = 0; index < nodes_.size();
+         ++index) { // substrate generic algorithm
+        if (auto const *branch = std::get_if<branch_type>(&nodes_[index])) {
+            link_children(index, branch->children);
+        }
+    }
+}
+
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
 constexpr auto
 tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::add_leaf(Leaf leaf) -> int {
     int const index = nodes_.size();
     nodes_.push_back(node_type{std::move(leaf)});
+    links_.push_back(tree_link{});
     return index;
 }
 
@@ -186,6 +249,8 @@ template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
 constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::add_branch(
     Tag tag, child_list children) -> int {
     int const index = nodes_.size();
+    links_.push_back(tree_link{});
+    link_children(index, children);
     nodes_.push_back(
         node_type{branch_type{std::move(tag), std::move(children)}});
     return index;
@@ -265,6 +330,20 @@ constexpr auto
 tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::branch(int index) const
     -> branch_type const & {
     return std::get<branch_type>(node(index));
+}
+
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+constexpr auto
+tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::link(int index) const
+    -> tree_link const & {
+    assert(index >= 0 && index < links_.size());
+    return links_[index];
+}
+
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::links() const
+    -> std::span<tree_link const> {
+    return std::span<tree_link const>{links_.begin(), links_.end()};
 }
 
 } // namespace smd::cl::foundation

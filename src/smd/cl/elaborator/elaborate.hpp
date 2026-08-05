@@ -269,78 +269,103 @@ head_symbol(lowered_tree<MaxNodes, MaxList> const &tree,
     return form_kind::call;
 }
 
-/// Propagates @p index's own role to its children, and records which form
-/// it is if it is a compound one.
+/// The role @p index plays, read from its parent instead of written by it.
+///
+/// The tree carries a @ref smd::cl::foundation::tree_link per node — the
+/// parent's index and this node's position among that parent's children —
+/// which is the transpose of the child list the parent holds. Having that
+/// direction available is what makes this a question a node can ask. The
+/// answer needs the parent's finished plan, and construction is
+/// children-before-parent, so descending index order has already settled it.
 template <int MaxNodes, int MaxList>
-constexpr auto
-plan_children(lowered_tree<MaxNodes, MaxList> const &tree,
-              operator_ids const &operators,
-              foundation::static_vector<node_plan, MaxNodes> &plans, int index)
-    -> void {
-    if (tree.is_leaf(index)) {
-        return;
+[[nodiscard]] constexpr auto
+role_of(lowered_tree<MaxNodes, MaxList> const &tree,
+        foundation::static_vector<node_plan, MaxNodes> const &plans, int index)
+    -> node_role {
+    if (index == tree.root()) {
+        return node_role::evaluate;
     }
-    auto const &branch = tree.branch(index);
-    auto const give = [&plans](int child, node_role role) {
-        plans[child].role = role;
-    };
-    switch (plans[index].role) {
+    auto const link = tree.link(index);
+    if (link.parent < 0) {
+        // Built but named by no branch, and not the root: unreached.
+        return node_role::unreachable;
+    }
+    auto const parent_plan = plans[link.parent];
+    switch (parent_plan.role) {
     case node_role::unreachable:
     case node_role::operator_name:
         // Nothing below an unreached node; and a compound in head position
         // is diagnosed rather than descended into.
-        return;
+        return node_role::unreachable;
     case node_role::quote_datum:
-        std::ranges::for_each(branch.children, [&give](int child) {
-            give(child, node_role::quote_datum);
-        });
-        return;
+        return node_role::quote_datum;
     case node_role::evaluate:
         break;
     }
+    auto const &parent = tree.branch(link.parent);
+    if (parent.tag == reader::datum_branch::quote) {
+        return node_role::quote_datum;
+    }
+    if (parent.tag != reader::datum_branch::list) {
+        // `#(...)`, `#'f` and the backquote family have no evaluated
+        // subforms yet: the emission pass reports, and reporting needs no
+        // planned child.
+        return node_role::unreachable;
+    }
+    if (link.ordinal == 0) {
+        return node_role::operator_name;
+    }
+    return parent_plan.form == form_kind::quotation ? node_role::quote_datum
+                                                    : node_role::evaluate;
+}
+
+/// Which compound form @p index is, given the @p role it plays.
+///
+/// Row-wise, unlike @ref role_of: a node's form is decided by the node and
+/// its own children's head symbol, never by its parent. Only a node in an
+/// expression position has one; everything else keeps the default, which
+/// nothing reads.
+template <int MaxNodes, int MaxList>
+[[nodiscard]] constexpr auto
+form_of(lowered_tree<MaxNodes, MaxList> const &tree,
+        operator_ids const &operators, int index, node_role role) -> form_kind {
+    if (role != node_role::evaluate || tree.is_leaf(index)) {
+        return form_kind::call;
+    }
+    auto const &branch = tree.branch(index);
     if (branch.tag == reader::datum_branch::quote) {
-        plans[index].form = form_kind::quotation;
-        std::ranges::for_each(branch.children, [&give](int child) {
-            give(child, node_role::quote_datum);
-        });
-        return;
+        return form_kind::quotation;
     }
     if (branch.tag != reader::datum_branch::list || branch.children.empty()) {
-        // `#(...)`, `#'f` and the backquote family have no evaluated
-        // subforms yet, and `()` is the constant NIL: the emission pass
-        // reports or constructs, and neither needs a planned child.
-        return;
+        // `()` is the constant NIL, and the rest are diagnosed on emission.
+        return form_kind::call;
     }
-    plans[index].form =
-        classify_head(head_symbol(tree, branch.children), operators);
-    give(branch.children[0], node_role::operator_name);
-    auto const argument_role = plans[index].form == form_kind::quotation
-                                   ? node_role::quote_datum
-                                   : node_role::evaluate;
-    std::ranges::for_each(
-        branch.children | std::views::drop(1),
-        [&give, argument_role](int child) { give(child, argument_role); });
+    return classify_head(head_symbol(tree, branch.children), operators);
 }
 
 // dc3ee031-e752-4420-a3e8-610face05838
-/// Assigns every node its role, top down in one descending pass.
+/// Assigns every node its plan, top down in one descending fold.
+///
+/// Each step writes one entry — its own — and reads its parent's, so this
+/// is a fold over the plan column rather than a scatter into it. The
+/// difference is the @ref smd::cl::foundation::tree_link column: without it
+/// a node cannot find its parent, so the only way to propagate downward is
+/// for each parent to write its children's entries.
 template <int MaxNodes, int MaxList>
 [[nodiscard]] constexpr auto
 plan_nodes(lowered_tree<MaxNodes, MaxList> const &tree,
            operator_ids const &operators)
     -> foundation::static_vector<node_plan, MaxNodes> {
-    auto plans = foundation::static_vector<node_plan, MaxNodes>::filled(
-        tree.size(), node_plan{});
-    if (tree.root() < 0) {
-        return plans;
-    }
-    plans[tree.root()].role = node_role::evaluate;
-    // Every parent's index exceeds its children's, so descending index
-    // order visits each node after whichever node gave it its role.
-    std::ranges::for_each(
+    using plan_column = foundation::static_vector<node_plan, MaxNodes>;
+    return std::ranges::fold_left(
         std::views::iota(0, tree.size()) | std::views::reverse,
-        [&](int index) { plan_children(tree, operators, plans, index); });
-    return plans;
+        plan_column::filled(tree.size(), node_plan{}),
+        [&tree, &operators](plan_column plans, int index) {
+            auto const role = role_of(tree, plans, index);
+            plans[index] =
+                node_plan{role, form_of(tree, operators, index, role)};
+            return plans;
+        });
 }
 // dc3ee031-e752-4420-a3e8-610face05838 end
 
