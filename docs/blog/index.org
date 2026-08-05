@@ -124,6 +124,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ A tree built children-before-parent has node indices in topological order, so ascending index order is a bottom-up catamorphism and descending order is top-down propagation. Elaboration becomes three index loops — atoms by ~traverse~, roles by a descending pass, emission by a fold that stops on the first error — with no stack, no visitor that calls itself, and no bound on nesting depth. Plus the Lisp-2 rule as a consequence rather than a special case, and the one new node kind that decision D18's own exception licenses.
 
+** [[file:phase-28-three-channels.org][Phase 28 — Three Channels, and a Machine Instead of a Fold]]
+
+/DRAFT — pending author revision./ An evaluated form finishes with a value, with a diagnosed error, or with an unwind in flight, and decision D13 makes those three alternatives of one type, so the pivot's sentinel messages compared by pointer identity are deleted instead of ported. ~unwind-protect~ is what the split costs, and it is rebuilt as a continuation frame that intercepts all three channels. Evaluation is the one traversal here that cannot be a fold, so the evaluator is a small-step machine with defunctionalized continuations and its single loop in ~foundation::trampoline~ — which makes recursion depth and non-termination diagnosed capacities rather than compiler behaviour. Plus DIV-0009 closed: a recursive ~defun~ counts a list inside a ~static_assert~.
+
 * Table of Contents
 
 #+toc: headlines 1

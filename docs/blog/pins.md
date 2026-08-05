@@ -31,8 +31,9 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-25-symbols.org` | `1a2e97a` | `blog/phase-25` | `Merge step R2`, rewritten to carry R2's anchors (era 3) |
 | `phase-26-reader-core-ast.org` | `89ecc19` | `blog/phase-26` | `Merge step R3`, rewritten to carry R3's anchors (era 3) |
 | `phase-27-elaboration.org` | `8d902e6` | `blog/phase-27` | `Merge step R4`, rewritten to carry R4's anchors (era 3) |
+| `phase-28-three-channels.org` | `5b0e9bb` | `blog/phase-28` | `Merge step R5` (tag created at the merge, before the post) |
 
-78 transclusions across 17 posts. Every row passes the anchor test at its pin,
+88 transclusions across 18 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
@@ -73,6 +74,14 @@ alternatives at `blog/phase-26` and eight at `blog/phase-27` — the same UUID, 
 file, naming the same declaration, showing different code at each tag. `60da8def` does the
 same for the branch tags, three and four. That is what an anchor names: the declaration,
 not a revision of it.
+
+Phase 28 is the first rebuild post pinned the ordinary way rather than by construction:
+the tag was created at step R5's `--no-ff` merge before the post was written, so none of
+the backfill applies to it. It transcludes ten anchors, and one of them repeats the
+artifact above. `53eabd7c` in `elaborator/elaborate.hpp` is an anchor phase 27
+transcludes, and R5 grew a second function inside the pair: it is `elaborate` alone at
+`blog/phase-27`, and `elaborate_into` above `elaborate` at `blog/phase-28`. That is the
+first such case outside the rewrite. The post says so in its own prose.
 
 
 ## Two authorship eras

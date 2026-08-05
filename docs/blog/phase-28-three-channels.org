@@ -1,0 +1,244 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+bibliography: references.bib
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 28 - Three Channels, and a Machine Instead of a Fold
+#+AUTHOR: Steve Downey
+#+DATE: 2026-08-04
+
+*DRAFT --- pending author revision*
+
+#+begin_abstract
+Step R5 gives the rebuild an evaluator.
+An evaluated form finishes in one of three ways: with a value, with a diagnosed error, or with an unwind in flight, and ~eval::outcome~ makes those three alternatives of one type, so control flow never travels in the error channel.
+That's decision D13, and the pivot's sentinel messages compared by pointer identity are deleted rather than ported.
+~unwind-protect~ is the form the split breaks, and it gets rebuilt as a continuation frame.
+The evaluator itself is a small-step abstract machine, because evaluation is the one traversal in this pipeline that can't be a fold.
+And ~(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))~ works, inside a ~static_assert~.
+#+end_abstract
+
+#+MACRO: TEASER_END
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-27-elaboration.org][Phase 27 - The Elaborator Never Recurses ←]]
+#+html: </nav>
+
+
+* The sentinels that had to be objects
+
+Four things travel down the closure backends' one wire: a value, a diagnosed error, and two kinds of unwind, one for ~return-from~ and one for ~throw~.
+All four arrive as a ~result<value>~, so telling them apart needs something out of band, and what the pivot used was a pair of ~parse_error~ messages compared by pointer identity.
+Compared by pointer, which is why they had to be named ~inline constexpr char[]~ objects and not bare string literals: two equal string literals are not required to share an address, so ~==~ on the pointers is only meaningful if there's exactly one object to point at.
+Phase 21 already recorded that the sender backend doesn't do any of this, because a sender has three completion channels natively and there's nothing to multiplex.
+
+D13 says the two backends that got it wrong should be doing what the one that got it right does, and R5 is where that becomes a type.
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/eval/outcome.hpp::8f5b0a1c-3f0e-4f6f-95b0-2a0b4a5f6c31]] :lines 2- :src cpp :end "8f5b0a1c-3f0e-4f6f-95b0-2a0b4a5f6c31 end"
+
+An ~unwind~ carries the name of the exit point it's aimed at and the value it's carrying there, and that's all the state a nonlocal exit needs.
+There's no evaluator-wide "returning" register, because the question /is this unwind aimed at me?/ is asked by the block's own frame, which is the only place that knows the answer.
+There's a ~to_outcome~ that widens an ordinary ~result<value>~ into the three-channel form; the other direction isn't a function at all, and that's the whole point of the split.
+An unwind in flight has nowhere to go in a type with two alternatives, and pretending otherwise is what the sentinels were for.
+
+* unwind-protect is what the split costs
+
+D13's record says what the split would cost before the step opened it.
+Under a one-wire result, ~unwind-protect~ gets "run the cleanup on every exit path" free: the outcomes are already merged into one value by the time it sees them, so one unconditional statement covers every path there is.
+Split the channels and there's no merged path left to hang that statement on.
+The property has to be rebuilt.
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/eval/machine.hpp::2e6f8b3a-51d7-4a0c-9f6e-7c2b1d0a4e58]] :lines 2- :src cpp :end "2e6f8b3a-51d7-4a0c-9f6e-7c2b1d0a4e58 end"
+
+The frame saves whichever of the three arrived from the protected form, runs the cleanups in order, and re-emits the saved one.
+Cleanup-on-all-three-channels is then a property of the frame's shape, and there's no list of cases anywhere that a fourth channel could get left off of.
+
+One case doesn't re-emit.
+If a cleanup form itself completes with an error or an unwind, that outcome replaces what it was cleaning up after, and there's nothing left to put back.
+The frame pops and lets the new one travel.
+That's one arm of an ~if~ in the resume visitor, and it reads as an ordinary rule.
+
+I'd rather not oversell the split.
+D13 says so too: restoring a dynamic binding stays in ordinary C++ control flow, because it brackets a callee's whole extent instead of a single completion, and nothing about having three channels helps with it.
+Splitting is better where the thing being expressed is a completion.
+There are no special variables in this tree yet, so I haven't had to prove that half.
+
+* Evaluation is not a fold
+
+Phase 27 ended on a question: whether an evaluator over the same core tree could stay in the shape the elaborator is in: three index loops and no recursive descent, because a ~tagged_tree~ built children-before-parent has its nodes in topological order already.
+I wrote that I didn't see why it couldn't, and that this wasn't the same as knowing.
+It couldn't, and it isn't close.
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/eval/machine.hpp::0b7a5e42-9d3c-4b19-83f4-6e5c2a1b7d04]] :lines 2- :src cpp :end "0b7a5e42-9d3c-4b19-83f4-6e5c2a1b7d04 end"
+
+A catamorphism visits every node once, in an order the structure fixes [cite:@meijer1991functional].
+Evaluation visits one arm of an ~if~ and never the other, visits a function body once per call and not once per node, and past a ~return-from~ visits nothing at all.
+Those aren't awkward cases to be handled inside a fold; they're the reason the fold doesn't typecheck as a description of what's happening.
+So the coding rules' preference for a traversal typeclass over hand-written recursion runs out here, and what replaces it is the other classical answer: continuation-passing style with the continuations defunctionalized [cite:@reynolds1972definitional] [cite:@danvy2006defunctionalization].
+~k_if~, ~k_sequence~, ~k_arguments~, ~k_block~, ~k_return_from~ and ~k_protect~ are the continuation constructors, a ~static_vector~ of them is the continuation, and ~step~ is ~apply~.
+
+That leaves exactly one loop in the whole evaluator, and it isn't in the evaluator:
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/foundation/trampoline.hpp::4b3c37ec-1a54-4b6b-a10c-4d20ff2e3427]] :lines 2- :src cpp :end "4b3c37ec-1a54-4b6b-a10c-4d20ff2e3427 end"
+
+The budget isn't a safety net bolted on afterwards.
+An object program that doesn't terminate must not turn into a translation that doesn't terminate: an unbounded loop under constant evaluation is a compiler that hangs, with no output and nothing to read.
+So the step count is part of the contract, and running out of it is diagnosed the same ordinary way every capacity in this tree is diagnosed.
+The same is true of depth.
+No evaluation recursion is C++ recursion here, so how deep a program may go is ~limits::frames~, a number in a struct.
+The compiler's own stack doesn't come into it.
+
+~foundation/~ grew two things for this and no more: ~static_vector::pop_back~, because a continuation stack is the substrate's first client that shrinks, and ~trampoline.hpp~ itself.
+Whether ~trampoline~ is the right shape is a question a second backend answers, and the second backend is R7.
+
+* Five new tags, and D18's bar
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/core/ast.hpp::7d0ac0a1-9c4e-4f2b-8a2e-3f4b6d1e5c07]] :lines 2- :src cpp :end "7d0ac0a1-9c4e-4f2b-8a2e-3f4b6d1e5c07 end"
+
+D18 wants a new operator lowered onto forms the core already has before it gets a node kind of its own, and phase 27 spent a section on the one exception the decision states for itself.
+Five more went past the bar this step, each with its own reason.
+~core_defun~, because "put this function in that symbol's function slot" is not a thing any other form says.
+~core_lambda~ separately from ~core_defun~, because keeping parameter binding on its own node is what lets ~let~ and ~multiple-value-bind~ lower to a lambda application later, which is the pivot's proven strategy and D18's own stated mitigation.
+~core_block~ and ~core_return_from~, because without them the third channel has no producer, and a channel nothing can put anything into is untestable.
+~core_unwind_protect~, because it's the one form whose meaning is stated in terms of all three channels at once, which is why it belongs in the phase that split them.
+
+Nine tags now, where phase 27 had four.
+That's a faster rate of growth than D18 wants sustained, and the next step to add one should have to say why in the same terms.
+
+* defun is three nodes
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/elaborator/elaborate.hpp::d398d3f2-8862-4663-9e03-28262372feae]] :lines 2- :src cpp :end "d398d3f2-8862-4663-9e03-28262372feae end"
+
+A ~defun~ over a ~lambda~ over a ~block~, and the nesting is all of what ~defun~ means.
+The block is the implicit one ANSI 3.1.2.1.2.2 requires [cite:@steele1990cltl2], named for the function, which is what makes ~return-from~ usable in a body that never wrote a ~block~ of its own.
+The lambda binds the parameters.
+The defun puts the lambda in the slot.
+Each of the three says one thing, and the reason to want that is the next section.
+
+The role pass from phase 27 needed one addition to get here.
+A form now says how many of the children after its head are *names* and not subforms (two for ~defun~, one for ~block~ and ~return-from~), and a name is simply left with the role every node is born with, ~unreachable~, so no later pass mistakes it for an expression.
+The emission pass reads it straight out of the source tree.
+Nothing about that needs a stack, and the pass is still one descending sweep of the node array.
+
+* The recursion works
+
+#+begin_src lisp
+(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))
+(len '(a b c))  ; => 3
+#+end_src
+
+Phase 25 opened with that program not working.
+Call ~len~ in the pivot tree and you get =undefined function=, because the closure captures a copy of the environment made before ~defun~ binds the function's own name into it, so the self-call looks up a name that copy never had.
+It's DIV-0009, classified a defect, and it's the divergence D12 was recorded to close.
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/eval/machine.hpp::7fb628ca-8a1d-4af4-ac88-3a05726e237f]] :lines 2- :src cpp :end "7fb628ca-8a1d-4af4-ac88-3a05726e237f end"
+
+The whole fix is that the lookup is in the first two lines of ~call_function~, at the moment of the call.
+A closure holds the index of the node its body lives at and the environment it captured, and it doesn't hold its own name, so there's no copy to be stale.
+A body that names itself resolves through the function slot, and by the time the body runs, the slot has the definition in it.
+That's what an interned symbol with slots gives you, and seven divergence records were separately complaining about its absence.
+
+Two consequences fall out of the same line.
+A builtin isn't a special case in the call path: ~(car x)~ is an ordinary ~core_call~ whose callee happens to have a ~builtin_op~ in its slot where a closure would go, so ~(defun car ...)~ overwrites ~car~ the way it would overwrite anything else, and there's a test pinning that.
+And entering a function costs no continuation frame, because the body's value is the call's value and whatever frame is underneath continues with its own environment.
+
+That second one is less good than it sounds, and the comment in the code says so.
+The implicit block *does* push a frame, and it can't pop it until the body finishes, so a self-call in tail position costs one frame per call rather than none.
+Omitting the block when a body contains no ~return-from~ is a real optimization, it's obvious, and it isn't done.
+~len~ over a three-element list is nowhere near ~limits::frames~, so nothing forced the issue.
+
+The acceptance witness is the part to be careful about.
+It isn't that the demo runs; it's a ~static_assert~ in ~machine.test.cpp~, one of twenty-six.
+Reading, elaborating, allocating cons cells, building an environment, entering a closure three times and doing the arithmetic all happen inside the constant evaluator, and the compiler refuses to produce an object file if the answer isn't ~3~.
+The revisit condition DIV-0009 wrote for itself asked for a runtime demonstration, and this is stronger, so the record gets a dated note saying it's closed for this tree.
+The pivot tree keeps the defect. It's the oracle, it's never edited, and where the two trees disagree about recursion the old one is a wrong answer on purpose (DIV-0009's resolution note; D16 is why no test may pin it).
+
+* One arena, several forms
+
+Two top-level forms, run in order, turn out to need something the elaborator didn't offer.
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/elaborator/elaborate.hpp::53eabd7c-d0c2-4f0e-a63b-3260a0151044]] :lines 2- :src cpp :end "53eabd7c-d0c2-4f0e-a63b-3260a0151044 end"
+
+That's the same anchor phase 27 transcluded, and it's grown a function above the one that post was about.
+~elaborate~ makes a tree, fills it, and sets its root; ~elaborate_into~ emits into a tree that may already hold earlier forms and hands back the root instead of setting it.
+The reason is the closure: it names its body by node index, so a function defined by the first form and called by the second needs both forms' nodes in one arena that outlives both.
+Elaborate each form into its own tree and the index in the closure means nothing.
+
+Reading a *sequence* of top-level forms still isn't in the library.
+~read_datum~ returns the cursor after the datum it read, so the unfold is available; nobody has written it.
+Driving a program today is four calls chained through ~and_then~ (install the builtins, read, elaborate, run), and ~install_builtins~ has to go first, because it interns ~NIL~ and ~T~, which the elaborator asks the table about when deciding whether a bare ~nil~ is a constant or a variable.
+That chain exists twice in ~machine.test.cpp~ and wants to be a component before it exists a third time.
+R6 is a conformance corpus, so R6 is where it gets written.
+
+* Under all of it, an object layer
+
+None of the above is about anything without values to be about.
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/eval/value.hpp::5d5f74e8-b4a3-4d0e-9b1f-0f0e3e7f7a11]] :lines 2- :src cpp :end "5d5f74e8-b4a3-4d0e-9b1f-0f0e3e7f7a11 end"
+
+A value is an immediate --- a fixnum, a character, a symbol id --- or a capacity-free handle into a heap of cons cells, string characters and closures.
+No runtime value type is parameterized on a capacity, which is D14, and the capacities all sit on the heap where storage belongs.
+An environment is not a data structure of its own: it's a chain of ~(symbol . value)~ pairs in that same heap, so it's an ordinary Lisp value, ~lookup~ is ~find_if~ over a view of the chain, and ~extend~ is two conses.
+The evaluator never walks a chain by hand; ~heap::list_view~ is a forward range and the loop is the iterator's increment.
+
+Eighteen builtins go into function slots before anything runs: ~car~, ~cdr~, ~cons~, ~list~, ~null~, ~not~, ~eq~, ~eql~, ~atom~, ~consp~, ~symbolp~, ~length~, and the six arithmetic and comparison operators.
+~apply_builtin~ returns an ~outcome~ rather than a value, because a builtin can fail, and its third channel is always empty, because nothing in that list is a control-transfer operator.
+A channel with no producer is not a channel that function has to think about.
+
+~eq~ and ~eql~ still coincide, and the reason has changed under them.
+DIV-0002 had them coincide because both were string comparison on a name.
+Here identity is real (an id, a cell index, a pool offset), and they agree only because every number that exists is an immediate, so there's nothing yet for which ~eql~ is the weaker test.
+Boxed numbers are what separates them, and boxed numbers are D19's later lanes.
+
+* The third copy of intern_checked
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-28::src/smd/cl/symbol/symbol_table.hpp::c589354c-b5fe-4109-9eb9-31c9929ae887]] :lines 2- :src cpp :end "c589354c-b5fe-4109-9eb9-31c9929ae887 end"
+
+Phase 27 left ~intern_checked~ written twice, in ~reader::detail~ and ~elaborator::detail~, and said R5 would decide because R5 would want a third copy.
+It did want one, for ~defun~'s function slot, so all three collapsed into a free function beside the table.
+Beside, because only the table knows what "full" means, and free instead of a member because the checked form is a policy (diagnose, don't assert) while the unchecked member stays right for a caller that already established there's room.
+
+The copies could not have survived the promotion anyway, which I didn't see until the new definition was there.
+A symbol table's own type puts ~smd::cl::symbol~ among the associated namespaces of every call that passes one, so the moment ~intern_checked~ lived beside the table, ADL found it from inside ~reader::detail~ and ~elaborator::detail~ as well, and every unqualified call there was ambiguous with the local copy.
+R4 hit the identical collision promoting ~and_then~.
+Twice is a coincidence; I'd like to notice it before the third one.
+
+* What it doesn't do
+
+~lambda~ is not an expression.
+Nothing in this object language produces a function object at all: ~defun~ names one, a call resolves one through a slot, and ~#'f~, ~funcall~, ~apply~ and ~lambda~ in expression position are all diagnosed.
+There's no function alternative in ~value~ either, and there shouldn't be until something can make one.
+The current diagnostic for ~(lambda (x) x)~ is =undefined function=, because ~LAMBDA~ falls through to an ordinary call and the elaborator never gets a chance to say something better.
+That's a poor message, and fixing it means the elaborator recognizing ~lambda~ well enough to reject it properly, which nothing this step needed.
+
+~(block nil ...)~ is rejected.
+The atom pass turns ~NIL~ and ~T~ into constants before the role pass runs, so neither is available as a block name. And ANSI uses ~(block nil ...)~ for ~loop~'s implicit block, so this needs an answer before any iteration macro lands.
+It needs classifying first, because D16 is clear that a test may pin a scope decision and must never pin a defect, and I don't yet know which one this is.
+There's nothing behind ~&optional~ or ~&rest~ either: a lambda list keyword is diagnosed where it stands.
+
+Diagnostics still carry no source position, and it's worse than it was in phase 27.
+The datum tree has no positions on its nodes, so elaborator errors got a default one; now every *evaluator* error inherits the same hole, and =unbound variable= and =wrong number of arguments= arrive pointing at nothing.
+A conformance corpus is where that starts to hurt first, and R6 is a conformance corpus.
+Fixing it is reader and foundation work, not evaluator work, which is why it keeps not happening.
+
+And there's still no SBCL in this environment, so R3's reader syntax, R4's elaboration and now R5's evaluation semantics are all read off the standard and pinned by tests I wrote myself.
+That remains the weakest evidence in the project.
+Everything in this post is a claim about a machine I built agreeing with a specification I read.
+
+* The merge criterion
+
+~(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))~, then ~(len '(a b c))~, constant-evaluating to ~3~.
+That was written into the brief before the step started, and it's the only line in it that couldn't be satisfied by a partial job: an evaluator that can do everything except call a function by its own name is an evaluator that hasn't closed the divergence the rebuild was argued for.
+
+What I can't tell yet is how much of the rest is right.
+Twenty-six ~static_assert~ cases are twenty-six programs I thought of, and D16's whole point is that a conformance corpus is a different kind of evidence from a test suite the implementer wrote.
+Next step builds the corpus, and every entry in it has to state its expected outcome *by channel* (value, error, or unwind), since collapsing them there would hand back what this phase spent itself separating.
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-27-elaboration.org][← Phase 27 - The Elaborator Never Recurses]]
+#+html: </nav>
+
+* References
+
+#+print_bibliography:
