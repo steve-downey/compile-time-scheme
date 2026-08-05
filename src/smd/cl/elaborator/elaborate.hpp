@@ -28,32 +28,46 @@
 /// The reader classifies no special operators; this is where a list stops
 /// being a list and becomes a conditional, a sequence, a literal, or a call.
 ///
-/// It runs as three passes over the datum tree's node array, and none of
-/// them is a recursive descent. A @ref smd::cl::foundation::tagged_tree is
-/// built children-before-parent, so its node indices are a topological
-/// order: ascending index order is a bottom-up catamorphism and descending
-/// index order is a top-down propagation. Both are folds — over the tree's
-/// own node sequence where a pass needs only the nodes, over an index range
-/// where it also has to address a parallel table by node index — which is
-/// why no pass needs a stack, a visitor that recurses, or a bound on
-/// nesting depth.
+/// It runs as three passes and none of them is a recursive descent. A
+/// @ref smd::cl::foundation::tagged_tree is a set of columns keyed by node
+/// index — the nodes, and the @ref smd::cl::foundation::tree_link giving
+/// each node its parent and its position among that parent's children —
+/// and each pass reads columns and produces one more, so the pipeline is
+/// nodes, then plans, then emitted core indices. Construction is
+/// children-before-parent, so index order is a topological order:
+/// ascending is bottom-up, descending is top-down, and neither direction
+/// needs a stack, a visitor that recurses, or a bound on nesting depth.
 ///
-/// - **Atoms** (ascending, @c traverse over the result applicative). Every
-///   datum atom becomes a @ref smd::cl::core::core_leaf, shape preserved.
-///   This is where an atom's *denotation* is decided and diagnosed: `NIL`
-///   and `T` become constants, a numeric-tower literal becomes an error
-///   (decision D19 makes it readable but not yet executable). Because
-///   @c traverse visits every leaf, an unreachable atom is diagnosed too,
-///   and an atom-level error is reported ahead of any structural one.
-/// - **Roles** (descending, total). Each node learns what position it
-///   occupies — an expression, quoted data, the head of a form, or
-///   unreached — from its parent. Reachability falls out: only the root
-///   starts reachable.
-/// - **Emission** (ascending, @c fold_left_short over the result effect).
-///   Each node emits its core, reading its children's already-emitted core
-///   indices out of the fold's accumulator. This is the pass that must stop
-///   at the first error rather than visit everything: the core tree is a
-///   shared arena, and continuing past a failure would spend its capacity
+/// What makes all three folds rather than scatters is that every pass
+/// writes only the row it is standing on. Reading another row is ordinary
+/// random access and happens throughout — a parent's role, a child's
+/// emitted index — but no pass reaches over and writes someone else's
+/// entry. The link column is what buys that for the role pass; without a
+/// way to find its parent, a node can only be told what it is by a parent
+/// writing into it.
+///
+/// - **Atoms** (ascending, @c traverse over the result applicative, one
+///   column in and one out). Row-wise: every datum atom becomes a
+///   @ref smd::cl::core::core_leaf, shape preserved. This is where an
+///   atom's *denotation* is decided and diagnosed: `NIL` and `T` become
+///   constants, a numeric-tower literal becomes an error (decision D19
+///   makes it readable but not yet executable). Because @c traverse visits
+///   every leaf, an unreachable atom is diagnosed too, and an atom-level
+///   error is reported ahead of any structural one.
+/// - **Roles** (descending, a fold producing the plan column, total). Each
+///   node asks its parent what position it occupies — an expression,
+///   quoted data, the head of a form, or unreached — following its link
+///   and reading the parent's plan. Reachability falls out: only the root
+///   starts reachable. Descending order is what makes the parent's plan
+///   final before any child reads it, since a parent's index always
+///   exceeds its children's.
+/// - **Emission** (ascending, @c fold_left_short over the nodes zipped with
+///   their plans). Each node emits its core and appends where it landed,
+///   reading its children's already-appended indices out of the fold's
+///   accumulator. One entry per node, so entry @c i stays node @c i's
+///   without an index doing the bookkeeping. This is the pass that must
+///   stop at the first error rather than visit everything: the core tree is
+///   a shared arena, and continuing past a failure would spend its capacity
 ///   on nodes that are already discarded.
 ///
 /// The atom pass reads a symbol as a variable reference, which is the
