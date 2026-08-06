@@ -17,6 +17,7 @@ target_sources(
                 functor.hpp
                 identity.hpp
                 monoid.hpp
+                node_f.hpp
                 parse_error.hpp
                 result.hpp
                 result_instances.hpp
@@ -24,6 +25,9 @@ target_sources(
                 source_span.hpp
                 static_vector.hpp
                 static_vector_instances.hpp
+                tagged_tree.hpp
+                tagged_tree_instances.hpp
+                tagged_tree_schemes.hpp
                 topo_fold.hpp
                 traversable.hpp
 )
@@ -43,6 +47,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             functor.test.cpp
             identity.test.cpp
             monoid.test.cpp
+            node_f.test.cpp
             parse_error.test.cpp
             result.test.cpp
             result_instances.test.cpp
@@ -50,6 +55,9 @@ if(SCHEMEPOC_ENABLE_TESTING)
             source_span.test.cpp
             static_vector.test.cpp
             static_vector_instances.test.cpp
+            tagged_tree.test.cpp
+            tagged_tree_instances.test.cpp
+            tagged_tree_schemes.test.cpp
             topo_fold.test.cpp
             traversable.test.cpp
     )

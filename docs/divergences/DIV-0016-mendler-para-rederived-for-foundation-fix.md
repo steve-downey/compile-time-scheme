@@ -49,3 +49,14 @@ The paramorphic (rather than catamorphic) variant is the right one for the same 
 ## Revisit condition
 
 Closed when either fixed-point type is retired in favour of the other, or when `smd::fixpoint::mendler_para` is generalised to accept any type exposing one functor layer (a concept rather than a concrete `Fix<F>`), at which point the local copy can be deleted and the call site pointed back at the library.
+
+## 2026-08-01: R3's schemes supersede this for the rebuild tree
+
+`src/smd/cl/foundation/tagged_tree_schemes.hpp` lands `cata`/`para` and
+`scan_down` as linear folds over the columnar tree, and deliberately no
+Mendler variant: over a materialized column the children's results are
+computed by position before the parent is visited, so the recurse-knob
+this record argues for has nothing left to turn there. `para` carries
+the tree and the node's own index, which is this record's actual driver
+— the algebra that needs the node itself. The two `mendler_para` copies
+this record describes remain what the frozen trees use.
