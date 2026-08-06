@@ -135,6 +135,19 @@ ctest_: compile
 .PHONY: test
 test: ctest_ ## Rebuild and run tests
 
+# Debug is -O0 and Asan is -O3, and neither witnesses what the other does:
+# -O0 shows unspecified evaluation order in its naive form, -O3 shows
+# constant-folding and lowering defects and is where the sanitizers have
+# anything to trap. See docs/verification-matrix.md.
+_test_matrix_configs ?= Debug Asan
+
+.PHONY: test-matrix
+test-matrix: ## Rebuild and run tests in each of $(_test_matrix_configs)
+	@for cfg in $(_test_matrix_configs); do \
+		echo "=== $@: CONFIG=$$cfg ==="; \
+		$(MAKE) --no-print-directory CONFIG="$$cfg" test || exit 1; \
+	done
+
 .PHONY: cmake
 cmake: |  $(_build_path)
 	cd $(_build_path) && ${run_cmake}
