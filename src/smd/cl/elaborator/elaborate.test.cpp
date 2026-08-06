@@ -14,22 +14,28 @@
 #include <string_view>
 #include <variant>
 
+using smd::cl::core::core_block;
 using smd::cl::core::core_call;
 using smd::cl::core::core_character;
 using smd::cl::core::core_cons;
+using smd::cl::core::core_defun;
 using smd::cl::core::core_fixnum;
 using smd::cl::core::core_if;
 using smd::cl::core::core_keyword;
+using smd::cl::core::core_lambda;
 using smd::cl::core::core_leaf;
 using smd::cl::core::core_nil;
 using smd::cl::core::core_progn;
 using smd::cl::core::core_quoted_symbol;
+using smd::cl::core::core_return_from;
 using smd::cl::core::core_string;
 using smd::cl::core::core_t;
 using smd::cl::core::core_tag;
 using smd::cl::core::core_tree;
+using smd::cl::core::core_unwind_protect;
 using smd::cl::core::core_variable;
 using smd::cl::elaborator::elaborate;
+using smd::cl::elaborator::elaborate_into;
 using smd::cl::foundation::and_then;
 using smd::cl::foundation::result;
 using smd::cl::reader::datum_tree;
@@ -300,6 +306,161 @@ constexpr auto deferred_quoted_syntax_is_diagnosed() -> bool {
 }
 
 // ------------------------------------------------------------------
+// Definitions and non-local exit
+// ------------------------------------------------------------------
+
+// (defun f (x) x) is three nested nodes: a defun over a lambda over a block
+// named for the function. The block is ANSI 3.1.2.1.2.2's implicit one, and
+// the nesting is what lets each node say exactly one thing.
+constexpr auto defun_nests_defun_lambda_block() -> bool {
+    sym_table symbols;
+    auto const r = elaborate_text("(defun f (x) x)", symbols);
+    auto const f = symbols.find("F");
+    auto const x = symbols.find("X");
+    if (!r.has_value() || !f || !x) {
+        return false;
+    }
+    auto const &t = r.value();
+    auto const &defun = t.branch(t.root());
+    if (!std::holds_alternative<core_defun>(defun.tag) ||
+        defun.children.size() != 1) {
+        return false;
+    }
+    auto const &lambda = t.branch(defun.children[0]);
+    if (!std::holds_alternative<core_lambda>(lambda.tag) ||
+        lambda.children.size() != 1) {
+        return false;
+    }
+    auto const &block = t.branch(lambda.children[0]);
+    return std::get<core_defun>(defun.tag).name == *f &&
+           std::get<core_lambda>(lambda.tag).params.size() == 1 &&
+           std::get<core_lambda>(lambda.tag).params[0] == *x &&
+           std::holds_alternative<core_block>(block.tag) &&
+           std::get<core_block>(block.tag).name == *f &&
+           block.children.size() == 1 &&
+           t.leaf(block.children[0]) == core_leaf{core_variable{*x}};
+}
+
+// The name and the lambda list are *names*, not expressions, so neither is
+// elaborated as one: `f` does not become an unbound variable reference, and
+// a parameter does not become a lookup of itself.
+constexpr auto a_function_name_is_not_an_expression() -> bool {
+    sym_table symbols;
+    auto const r = elaborate_text("(defun f (x) 1)", symbols);
+    if (!r.has_value()) {
+        return false;
+    }
+    auto const &t = r.value();
+    // defun, lambda, block, and the one literal. Nothing was emitted for the
+    // name or for the parameter.
+    return t.size() == 4;
+}
+
+constexpr auto defun_takes_a_body_of_any_length() -> bool {
+    auto const empty = elaborated("(defun f ())");
+    auto const several = elaborated("(defun f (x) 1 2 3)");
+    return empty.has_value() &&
+           empty.value().branch(empty.value().root()).children.size() == 1 &&
+           several.has_value();
+}
+
+constexpr auto malformed_definitions_are_diagnosed() -> bool {
+    return fails("(defun)") && fails("(defun f)") &&
+           // The name must be a symbol, and NIL and T are constants.
+           fails("(defun 1 (x) x)") && fails("(defun nil (x) x)") &&
+           // The lambda list must be a list of symbols.
+           fails("(defun f x x)") && fails("(defun f (1) x)") &&
+           // Lambda list keywords are diagnosed rather than bound as if they
+           // were ordinary parameters.
+           fails("(defun f (&optional x) x)");
+}
+
+constexpr auto blocks_carry_their_name_in_the_tag() -> bool {
+    sym_table symbols;
+    auto const r = elaborate_text("(block here 1 2)", symbols);
+    auto const here = symbols.find("HERE");
+    if (!r.has_value() || !here) {
+        return false;
+    }
+    auto const &root = r.value().branch(r.value().root());
+    return std::holds_alternative<core_block>(root.tag) &&
+           std::get<core_block>(root.tag).name == *here &&
+           root.children.size() == 2;
+}
+
+// return-from's value is optional; without one the node has no children at
+// all, and the machine supplies nil.
+constexpr auto return_from_takes_an_optional_value() -> bool {
+    sym_table symbols;
+    auto const with =
+        elaborate_text("(block here (return-from here 1))", symbols);
+    auto const without =
+        elaborate_text("(block here (return-from here))", symbols);
+    auto const here = symbols.find("HERE");
+    if (!with.has_value() || !without.has_value() || !here) {
+        return false;
+    }
+    auto const &exit = with.value().branch(
+        with.value().branch(with.value().root()).children[0]);
+    auto const &bare = without.value().branch(
+        without.value().branch(without.value().root()).children[0]);
+    return std::holds_alternative<core_return_from>(exit.tag) &&
+           std::get<core_return_from>(exit.tag).name == *here &&
+           exit.children.size() == 1 && bare.children.empty();
+}
+
+constexpr auto malformed_exits_are_diagnosed() -> bool {
+    return fails("(block)") && fails("(block 1 2)") && fails("(return-from)") &&
+           fails("(return-from 1)") && fails("(return-from here 1 2)");
+}
+
+// unwind-protect's children are the protected form and then the cleanups,
+// all of them ordinary expressions.
+constexpr auto unwind_protect_is_protected_form_then_cleanups() -> bool {
+    auto const r = elaborated("(unwind-protect 1 2 3)");
+    if (!r.has_value()) {
+        return false;
+    }
+    auto const &root = r.value().branch(r.value().root());
+    auto const bare = elaborated("(unwind-protect 1)");
+    return std::holds_alternative<core_unwind_protect>(root.tag) &&
+           root.children.size() == 3 &&
+           // ANSI's grammar is `unwind-protect protected-form cleanup-form*`,
+           // so no cleanup at all is legal; no protected form is not.
+           bare.has_value() &&
+           bare.value().branch(bare.value().root()).children.size() == 1 &&
+           fails("(unwind-protect)");
+}
+
+// A special operator is only special because a symbol named it. Shadowing is
+// not attempted here, but a name the source never mentions is not resolved
+// at all, which is why recognition costs nothing per form.
+constexpr auto an_unmentioned_operator_is_not_resolved() -> bool {
+    sym_table symbols;
+    auto const r = elaborate_text("(f 1)", symbols);
+    return r.has_value() && !symbols.find("DEFUN").has_value() &&
+           !symbols.find("UNWIND-PROTECT").has_value();
+}
+
+// Several top-level forms share one core arena, which is what lets a
+// closure made by an earlier form name a node that is still there when a
+// later form calls it.
+constexpr auto several_forms_share_one_arena() -> bool {
+    sym_table symbols;
+    tree program;
+    auto const first = read<datum_nodes, datum_list>("1", symbols);
+    auto const second = read<datum_nodes, datum_list>("2", symbols);
+    if (!first.has_value() || !second.has_value()) {
+        return false;
+    }
+    auto const first_root = elaborate_into(first.value(), symbols, program);
+    auto const second_root = elaborate_into(second.value(), symbols, program);
+    return first_root.has_value() && second_root.has_value() &&
+           first_root.value() == 0 && second_root.value() == 1 &&
+           program.size() == 2;
+}
+
+// ------------------------------------------------------------------
 // Error propagation
 // ------------------------------------------------------------------
 
@@ -350,6 +511,16 @@ static_assert(quoted_lists_do_not_call_cons());
 static_assert(nested_quotation_materializes_the_operator());
 static_assert(quote_takes_exactly_one_argument());
 static_assert(deferred_quoted_syntax_is_diagnosed());
+static_assert(defun_nests_defun_lambda_block());
+static_assert(a_function_name_is_not_an_expression());
+static_assert(defun_takes_a_body_of_any_length());
+static_assert(malformed_definitions_are_diagnosed());
+static_assert(blocks_carry_their_name_in_the_tag());
+static_assert(return_from_takes_an_optional_value());
+static_assert(malformed_exits_are_diagnosed());
+static_assert(unwind_protect_is_protected_form_then_cleanups());
+static_assert(an_unmentioned_operator_is_not_resolved());
+static_assert(several_forms_share_one_arena());
 static_assert(the_leftmost_atom_error_wins());
 static_assert(exhausted_capacity_is_an_error());
 static_assert(too_many_subforms_is_an_error());
@@ -385,6 +556,25 @@ TEST_CASE("ElaborateTest - Quotation") {
     CHECK(nested_quotation_materializes_the_operator());
     CHECK(quote_takes_exactly_one_argument());
     CHECK(deferred_quoted_syntax_is_diagnosed());
+}
+
+TEST_CASE("ElaborateTest - Definitions") {
+    CHECK(defun_nests_defun_lambda_block());
+    CHECK(a_function_name_is_not_an_expression());
+    CHECK(defun_takes_a_body_of_any_length());
+    CHECK(malformed_definitions_are_diagnosed());
+}
+
+TEST_CASE("ElaborateTest - NonLocalExit") {
+    CHECK(blocks_carry_their_name_in_the_tag());
+    CHECK(return_from_takes_an_optional_value());
+    CHECK(malformed_exits_are_diagnosed());
+    CHECK(unwind_protect_is_protected_form_then_cleanups());
+}
+
+TEST_CASE("ElaborateTest - ProgramArena") {
+    CHECK(an_unmentioned_operator_is_not_resolved());
+    CHECK(several_forms_share_one_arena());
 }
 
 TEST_CASE("ElaborateTest - ErrorPropagation") {

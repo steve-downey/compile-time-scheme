@@ -25,6 +25,25 @@ static_assert(!make_vec().empty());
 static_assert(make_vec()[0] == 1);
 static_assert(make_vec()[1] == 2);
 
+constexpr auto popped() {
+    auto xs = make_vec();
+    xs.pop_back();
+    return xs;
+}
+
+static_assert(popped().size() == 1);
+static_assert(popped()[0] == 1);
+
+// A pop then a push reuses the slot rather than growing past it.
+constexpr auto popped_then_pushed() {
+    auto xs = popped();
+    xs.push_back(9);
+    return xs;
+}
+
+static_assert(popped_then_pushed().size() == 2);
+static_assert(popped_then_pushed()[1] == 9);
+
 static_assert(static_vector<int, 4>{}.empty());
 static_assert(static_vector<int, 4>{}.size() == 0);
 static_assert(static_vector<int, 4>{}.capacity() == 4);
@@ -105,6 +124,17 @@ TEST_CASE("StaticVectorTest - CapacityIsFixed") {
     v.push_back(1);
     CHECK(v.capacity() == 4);
     CHECK(v.size() < v.capacity());
+}
+
+TEST_CASE("StaticVectorTest - PopBackShrinks") {
+    static_vector<int, 4> v;
+    v.push_back(10);
+    v.push_back(20);
+    v.pop_back();
+    CHECK(v.size() == 1);
+    CHECK(v[0] == 10);
+    v.pop_back();
+    CHECK(v.empty());
 }
 
 TEST_CASE("StaticVectorTest - MutatingAccess") {
