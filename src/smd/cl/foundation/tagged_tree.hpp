@@ -64,6 +64,7 @@ struct tree_link {
 /// nothing capacity-shaped leaks into node identity (decision D14);
 /// the capacities parameterise the tree because the tree is storage.
 ///
+// 87923031-20f5-4ce0-81cd-3045681573da
 /// Two invariants govern this type. They are not the same invariant, and
 /// only the first is the container's to keep.
 ///
@@ -96,6 +97,7 @@ struct tree_link {
 /// `elaborator::lower_atoms` calls the leftmost bad one. That is a
 /// diagnostic moving without a scheme moving, so if I2 ever has to hold
 /// for a new builder, test it at that builder.
+// 87923031-20f5-4ce0-81cd-3045681573da end
 ///
 /// @tparam Leaf        Leaf payload type; must be default-constructible
 ///                     (node storage is a @ref static_vector).
@@ -274,6 +276,7 @@ template <std::ranges::input_range R>
         std::variant<Leaf, tree_branch<Tag, MaxChildren>>>
 constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::from_nodes(
     R &&node_range, int root) -> tagged_tree {
+    // 23e9cc39-2345-456a-a6b2-31fb81f9023d
     tagged_tree built;
     built.nodes_.append_range(std::forward<R>(node_range));
     // Checked before relink rather than after: link_children would index
@@ -301,6 +304,7 @@ tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::is_children_before_parent() const
                    });
         });
 }
+// 23e9cc39-2345-456a-a6b2-31fb81f9023d end
 
 template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
 constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::link_children(
