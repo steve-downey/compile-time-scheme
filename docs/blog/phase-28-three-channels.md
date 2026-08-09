@@ -1,12 +1,12 @@
 **DRAFT &#x2014; pending author revision**
 
-<div class="abstract" id="org72d7078">
+<div class="abstract" id="orgc3198a0">
 <p>
 Step R5 gives the rebuild an evaluator.
 An evaluated form finishes in one of three ways: with a value, with a diagnosed error, or with an unwind in flight, and <code>eval::outcome</code> makes those three alternatives of one type, so control flow never travels in the error channel.
 That's decision D13, and the pivot's sentinel messages compared by pointer identity are deleted rather than ported.
 <code>unwind-protect</code> is the form the split breaks, and it gets rebuilt as a continuation frame.
-The evaluator itself is a small-step abstract machine, because evaluation is the one traversal in this pipeline that can't be a fold.
+The evaluator itself is a small-step abstract machine, because evaluation is the one traversal in this pipeline the tree's folds can not carry, and saying why means answering phase 7, which already ran <code>if</code> inside a fold once.
 And <code>(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))</code> works, inside a <code>static_assert</code>.
 </p>
 
@@ -142,9 +142,9 @@ One case doesn't re-emit. If a cleanup form itself completes with an error or an
 I'd rather not oversell the split. D13 says so too: restoring a dynamic binding stays in ordinary C++ control flow, because it brackets a callee's whole extent instead of a single completion, and nothing about having three channels helps with it. Splitting is better where the thing being expressed is a completion. There are no special variables in this tree yet, so I haven't had to prove that half.
 
 
-# Evaluation is not a fold
+# Evaluation is an unfold
 
-Phase 27 ended on a question: whether an evaluator over the same core tree could stay in the shape the elaborator is in: three named schemes and no recursive descent, because a `tagged_tree` built children-before-parent has its nodes in topological order already. I wrote that I didn't see why it couldn't, and that this wasn't the same as knowing. It couldn't, and it isn't close. But having `cata` on the shelf is what makes that a checkable claim instead of a mood: the fold the machine isn't is a named thing with laws, and the reasons it isn't one are the reasons below.
+Phase 27 ended on a question: whether an evaluator over the same core tree could stay in the shape the elaborator is in: three named schemes and no recursive descent, because a `tagged_tree` built children-before-parent has its nodes in topological order already. I wrote that I didn't see why it couldn't, and that this wasn't the same as knowing. It couldn't, and the answer took two goes to state, because my first one was wrong in a way worth keeping in the post.
 
 ```cpp
 /// A small-step abstract machine that evaluates an elaborated core tree.
@@ -270,7 +270,15 @@ class machine {
 };
 ```
 
-A catamorphism visits every node once, in an order the structure fixes (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991). Evaluation visits one arm of an `if` and never the other, visits a function body once per call and not once per node, and past a `return-from` visits nothing at all. Those aren't awkward cases to be handled inside a fold; they're the reason the fold doesn't typecheck as a description of what's happening. So the coding rules' preference for a traversal typeclass over hand-written recursion runs out here, and what replaces it is the other classical answer: continuation-passing style with the continuations defunctionalized (Reynolds, John C., 1972) (Danvy, Olivier and Nielsen, Lasse R., 2001). `k_if`, `k_sequence`, `k_arguments`, `k_block`, `k_return_from` and `k_protect` are the continuation constructors, a `static_vector` of them is the continuation, and `step` is `apply`.
+A catamorphism visits every node once, in an order the structure fixes (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991). Evaluation visits one arm of an `if` and never the other, visits a function body once per call and not once per node, and past a `return-from` visits nothing at all. A plain fold has no way to say any of that.
+
+But I have to be more careful than that, because this series solved this problem inside a fold once already. Phase 7's interpreter is a Mendler-style fold (Mendler, Nax Paul, 1987): the algebra receives `recurse` as an argument and decides what to do with it, so `if` evaluates its condition, recurses into the arm it chose, and never touches the other; a closure keeps its own node, and a body is recursed into once per call, in the environment the call built. Selective descent is the whole point of the Mendler shape, and `smd::fixpoint::mendler_para` is still in this repository, tested, doing it. "Evaluation can't be a fold" would have been news to me in June.
+
+What killed it is that the tree changed underneath it. Phase 7's interpreter needed a `Comp` tree &#x2014; `Fix`, `Box`, a child reached through a pointer &#x2014; and the recurse-knob exists to decide when to chase one. A `tagged_tree` has no pointer to chase and no descent to decide: children's results are computed by position, before the parent is looked at, which is why `tagged_tree_schemes.hpp` offers `cata` and `para` and deliberately no Mendler variant, and why `para`'s comment claims it subsumes the Mendler motivation on this representation. The knob has nothing left to turn. Getting it back means building the pointer tree again, beside the columnar one, with a second full spelling of every node kind and capacities back inside the types &#x2014; which is DIV-0016 and D14, the two things the rebuild was argued for.
+
+And having said that, "evaluation is not a fold" is still the wrong sentence, because it describes the machine by what it isn't. Evaluation isn't a traversal of the syntax tree at all. A call evaluates a body once per call rather than once per node, so what evaluation actually recurses over is the trace, and the tree only seeds it. Recursion over a structure you consume is a fold; corecursion over a state space you produce is an unfold (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991), and an unfold is exactly what `step` and `step_status` are: a coalgebra, and its signal for *this state is final*. The frames fold the results back as they pop. So the machine is a scheme after all, and it is the one the rules didn't happen to name, because `docs/cpp-rules.md` was written about trees and this isn't a tree.
+
+The pieces are the other classical answer: continuation-passing style with the continuations defunctionalized (Reynolds, John C., 1972) (Danvy, Olivier and Nielsen, Lasse R., 2001). `k_if`, `k_sequence`, `k_arguments`, `k_block`, `k_return_from` and `k_protect` are the continuation constructors, a `static_vector` of them is the continuation, and `step` is `apply`.
 
 That leaves exactly one loop in the whole evaluator, and it isn't in the evaluator:
 
@@ -292,7 +300,7 @@ template <class State, class Step>
 
 The budget isn't a safety net bolted on afterwards. An object program that doesn't terminate must not turn into a translation that doesn't terminate: an unbounded loop under constant evaluation is a compiler that hangs, with no output and nothing to read. So the step count is part of the contract, and running out of it is diagnosed the same ordinary way every capacity in this tree is diagnosed. The same is true of depth. No evaluation recursion is C++ recursion here, so how deep a program may go is `limits::frames`, a number in a struct. The compiler's own stack doesn't come into it.
 
-`foundation/` grew two things for this and no more: `static_vector::pop_back`, because a continuation stack is the substrate's first client that shrinks, and `trampoline.hpp` itself. Whether `trampoline` is the right shape is a question a second backend answers, and the second backend is R7.
+`foundation/` grew two things for this and no more: `static_vector::pop_back`, because a continuation stack is the substrate's first client that shrinks, and `trampoline.hpp` itself. Whether `trampoline` is the right shape is a question a second backend answers, and the second backend is R7. There's a warning on file for it, and I think the warning has expired. `docs/fixpoint-mendler-reference.md` says a CPS trampoline linearizes the argument structure that `Fix<CompF>` preserved, so the pivot's sender backend could hand independent arguments to `when_all` and a step loop could not. Written about the pointer tree, that was true. Over a column it's backwards: `evaluate_subforms` has the whole independent set in its hand at once, as `branch.children`, and `k_arguments` walks it left to right because I wrote one frame that walks, not because anything was lost. A frame that forks is a frame.
 
 
 # Five new tags, and D18's bar
@@ -770,6 +778,8 @@ What I can't tell yet is how much of the rest is right. Twenty-six `static_asser
 Danvy, Olivier and Nielsen, Lasse R. (2001). *Defunctionalization at Work*.
 
 Meijer, Erik and Fokkinga, Maarten and Paterson, Ross (1991). *Functional Programming with Bananas, Lenses, Envelopes and Barbed Wire*.
+
+Mendler, Nax Paul (1987). *Recursive Types and Type Constraints in Second-Order Lambda Calculus*.
 
 Reynolds, John C. (1972). *Definitional interpreters for higher-order programming languages*.
 

@@ -340,11 +340,17 @@ Once Common Lisp is the third working client.
 | R3 | 26 | a readtable-shaped reader, and one arena tree with instances from the start |
 | R4 | 27 | elaboration as three index folds; why a catamorphism needs no stack |
 | R5 | 28 | one evaluator, three channels; recursive `defun` at last |
-| R6 | 29 | conformance against external authority |
-| R7 | 30 | the sender backend, second time around |
-| R8 | 31 | extracting the kit |
+| — | 29 | the Mendler interpreter the rebuild does not have, and a tree's two invariants |
+| R6 | 30 | conformance against external authority |
+| R7 | 31 | the sender backend, second time around |
+| R8 | 32 | extracting the kit |
 
 Titles and framing belong to whoever drafts each post; the subjects above are the phase's own claim on a reader's attention, not a brief.
+
+Post 29 has no phase, recorded 2026-08-08: it documents a reconsideration of phase 28's argument about Mendler folds, and the substrate repair that came out of it, neither of which is a step of this plan.
+The rest of the column shifted down by one rather than the post going unnumbered, because the series has numbered every entry since phase 0 and the index, the nav links and `docs/blog/pins.md` all assume it.
+D20's three-agent sequence applied to it unchanged; a post that is not a phase's deliverable still gets the distance.
+Expect this again — the plan does not own the blog, and work that is worth a post but is not a step should take the next number rather than wait for one.
 
 ---
 
