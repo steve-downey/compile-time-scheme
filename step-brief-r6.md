@@ -86,6 +86,34 @@ step-brief-r6.md                    (retire), step-brief-r7.md (write)
 - **The informal SBCL differential check is still pending.**
   No CL implementation is installed here, so R3's reader syntax, R4's elaboration and R5's evaluation semantics were all derived from the specification and pinned by tests. Run the cross-check when sbcl arrives (plan §4, tier 3).
 
+## For the R7 brief: the sender backend's shape is a choice, not an inheritance
+
+R6 writes `step-brief-r7.md`, and that brief must pose the following as a decision the R7 agent opens the step by making, not something inherited from R5 by default.
+
+**Rule out the obvious wrong answer first.** Porting the pivot's Mendler sender interpreter (`src/smd/smdlisp/sender/sender_eval.hpp`, and the Scheme `sender_mendler_eval.hpp` behind it) is not an option, and a brief that leaves it looking like one will get it built.
+It needs a pointer-shaped tree — `Fix`, `Box`, the `Comp` tree of `smdscheme/sender/comp_tree.hpp` — which is a second full spelling of every core node kind beside the columnar one (DIV-0016 priced this at "a step's worth of work on its own and buys nothing"), and `Comp` puts capacities inside types (`comp_lambda<A, MaxList>`, `env<CompT, 16>`), which is the D14 violation the rebuild exists to remove.
+`src/smd/cl/foundation/` has no Mendler scheme and needs none: `para` already carries the node itself, and over a materialized column there is no descent for a recurse-knob to choose (DIV-0016, 2026-08-01 note).
+
+- **Shape one: drive the machine.**
+  A sender or scheduler loop around `machine::step` — `foundation::trampoline` generalised, which is the question R5 left it holding.
+  Keeps `limits::steps` and `limits::frames` exactly as R5 diagnosed them, and reuses `eval::outcome` unchanged.
+- **Shape two: the machine with a forking argument frame.**
+  `k_arguments` walks `branch.children` left to right; the independent set is *already in hand* at `machine::evaluate_subforms`, so exposing it to `when_all` is a change to one frame's scheduling, not a change of representation or of scheme.
+  This is what the pivot's `when_all` demonstration bought, without the pointer tree.
+- **The standing prediction, and why it has expired.**
+  `docs/fixpoint-mendler-reference.md` § "Applicative Parallelism Preserved" predicts that a CPS trampoline linearizes the argument structure `Fix<CompF>` preserves, and R5's evaluator is that trampoline.
+  That claim was about the pointer tree, where independence is only visible to whoever holds the sub-`Box`es; on a columnar tree it inverts, since the whole child list is one `static_vector` on the branch.
+  R7 should record this — a dated note on DIV-0016, or a correction at the head of the reference doc, which currently reads as live guidance for a foundation that no longer exists.
+- **What favours senders regardless of shape.**
+  D13's `outcome` maps one-to-one onto the completion channels — value/error/unwind against `set_value`/`set_error`/`set_stopped` (`docs/compiler_architecture.org` § "A sender has three completion channels, and that is a semantic resource"), which is the observation that produced D13 in the first place.
+- **Do not reuse R5's depth argument here.**
+  Phase 28 justifies the machine partly because each recursion would be a C++ activation record under `-fconstexpr-depth`.
+  That argument does not transfer: DIV-0015 is accepted-permanent, `connect`/`start`/`sync_wait` are not constant-evaluable, so this backend has no compile-time evidence to protect.
+  What survives is ordinary runtime stack depth, which is a weaker reason and should be stated as the weaker one.
+- **Scope any `when_all` demonstration honestly.**
+  Left-to-right argument evaluation is the conforming order (ANSI 3.1.2.1.2.3) as soon as an argument can have effects, and D19 aims at full ANSI.
+  Whatever R7 shows must be scoped to the effect-free fragment or presented as visible graph structure, never as a claim about evaluation order.
+
 ## Flag for the next docs-owning step
 
 None of these were edited by R5, per its own file list.

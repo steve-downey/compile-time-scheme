@@ -57,6 +57,16 @@ Every source file opens with the repo-relative path and Emacs mode line, then SP
   A new operation over an AST is a new algebra, not a new `switch` or another wide `std::visit` ladder.
   `std::visit` may dispatch the alternatives of a single node inside an algebra; it must not drive the recursion.
   Reach for `para` exactly when the algebra must read the node as syntax — a name in head position, a binding list — and say so at the call site.
+  There is no Mendler scheme here and no need of one: over a materialized column the children's results are computed by position before the parent is visited, so a recurse-knob has nothing to turn, and `para` already carries the node itself (DIV-0016, 2026-08-01).
+- **A corecursion over a state space is an unfold, and its loop is `foundation::trampoline`.**
+  The rule above is about consuming a tree. Evaluation does not consume the core tree — it produces a trace the tree only seeds, which is why `eval::machine` is a small-step machine and not a fold: `step` is the coalgebra, `step_status` says whether the state is final, and the frame stack folds results back as it pops.
+  Write a machine this way when descent is selective (an `if` arm, a body per call, an unwind in flight), and extend it with a new frame alternative, never with a new recursion.
+  The payoff is the reason to insist: no evaluation recursion is C++ recursion, so depth and steps are diagnosed capacities (`limits::frames`, `limits::steps`) instead of `-fconstexpr-depth` and a hung compiler.
+- **Know which of a tree's two invariants your pass depends on.**
+  `tagged_tree` guarantees **I1**, children before parent, so index order is *a* topological order. It does not guarantee **I2**, that leaf index order is left-to-right source order — that holds only because the reader and the elaborator build children left to right, and no type can check it.
+  A scheme (`cata`, `para`, `scan_down`) needs I1 alone and needs no law of its algebra: children arrive through the branch's own child list, so the answer is a function of shape, not of layout.
+  An element fold (`fold_map`, `fold_right`, `traverse`) visits in *index* order, so under a non-commutative monoid — or a `result` applicative, where the leftmost error wins — its answer depends on layout, and depends on I2 to mean "leftmost in the source".
+  Assembling a node sequence by hand rather than mapping one is the only way to break I1; `tagged_tree::is_children_before_parent` is the precondition of `from_nodes` made checkable, and both it and `add_branch` assert it.
 - **Error propagation is `traverse`.**
   Threading `result` through a structure is `traverse` over the result applicative, not an `if (!r.has_value()) return r;` ladder.
 - **`constexpr` everything; `consteval` what cannot be runtime.**

@@ -1,5 +1,22 @@
 # Fixpoint and Mendler-Style Interpretation: A Reference
 
+> **Status (2026-08-06): history for `src/smd/cl/**`, current for the frozen trees.**
+> Everything below describes the `Fix<F>` / `Box<A>` / `Comp` foundation of
+> `smdscheme` and `smdlisp`, where a child is reached through a pointer.
+> The rebuild tree has no such type: `foundation/node_f.hpp` is the base functor,
+> `tagged_tree` is its fixed point at `R = int`, and `tagged_tree_schemes.hpp`
+> supplies `cata`/`para`/`scan_down` and deliberately no Mendler variant —
+> over a materialized column the children's results are computed by position
+> before the parent is visited, so a recurse-knob has nothing to turn
+> (DIV-0016, 2026-08-01).
+> Two sections below invert on that representation rather than merely not
+> applying: § "Why Environment-Threading Breaks Catamorphisms", whose cases are
+> answered by `para` plus a small-step machine (phase 28), and § "Applicative
+> Parallelism Preserved", whose warning that a CPS trampoline linearizes
+> independent arguments is false on a columnar tree — a branch's whole child
+> list is one `static_vector`, held at once by `machine::evaluate_subforms`.
+> Do not plan `src/smd/cl/**` work from this document.
+
 ## Motivation
 
 The `sender_cps_program.hpp` backend builds sender graphs and immediately `sync_wait`s them at every node, defeating the compositional purpose of senders.

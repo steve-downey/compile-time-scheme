@@ -12,6 +12,8 @@
 #include <smd/cl/foundation/result.hpp>
 #include <smd/cl/foundation/static_vector.hpp>
 
+#include <algorithm>
+#include <cassert>
 #include <concepts>
 #include <functional>
 #include <ranges>
@@ -114,6 +116,14 @@ template <class A, int Capacity, std::ranges::input_range Layers, class Alg>
 /// value usually depends on where the element sits, not only on what its
 /// parent concluded; the caller's other columns are a capture away.
 ///
+/// Unlike @ref fold_up's, this precondition is checkable here and is
+/// checked: a parent column is a range of positions, so the fold can see
+/// what it requires. @ref fold_up is handed layers whose child positions
+/// only the algebra knows how to find, so its own precondition can not be
+/// stated in terms of anything it holds — which is why the tree that
+/// satisfies it carries the check instead
+/// (@c tagged_tree::is_children_before_parent).
+///
 /// @tparam A        The step's carrier (explicit; default-constructible,
 ///                  because the column is materialized before it is
 ///                  filled).
@@ -133,6 +143,12 @@ template <class A, int Capacity, std::ranges::random_access_range Parents,
 [[nodiscard]] constexpr auto fold_down(Parents const &parents, Step step)
     -> static_vector<A, Capacity> {
     int const count = static_cast<int>(std::ranges::distance(parents));
+    assert(std::ranges::all_of(
+        std::views::enumerate(parents), [](auto const &entry) {
+            auto const &[index, parent] = entry;
+            return static_cast<int>(parent) < 0 ||
+                   static_cast<int>(parent) > static_cast<int>(index);
+        }));
     auto done = static_vector<A, Capacity>::filled(count, A{});
     for (int index = count - 1; index >= 0; --index) { // substrate generic
                                                        // algorithm

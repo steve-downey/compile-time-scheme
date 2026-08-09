@@ -140,6 +140,85 @@ constexpr auto from_nodes_of_nothing_is_the_default_tree() -> bool {
     return tree::from_nodes(tree{}.nodes(), -1) == tree{};
 }
 
+// I1: every tree a builder can produce satisfies the invariant the
+// recursion schemes read children through, and so does everything
+// from_nodes will accept. The predicate exists so that from_nodes' third
+// precondition is checkable by a caller assembling a node sequence rather
+// than mapping one, which is the only way a forward reference can arise —
+// add_branch can not name a node that does not exist yet.
+constexpr auto built_trees_satisfy_i1() -> bool {
+    return sample_tree().is_children_before_parent() &&
+           tree{}.is_children_before_parent() &&
+           tree::from_nodes(sample_tree().nodes(), sample_tree().root())
+               .is_children_before_parent();
+}
+
+// A hand-assembled sequence is the case the predicate is for: this one
+// satisfies I1, so from_nodes accepts it. The negative case — a branch
+// naming a higher index — is a precondition violation and therefore
+// untestable by design; it is asserted, not diagnosed.
+constexpr auto a_synthesised_sequence_can_be_checked_before_use() -> bool {
+    std::array<tree::node_type, 3> nodes{};
+    nodes[0] = tree::node_type{7};
+    nodes[1] = tree::node_type{8};
+    tree::child_list children;
+    children.push_back(0);
+    children.push_back(1);
+    nodes[2] = tree::node_type{tree::branch_type{'L', children}};
+    auto const built = tree::from_nodes(nodes, 2);
+    return built.is_children_before_parent() && built.size() == 3 &&
+           built.link(0) == smd::cl::foundation::tree_link{2, 0} &&
+           built.link(1) == smd::cl::foundation::tree_link{2, 1};
+}
+
+// I1 is weaker than I2, and this is the witness: two trees of the same
+// shape — a branch over leaves 4 then 9, in that order — laid out in two
+// different topological orders. Both satisfy I1, and they are different
+// tagged_tree values, which is why the Foldable laws survive an element
+// order that depends on layout. What the two layouts then do to a fold is
+// pinned next door, in tagged_tree_schemes.test.cpp's
+// cata_and_fold_map_disagree_on_permuted_trees; this one is about the
+// invariant rather than its consequence.
+constexpr auto source_order_layout() -> tree { // 4 at 0, 9 at 1
+    tree t;
+    int const first = t.add_leaf(4);
+    int const second = t.add_leaf(9);
+    tree::child_list children;
+    children.push_back(first);
+    children.push_back(second);
+    t.set_root(t.add_branch('L', children));
+    return t;
+}
+
+constexpr auto other_layout() -> tree { // 9 at 0, 4 at 1; same child order
+    tree t;
+    int const second = t.add_leaf(9);
+    int const first = t.add_leaf(4);
+    tree::child_list children;
+    children.push_back(first);
+    children.push_back(second);
+    t.set_root(t.add_branch('L', children));
+    return t;
+}
+
+constexpr auto i1_admits_more_than_one_layout_of_a_shape() -> bool {
+    auto const source = source_order_layout();
+    auto const other = other_layout();
+    return source.is_children_before_parent() &&
+           other.is_children_before_parent() &&
+           // the same shape: same tag, same ordered children
+           source.branch(source.root()).tag == other.branch(other.root()).tag &&
+           source.leaf(source.branch(source.root()).children[0]) ==
+               other.leaf(other.branch(other.root()).children[0]) &&
+           source.leaf(source.branch(source.root()).children[1]) ==
+               other.leaf(other.branch(other.root()).children[1]) &&
+           // and not the same value, because layout is part of the value
+           !(source == other) &&
+           // which is exactly the difference between I1 and I2
+           std::ranges::equal(source.leaves(), std::array{4, 9}) &&
+           std::ranges::equal(other.leaves(), std::array{9, 4});
+}
+
 } // namespace
 
 static_assert(builds_and_reads_back());
@@ -156,6 +235,9 @@ static_assert(from_nodes_rebuilds_links());
 static_assert(from_nodes_round_trips());
 static_assert(from_nodes_without_a_root());
 static_assert(from_nodes_of_nothing_is_the_default_tree());
+static_assert(built_trees_satisfy_i1());
+static_assert(a_synthesised_sequence_can_be_checked_before_use());
+static_assert(i1_admits_more_than_one_layout_of_a_shape());
 
 TEST_CASE("TaggedTreeTest - HeaderIsIdempotent") { REQUIRE(true); }
 
@@ -196,6 +278,12 @@ TEST_CASE("TaggedTreeTest - FromNodesRoundTrips") {
     CHECK(from_nodes_round_trips());
     CHECK(from_nodes_without_a_root());
     CHECK(from_nodes_of_nothing_is_the_default_tree());
+    CHECK(a_synthesised_sequence_can_be_checked_before_use());
+}
+
+TEST_CASE("TaggedTreeTest - ChildrenBeforeParentIsCheckable") {
+    CHECK(built_trees_satisfy_i1());
+    CHECK(i1_admits_more_than_one_layout_of_a_shape());
 }
 
 TEST_CASE("TaggedTreeTest - LinksAreTheTransposeOfTheChildLists") {

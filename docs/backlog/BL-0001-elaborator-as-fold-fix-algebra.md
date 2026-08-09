@@ -1,7 +1,7 @@
 # BL-0001: rewrite the elaborators as `fold_fix` algebras
 
-- **Status:** scheduled — split across steps R1 and R4 of `docs/cl-rebuild-plan.md`
-- **Date:** 2026-07-30, updated 2026-07-31
+- **Status:** landed — R1 deleted `fold_fix`; R4 shipped the named schemes (`src/smd/cl/foundation/tagged_tree_schemes.hpp`) and the traversal elaborator
+- **Date:** 2026-07-30, updated 2026-07-31, closed 2026-08-06
 - **Origin:** the closing aside of the retired root-level `plan-refactor-arena-box.md` (deleted 2026-07-30; see `git log -- plan-refactor-arena-box.md`) — "since we have `fold_fix`, the elaborator can possibly be written as an algebra `DatumF<Core> -> Core`". Every other phase of that plan had shipped; this was the only part never attempted.
 - **Frozen-tree impact:** none as of D11, which retires the D1 freeze.
 

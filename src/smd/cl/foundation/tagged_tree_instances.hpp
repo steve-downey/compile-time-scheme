@@ -7,10 +7,25 @@
 // where decision D15's Foldable and Traversable instances live for both.
 //
 // Traversal order contract for every instance in this header: leaves are
-// visited in ascending node-index order. Because tagged_tree construction
-// is children-before-parent, a builder that adds children left to right
-// (the reader, the elaborator) makes this exactly left-to-right source
-// order. For traverse, effects are sequenced in that same order.
+// visited in ascending node-index order. For traverse, effects are
+// sequenced in that same order.
+//
+// Index order, and not tree shape, is what that contract names — which
+// makes these instances the ones that depend on tagged_tree's I2 and not
+// merely on I1. A monoid that does not commute, or an applicative whose
+// apply picks a side (result takes the leftmost error), returns an answer
+// about the layout the builder chose. Two trees of identical shape, laid
+// out in two different topological orders, are two different tagged_tree
+// values and fold to two different results; the laws hold because layout
+// is part of the value, not because the fold ignores it. Both halves are
+// pinned in tagged_tree_schemes.test.cpp — cata agrees with fold_map on a
+// built tree, and disagrees on a permuted one.
+//
+// The instances are usable because the builders in this project add each
+// node's children left to right and the parent after them, which makes
+// index order left-to-right source order. That is I2, no part of it is
+// checked here, and a builder that drops it changes what "the leftmost
+// error" means without changing anything in this file.
 #ifndef SRC_SMD_CL_FOUNDATION_TAGGED_TREE_INSTANCES_HPP
 #define SRC_SMD_CL_FOUNDATION_TAGGED_TREE_INSTANCES_HPP
 
