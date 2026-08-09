@@ -60,3 +60,29 @@ this record argues for has nothing left to turn there. `para` carries
 the tree and the node's own index, which is this record's actual driver
 — the algebra that needs the node itself. The two `mendler_para` copies
 this record describes remain what the frozen trees use.
+
+## 2026-08-06: R5 settles the evaluation half — the machine, not a Mendler fold
+
+The one client the 2026-08-01 note left open — selective descent,
+evaluation — landed in R5 as a defunctionalised-CPS abstract machine
+(`src/smd/cl/eval/machine.hpp`), so the rebuild tree now contains no
+Mendler scheme at all: `cata`/`para` carry elaboration, and evaluation
+declined the fold entirely, because each `recurse` in a Mendler
+interpreter is a C++ activation record, and the rebuild requires depth
+and steps to be diagnosed capacities under constant evaluation
+(`limits::frames`, `limits::steps`; phase 28 § "Evaluation is not a
+fold").
+One prediction on file is now obsolete rather than pending, and it is
+recorded here because the document carrying it does not say so.
+`docs/fixpoint-mendler-reference.md` § "Applicative Parallelism
+Preserved" predicts that a CPS trampoline linearizes the independent
+argument structure `Fix<CompF>` preserves for `when_all`. R5's
+evaluator is that trampoline, so the prediction appears to name it. It
+does not: the claim holds where children are reached through separate
+`Box`es, and inverts on a columnar tree, where a branch's whole child
+list is one `static_vector` that `machine::evaluate_subforms` holds at
+once. `k_arguments` evaluates left to right by choice of frame, not
+because the structure was erased. That whole reference doc describes
+the `Fix`/`Box`/`Comp` foundation, which `src/smd/cl/` does not have;
+it should be read as history for the rebuild tree.
+The revisit condition above is unchanged.
