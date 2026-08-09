@@ -1,6 +1,6 @@
 **DRAFT &#x2014; pending author revision**
 
-<div class="abstract" id="org4a2e00d">
+<div class="abstract" id="orgcd424fb">
 <p>
 No step of the rebuild landed here.
 Phase 28 said evaluation is the one traversal in this pipeline that can't be a fold, and phase 7 of this same series evaluated <code>if</code> inside a fold, selectively, and shipped a post about it.
@@ -37,29 +37,20 @@ That's selective descent, and it's a fold with the uniformity requirement droppe
 
 # The knob has nothing to turn
 
-The representation is what ruled the Mendler fold out.
+The representation is what ruled the Mendler fold out, and phase 28 now says so in two sentences, so here is the part that doesn't fit in two sentences: the price.
 
-Phase 5 built `Fix<CompF>`, where a child is a `Box` and reaching it is dereferencing a pointer. The recurse-knob exists to decide when to chase one. A `tagged_tree` has no pointer to chase and no descent to decide: children's results are computed by position, before the parent is looked at, so by the time an algebra sees a node its children are already values. `tagged_tree_schemes.hpp` offers `cata` and `para` and no Mendler variant, and `para`'s comment claims it subsumes the Mendler motivation on this representation, on the grounds that everything the knob could have reached is in the accumulator already, by position.
-
-Getting the knob back means building the pointer tree again beside the columnar one: a second full spelling of every core node kind, and capacities back inside the types (`comp_lambda<A, MaxList>`, `env<CompT, 16>`). DIV-0016 priced that at a step's worth of work that buys nothing, and D14 is the decision that capacities don't belong in node identity. Those are two of the reasons the rebuild was argued for in the first place, which makes this a nice test of whether the argument holds when it's inconvenient.
+Phase 5 built `Fix<CompF>`, where a child is a `Box` and reaching it is dereferencing a pointer, and the recurse-knob exists to decide when to chase one. Getting the knob back means building that tree again beside the columnar one: a second full spelling of every core node kind, and capacities back inside the types (`comp_lambda<A, MaxList>`, `env<CompT, 16>`). DIV-0016 priced that at a step's worth of work that buys nothing, and D14 is the decision that capacities don't belong in node identity. Those are two of the reasons the rebuild was argued for in the first place, which makes this a nice test of whether the argument holds when it's inconvenient.
 
 There's a second reason, however, and it's the cheaper one to state. Every `recurse` in a Mendler interpreter is a C++ activation record, so under constant evaluation the object program's depth is the compiler's `-fconstexpr-depth`. This tree wants that number to be `limits::frames`, diagnosed like every other capacity.
 
-
-# A machine is a scheme too
-
-Having got that far I still didn't like the sentence, because it says what the machine isn't.
-
-Evaluation isn't a traversal of the syntax tree at all. A call evaluates a body once per call rather than once per node, so what the evaluator recurses over is the trace, and the tree only seeds it. Recursion over a structure you consume is a fold; corecursion over a state space you produce is an unfold (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991), and `step` and `step_status` are a coalgebra and its signal for *this state is final*. The frames fold the results back as they pop.
-
-So `docs/cpp-rules.md` has a new rule sitting next to the one about `cata`: a corecursion over a state space is an unfold, its loop is `foundation::trampoline`, and you extend such a machine with a new frame alternative and never with a new recursion. The rules hadn't named it because the rules were written about trees.
+And the sentence still wasn't right even then, because it says what the machine isn't. Phase 28 carries where that came out (evaluation recurses over the trace, and the tree only seeds it, so the machine is an unfold (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991) with a name of its own), along with the new rule in `docs/cpp-rules.md` that names it. What's worth adding here is only that the rules hadn't named it because the rules were written about trees, and a document that has been right about trees for four phases is a hard thing to notice the edge of.
 
 
 # The warning that inverted
 
 `docs/fixpoint-mendler-reference.md` is the design document behind phases 5 through 8, and it has been sitting in `docs/` reading like live guidance for a foundation this tree doesn't have. Two of its sections don't merely fail to apply, they come out backwards.
 
-"Why Environment-Threading Breaks Catamorphisms" lists the two cases as lazy `if` and a body evaluated in the extended environment; both are answered here by `para` plus a machine. "Applicative Parallelism Preserved" is the interesting one. It predicts that a CPS trampoline linearizes the independent argument structure `Fix<CompF>` preserves, so a sender backend can hand independent arguments to `when_all` and a step loop can't. R5's evaluator is a CPS trampoline, so the warning looks like it was written about it. On a column it's the other way round: a branch's whole child list is one `static_vector`, `machine::evaluate_subforms` has it in hand all at once, and `k_arguments` walks it left to right because I wrote one frame that walks.
+"Why Environment-Threading Breaks Catamorphisms" lists the two cases as lazy `if` and a body evaluated in the extended environment; both are answered here by `para` plus a machine. "Applicative Parallelism Preserved" is the one phase 28 already takes apart: its prediction that a CPS trampoline linearizes what `Fix<CompF>` preserved is true of a pointer tree and backwards on a column. What that post doesn't say is that the prediction has been sitting in `docs/` for four phases with nothing marking it as spent, which is the part that worries me more than the claim did.
 
 The document gets a status header saying not to plan `src/smd/cl/**` work from it. DIV-0016 gets a dated note recording the prediction as obsolete rather than pending, since the document carrying it doesn't say so itself. And R7's brief gets the decision instead of the inheritance: porting the pivot's Mendler sender interpreter is ruled out, and a `when_all` demonstration, if there's one to make, comes from an argument frame that forks. Scoped honestly, too. Left-to-right argument evaluation is the conforming order as soon as an argument can have effects (ANSI 3.1.2.1.2.3) (Steele, Guy L., 1990), so whatever R7 shows is either about the effect-free fragment or about visible graph structure, and never about evaluation order.
 
