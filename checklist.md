@@ -106,9 +106,10 @@ R0–R4 landed before that was recorded; `docs/blog-backfill-plan.md` covers the
 - [x] Step R3: reader and core AST — the tree as its own base functor's fixed point, with instances and schemes — `src/smd/cl/reader`, `src/smd/cl/core`, `foundation/tagged_tree`
 - [x] Step R4: elaborator as three schemes (D15) — `traverse` atoms, `scan_down` roles, `para_short` emission — `src/smd/cl/elaborator`, `foundation::and_then`
 - [x] Step R5: one evaluator, three channels (D13) — recursive `defun` is the acceptance witness — `src/smd/cl/eval`, `foundation/trampoline`, `symbol::intern_checked` (+ phase 28)
-- [ ] Step R6: conformance corpus and differential oracle (D16) (brief: `step-brief-r6.md`) (+ phase 29)
-- [ ] Step R7: sender backend (D17) (+ phase 30)
-- [ ] Step R8: extract the kit (+ phase 31)
+- [x] No step: the two invariants of a `tagged_tree`, and `from_nodes`' unchecked precondition — a reconsideration of phase 28's Mendler argument, `is_children_before_parent` and three asserts (+ phase 29)
+- [ ] Step R6: conformance corpus and differential oracle (D16) (brief: `step-brief-r6.md`) (+ phase 30)
+- [ ] Step R7: sender backend (D17) (+ phase 31)
+- [ ] Step R8: extract the kit (+ phase 32)
 
 ## Blog backfill (docs/blog-backfill-plan.md)
 

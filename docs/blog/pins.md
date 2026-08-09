@@ -32,6 +32,7 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-26-reader-core-ast.org` | `57ce8ea` | `blog/phase-26` | `Merge step R3`, tagged retroactively (era 3) |
 | `phase-27-elaboration.org` | `47d2094` | `blog/phase-27` | `Merge step R4`, tagged retroactively (era 3) |
 | `phase-28-three-channels.org` | `f0f3734` | `blog/phase-28` | `Merge step R5` (tag created at the merge, before the post) |
+| `phase-29-answering-phase-7.org` | `0e7e740` | `blog/phase-29` | `Merge tree-invariant-anchors` (tag created at the merge, before the post) |
 
 78 transclusions across 17 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
