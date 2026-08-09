@@ -75,11 +75,10 @@ struct monad : protected Impl {
                          MA const &argument_value) {
         return self.bind(
             function_value, [&self, &argument_value](auto const &function) {
-                return self.bind(argument_value,
-                                 [&self, &function](auto const &argument) {
-                                     return self.pure(
-                                         std::invoke(function, argument));
-                                 });
+                return self.bind(
+                    argument_value, [&self, &function](auto const &argument) {
+                        return self.pure(std::invoke(function, argument));
+                    });
             });
     }
 };

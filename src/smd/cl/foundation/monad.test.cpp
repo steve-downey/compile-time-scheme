@@ -44,11 +44,12 @@ static_assert(bind(result<int>{8}, halve).value() == halve(8).value());
 static_assert(!bind(result<int>{7}, halve).has_value());
 
 // Right identity: m >>= pure == m
-static_assert(
-    bind(result<int>{5}, [](int v) { return result<int>{v}; }).value() == 5);
-static_assert(
-    !bind(result<int>{failure}, [](int v) { return result<int>{v}; })
-         .has_value());
+static_assert(bind(result<int>{5}, [](int v) {
+                  return result<int>{v};
+              }).value() == 5);
+static_assert(!bind(result<int>{failure}, [](int v) {
+                   return result<int>{v};
+               }).has_value());
 
 // Associativity: (m >>= f) >>= g == m >>= (\x -> f x >>= g)
 constexpr auto left_assoc = bind(bind(result<int>{8}, halve), halve);
@@ -78,8 +79,8 @@ static_assert(join(result<result<int>>{result<int>{3}}).value() == 3);
 static_assert(!join(result<result<int>>{failure}).has_value());
 static_assert(!join(result<result<int>>{result<int>{failure}}).has_value());
 
-static_assert(
-    result_monad_map{}.then(result<int>{1}, result<int>{2}).value() == 2);
+static_assert(result_monad_map{}.then(result<int>{1}, result<int>{2}).value() ==
+              2);
 static_assert(
     !result_monad_map{}.then(result<int>{failure}, result<int>{2}).has_value());
 
@@ -94,9 +95,8 @@ static_assert(!invoke(add, result<int>{failure}, result<int>{3}).has_value());
 static_assert(!invoke(add, result<int>{2}, result<int>{failure}).has_value());
 
 // Leftmost error wins when both operands failed.
-static_assert(
-    invoke(add, result<int>{failure}, result<int>{other_failure}).error() ==
-    failure);
+static_assert(invoke(add, result<int>{failure}, result<int>{other_failure})
+                  .error() == failure);
 
 TEST_CASE("MonadTest - LawsHoldAtRuntimeToo") {
     CHECK(bind(result<int>{8}, halve).value() == 4);

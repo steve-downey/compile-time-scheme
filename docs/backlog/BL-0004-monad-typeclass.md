@@ -1,6 +1,6 @@
 # BL-0004: finish the Monad typeclass — `and_then`'s home, and why `fold_left_short` keeps its loop
 
-- **Status:** open — partially landed on branch `monad-typeclass`, unverified against the project toolchain
+- **Status:** open — partially landed on branch `monad-typeclass`, verified on GCC 16
 - **Date:** 2026-08-09
 - **Origin:** a question about phase 24's "A fold that stops" — whether `fold_left_short` is classically a `foldM` or a right fold with delayed evaluation, whether the loop honours the spirit of D15's exemption, and whether rewriting it would be better, worse, or indifferent.
 - **Frozen-tree impact:** none.
@@ -132,12 +132,18 @@ intended here.
 
 The landed part is additive: one new header, one new test file, two CMake
 lines, and a `result_instances.hpp` change whose only semantic content is that
-`apply` is now nested `bind`s instead of hand-written branches. Verified only
-as far as this session could: every `static_assert` in `monad.test.cpp` passes
-under Clang 18, and `result_instances`, `result`, `fold_left_short`,
-`foldable`, `traversable` and `applicative` test translation units still
-compile there against a stub `catch_test_macros.hpp`. **`make test-matrix` has
-not been run. Treat the branch as unverified until it has.**
+`apply` is now nested `bind`s instead of hand-written branches.
+
+Verified on GCC 16 (`g++-16 16.0.1 20260322 trunk r16-8246`), 2026-08-09:
+`make test-matrix` green in both configs — Debug 1066/1066 and Asan 1066/1066,
+`MonadTest` among them — and `make lint` green after clang-format reflowed the
+two new files. The `static_assert`s carry the real weight, since they pass by
+virtue of compiling; the two `TEST_CASE`s add five runtime assertions.
+
+Note that the 1066 includes the two new `MonadTest` cases, so the pre-existing
+count was 1064; deriving `apply` from `bind` changed no test's outcome, which
+is the result that matters — the hand-written applicative and the monad-derived
+one agree on every case the suite already exercised.
 
 The unlanded part is wider — five headers plus tests gain an include — but is
 mechanical and fully checked by the compiler.
