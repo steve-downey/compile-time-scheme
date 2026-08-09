@@ -17,6 +17,11 @@ namespace smd::cl::foundation {
 /// An effect type a fold can stop on: it can be asked whether it succeeded,
 /// and carries a value on success and an error otherwise.
 /// @ref result models this.
+///
+/// This is deliberately a structural constraint and not @c monad
+/// (<smd/cl/foundation/monad.hpp>). Asking an effect whether it has already
+/// failed is exactly the operation a Monad does not have, and exactly the
+/// one a strict @c foldM needs; see @ref fold_left_short.
 template <class E>
 concept short_circuit_effect = requires(E const &e) {
     { e.has_value() } -> std::convertible_to<bool>;
@@ -31,6 +36,29 @@ concept short_circuit_effect = requires(E const &e) {
 /// failed step is returned immediately and no later element is visited —
 /// this early exit is the difference from @c std::ranges::fold_left and
 /// from @c traverse, both of which visit every element.
+///
+/// This is @c foldM, written as a loop over @ref short_circuit_effect
+/// rather than derived from @c bind. That is a deliberate choice against
+/// the classical definition
+/// `foldM f z xs = foldr (\x k z -> f z x >>= k) return xs z`, and the
+/// reason is strictness rather than taste: @c bind skips the *work* after a
+/// failure, because it never invokes its function, but it does not stop the
+/// *iteration*. Haskell's `foldM` stops the traversal only because `>>=` is
+/// lazy in `k` — the unevaluated tail of the whole fold is its second
+/// argument. Under strict evaluation something has to ask the effect
+/// whether it has already failed, and only the fold is in a position to act
+/// on the answer.
+///
+/// Materializing that `foldr`'s accumulated continuation is not possible
+/// here anyway: `k`'s type changes at every step, so a runtime-length range
+/// would need type erasure — the same limit @ref foldable records for not
+/// deriving @c fold_right from @c fold_map. Naming the continuation
+/// recursively instead does work and needs no @c has_value at all, but
+/// spends constexpr call depth linear in the range where this loop spends
+/// O(1). For a compile-time compiler, where this fold runs inside an
+/// already-deep constexpr evaluation, that is the deciding cost.
+/// docs/backlog/BL-0004-monad-typeclass.md carries the measurement and its
+/// caveats.
 ///
 /// @tparam Range An input range.
 /// @tparam Acc   Accumulator type.
