@@ -52,6 +52,14 @@ materialize(static_vector<A, MaxNodes> const &done,
 /// first and the whole catamorphism is one linear pass: no stack, no
 /// recursion, no bound on nesting depth.
 ///
+/// This needs I1 (@ref tagged_tree) and nothing else, and in particular
+/// needs no law of the algebra — not commutativity, not associativity.
+/// The children reach the algebra through the branch's own child list, in
+/// that list's order, so two layouts of one shape give one answer, and
+/// which topological order the builder chose is invisible here. That is
+/// not true of the Foldable and Traversable instances, whose element
+/// order *is* index order; see I2.
+///
 /// @tparam A   The algebra's carrier (explicit).
 /// @tparam Alg Callable: `A(node_f<Leaf, Tag, A, MaxChildren> const&)`.
 /// @pre the tree has a root

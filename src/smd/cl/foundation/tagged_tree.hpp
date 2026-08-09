@@ -10,6 +10,7 @@
 #include <smd/cl/foundation/node_f.hpp>
 #include <smd/cl/foundation/static_vector.hpp>
 
+#include <algorithm>
 #include <cassert>
 #include <concepts>
 #include <ranges>
@@ -63,12 +64,38 @@ struct tree_link {
 /// nothing capacity-shaped leaks into node identity (decision D14);
 /// the capacities parameterise the tree because the tree is storage.
 ///
-/// Construction is children-before-parent: a branch may only refer to
-/// nodes that already exist, so node index order is a topological order
-/// with every child preceding its parent. A builder that adds children
-/// left to right (as the reader does) therefore leaves the leaves in
-/// left-to-right source order — the order the typeclass instances in
-/// <smd/cl/foundation/tagged_tree_instances.hpp> document.
+/// Two invariants govern this type. They are not the same invariant, and
+/// only the first is the container's to keep.
+///
+/// **I1 — children before parent. Guaranteed here.** A branch may only
+/// name nodes that already exist, so every child's index is strictly less
+/// than its parent's, and node index order is therefore *a* topological
+/// order. @ref add_branch establishes it, @ref from_nodes requires it,
+/// and @ref is_children_before_parent is the predicate both are stated in
+/// terms of. I1 is the whole of what the recursion schemes in
+/// <smd/cl/foundation/tagged_tree_schemes.hpp> need, and it is enough for
+/// them: an algebra receives its children through the branch's own child
+/// list and never sees an index, so a scheme's answer is a function of
+/// the tree's *shape* and not of its layout.
+///
+/// **I2 — leaves in source order. Not guaranteed here.** I1 admits many
+/// layouts of one shape, since any topological order satisfies it, and
+/// the element-wise operations are not indifferent to which one they got.
+/// Foldable and Traversable visit leaves in ascending index order
+/// (<smd/cl/foundation/tagged_tree_instances.hpp>), so `fold_map` under a
+/// non-commutative monoid, and the leftmost error of a `traverse`, are
+/// answers about the layout as much as about the tree. Index order is
+/// left-to-right source order exactly when the builder adds each node's
+/// children left to right and the parent after them — which the reader
+/// and the elaborator do, and which this class can not check, because
+/// nothing in a finished tree records how it was built.
+///
+/// The consequence to keep in view: a builder that keeps I1 and drops I2
+/// — one emitting by level, or hash-consing shared subtrees — leaves
+/// every scheme's answer unchanged and silently changes which atom
+/// `elaborator::lower_atoms` calls the leftmost bad one. That is a
+/// diagnostic moving without a scheme moving, so if I2 ever has to hold
+/// for a new builder, test it at that builder.
 ///
 /// @tparam Leaf        Leaf payload type; must be default-constructible
 ///                     (node storage is a @ref static_vector).
@@ -103,8 +130,19 @@ class tagged_tree {
     /// the nodes they named before. Nothing has to walk an index range to
     /// arrange that.
     ///
+    /// I1 is a *precondition* here and not a consequence, which is the one
+    /// way this differs from building a tree an edge at a time: @ref
+    /// add_branch can not accept a forward reference, because the node it
+    /// would name does not exist yet, whereas a node sequence handed over
+    /// whole can contain one. A caller mapping @ref nodes preserves I1 for
+    /// free by preserving indices; a caller synthesising a sequence must
+    /// establish it, and @ref is_children_before_parent is how.
+    ///
     /// @pre the range's length is <= @p MaxNodes
     /// @pre @p root is -1 (no root) or an index into the range
+    /// @pre the range satisfies I1: every child index in a branch is
+    ///      non-negative and strictly less than that branch's own index
+    ///      (@ref is_children_before_parent)
     template <std::ranges::input_range R>
         requires std::convertible_to<std::ranges::range_reference_t<R>,
                                      node_type>
@@ -116,6 +154,13 @@ class tagged_tree {
     constexpr auto add_leaf(Leaf leaf) -> int;
 
     /// Appends a branch node and returns its index.
+    ///
+    /// Establishes I1 for the node it adds: an existing node is one at a
+    /// lower index, so a branch built this way can not name a forward
+    /// reference. The precondition is checked, because violating it
+    /// corrupts the tree in a way no later operation reports — a scheme
+    /// reads a child's result before it has one.
+    ///
     /// @pre size() < capacity()
     /// @pre every index in @p children names an existing node
     constexpr auto add_branch(Tag tag, child_list children) -> int;
@@ -177,6 +222,20 @@ class tagged_tree {
     /// the column to zip against when a pass reads both.
     [[nodiscard]] constexpr auto links() const -> std::span<tree_link const>;
 
+    /// Returns true if the tree satisfies I1: every branch's child indices
+    /// are non-negative and strictly less than the branch's own index.
+    ///
+    /// This is the tree's structural invariant made checkable, so that the
+    /// precondition of @ref from_nodes can be stated in code rather than
+    /// only in prose, and so that a builder assembling a node sequence by
+    /// hand has something to assert against. Every tree built through
+    /// @ref add_leaf and @ref add_branch satisfies it by construction; the
+    /// query exists for the trees that were not.
+    ///
+    /// It says nothing about I2 — a tree can satisfy this and still have
+    /// its leaves in an order no source text ever had.
+    [[nodiscard]] constexpr auto is_children_before_parent() const -> bool;
+
     // HIDDEN FRIEND
     friend constexpr auto operator==(tagged_tree const &, tagged_tree const &)
         -> bool = default;
@@ -217,11 +276,30 @@ constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::from_nodes(
     R &&node_range, int root) -> tagged_tree {
     tagged_tree built;
     built.nodes_.append_range(std::forward<R>(node_range));
+    // Checked before relink rather than after: link_children would index
+    // links_ through a forward reference, so a violation is out of bounds
+    // there and merely wrong here.
+    assert(built.is_children_before_parent());
     built.relink();
     if (root >= 0) {
         built.set_root(root);
     }
     return built;
+}
+
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+constexpr auto
+tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::is_children_before_parent() const
+    -> bool {
+    return std::ranges::all_of(
+        std::views::enumerate(nodes()), [](auto const &entry) {
+            auto const &[index, node] = entry;
+            auto const *branch = std::get_if<branch_type>(&node);
+            return branch == nullptr ||
+                   std::ranges::all_of(branch->children, [index](int child) {
+                       return child >= 0 && child < static_cast<int>(index);
+                   });
+        });
 }
 
 template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
@@ -258,6 +336,8 @@ template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
 constexpr auto tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::add_branch(
     Tag tag, child_list children) -> int {
     int const index = nodes_.size();
+    assert(std::ranges::all_of(
+        children, [index](int child) { return child >= 0 && child < index; }));
     links_.push_back(tree_link{});
     link_children(index, children);
     nodes_.push_back(

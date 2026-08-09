@@ -97,6 +97,14 @@ A catamorphism ascends, an inherited-attribute scan descends through the transpo
 Raw index loops are permitted only inside the substrate's own generic algorithms.
 This is a style rule that is really an architecture rule: the loop count is a consequence of arena indices plus wide `std::visit`, and it does not fall without changing that shape.
 
+Scope of the linearity claim, recorded 2026-08-08: the sentence above is too broad by one pass, and it is the pass that carries diagnostics.
+Children-before-parent gives *a* topological order, and that is the whole of what a scheme needs — `cata`, `para` and `scan_down` reach children through a branch's own child list, so their answers are a function of the tree's shape and not of which topological order the builder chose.
+No law of the algebra is required there either, neither associativity nor commutativity.
+The Foldable and Traversable instances are not in that position: they visit leaves in *index* order, so `fold_map` under a non-commutative monoid, and the leftmost error of a `traverse` over the result applicative, are answers about the layout as much as about the tree.
+Index order is left-to-right source order only because the reader and the elaborator add children left to right, which is a property of those builders and not one any type can check — so a later builder that emits by level or hash-conses shared subtrees would keep every scheme's answer and silently change which atom `lower_atoms` calls the leftmost bad one.
+Both invariants are now named where they live, as I1 and I2 in `src/smd/cl/foundation/tagged_tree.hpp`; I1 is checkable as `is_children_before_parent` and asserted in `add_branch` and `from_nodes`, and `docs/cpp-rules.md` carries the operative statement for anyone writing a pass.
+The decision itself is unchanged, and this is a correction rather than an overturning: a traversal is still a typeclass instance and never hand-written recursion. What was wrong is the claim underneath it, which licensed three passes with an argument that reaches two.
+
 **D16 — Conformance is measured against external authority.**
 Adopted from `compile-time-forth`'s D14 and D23.
 Correctness evidence comes from a corpus derived from the standard and from a differential oracle running a reference implementation, not from tests written against this implementation's behaviour.
