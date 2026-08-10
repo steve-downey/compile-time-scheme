@@ -558,7 +558,7 @@ template <class Ctx>
 [[nodiscard]] constexpr auto
 emit_quoted_list(Ctx &ctx, typename Ctx::source_children const &elements)
     -> foundation::result<int> {
-    return foundation::and_then(
+    return foundation::bind(
         add_leaf_checked(ctx, core::core_leaf{core::core_nil{}}),
         [&ctx, &elements](int tail) {
             return foundation::fold_left_short(
@@ -582,18 +582,18 @@ template <class Ctx>
 [[nodiscard]] constexpr auto
 emit_quoted_operator(Ctx &ctx, typename Ctx::source_children const &children,
                      std::string_view name) -> foundation::result<int> {
-    return foundation::and_then(
+    return foundation::bind(
         intern_checked(ctx.symbols, name),
         [&ctx, &children](symbol::symbol_id operator_id) {
-            return foundation::and_then(
+            return foundation::bind(
                 add_leaf_checked(ctx, core::core_leaf{core::core_quoted_symbol{
                                           operator_id}}),
                 [&ctx, &children](int head) {
-                    return foundation::and_then(
+                    return foundation::bind(
                         add_leaf_checked(ctx,
                                          core::core_leaf{core::core_nil{}}),
                         [&ctx, &children, head](int tail) {
-                            return foundation::and_then(
+                            return foundation::bind(
                                 make_pair(ctx, children[0], tail),
                                 [&ctx, head](int rest) {
                                     return make_pair(ctx, head, rest);
@@ -642,7 +642,7 @@ emit_conditional(Ctx &ctx, typename Ctx::source_children const &children)
         return foundation::parse_error{
             {}, "if takes a test, a then form, and an optional else form"};
     }
-    return foundation::and_then(
+    return foundation::bind(
         collect_emitted<typename Ctx::out_children>(children, 1),
         [&ctx](typename Ctx::out_children arms) {
             return add_branch_checked(ctx, core::core_tag{core::core_if{}},
@@ -658,7 +658,7 @@ emit_sequence(Ctx &ctx, typename Ctx::source_children const &children)
     if (children.size() == 1) {
         return add_leaf_checked(ctx, core::core_leaf{core::core_nil{}});
     }
-    return foundation::and_then(
+    return foundation::bind(
         collect_emitted<typename Ctx::out_children>(children, 1),
         [&ctx](typename Ctx::out_children body) {
             return add_branch_checked(ctx, core::core_tag{core::core_progn{}},
@@ -682,7 +682,7 @@ emit_call(Ctx &ctx, typename Ctx::source_children const &source_children,
         return foundation::parse_error{
             {}, "the head of a form must name a function"};
     }
-    return foundation::and_then(
+    return foundation::bind(
         collect_emitted<typename Ctx::out_children>(children, 1),
         [&ctx, callee](typename Ctx::out_children arguments) {
             return add_branch_checked(ctx,
@@ -763,7 +763,7 @@ template <class Ctx>
 [[nodiscard]] constexpr auto
 emit_named_block(Ctx &ctx, typename Ctx::source_children const &children,
                  int skip, symbol::symbol_id name) -> foundation::result<int> {
-    return foundation::and_then(
+    return foundation::bind(
         collect_emitted<typename Ctx::out_children>(children, skip),
         [&ctx, name](typename Ctx::out_children body) {
             return add_branch_checked(
@@ -800,13 +800,13 @@ emit_definition(Ctx &ctx, typename Ctx::source_children const &source_children,
     if (!name.valid()) {
         return foundation::parse_error{{}, "a function name must be a symbol"};
     }
-    return foundation::and_then(
+    return foundation::bind(
         read_lambda_list(ctx, source_children[2]),
         [&ctx, &children, name](parameter_list const &params) {
-            return foundation::and_then(
+            return foundation::bind(
                 emit_named_block(ctx, children, 3, name),
                 [&ctx, &params, name](int body) {
-                    return foundation::and_then(
+                    return foundation::bind(
                         emit_wrapper(ctx,
                                      core::core_tag{core::core_lambda{params}},
                                      body),
@@ -850,7 +850,7 @@ emit_block_exit(Ctx &ctx, typename Ctx::source_children const &source_children,
     if (!name.valid()) {
         return foundation::parse_error{{}, "a block name must be a symbol"};
     }
-    return foundation::and_then(
+    return foundation::bind(
         collect_emitted<typename Ctx::out_children>(children, 2),
         [&ctx, name](typename Ctx::out_children carried) {
             return add_branch_checked(
@@ -870,7 +870,7 @@ emit_protection(Ctx &ctx, typename Ctx::source_children const &children)
         return foundation::parse_error{
             {}, "unwind-protect takes a protected form and cleanup forms"};
     }
-    return foundation::and_then(
+    return foundation::bind(
         collect_emitted<typename Ctx::out_children>(children, 1),
         [&ctx](typename Ctx::out_children forms) {
             return add_branch_checked(
@@ -1005,7 +1005,7 @@ elaborate_into(reader::datum_tree<DatumNodes, DatumList> const &form,
                   "halves");
     using context = detail::emit_context<MaxNodes, MaxChildren, DatumNodes,
                                          DatumList, SymbolTable>;
-    return foundation::and_then(
+    return foundation::bind(
         detail::lower_atoms(form, symbols),
         [&symbols,
          &out](detail::lowered_tree<DatumNodes, DatumList> const &lowered)
@@ -1060,12 +1060,11 @@ elaborate(reader::datum_tree<DatumNodes, DatumList> const &form,
     -> foundation::result<core::core_tree<MaxNodes, MaxChildren>> {
     using out_tree = core::core_tree<MaxNodes, MaxChildren>;
     out_tree out;
-    return foundation::and_then(
-        elaborate_into(form, symbols, out),
-        [&out](int root) -> foundation::result<out_tree> {
-            out.set_root(root);
-            return out;
-        });
+    return foundation::bind(elaborate_into(form, symbols, out),
+                            [&out](int root) -> foundation::result<out_tree> {
+                                out.set_root(root);
+                                return out;
+                            });
 }
 // 53eabd7c-d0c2-4f0e-a63b-3260a0151044 end
 

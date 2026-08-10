@@ -11,6 +11,7 @@
 #include <smd/cl/eval/outcome.hpp>
 #include <smd/cl/eval/value.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/reader/read.hpp>
 
 #include <catch2/catch_test_macros.hpp>
@@ -34,7 +35,7 @@ using smd::cl::eval::value;
 using smd::cl::eval::value_cons;
 using smd::cl::eval::value_fixnum;
 using smd::cl::eval::value_symbol;
-using smd::cl::foundation::and_then;
+using smd::cl::foundation::bind;
 using smd::cl::foundation::result;
 using smd::cl::reader::datum_tree;
 using smd::cl::reader::read;
@@ -73,12 +74,12 @@ struct report {
 /// Runs @p source as one top-level form.
 constexpr auto evaluate(std::string_view source) -> report {
     table_type symbols;
-    auto const ran = and_then(
+    auto const ran = bind(
         install_builtins(symbols), [&symbols, source](standard_symbols known) {
-            return and_then(
+            return bind(
                 read<datum_nodes, datum_list>(source, symbols),
                 [&symbols, known](form_type const &form) {
-                    return and_then(
+                    return bind(
                         elaborate<core_nodes, core_children>(form, symbols),
                         [&symbols, known](
                             program_type const &program) -> result<outcome> {
@@ -117,17 +118,17 @@ constexpr auto evaluate_both(std::string_view first, std::string_view second)
     table_type symbols;
     program_type program;
     auto const ran =
-        and_then(install_builtins(symbols), [&](standard_symbols known) {
-            return and_then(
+        bind(install_builtins(symbols), [&](standard_symbols known) {
+            return bind(
                 read<datum_nodes, datum_list>(first, symbols),
                 [&](form_type const &head) {
-                    return and_then(
+                    return bind(
                         elaborate_into(head, symbols, program),
                         [&](int first_root) {
-                            return and_then(
+                            return bind(
                                 read<datum_nodes, datum_list>(second, symbols),
                                 [&, first_root](form_type const &tail) {
-                                    return and_then(
+                                    return bind(
                                         elaborate_into(tail, symbols, program),
                                         [&, first_root](int second_root)
                                             -> result<outcome> {
@@ -349,11 +350,11 @@ constexpr limits tight_steps{.cells = 32,
 constexpr auto a_spent_step_budget_is_diagnosed() -> bool {
     table_type symbols;
     auto const ran =
-        and_then(install_builtins(symbols), [&symbols](standard_symbols known) {
-            return and_then(
+        bind(install_builtins(symbols), [&symbols](standard_symbols known) {
+            return bind(
                 read<datum_nodes, datum_list>("(+ 1 (+ 2 (+ 3 4)))", symbols),
                 [&symbols, known](form_type const &form) {
-                    return and_then(
+                    return bind(
                         elaborate<core_nodes, core_children>(form, symbols),
                         [&symbols, known](
                             program_type const &program) -> result<outcome> {

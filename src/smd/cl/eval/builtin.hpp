@@ -9,6 +9,7 @@
 #include <smd/cl/foundation/fold_left_short.hpp>
 #include <smd/cl/foundation/parse_error.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
 #include <smd/cl/symbol/symbol_table.hpp>
 
@@ -123,17 +124,17 @@ using symbol_table =
 template <class SymbolTable>
 [[nodiscard]] constexpr auto install_builtins(SymbolTable &symbols)
     -> foundation::result<standard_symbols> {
-    return foundation::and_then(
+    return foundation::bind(
         symbol::intern_checked(symbols, "NIL"),
         [&symbols](symbol::symbol_id nil) {
-            return foundation::and_then(
+            return foundation::bind(
                 symbol::intern_checked(symbols, "T"),
                 [&symbols, nil](symbol::symbol_id t) {
                     return foundation::fold_left_short(
                         builtins, standard_symbols{nil, t},
                         [&symbols](standard_symbols known, builtin_entry entry)
                             -> foundation::result<standard_symbols> {
-                            return foundation::and_then(
+                            return foundation::bind(
                                 symbol::intern_checked(symbols, entry.name),
                                 [&symbols, known,
                                  op = entry.op](symbol::symbol_id id)

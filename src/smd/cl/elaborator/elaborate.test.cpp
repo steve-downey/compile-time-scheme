@@ -6,6 +6,7 @@
 
 #include <smd/cl/core/ast.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/reader/read.hpp>
 #include <smd/cl/symbol/symbol_table.hpp>
 
@@ -36,7 +37,7 @@ using smd::cl::core::core_unwind_protect;
 using smd::cl::core::core_variable;
 using smd::cl::elaborator::elaborate;
 using smd::cl::elaborator::elaborate_into;
-using smd::cl::foundation::and_then;
+using smd::cl::foundation::bind;
 using smd::cl::foundation::result;
 using smd::cl::reader::datum_tree;
 using smd::cl::reader::read;
@@ -56,11 +57,10 @@ using tree = core_tree<core_nodes, core_children>;
 
 constexpr auto elaborate_text(std::string_view text, sym_table &symbols)
     -> result<tree> {
-    return and_then(
-        read<datum_nodes, datum_list>(text, symbols),
-        [&symbols](datum_tree<datum_nodes, datum_list> const &form) {
-            return elaborate<core_nodes, core_children>(form, symbols);
-        });
+    return bind(read<datum_nodes, datum_list>(text, symbols),
+                [&symbols](datum_tree<datum_nodes, datum_list> const &form) {
+                    return elaborate<core_nodes, core_children>(form, symbols);
+                });
 }
 
 // Elaborates with a throwaway table, for the cases that do not need to ask

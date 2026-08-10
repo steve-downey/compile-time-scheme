@@ -38,13 +38,17 @@ struct result_functor_map : functor<result_functor_impl> {
 
 /// Monad @c Impl for @ref result.
 ///
-/// @c bind delegates to @ref and_then, which is this operation under the
-/// datatype's own name and predates the typeclass. Keeping one
-/// implementation means the existing @c and_then call sites in the reader,
-/// elaborator and evaluator continue to name the same code; moving the
-/// definition here, so that the datatype header stops carrying its own
-/// adaptation, is a separate change (see
-/// docs/backlog/BL-0004-monad-typeclass.md).
+/// @c bind applies @p f to the success value, or passes the error through
+/// unchanged. This was `foundation::and_then` in `result.hpp` until the
+/// typeclass existed to hold it; it lives here because a datatype does not
+/// carry its own adaptation (docs/CODING_RULES.md, Typeclass Design).
+///
+/// Decision D15 rules out the `if (!r.has_value()) return r;` ladder and
+/// names two replacements: @c traverse where there is a structure to thread
+/// the effect through, and @c fold_left_short where a sequence must stop
+/// early. This is the third shape, and the one neither covers — a single
+/// step whose input is the previous step's output, with no structure and no
+/// sequence.
 struct result_monad_impl {
     template <class V>
     constexpr auto pure(this auto &&, V &&value)
@@ -54,7 +58,12 @@ struct result_monad_impl {
 
     template <class T, class F>
     constexpr auto bind(this auto &&, result<T> const &step, F &&f) {
-        return and_then(step, std::forward<F>(f));
+        using out_type =
+            std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
+        if (!step.has_value()) {
+            return out_type{step.error()};
+        }
+        return std::invoke(std::forward<F>(f), step.value());
     }
 };
 

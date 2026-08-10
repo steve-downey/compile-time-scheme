@@ -77,37 +77,58 @@ Two concrete routes were tried:
   why `fold_right` is an instance primitive rather than derived from
   `fold_map`. Not attempted further.
 - *Recursively-named continuation.* Monomorphic, uses only `bind`, needs no
-  `has_value` anywhere. This was built and it works: it compiles under
-  `constexpr` and short-circuits correctly, reproducing `visited == 2` on the
-  input `fold_left_short.test.cpp:93` uses. Its cost is constexpr call depth
-  linear in the range length, against the loop's O(1).
+  `has_value` anywhere — and it is **drop-in**. Substituted for the loop
+  through an include overlay, it compiles and constexpr-evaluates the entire
+  pipeline (`read` → `elaborate` → `machine::run`) at every existing call
+  site. Feasibility is not the objection; depth is.
 
-**Measured, with a caveat that matters.** The container available to this
-session had GCC 13 and Clang 18 only — no GCC 16, no Catch2, no configured
-build — so nothing here ran under the project's toolchain and `make test-matrix`
-was never run. Under `clang++-18 -std=c++2b` with libstdc++ 13 and the default
-512-frame `constexpr` depth limit, folding a `static_vector<int, N>` with a
-`result<int>`-returning step:
+**Measured on GCC 16** (`g++-16 16.0.1 20260322 trunk r16-8246`,
+`-std=gnu++26`), 2026-08-09, by bisecting the minimum `-fconstexpr-depth`
+each form needs. Synthetic fold of a `static_vector<int, N>` with a
+`result<int>` step:
 
 | N | recursive `foldM` | current loop |
 |---|---|---|
-| 32 | ok | ok |
-| 64 | ok | ok |
-| 128 | depth exceeded | ok |
-| 256 | depth exceeded | ok |
+| 4 | 48 | 19 |
+| 8 | 80 | 19 |
+| 16 | 144 | 19 |
+| 32 | 272 | 19 |
+| 64 | 528 | 19 |
+| 128 | 1040 | 19 |
 
-and with the same 32-element fold placed under an artificial enclosing
-`constexpr` call depth, the recursive version failed between depth 300 and 400
-while the loop was still fine — i.e. roughly four frames per element, so a
-32-element fold consumes something like a quarter of a translation unit's
-entire budget before the enclosing evaluation is counted.
+An exact fit: `depth(N) = 8N + 16` for the recursive form, a flat 19 for the
+loop. **Eight frames per element, not the four an earlier Clang 18 measurement
+suggested** — the caveat on those numbers was warranted and the correction went
+against the recursive form.
 
-Treat the *shape* as established and the *numbers* as indicative only. They are
-specific to `result`-over-`std::variant`, to libstdc++ 13, and to Clang's
-frame accounting; GCC 16's may differ. What does not depend on the compiler is
-that the recursive form is O(n) in a budget the loop is O(1) in, and that this
-fold runs inside `elaborate()`, which is itself constexpr-evaluated — so the
-budget is already partly spent when it is reached.
+Over the real pipeline rather than the synthetic fold, quoting a list of N
+symbols:
+
+| list length | recursive `foldM` | current loop |
+|---|---|---|
+| 4 | 171 | 60 |
+| 8 | 171 | 60 |
+| 16 | 178 | 60 |
+| 32 | 306 | 60 |
+
+The loop is flat at 60 frames whatever the input; the recursive form reaches
+306, or 60% of the 512 default, on a 32-element list. Both fit, so this is a
+margin argument and not a correctness one — 452 frames of headroom against
+206.
+
+Three claims from the pre-GCC-16 version of this note were wrong and are
+withdrawn. The recursive derivation is not infeasible, only costlier. Depth
+tracks *actual* data length and not declared capacity, so "a fold over
+`default_max_nodes` (256) does not fit at any nesting" was misleading —
+raising `MaxList` to 64 costs nothing by itself, as a direct test confirmed.
+And readings that showed both forms failing at a 48-element list were
+capacity exhaustion inside the machine (`static assertion failed` at any
+depth), not depth exhaustion; the same artifact made an unimplemented `let`
+look like a depth failure.
+
+What survives: the loop keeps a constant where the alternative scales with
+user data, against a ceiling that is a compiler flag rather than something
+the library controls.
 
 **On the spirit of D15.** The loop is inside a substrate generic algorithm,
 which D15 permits. It is also not what D15 is aimed at: the target is
@@ -117,9 +138,11 @@ intended here.
 
 ## Open questions
 
-- Does GCC 16 spend the same ~4 constexpr frames per element? If it is
-  dramatically cheaper the recursive derivation deserves a second look, though
-  O(n) vs O(1) in depth would still decide it for large columns.
+- ~~Does GCC 16 spend the same ~4 constexpr frames per element?~~ Answered
+  2026-08-09: eight, and the whole-pipeline peak is 306 against the loop's 60
+  on a 32-element list. Since both fit, whether the margin alone justifies
+  keeping the loop is a judgement rather than a measurement, and is the one
+  part of this item still genuinely open.
 - Should `topo_fold.hpp`'s `fold_up_short` take `short_circuit_effect` instead
   of hard-wiring `result<A>`? It re-implements the same early exit inline.
   Note it should *not* be routed through `fold_left_short`, which takes `Acc`

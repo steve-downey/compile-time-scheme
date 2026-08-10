@@ -6,6 +6,7 @@
 #include <smd/cl/eval/heap.hpp>
 #include <smd/cl/eval/value.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
 
 #include <algorithm>
@@ -56,10 +57,10 @@ template <class Heap>
 [[nodiscard]] constexpr auto extend(Heap &store, value const &env,
                                     symbol::symbol_id id, value bound)
     -> foundation::result<value> {
-    return foundation::and_then(store.cons(symbol_value(id), std::move(bound)),
-                                [&store, &env](value const &binding) {
-                                    return store.cons(binding, env);
-                                });
+    return foundation::bind(store.cons(symbol_value(id), std::move(bound)),
+                            [&store, &env](value const &binding) {
+                                return store.cons(binding, env);
+                            });
 }
 // 8a26a939-6938-4e23-a016-5328e9288d5b end
 

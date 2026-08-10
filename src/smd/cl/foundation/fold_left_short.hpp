@@ -50,15 +50,23 @@ concept short_circuit_effect = requires(E const &e) {
 /// on the answer.
 ///
 /// Materializing that `foldr`'s accumulated continuation is not possible
-/// here anyway: `k`'s type changes at every step, so a runtime-length range
-/// would need type erasure — the same limit @ref foldable records for not
-/// deriving @c fold_right from @c fold_map. Naming the continuation
-/// recursively instead does work and needs no @c has_value at all, but
-/// spends constexpr call depth linear in the range where this loop spends
-/// O(1). For a compile-time compiler, where this fold runs inside an
-/// already-deep constexpr evaluation, that is the deciding cost.
-/// docs/backlog/BL-0004-monad-typeclass.md carries the measurement and its
-/// caveats.
+/// here: `k`'s type changes at every step, so a runtime-length range would
+/// need type erasure — the same limit @ref foldable records for not deriving
+/// @c fold_right from @c fold_map.
+///
+/// Naming the continuation recursively instead *does* work. It is
+/// monomorphic, uses only @c bind, needs no @c has_value anywhere, and is
+/// drop-in: substituting it for this loop compiles and constexpr-evaluates
+/// the whole pipeline, every call site included. It is rejected on cost
+/// rather than on feasibility. Measured under GCC 16 with the default
+/// 512-frame `-fconstexpr-depth`, over the reader/elaborator/evaluator
+/// pipeline: this loop holds a flat 60 frames whatever the input, while the
+/// recursive form spends 8 frames per element and reaches 306 — 60% of the
+/// budget — on a 32-element list. Both fit today, so this is a margin
+/// argument and not a correctness one: it keeps a constant where the
+/// alternative scales with user data, against a ceiling that is a compiler
+/// flag the library does not control.
+/// docs/backlog/BL-0004-monad-typeclass.md carries the full measurement.
 ///
 /// @tparam Range An input range.
 /// @tparam Acc   Accumulator type.

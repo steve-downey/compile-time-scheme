@@ -5,6 +5,7 @@
 
 #include <smd/cl/foundation/parse_error.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/foundation/source_pos.hpp>
 #include <smd/cl/reader/cursor.hpp>
 #include <smd/cl/reader/datum.hpp>
@@ -39,12 +40,18 @@ namespace detail {
 /// — there is no structure to @c traverse until the reader has built it —
 /// so sequential steps chain through this bind instead.
 ///
-/// It lived here until the elaborator needed the same shape; it is now
-/// @ref foundation::and_then, named here because the two calls in this
-/// header's public entry points spell it @c detail::and_then. The calls
-/// inside this namespace would find it by argument-dependent lookup
-/// regardless — @c result is a @c foundation type.
-using foundation::and_then;
+/// It lived here until the elaborator needed the same shape, and it is now
+/// the Monad instance's @c bind — @ref foundation::result_monad_impl,
+/// reached through the CPO in <smd/cl/foundation/monad.hpp>. It is named
+/// here because the two calls in this header's public entry points spell it
+/// @c detail::bind.
+///
+/// This using-declaration is load-bearing, which it was not when the
+/// operation was @c foundation::and_then. A CPO is an object, not a
+/// function template, so argument-dependent lookup does not find it: the
+/// unqualified calls inside this namespace resolve only because the name is
+/// introduced here.
+using foundation::bind;
 
 /// Everything one read shares: the tree being built, the symbol table
 /// names are interned into, and the readtable driving dispatch. The
@@ -160,18 +167,17 @@ template <class Ctx>
                                           datum_branch kind,
                                           foundation::source_pos where)
     -> foundation::result<parse_state<int>> {
-    return and_then(
-        read_node(after_marker, ctx),
-        [&](parse_state<int> const &inner)
-            -> foundation::result<parse_state<int>> {
-            typename Ctx::child_list children;
-            children.push_back(inner.value);
-            return and_then(
-                add_branch_checked(ctx, kind, children, where),
-                [&](int id) -> foundation::result<parse_state<int>> {
-                    return parse_state<int>{id, inner.rest};
+    return bind(read_node(after_marker, ctx),
+                [&](parse_state<int> const &inner)
+                    -> foundation::result<parse_state<int>> {
+                    typename Ctx::child_list children;
+                    children.push_back(inner.value);
+                    return bind(
+                        add_branch_checked(ctx, kind, children, where),
+                        [&](int id) -> foundation::result<parse_state<int>> {
+                            return parse_state<int>{id, inner.rest};
+                        });
                 });
-        });
 }
 
 /// Reads `)`-delimited elements (the opening delimiter already consumed)
@@ -191,11 +197,10 @@ template <class Ctx>
             return foundation::parse_error{cur.position(), "expected ')'"};
         }
         if (ctx.table.macro_of(cur.peek()) == macro_kind::right_paren) {
-            return and_then(
-                add_branch_checked(ctx, kind, children, where),
-                [&](int id) -> foundation::result<parse_state<int>> {
-                    return parse_state<int>{id, cur.bump()};
-                });
+            return bind(add_branch_checked(ctx, kind, children, where),
+                        [&](int id) -> foundation::result<parse_state<int>> {
+                            return parse_state<int>{id, cur.bump()};
+                        });
         }
         auto const element = read_node(cur, ctx);
         if (!element.has_value()) {
@@ -221,11 +226,10 @@ template <class Ctx>
     while (!cur.empty()) {
         char c = cur.peek();
         if (ctx.table.macro_of(c) == macro_kind::double_quote) {
-            return and_then(
-                add_leaf_checked(ctx, datum_atom{contents}, where),
-                [&](int id) -> foundation::result<parse_state<int>> {
-                    return parse_state<int>{id, cur.bump()};
-                });
+            return bind(add_leaf_checked(ctx, datum_atom{contents}, where),
+                        [&](int id) -> foundation::result<parse_state<int>> {
+                            return parse_state<int>{id, cur.bump()};
+                        });
         }
         if (ctx.table.syntax_of(c) == syntax_type::single_escape) {
             cur = cur.bump();
@@ -297,7 +301,7 @@ template <class Ctx>
         !after_first.empty() &&
         ctx.table.syntax_of(after_first.peek()) == syntax_type::constituent;
     auto const finish = [&](char value, cursor rest) {
-        return and_then(
+        return bind(
             add_leaf_checked(ctx, datum_atom{datum_character{value}}, where),
             [&](int id) -> foundation::result<parse_state<int>> {
                 return parse_state<int>{id, rest};
@@ -326,12 +330,12 @@ template <class Ctx>
 [[nodiscard]] constexpr auto read_radix_number(cursor cur, Ctx &ctx, int radix,
                                                foundation::source_pos where)
     -> foundation::result<parse_state<int>> {
-    return and_then(
+    return bind(
         scan_token(cur, ctx.table),
         [&](parse_state<token_text> const &token)
             -> foundation::result<parse_state<int>> {
             auto const finish = [&](datum_atom atom) {
-                return and_then(
+                return bind(
                     add_leaf_checked(ctx, std::move(atom), where),
                     [&](int id) -> foundation::result<parse_state<int>> {
                         return parse_state<int>{id, token.rest};
@@ -438,12 +442,12 @@ template <class Ctx>
 [[nodiscard]] constexpr auto read_token_datum(cursor cur, Ctx &ctx)
     -> foundation::result<parse_state<int>> {
     auto const where = cur.position();
-    return and_then(
+    return bind(
         scan_token(cur, ctx.table),
         [&](parse_state<token_text> const &token)
             -> foundation::result<parse_state<int>> {
             auto const finish = [&](datum_atom atom) {
-                return and_then(
+                return bind(
                     add_leaf_checked(ctx, std::move(atom), where),
                     [&](int id) -> foundation::result<parse_state<int>> {
                         return parse_state<int>{id, token.rest};
@@ -470,13 +474,13 @@ template <class Ctx>
             auto const view = token.value.view();
             bool const keyword = !token.value.has_escape && view.size() > 1 &&
                                  view.front() == ':';
-            return and_then(intern_checked(ctx.symbols, view, where),
-                            [&](symbol::symbol_id id)
-                                -> foundation::result<parse_state<int>> {
-                                return finish(
-                                    keyword ? datum_atom{datum_keyword{id}}
-                                            : datum_atom{datum_symbol{id}});
-                            });
+            return bind(intern_checked(ctx.symbols, view, where),
+                        [&](symbol::symbol_id id)
+                            -> foundation::result<parse_state<int>> {
+                            return finish(keyword
+                                              ? datum_atom{datum_keyword{id}}
+                                              : datum_atom{datum_symbol{id}});
+                        });
         });
 }
 
@@ -546,7 +550,7 @@ read_datum(cursor cur, SymbolTable &symbols,
     datum_tree<MaxNodes, MaxList> tree;
     detail::read_context<SymbolTable, MaxNodes, MaxList> ctx{tree, symbols,
                                                              table};
-    return detail::and_then(
+    return detail::bind(
         detail::read_node(cur, ctx),
         [&](parse_state<int> const &node)
             -> foundation::result<parse_state<datum_tree<MaxNodes, MaxList>>> {
@@ -563,7 +567,7 @@ template <int MaxNodes = default_max_nodes, int MaxList = default_max_list,
 [[nodiscard]] constexpr auto read(std::string_view source, SymbolTable &symbols,
                                   readtable const &table = standard_readtable)
     -> foundation::result<datum_tree<MaxNodes, MaxList>> {
-    return detail::and_then(
+    return detail::bind(
         read_datum<MaxNodes, MaxList>(cursor{source}, symbols, table),
         [&](parse_state<datum_tree<MaxNodes, MaxList>> const &state)
             -> foundation::result<datum_tree<MaxNodes, MaxList>> {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // New in this tree: the Monad typeclass. docs/CODING_RULES.md's Semantic
 // Defaults have required monad-derived Applicative semantics all along
-// against a Monad that did not exist, and result's `and_then` has been bind
+// against a Monad that did not exist, and result's `and_then` had been bind
 // under another name since R3.
 #ifndef SRC_SMD_CL_FOUNDATION_MONAD_HPP
 #define SRC_SMD_CL_FOUNDATION_MONAD_HPP
