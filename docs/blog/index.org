@@ -132,6 +132,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ No step of the rebuild landed here. Phase 28 claimed evaluation is the one traversal that can't be a fold, and phase 7 of this series had already evaluated ~if~ inside a Mendler fold; what actually rules the fold out is the representation, since a columnar tree has no pointer to chase and no descent for a recurse-knob to choose. The machine turns out to be a scheme anyway — an unfold, with ~step~ as the coalgebra — and the reference doc behind phases 5 through 8 gets a status header, because its warning that a CPS trampoline linearizes independent arguments inverts on a column. Re-reading the argument against the code found the defect: ~tagged_tree~ was carrying two invariants as one, and children-before-parent, which every scheme depends on, was documented in a comment and checked nowhere.
 
+** [[file:phase-30-asking-someone-else.org][Phase 30 — Asking Someone Else Whether the Answers Are Right]]
+
+/DRAFT — pending author revision./ Decision D16's conformance corpus: seventy-five cases, each stating its outcome by channel — value, diagnosed error, or unwind — split between thirty-five adapted from Paul Dietz's ~ansi-test~ (MIT, pinned commit) and forty hand-derived from the ANSI text, because ~ansi-test~ leans on strings, characters and the numeric tower, none of which are in scope. Only one entry, ~nil.8~, pins anything, because D16 permits a test to pin a scope-decision and never a defect; writing the other seventy-four found six new divergences. Plus ~sbcl_oracle.hpp~: a differential check against a real SBCL, shelled out to and skipped rather than failed when the binary isn't on ~PATH~, closing the weakest evidence this series has been carrying since phase 28.
+
 * Table of Contents
 
 #+toc: headlines 1

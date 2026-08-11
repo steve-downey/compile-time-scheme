@@ -1,6 +1,6 @@
-**DRAFT &#x2014; pending author revision**
+**DRAFT &mdash; pending author revision**
 
-<div class="abstract" id="org48f3f0d">
+<div class="abstract" id="org62ea107">
 <p>
 Phase 15 argued that Common Lisp's control operators are the largest control vocabulary a structured-concurrency backend can express soundly, and Phase 19 built them in two evaluators that had never met a sender.
 This is the step where they meet one.
