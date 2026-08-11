@@ -252,3 +252,35 @@ The second shows the Foreign Function Interface: an ordinary C++ function reacha
 ** Limitations
 
 This section states what the Common Lisp layer *is*; it deliberately does not restate everything it is not. [[file:cl-limitations.md][=docs/cl-limitations.md=]] is the single consolidated record of every ANSI Common Lisp divergence across the reader, the evaluation model, control flow, macros, multiple values, the sender backend, and build/constexpr limits -- consult it rather than this section for the full, itemized list.
+
+* The Common Lisp Rebuild: =smd::cl=
+
+=smd::smdlisp= above is the pivot; =smd::cl= (=docs/cl-rebuild-plan.md=) is the rebuild that supersedes it, one pipeline stage at a time, from step R1 onward. This section records only the facts steps R2, R4 and R5 asked to have carried here -- it is not a restatement of the rebuild's plan or of =docs/divergences/=, which classifies every deliberate gap the rebuild has accepted so far.
+
+** The evaluator is a machine, not a fold
+
+=smd::cl::eval::machine= (step R5) evaluates the elaborator's core tree with a small-step abstract machine rather than a recursive walk. The reason is structural, not stylistic: the elaborator's three passes (Phase 3-equivalent for this tree, =docs/cl-pivot-plan.md='s D15) are folds over node indices because a fold visits every node in a fixed order, and evaluation cannot be made into one -- it visits an =if='s arms selectively, a function body once per call rather than once per node, and, past an unwind, not at all. What evaluation *is* instead is continuation-passing style with the continuations defunctionalised: a handful of =detail::k_*= frame types are the continuation constructors, a fixed-capacity frame stack is the continuation, and =machine::step= is the transition function, driven by one =foundation::trampoline= loop rather than C++ recursion.
+
+#+transclude: [[file:../src/smd/cl/eval/machine.hpp::0b7a5e42-9d3c-4b19-83f4-6e5c2a1b7d04]] :lines 2- :src cpp :end "0b7a5e42-9d3c-4b19-83f4-6e5c2a1b7d04 end"
+
+A consequence worth stating plainly: no evaluation recursion is C++ recursion, so the depth a program may reach is a diagnosed capacity (=limits::frames=) rather than the C++ stack, at compile time as at run time -- the same discipline =limits::steps= already applies to the step count as a whole.
+
+** D13's three channels are now a type, not a discriminator convention
+
+Phase 6's "a sender has three completion channels" observation, above, is what decision D13 generalises to an ordinary evaluator: =smd::cl::eval::outcome= carries a value, a diagnosed =foundation::parse_error=, or an =unwind= in flight as three distinct alternatives of one type, the same way a receiver's =set_value=/=set_error=/=set_stopped= are three distinct functions.
+
+#+transclude: [[file:../src/smd/cl/eval/outcome.hpp::8f5b0a1c-3f0e-4f6f-95b0-2a0b4a5f6c31]] :lines 2- :src cpp :end "8f5b0a1c-3f0e-4f6f-95b0-2a0b4a5f6c31 end"
+
+This is a sharper split than the pivot's closure backends ever had (=smd::smdlisp::closure=, above): those multiplex all four of their outcomes onto one two-alternative =result= and tell the cases apart with a pair of sentinel =parse_error= messages compared by pointer identity, which is why those sentinels had to be named =inline constexpr char[]= objects rather than bare literals. None of that machinery is ported. There is nothing left to discriminate, because there is nothing left multiplexed.
+
+The consequence Phase 6 already named for senders applies here in exactly the same shape: splitting the channels means =unwind-protect='s run-the-cleanup-on-every-exit-path property is no longer a free consequence of there being only one exit path, and has to be *reconstructed*. In this machine it is reconstructed by =detail::k_protect=, a continuation frame that intercepts all three alternatives of =outcome= and funnels them through the same cleanup sequence before re-emitting whichever one it saved.
+
+#+transclude: [[file:../src/smd/cl/eval/machine.hpp::2e6f8b3a-51d7-4a0c-9f6e-7c2b1d0a4e58]] :lines 2- :src cpp :end "2e6f8b3a-51d7-4a0c-9f6e-7c2b1d0a4e58 end"
+
+** The interned symbol table survives into the runtime program
+
+Decision D12's symbol table (=smd::cl::symbol::symbol_table=, step R2) is not reader-only scaffolding that a later stage discards: the same table instance that interning built is the one the evaluator resolves every variable, function-slot, and =eq= comparison against at run time (=eval::symbol_table=, step R5's alias over it in =src/smd/cl/eval/builtin.hpp=). That is only safe because the table owns its name characters outright -- interning copies a name into the table's own pool rather than storing a view into the reader's datum arena or any other caller-owned storage -- so a program built from this table is self-contained the moment elaboration finishes, with nothing left dangling once the source text and the datum tree that read it go out of scope. This is the rebuild's answer to the dangling-view failure =docs/divergences/DIV-0007= documents for the pivot's =source_literal=: R2 designed the table so that failure mode has no equivalent here, not by patching it after the fact but by never storing a borrowed view in the first place.
+
+** =core_cons=: a deliberate exception to "lower before you add a tag"
+
+Decision D18 asks the elaborator to lower a new form onto existing =core_tag= alternatives before adding a new one. =core::core_cons= (step R4) is the one form R4 added anyway, and the reason is worth keeping on record rather than re-deriving: the obvious lowering for quoted list data, an ordinary call to the function named =CONS=, is not merely inelegant but *wrong*. ANSI quoted data is a literal, so =(quote (1 2))='s pairs must exist independent of what a program does to the function slot of =CONS= at run time -- a program that redefines =cons= must still get ordinary pairs from its quoted lists, and =core_call{CONS}= cannot express that independence. =core_cons= is a hermetic pair constructor with no dependency on any symbol's function slot, used only by =elaborator::emit_quoted_list= (quoted data) and never by an ordinary call to =cons= (which does lower onto the =CONS= builtin, in the function slot, exactly as D18 prefers). It is the one node kind in the rebuild's core AST that decision D18's own text names as its expected exception, not a quiet violation of the rule.
