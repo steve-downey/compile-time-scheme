@@ -39,3 +39,19 @@ new decision.
 Revisit if/when a numeric tower beyond fixnums (floats, ratios, bignums) or
 characters are added to `smdlisp`; until then this is accepted as scope
 matching the current value model.
+
+## 2026-08-11: still applies in the rebuild, for a different reason
+
+`src/smd/cl/eval/builtin.hpp`'s `apply_builtin` (decision D12's evaluator,
+step R5) implements `eq` and `eql` identically, exactly as `smdlisp` does —
+but not for `smdlisp`'s reason. There, both were string comparison on a
+symbol name. Here, `eq`'s identity is real (an interned id, a cell index, a
+pool offset) and every number that exists is an immediate `int`, so `eq`
+and `eql` compare the same `std::variant<...>` structurally either way;
+there is nothing yet for which `eql`'s value-equality is weaker than `eq`'s
+identity. Boxed numbers, when D19's later lanes add them, are what would
+first separate the two. The classification in `docs/divergences/README.md`
+(`scope-decision`) and the revisit condition above both still apply
+unchanged; only the mechanism producing the coincidence is new.
+`src/smd/cl/conformance/corpus.hpp`'s `nil.8` entry pins this behaviour, as
+D16 permits for a `scope-decision`.

@@ -62,6 +62,12 @@ Five classes:
 | DIV-0019 | escapes carry one value, not multiple | `defect` | **the only silent wrong answer**; needs D14 |
 | DIV-0020 | multiple-value operator set and cap | mixed | the two-form operator subset is `scope-decision`; the cap of 8 is a `defect` — ANSI requires at least 20 |
 | DIV-0021 | same-named inner exit scope shadows permanently | `defect` | ANSI-nonconforming, and the environment grows without bound in a loop; needs D13 |
+| DIV-0022 | reader has no dotted-pair consing-dot syntax | `scope-decision` | deferred by the pivot's D6; carried into R3 unreopened; bit during R6 |
+| DIV-0023 | `(block nil ...)` is diagnosed, not accepted | `defect` | ANSI-nonconforming; needs an elaborator ordering fix, forced by iteration macros |
+| DIV-0024 | lambda-list keywords diagnosed, not bound | `scope-decision` | required-parameters-only is decision D19's deliberate scope |
+| DIV-0025 | `lambda`/`#'f`/`funcall`/`apply` not executable | `scope-decision` | D19: no value channel without both a producer and a consumer in one step |
+| DIV-0026 | GCC trunk r16-8246 misfolds memchr-lowered `find` | `toolchain` | GCC defect; keep the predicate-search workaround in `reader/number.hpp` |
+| DIV-0027 | elaborator/evaluator diagnostics carry no source position | `scope-decision` | needs a position/span column on `tagged_tree`; reader and foundation work |
 
 There is no DIV-0005; the number was never issued.
 
