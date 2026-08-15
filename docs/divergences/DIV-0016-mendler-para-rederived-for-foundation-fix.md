@@ -86,3 +86,60 @@ because the structure was erased. That whole reference doc describes
 the `Fix`/`Box`/`Comp` foundation, which `src/smd/cl/` does not have;
 it should be read as history for the rebuild tree.
 The revisit condition above is unchanged.
+
+## 2026-08-15: R7 settles the sender-backend shape — driving the machine, not forking it
+
+Step R7 (`docs/cl-rebuild-plan.md` D17) had to choose a shape for the sender
+backend before writing one, and the 2026-08-06 note above is exactly what
+made the choice non-obvious: it says the columnar tree *inverts* the
+"CPS trampoline linearizes independence" claim, which reads as an argument
+*for* forking `k_arguments` into a `when_all` over sibling senders, the way
+the pivot's `sender_eval.hpp` forks `comp_apply`'s argument list. R7 did not
+take that path. It is recorded here rather than only in `machine_sender.hpp`
+because this is where a future reader will land looking for "didn't the
+2026-08-06 note argue for forking arguments?" and the answer needs to be
+next to that argument, not only next to the code.
+
+The reason is a concrete cost, not a re-litigation of the inversion claim
+(which stands: a branch's whole child list genuinely is one `static_vector`,
+visible at once). `eval::machine` is single-owner state — one frame stack
+(`konts_`), one heap (`store_`), one control register
+(`control_`/`env_`/`pending_`), all mutated in place by `step`. Forking an
+argument list into sibling senders needs each sibling to make independent
+progress, and nothing about that state supports two siblings advancing it at
+once: a `when_all` over `machine`-internal continuations would need either a
+second frame stack per sibling (at which point the siblings are not really
+inside *this* machine any more, they are separate machines evaluating
+sub-terms, with all the environment-sharing questions that raises for
+`setq`/`defun` visibility) or a recursive call back into a fresh evaluator
+for each argument, built in C++ recursion rather than the frame stack. The
+second option spends exactly the property R5 was built to buy: no evaluation
+recursion is C++ recursion, so `limits::frames` and `limits::steps` are
+diagnosed capacities rather than stack depth. `limits::steps` defaults to
+200000; rebuilding a Mendler-shaped recursive evaluator on the sender side to
+get `when_all` over one call's arguments would make 200000 steps into 200000
+C++ activation records in the one place R5 spent a whole step removing them.
+
+R7 chose the other shape instead: `smd::cl::sender::machine_sender`
+(`src/smd/cl/sender/machine_sender.hpp`) treats one whole `machine::run` as
+the unit a sender completes. `start` drives the machine's own trampoline —
+unchanged, still one loop, still bounded by the same `limits` — to
+completion, then dispatches the resulting `eval::outcome` onto
+`set_value`/`set_error`/`set_stopped`, D13's mapping spent a second time.
+Nothing in `eval::machine`, `eval::outcome`, `eval::value` or `eval::heap`
+changed; no seam needed exposing. This was not underdetermined between the
+two shapes — the recursion-depth cost above is a real, checkable difference,
+not a preference — so no escalation was needed to pick it.
+
+What this shape still lets `when_all` say honestly: two whole-program
+evaluations, each its own machine and its own heap with no shared mutable
+state, are genuinely independent senders, and joining them is a true
+structural-independence claim (`machine_sender.test.cpp`'s
+`WhenAllJoinsTwoIndependentPrograms`). What it does not let `when_all` say,
+and what R7's step brief was explicit must not be claimed: anything about
+the evaluation order of one program's arguments, which stays exactly what
+ANSI 3.1.2.1.2.3 requires and what `k_arguments` already gave it.
+
+The revisit condition above is unchanged: this note does not reopen the
+Mendler-scheme question, only records why R7's sender backend did not reopen
+it either.
