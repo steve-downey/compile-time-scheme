@@ -1,8 +1,9 @@
-// src/smd/cl/foundation/source_span.test.cpp                          -*-C++-*-
+// src/smd/cl/foundation/source_span.test.cpp                        -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Reviewed union of the two prior copies of this test:
-// src/smd/smdscheme/foundation/source_span.test.cpp (compile-time-scheme) and
-// src/smd/forth/foundation/source_span.test.cpp (compile-time-forth).
+// Shim smoke test (step R8): the substantive source_span tests moved to
+// src/smd/kit/foundation/source_span.test.cpp with the definition. This
+// file only verifies that the forwarding shim compiles and that the
+// forwarded name is usable from smd::cl::foundation exactly as before.
 
 #include <smd/cl/foundation/source_span.hpp>
 #include <smd/cl/foundation/source_span.hpp> // test 2nd include OK
@@ -13,21 +14,11 @@ using smd::cl::foundation::source_pos;
 using smd::cl::foundation::source_span;
 
 static_assert(source_span{} == source_span{});
-static_assert(source_span{source_pos{0, 1, 1}, source_pos{3, 1, 4}} ==
-              source_span{source_pos{0, 1, 1}, source_pos{3, 1, 4}});
 
-TEST_CASE("SourceSpanTest - HeaderIsIdempotent") { REQUIRE(true); }
+TEST_CASE("SourceSpanShimTest - HeaderIsIdempotent") { REQUIRE(true); }
 
-TEST_CASE("SourceSpanTest - DefaultConstruction") {
-    constexpr source_span span{};
-    CHECK(span.first == source_pos{});
-    CHECK(span.last == source_pos{});
-}
-
-TEST_CASE("SourceSpanTest - Equality") {
+TEST_CASE("SourceSpanShimTest - EqualityThroughShim") {
     constexpr source_span s{source_pos{0, 1, 1}, source_pos{3, 1, 4}};
     constexpr source_span t{source_pos{0, 1, 1}, source_pos{3, 1, 4}};
-    constexpr source_span u{source_pos{0, 1, 1}, source_pos{5, 1, 6}};
     CHECK(s == t);
-    CHECK(!(s == u));
 }

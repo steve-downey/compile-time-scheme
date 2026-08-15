@@ -1,8 +1,9 @@
-// src/smd/cl/foundation/source_pos.test.cpp                           -*-C++-*-
+// src/smd/cl/foundation/source_pos.test.cpp                         -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Reviewed union of the two prior copies of this test:
-// src/smd/smdscheme/foundation/source_pos.test.cpp (compile-time-scheme) and
-// src/smd/forth/foundation/source_pos.test.cpp (compile-time-forth).
+// Shim smoke test (step R8): the substantive source_pos tests moved to
+// src/smd/kit/foundation/source_pos.test.cpp with the definition. This file
+// only verifies that the forwarding shim compiles and that the forwarded
+// name is usable from smd::cl::foundation exactly as before.
 
 #include <smd/cl/foundation/source_pos.hpp>
 #include <smd/cl/foundation/source_pos.hpp> // test 2nd include OK
@@ -12,22 +13,11 @@
 using smd::cl::foundation::source_pos;
 
 static_assert(source_pos{} == source_pos{0, 1, 1});
-static_assert(source_pos{5, 2, 3} == source_pos{5, 2, 3});
-static_assert(!(source_pos{0, 1, 1} == source_pos{1, 1, 2}));
 
-TEST_CASE("SourcePosTest - HeaderIsIdempotent") { REQUIRE(true); }
+TEST_CASE("SourcePosShimTest - HeaderIsIdempotent") { REQUIRE(true); }
 
-TEST_CASE("SourcePosTest - DefaultConstruction") {
-    constexpr source_pos pos{};
-    CHECK(pos.offset == 0);
-    CHECK(pos.line == 1);
-    CHECK(pos.column == 1);
-}
-
-TEST_CASE("SourcePosTest - Equality") {
+TEST_CASE("SourcePosShimTest - EqualityThroughShim") {
     constexpr source_pos a{5, 2, 3};
     constexpr source_pos b{5, 2, 3};
-    constexpr source_pos c{6, 2, 4};
     CHECK(a == b);
-    CHECK(!(a == c));
 }

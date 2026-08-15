@@ -274,6 +274,15 @@ AST and recursion-scheme machinery is shared only among Lisp-family front ends a
 Extraction happens in R8, once Common Lisp is the third working client.
 Until then the substrate is developed in place with kit-shaped seams, meaning it stays free of language-specific types — which is already true of `foundation/`.
 
+Correction, recorded 2026-08-15, R8: three claims above needed re-verification against the actual R8-era code rather than the R0-era plan, and one of them does not survive it.
+First, "the kit's actual contents" for `foundation/` is right but incomplete in the other direction: R1's union moved `static_vector`, `result`, and `parse_error` materially past both older copies (`filled`/`append_range`/`pop_back`, `value_type`/equality/`and_then`, and a merged equality respectively), so "essentially zero drift" describes six of the nine files, not all nine — the other three are a strict superset, verified file by file rather than assumed, and travel with the extraction on that basis.
+Second, `foundation/`'s premise — "once Common Lisp is the third working client" — holds: `src/smd/cl/foundation/` genuinely defines and uses all nine files.
+Third, and this is the one that does not survive: the same sentence claims `parser/` (`cursor`, `parser`, `alt`, `parser_ops`) as part of the same extraction, and that is false for `cl`.
+`src/smd/cl/reader/cursor.hpp` is a hand-written type with no `parser<F>` wrapper and no `alt` combinator; nothing under `src/smd/cl/` uses `parser<T>`, `alt`, or `parser_ops`.
+R3 built a readtable-driven recursive-descent reader instead, and no step recorded that as a deliberate rejection of the combinator style — it was simply the shape chosen, unrevisited until now.
+So `cl` is a real third client of `foundation/` and no client at all of `parser/`; R8 extracts the former only, into `smd::kit::foundation`, and leaves `parser/` exactly as it stood in `smdscheme` and `forth`.
+See DIV-0028 for the classification and `docs/compiler_architecture.org` § "The kit: a real second target with one real client" for the fuller argument, including why the extraction that did happen is narrower than "the third working client" implies even for `foundation/`: the only client this repository can actually re-home is `cl` itself, since `smdscheme` is never edited in place and `compile-time-forth` is a separate repository.
+
 ---
 
 # 6. Phases

@@ -32,6 +32,7 @@ target_sources(
                 trampoline.hpp
                 traversable.hpp
 )
+target_link_libraries(cl.foundation INTERFACE kit.foundation)
 
 if(SCHEMEPOC_ENABLE_TESTING)
     find_package(Catch2 REQUIRED)

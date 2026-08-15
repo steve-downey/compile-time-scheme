@@ -1,114 +1,34 @@
-// src/smd/cl/foundation/result.hpp                               -*-C++-*-
+// src/smd/cl/foundation/result.hpp                                  -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Reviewed union of the two prior copies of this component:
-// src/smd/smdscheme/foundation/result.hpp (compile-time-scheme) and
-// src/smd/forth/foundation/result.hpp (compile-time-forth).
-// New here: the value_type alias and equality, which the typeclass instances
-// in <smd/cl/foundation/result_instances.hpp> and their law tests need.
+// Forwarding shim (step R8): smd::cl::foundation::result now names
+// smd::kit::foundation::result, extracted to the shared constexpr
+// substrate. and_then travelled with it — it is generic over any result<T>,
+// even though its doc comment still narrates the elaborator decision (D15)
+// that motivated writing it. result_instances.hpp (the Functor/Applicative
+// typeclass adapter for this type) stays in smd::cl::foundation: it also
+// depends on foldable.hpp/traversable.hpp, which have exactly one
+// implementation so far and have not earned kit membership by the same
+// two-independent-copies test the nine files here already passed. The
+// include path and the names below are unchanged for every existing caller
+// in this tree; only the definition moved.
 #ifndef SRC_SMD_CL_FOUNDATION_RESULT_HPP
 #define SRC_SMD_CL_FOUNDATION_RESULT_HPP
 
-#include <smd/cl/foundation/parse_error.hpp>
+// 80e2bedd-55e3-42e1-b835-55384ff35836
+#include <smd/kit/foundation/result.hpp>
 
-#include <functional>
-#include <type_traits>
-#include <utility>
-#include <variant>
+// The original result.hpp included parse_error.hpp; kept here (which in
+// turn keeps source_pos.hpp) so smd::cl::foundation still transitively
+// names parse_error and source_pos exactly as it did before this file
+// became a shim.
+#include <smd/cl/foundation/parse_error.hpp>
 
 namespace smd::cl::foundation {
 
-/// A discriminated union of a success value @p T or a @ref parse_error.
-///
-/// Used throughout the parsing and elaboration pipelines as the
-/// error-propagation type. Callers must check @ref has_value before accessing
-/// @ref value or @ref error.
-///
-/// Design note (decision D13): the evaluator built in step R5 needs a third
-/// alternative — an unwind in flight — as a distinct channel beside value and
-/// error. Keep client code on the has_value/value/error accessors rather than
-/// on the variant itself, so the alternative set can widen without breaking
-/// callers.
-///
-/// @tparam T The success type.
-// 065a04a3-92d8-4537-bc38-f5c19ba9250b
-template <class T>
-class result {
-  public:
-    /// The carried success type, named for effect-generic code such as
-    /// @c traverse instances.
-    using value_type = T;
-
-    /// Constructs a successful result holding @p value.
-    constexpr result(T value);
-
-    /// Constructs a failed result holding @p error.
-    constexpr result(parse_error error);
-
-    /// Returns true if this result holds a value rather than an error.
-    [[nodiscard]] constexpr auto has_value() const -> bool;
-
-    /// Returns the contained success value.
-    /// @pre has_value() == true
-    [[nodiscard]] constexpr auto value() const -> T const &;
-
-    /// Returns the contained error.
-    /// @pre has_value() == false
-    [[nodiscard]] constexpr auto error() const
-        -> foundation::parse_error const &;
-
-    // HIDDEN FRIEND
-    friend constexpr auto operator==(result const &lhs, result const &rhs)
-        -> bool = default;
-
-  private:
-    std::variant<T, foundation::parse_error> data_;
-};
-// 065a04a3-92d8-4537-bc38-f5c19ba9250b end
-
-template <class T>
-constexpr result<T>::result(T value) : data_{std::move(value)} {}
-
-template <class T>
-constexpr result<T>::result(parse_error error) : data_{error} {}
-
-template <class T>
-constexpr auto result<T>::has_value() const -> bool {
-    return std::holds_alternative<T>(data_);
-}
-
-template <class T>
-constexpr auto result<T>::value() const -> T const & {
-    return std::get<T>(data_);
-}
-
-template <class T>
-constexpr auto result<T>::error() const -> foundation::parse_error const & {
-    return std::get<foundation::parse_error>(data_);
-}
-
-/// Monadic sequencing for @ref result: applies @p f to the success value of
-/// @p step, or passes @p step's error through unchanged.
-///
-/// Decision D15 rules out the `if (!r.has_value()) return r;` ladder and
-/// names two replacements: @c traverse where there is a structure to thread
-/// the effect through, and @c fold_left_short where a sequence must stop
-/// early. This is the third shape, and the one neither covers — a single
-/// step whose input is the previous step's output, with no structure and no
-/// sequence. It is the reader's @c detail::and_then, promoted here because
-/// the elaborator needs the same shape (recorded in the R3 step brief as
-/// the expected growth); the reader's private copy is now redundant.
-///
-/// @tparam T The step's success type.
-/// @tparam F Callable with signature @c result<U>(T const &).
-template <class T, class F>
-[[nodiscard]] constexpr auto and_then(result<T> const &step, F &&f) {
-    using out_type = std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
-    if (!step.has_value()) {
-        return out_type{step.error()};
-    }
-    return std::invoke(std::forward<F>(f), step.value());
-}
+using smd::kit::foundation::and_then;
+using smd::kit::foundation::result;
 
 } // namespace smd::cl::foundation
+// 80e2bedd-55e3-42e1-b835-55384ff35836 end
 
 #endif
