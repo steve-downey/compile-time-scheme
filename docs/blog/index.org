@@ -136,6 +136,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ Decision D16's conformance corpus: seventy-five cases, each stating its outcome by channel — value, diagnosed error, or unwind — split between thirty-five adapted from Paul Dietz's ~ansi-test~ (MIT, pinned commit) and forty hand-derived from the ANSI text, because ~ansi-test~ leans on strings, characters and the numeric tower, none of which are in scope. Only one entry, ~nil.8~, pins anything, because D16 permits a test to pin a scope-decision and never a defect; writing the other seventy-four found six new divergences. Plus ~sbcl_oracle.hpp~: a differential check against a real SBCL, shelled out to and skipped rather than failed when the binary isn't on ~PATH~, closing the weakest evidence this series has been carrying since phase 28.
 
+** [[file:phase-31-driving-the-machine.org][Phase 31 — Driving the Machine, Not Forking It]]
+
+/DRAFT — pending author revision./ Decision D17's second backend over the rebuild's core tree: ~machine_sender~ connects a Beman Execution sender that runs ~eval::machine~'s own trampoline to completion, then dispatches the result onto ~set_value~, ~set_error~, and ~set_stopped~, D13's three channels spent again. The tempting alternative — forking a call's argument list into sibling senders, the pivot's trick — was rejected on a concrete cost recorded in DIV-0016: the machine is single-owner state, and reproducing that trick would mean rebuilding a recursive evaluator in the one place R5 spent a whole phase removing recursion from. Nothing here is ~constexpr~ (DIV-0015, accepted-permanent), and the one ~when_all~ demonstration joins two independent whole programs, never one program's own arguments.
+
 * Table of Contents
 
 #+toc: headlines 1

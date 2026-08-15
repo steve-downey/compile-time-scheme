@@ -34,8 +34,9 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-28-three-channels.org` | `f0f3734` | `blog/phase-28` | `Merge step R5` (tag created at the merge, before the post) |
 | `phase-29-answering-phase-7.org` | `0e7e740` | `blog/phase-29` | `Merge tree-invariant-anchors` (tag created at the merge, before the post) |
 | `phase-30-asking-someone-else.org` | `f60b0ff` | `blog/phase-30` | `Merge step R6` (tag created at the merge, before the post) |
+| `phase-31-driving-the-machine.org` | `2f48c9f` | `blog/phase-31` | `Merge step R7` (tag created at the merge, before the post) |
 
-83 transclusions across 18 posts. Every row passes the anchor test at its pin,
+88 transclusions across 19 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is

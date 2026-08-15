@@ -1,0 +1,110 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+bibliography: references.bib
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 31 - Driving the Machine, Not Forking It
+#+AUTHOR: Steve Downey
+#+DATE: 2026-08-15
+
+*DRAFT --- pending author revision*
+
+#+begin_abstract
+R7 gives the rebuild tree a second backend over its core AST, alongside R5's abstract machine (decision D17): a Beman Execution sender that connects, runs =eval::machine='s own trampoline to completion, and dispatches the result onto =set_value=, =set_error=, and =set_stopped=, D13's three channels spent a second time.
+Two shapes were on the table before any of that could be written, and the more tempting one (forking a call's argument list into sibling senders, the way the pivot did) was rejected on a concrete cost: the machine is single-owner state, and reproducing that trick would mean rebuilding a recursive evaluator on the sender side, in the one place R5 spent a whole phase removing recursion from.
+Nothing here is =constexpr=; DIV-0015 says a sender backend never gets to be, and that absence is stated in the API instead of turning up later in a test.
+The one =when_all= demonstration joins two independent whole programs, and says nothing about the order in which one program's arguments run.
+#+end_abstract
+
+#+MACRO: TEASER_END
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-30-asking-someone-else.org][Phase 30 - Asking Someone Else Whether the Answers Are Right ←]]
+#+html: </nav>
+
+
+* Ruling out the pivot's answer first
+
+Decision D17 asks for a second backend over the rebuild's core tree, built on Beman Execution [cite:@niebler2020p2300], next to the abstract machine R5 built and R6's conformance corpus now exercises.
+The pivot already has one of these, =smd::smdlisp::sender::sender_eval=, so the obvious move is to port it.
+The step brief rules that out before anything else: =sender_eval= is a Mendler fold [cite:@mendler1991recursive] over a pointer tree it does not itself define.
+=Fix=, =Box=, and the =Comp= tree live in =smd::smdscheme::sender::comp_tree= (=sender_mendler_eval.hpp= and =fixpoint_eval.hpp= behind it, in the dead-ended Scheme front end), a second full spelling of every core node kind next to the columnar one this tree already has.
+DIV-0016 priced that at "a step's worth of work on its own and buys nothing this step needs," and =Comp='s capacities live inside its types (=comp_lambda<A, MaxList>=, =env<CompT, 16>=), which is the D14 violation the rebuild exists to remove.
+Porting it would get the sender backend built by default rather than by decision, which is the thing the brief is most insistent this step not do.
+
+So R7 opens with no inherited shape, only a vocabulary to borrow the spelling of.
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-31::src/smd/cl/sender/sender_v.hpp::2cae776b-38af-41b9-b878-2cca67ac1295]] :lines 2- :src cpp :end "2cae776b-38af-41b9-b878-2cca67ac1295 end"
+
+A fresh copy, because both pivot trees are off limits for a different reason each: =smdscheme= is dead-ended, =smdlisp= is the behavioural oracle from R1 on; neither is a dependency =src/smd/cl= is allowed to take on.
+
+* The shape that looked free
+
+The 2026-08-06 note on DIV-0016 is the reason this step's choice wasn't obvious going in.
+It says the columnar tree *inverts* the pivot's own claim that a CPS trampoline linearizes argument independence: a branch's whole child list is one =static_vector=, visible at once, at =machine::evaluate_subforms=.
+Read on its own, that reads like an argument /for/ forking =k_arguments= into a =when_all= over sibling senders: the pivot's trick, minus the pointer tree that made it necessary in the first place.
+
+I want to grant that reading, because it's the honest one and it's what made the step worth stopping on instead of assuming.
+=eval::machine= is single-owner state: one frame stack, one heap, one control register, all mutated in place by =step=.
+Forking an argument list needs each sibling to make independent progress, and nothing about that state supports two siblings advancing it at once.
+The only ways to get there are a second frame stack per sibling (at which point the siblings aren't inside /this/ machine any more, they're separate machines evaluating sub-terms, with every environment-sharing question that raises for =setq= and =defun= visibility reopened), or a recursive call back into a fresh evaluator built in C++ recursion instead of the frame stack.
+That second option spends the property R5 built to buy: no evaluation recursion is C++ recursion, so =limits::frames= and =limits::steps= are diagnosed capacities instead of stack depth.
+=limits::steps= defaults to 200000.
+Rebuilding a Mendler-shaped evaluator on the sender side to get =when_all= over one call's arguments turns 200000 steps into 200000 C++ activation records, in the one place a whole phase was spent removing them.
+
+Not underdetermined, once the cost is stated. R7 drives the machine whole instead.
+
+* One machine, run to completion
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-31::src/smd/cl/sender/machine_sender.hpp::0c10d654-ec97-4580-9c14-aed654701bbf]] :lines 2- :src cpp :end "0c10d654-ec97-4580-9c14-aed654701bbf end"
+
+=machine_completions= is D13's mapping, spent a second time: value to =set_value_t=, diagnosed error to =set_error_t=, unwind to =set_stopped_t=, one for one.
+=machine_operation_state= owns the machine itself, and =start= runs its trampoline (unchanged, still one loop, still bounded by the same =limits=) to completion before looking at what it produced.
+The one case the comment in the code calls out: an unwind that reaches here is a =return-from= or =throw= no =block= or =catch= inside the program claimed, meaning every live one already had first refusal at it inside =machine::run= itself.
+=set_stopped= is niladic by Execution26's own contract, so the unwind's target and payload are dropped, deliberately, on the one channel built to say just that: stopped, no data.
+
+* The whole surface is two functions
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-31::src/smd/cl/sender/machine_sender.hpp::4087241f-a4fb-4e3f-bc87-59f3973fc026]] :lines 2- :src cpp :end "4087241f-a4fb-4e3f-bc87-59f3973fc026 end"
+
+=machine_sender= holds its program and symbol table by pointer, because =connect='s by-value convention wants a copyable sender, and the pointees have to outlive every connected operation; the same contract =eval::machine= already puts on its own caller, restated here and not loosened.
+=evaluate= is the entry point, and the second overload defaulting to =program.root()= is the one every test below actually calls: name a program and a symbol table, get back something you can =connect=, =start=, or fold into a larger graph with =when_all= or =then=.
+
+* The inverse direction, for a caller that wants an outcome back
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-31::src/smd/cl/sender/run_sender.hpp::bc5a6bf9-8aa1-45f2-bcbf-39c3ff2966b2]] :lines 2- :src cpp :end "bc5a6bf9-8aa1-45f2-bcbf-39c3ff2966b2 end"
+
+=machine_operation_state::start= turns an =eval::outcome= into a completion; =outcome_receiver= turns a completion back into one.
+Both directions exist as named code rather than as a claim in a comment, because D13's actual claim is that a value/error/unwind outcome and a value/error/stopped completion are the same fact seen from two sides, and a claim like that is worth being able to run in both directions and check.
+A stopped completion is reported back as a diagnosed error: there's no payload left to recover, and no record of which exit it even was, so "an unwind reached the top of the program uncaught" is the most =run_sender= can say.
+
+None of this is =constexpr=.
+DIV-0015 is accepted-permanent: Beman Execution's =connect=, =start=, and =sync_wait= are not constant-evaluable, so a sender graph has no compile-time value to produce, so there is nothing here for a =static_assert= to be about.
+=eval::machine= itself stays as constexpr-capable as R5 left it; only the sender wrapped around it loses that property, and it loses it in the type, not just in the tests: =start= is an ordinary noexcept member function, nothing about its signature invites constant evaluation.
+Only =eval::machine= is a compile-time evaluator. The sender backend never was.
+
+* Two programs, never one program's arguments
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-31::src/smd/cl/sender/machine_sender.test.cpp::84e9ce88-8829-4620-83f2-0b259fca7f3f]] :lines 2- :src cpp :end "84e9ce88-8829-4620-83f2-0b259fca7f3f end"
+
+This is what driving the machine whole still buys, once the forking shape is off the table: two whole-program evaluations, each its own machine and its own heap, share no mutable state at all, so joining them with =when_all= is a true structural-independence claim.
+It says nothing about the order in which =(+ 2 3)='s own two arguments would run, because nothing here reorders =k_arguments= at all; left to right stays left to right, as R5 left it.
+Left-to-right argument evaluation is ANSI's conforming order the moment an argument can have an effect (3.1.2.1.2.3) [cite:@steele1990cltl2], and D19 aims at all of ANSI, so that ordering was never R7's to renegotiate.
+Two separate =(+ 2 3)= and =(* 4 5)= calls, in two separate machines, joined and summed by =then=: that's the whole demonstration, and it claims no more than the test's own name says.
+
+* What's still owed
+
+The corpus R6 built doesn't run through this backend yet; every case in it still checks =eval::machine::run= directly, and a sender-side differential pass against the same seventy-five entries is a straightforward thing nobody has written.
+Multiple values are still unreachable from anywhere in this tree, so there's no widened completion signature to worry about yet the way the pivot eventually had to.
+And the kit R8 goes looking for next (=static_vector=, =result=, the parser combinators, the pieces three different front ends have each grown their own copy of) lives underneath everything R7 touched, which is why R7 didn't have to touch it.
+
+R8 is next.
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-30-asking-someone-else.org][← Phase 30 - Asking Someone Else Whether the Answers Are Right]]
+#+html: </nav>
+
+* References
+
+#+print_bibliography:
