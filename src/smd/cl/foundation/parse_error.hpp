@@ -1,45 +1,25 @@
-// src/smd/cl/foundation/parse_error.hpp                          -*-C++-*-
+// src/smd/cl/foundation/parse_error.hpp                             -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Reviewed union of the two prior copies of this component:
-// src/smd/smdscheme/foundation/parse_error.hpp (compile-time-scheme) and
-// src/smd/forth/foundation/parse_error.hpp (compile-time-forth).
-// The equality below keeps the scheme copy's same-pointer fast path and the
-// forth copy's explicit null handling; the character loop both copies carried
-// is replaced by std::string_view comparison.
+// Forwarding shim (step R8): smd::cl::foundation::parse_error now names
+// smd::kit::foundation::parse_error, extracted to the shared constexpr
+// substrate. The merged equality (scheme's same-pointer fast path, forth's
+// explicit null handling, cl's std::string_view comparison) travelled with
+// the extraction as a strict quality improvement over either older copy.
+// The include path and the name below are unchanged for every existing
+// caller in this tree; only the definition moved.
 #ifndef SRC_SMD_CL_FOUNDATION_PARSE_ERROR_HPP
 #define SRC_SMD_CL_FOUNDATION_PARSE_ERROR_HPP
 
-#include <smd/cl/foundation/source_pos.hpp>
+#include <smd/kit/foundation/parse_error.hpp>
 
-#include <string_view>
+// The original parse_error.hpp included source_pos.hpp; kept here so
+// smd::cl::foundation still transitively names source_pos exactly as it
+// did before this file became a shim.
+#include <smd/cl/foundation/source_pos.hpp>
 
 namespace smd::cl::foundation {
 
-/// A parse failure with the position in the input where it occurred
-/// and a static string describing the expected token or form.
-///
-/// The @p message pointer must be a string literal or have static lifetime;
-/// the struct does not own or copy the pointed-to string.
-struct parse_error {
-    foundation::source_pos where{}; ///< Position of the failure in the input.
-    char const *message{}; ///< Static description of what was expected.
-
-    // HIDDEN FRIEND
-    friend constexpr auto operator==(foundation::parse_error const &lhs,
-                                     foundation::parse_error const &rhs)
-        -> bool {
-        if (!(lhs.where == rhs.where)) {
-            return false;
-        }
-        if (lhs.message == rhs.message) {
-            return true;
-        }
-        if (lhs.message == nullptr || rhs.message == nullptr) {
-            return false;
-        }
-        return std::string_view{lhs.message} == std::string_view{rhs.message};
-    }
-};
+using smd::kit::foundation::parse_error;
 
 } // namespace smd::cl::foundation
 

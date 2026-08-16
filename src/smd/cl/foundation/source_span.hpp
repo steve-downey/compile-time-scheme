@@ -1,23 +1,24 @@
-// src/smd/cl/foundation/source_span.hpp                          -*-C++-*-
+// src/smd/cl/foundation/source_span.hpp                             -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// Reviewed union of the two prior copies of this component:
-// src/smd/smdscheme/foundation/source_span.hpp (compile-time-scheme) and
-// src/smd/forth/foundation/source_span.hpp (compile-time-forth).
+// Forwarding shim (step R8): smd::cl::foundation::source_span now names
+// smd::kit::foundation::source_span, extracted to the shared constexpr
+// substrate as one of the reviewed-union files that was already identical
+// across smdscheme, forth and cl but for guard, namespace and comment. The
+// include path and the name below are unchanged for every existing caller
+// in this tree; only the definition moved.
 #ifndef SRC_SMD_CL_FOUNDATION_SOURCE_SPAN_HPP
 #define SRC_SMD_CL_FOUNDATION_SOURCE_SPAN_HPP
 
+#include <smd/kit/foundation/source_span.hpp>
+
+// The original source_span.hpp included source_pos.hpp; kept here so
+// smd::cl::foundation still transitively names source_pos exactly as it
+// did before this file became a shim.
 #include <smd/cl/foundation/source_pos.hpp>
 
 namespace smd::cl::foundation {
 
-/// A half-open range in source text, defined by its first and last positions.
-struct source_span {
-    foundation::source_pos first{}; ///< Inclusive start of the span.
-    foundation::source_pos last{};  ///< Exclusive end of the span.
-
-    friend constexpr auto operator==(source_span, source_span)
-        -> bool = default;
-};
+using smd::kit::foundation::source_span;
 
 } // namespace smd::cl::foundation
 

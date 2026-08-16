@@ -1,136 +1,37 @@
-// src/smd/cl/foundation/static_vector_instances.hpp              -*-C++-*-
+// src/smd/cl/foundation/static_vector_instances.hpp                 -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// New in this tree: the designated adapter location for static_vector's
-// typeclass instances (per docs/CODING_RULES.md's Typeclass Design rules,
-// datatype and adaptation are separate concerns).
-//
-// Traversal order contract for every instance in this header: elements are
-// visited in index order, first to last. For traverse, effects are sequenced
-// in that same order.
+// Forwarding shim (step R8, decision 2 corrected): smd::cl::foundation's
+// static_vector typeclass instances now name smd::kit::foundation's.
+// static_vector's Functor typeclass was already kit-owned; once Foldable
+// and Traversable joined it (decision 2, corrected —
+// docs/compiler_architecture.org § "The kit: a real second target with
+// one real client"), this adapter's whole reason for staying in cl (that
+// it depended on cl-only typeclasses) no longer applied, so it moved with
+// them. The include path and the names below are unchanged for every
+// existing caller in this tree; only the definition moved.
 #ifndef SRC_SMD_CL_FOUNDATION_STATIC_VECTOR_INSTANCES_HPP
 #define SRC_SMD_CL_FOUNDATION_STATIC_VECTOR_INSTANCES_HPP
 
+#include <smd/kit/foundation/static_vector_instances.hpp>
+
+// The original static_vector_instances.hpp included applicative.hpp,
+// foldable.hpp, functor.hpp, static_vector.hpp, and traversable.hpp; kept
+// here so smd::cl::foundation still transitively names those exactly as it
+// did before this file became a shim.
 #include <smd/cl/foundation/applicative.hpp>
 #include <smd/cl/foundation/foldable.hpp>
 #include <smd/cl/foundation/functor.hpp>
 #include <smd/cl/foundation/static_vector.hpp>
 #include <smd/cl/foundation/traversable.hpp>
 
-#include <functional>
-#include <type_traits>
-#include <utility>
-
 namespace smd::cl::foundation {
 
-/// Functor @c Impl for @ref static_vector: maps @p f over the elements in
-/// index order, preserving capacity and length.
-struct static_vector_functor_impl {
-    template <class F, class T, int Capacity>
-    constexpr auto fmap(this auto &&, F &&f,
-                        static_vector<T, Capacity> const &values) {
-        using B = std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
-        static_vector<B, Capacity> mapped;
-        for (auto const &element : values) { // substrate generic algorithm
-            mapped.push_back(std::invoke(f, element));
-        }
-        return mapped;
-    }
-};
-
-/// Functor instance map for @ref static_vector.
-struct static_vector_functor_map : functor<static_vector_functor_impl> {
-    using static_vector_functor_impl::fmap;
-};
-
-/// Foldable @c Impl for @ref static_vector.
-///
-/// Traversal order: @c fold_map combines images in index order, first to
-/// last; @c fold_right combines from the last element back to the first.
-struct static_vector_foldable_impl {
-    template <class F, class T, int Capacity, class M>
-    constexpr auto fold_map(this auto &&, F &&f,
-                            static_vector<T, Capacity> const &values,
-                            M const &m) {
-        auto acc = m.empty();
-        for (auto const &element : values) { // substrate generic algorithm
-            acc = m.combine(std::move(acc), std::invoke(f, element));
-        }
-        return acc;
-    }
-
-    template <class F, class Acc, class T, int Capacity>
-    constexpr auto fold_right(this auto &&, F &&f, Acc init,
-                              static_vector<T, Capacity> const &values) -> Acc {
-        // substrate generic algorithm: reverse traversal is this instance's
-        // primitive (see foldable.hpp for why it is not derived).
-        for (int i = values.size() - 1; i >= 0; --i) {
-            init = f(values[i], std::move(init));
-        }
-        return init;
-    }
-};
-
-/// Foldable instance map for @ref static_vector.
-struct static_vector_foldable_map : foldable<static_vector_foldable_impl> {
-    using static_vector_foldable_impl::fold_map;
-    using static_vector_foldable_impl::fold_right;
-};
-
-/// Traversable @c Impl for @ref static_vector.
-///
-/// @c traverse applies the effectful @p f to every element in index order
-/// (the documented Foldable order), sequencing effects left to right
-/// through the effect's registered Applicative instance, and rebuilds a
-/// vector of the same shape inside the effect. Every element is visited;
-/// the effect's @c apply decides what surviving values look like (for
-/// @c result, the leftmost error wins). For error propagation that must
-/// stop visiting early, use @c fold_left_short instead.
-///
-/// The effect type must name its carried type as @c value_type and have a
-/// registered @c applicative_typeclass instance.
-struct static_vector_traversable_impl {
-    template <class F, class T, int Capacity>
-    constexpr auto traverse(this auto &&, F &&f,
-                            static_vector<T, Capacity> const &values) {
-        using effect_type =
-            std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
-        using B = typename effect_type::value_type;
-        auto const &tc = applicative_typeclass<effect_type>;
-        auto accumulated = tc.pure(static_vector<B, Capacity>{});
-        auto append = [](static_vector<B, Capacity> collected, B element) {
-            collected.push_back(std::move(element));
-            return collected;
-        };
-        for (auto const &element : values) { // substrate generic algorithm
-            accumulated = tc.invoke(append, std::move(accumulated),
-                                    std::invoke(f, element));
-        }
-        return accumulated;
-    }
-};
-
-/// Traversable instance map for @ref static_vector.
-struct static_vector_traversable_map
-    : traversable<static_vector_traversable_impl> {
-    using static_vector_traversable_impl::traverse;
-};
-
-// 51f97b89-0923-4b8f-94f1-166b79f6d70d
-/// Registers the Functor instance for @ref static_vector.
-template <class T, int Capacity>
-inline constexpr auto functor_typeclass<static_vector<T, Capacity>> =
-    static_vector_functor_map{};
-
-/// Registers the Foldable instance for @ref static_vector.
-template <class T, int Capacity>
-inline constexpr auto foldable_typeclass<static_vector<T, Capacity>> =
-    static_vector_foldable_map{};
-
-/// Registers the Traversable instance for @ref static_vector.
-template <class T, int Capacity>
-inline constexpr auto traversable_typeclass<static_vector<T, Capacity>> =
-    static_vector_traversable_map{};
-// 51f97b89-0923-4b8f-94f1-166b79f6d70d end
+using smd::kit::foundation::static_vector_foldable_impl;
+using smd::kit::foundation::static_vector_foldable_map;
+using smd::kit::foundation::static_vector_functor_impl;
+using smd::kit::foundation::static_vector_functor_map;
+using smd::kit::foundation::static_vector_traversable_impl;
+using smd::kit::foundation::static_vector_traversable_map;
 
 } // namespace smd::cl::foundation
 

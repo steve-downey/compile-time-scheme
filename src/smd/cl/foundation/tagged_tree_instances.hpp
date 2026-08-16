@@ -189,24 +189,42 @@ struct tagged_tree_traversable_map : traversable<tagged_tree_traversable_impl> {
     using tagged_tree_traversable_impl::traverse;
 };
 
-/// Registers the Functor instance for @ref tagged_tree.
-template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
-inline constexpr auto
-    functor_typeclass<tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>> =
-        tagged_tree_functor_map{};
-
-/// Registers the Foldable instance for @ref tagged_tree.
-template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
-inline constexpr auto
-    foldable_typeclass<tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>> =
-        tagged_tree_foldable_map{};
-
-/// Registers the Traversable instance for @ref tagged_tree.
-template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
-inline constexpr auto
-    traversable_typeclass<tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>> =
-        tagged_tree_traversable_map{};
-
 } // namespace smd::cl::foundation
+
+// Functor's, Foldable's, and Traversable's typeclass lookup variables all
+// live in smd::kit::foundation (step R8; Foldable and Traversable joined
+// Functor there when decision 2 was corrected — see
+// docs/compiler_architecture.org § "The kit: a real second target with one
+// real client"), so their specializations for tagged_tree must be written
+// in that namespace too -- a using-declaration in the cl::foundation shim
+// makes the names callable from cl, but a template specialization must be
+// declared where the primary template actually lives (a using-declaration
+// does not relocate specialization rights). tagged_tree itself is AST
+// machinery and stays out of the kit (docs/cl-rebuild-plan.md §5), so it is
+// named fully qualified here.
+namespace smd::kit::foundation {
+
+/// Registers the Functor instance for @ref
+/// smd::cl::foundation::tagged_tree.
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+inline constexpr auto functor_typeclass<
+    smd::cl::foundation::tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>> =
+    smd::cl::foundation::tagged_tree_functor_map{};
+
+/// Registers the Foldable instance for @ref
+/// smd::cl::foundation::tagged_tree.
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+inline constexpr auto foldable_typeclass<
+    smd::cl::foundation::tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>> =
+    smd::cl::foundation::tagged_tree_foldable_map{};
+
+/// Registers the Traversable instance for @ref
+/// smd::cl::foundation::tagged_tree.
+template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
+inline constexpr auto traversable_typeclass<
+    smd::cl::foundation::tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>> =
+    smd::cl::foundation::tagged_tree_traversable_map{};
+
+} // namespace smd::kit::foundation
 
 #endif

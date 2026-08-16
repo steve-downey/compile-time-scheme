@@ -1,87 +1,26 @@
-// src/smd/cl/foundation/traversable.hpp                          -*-C++-*-
+// src/smd/cl/foundation/traversable.hpp                             -*-C++-*-
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// New in this tree: the Traversable typeclass, required by
-// docs/CODING_RULES.md's Traversable rules and present in neither prior
-// copy of the foundation.
+// Forwarding shim (step R8, decision 2 corrected): smd::cl::foundation's
+// Traversable vocabulary now names smd::kit::foundation's. The initial R8
+// cut left this in cl on the grounds that no sibling front end had a use
+// for it yet; that was overturned as measuring a sibling project's
+// backlog rather than this code's shape (docs/compiler_architecture.org
+// § "The kit: a real second target with one real client"). The include
+// path and the names below are unchanged for every existing caller in
+// this tree; only the definition moved.
 #ifndef SRC_SMD_CL_FOUNDATION_TRAVERSABLE_HPP
 #define SRC_SMD_CL_FOUNDATION_TRAVERSABLE_HPP
 
-#include <type_traits>
-#include <utility>
+#include <smd/kit/foundation/traversable.hpp>
 
 namespace smd::cl::foundation {
 
-/// CRTP base that derives Traversable operations from the @c traverse
-/// primitive.
-///
-/// @c traverse is the minimal operation. @c Impl must provide:
-/// - @c traverse(f, container) — applies the effectful function @p f
-///   (@c Element -> @c Effect<B>) to every element and collects the results
-///   in an effect around a container of the same shape.
-///
-/// Contract (per docs/CODING_RULES.md's Traversable rules):
-/// - traversal preserves shape;
-/// - traversal uses the instance's documented Foldable order;
-/// - effect order is observable and is therefore part of the contract.
-///
-/// Derived here: @c sequence.
-///
-/// @tparam Impl Concrete implementation providing @c traverse.
-template <class Impl>
-struct traversable : protected Impl {
-    using Impl::traverse;
-
-    /// Collects a container of effects into an effect of a container,
-    /// derived as @c traverse with the identity function.
-    template <class T>
-    constexpr auto sequence(this auto &&self, T const &container) {
-        return self.traverse([](auto const &effect) { return effect; },
-                             container);
-    }
-};
-
-/// Typeclass lookup variable for Traversable; specialize for each container.
-///
-/// Default is @c std::false_type{}, producing a compile error if @ref
-/// traverse is called for an unregistered type.
-template <class T>
-inline constexpr auto traversable_typeclass = std::false_type{};
-
-/// Customization-point object for @c traverse.
-///
-/// Deduces the container type from the second argument and dispatches
-/// through @c traversable_typeclass<T>. The NTTP @c TC may be pinned
-/// explicitly.
-struct traverse_fn {
-    /// Applies the effectful @p f to every element of @p container.
-    ///
-    /// @tparam F  Callable type, @c Element -> @c Effect<B>.
-    /// @tparam T  Container type (deduced, used for typeclass lookup).
-    /// @tparam TC Typeclass instance (NTTP, defaults to lookup).
-    template <class F, class T,
-              const auto &TC = traversable_typeclass<std::remove_cvref_t<T>>>
-    constexpr auto operator()(F &&f, T const &container) const {
-        using tc_type = std::remove_cvref_t<decltype(TC)>;
-        return tc_type{}.traverse(std::forward<F>(f), container);
-    }
-};
-
-/// Global CPO for Traversable's @c traverse operation.
-inline constexpr traverse_fn traverse{};
-
-/// Customization-point object for the derived @c sequence operation.
-struct sequence_fn {
-    /// Collects a container of effects into an effect of a container.
-    template <class T,
-              const auto &TC = traversable_typeclass<std::remove_cvref_t<T>>>
-    constexpr auto operator()(T const &container) const {
-        using tc_type = std::remove_cvref_t<decltype(TC)>;
-        return tc_type{}.sequence(container);
-    }
-};
-
-/// Global CPO for Traversable's @c sequence operation.
-inline constexpr sequence_fn sequence{};
+using smd::kit::foundation::sequence;
+using smd::kit::foundation::sequence_fn;
+using smd::kit::foundation::traversable;
+using smd::kit::foundation::traversable_typeclass;
+using smd::kit::foundation::traverse;
+using smd::kit::foundation::traverse_fn;
 
 } // namespace smd::cl::foundation
 
