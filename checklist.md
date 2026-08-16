@@ -109,7 +109,7 @@ R0–R4 landed before that was recorded; `docs/blog-backfill-plan.md` covers the
 - [x] No step: the two invariants of a `tagged_tree`, and `from_nodes`' unchecked precondition — a reconsideration of phase 28's Mendler argument, `is_children_before_parent` and three asserts (+ phase 29)
 - [x] Step R6: conformance corpus and differential oracle (D16) (brief: `step-brief-r6.md`) (+ phase 30)
 - [x] Step R7: sender backend (D17) (+ phase 31)
-- [x] Step R8: extract the kit — `smd::kit::foundation` (nine `foundation/` files only; `parser/` has no `cl` client, DIV-0028) (+ phase 32)
+- [x] Step R8: extract the kit — `smd::kit::foundation` (seventeen `foundation/` files; `parser/` has no `cl` client, DIV-0028) (+ phase 32)
 
 ## Blog backfill (docs/blog-backfill-plan.md)
 
