@@ -140,6 +140,10 @@ Come back down from the summit for ~set!~: a shared store of mutable cells, an e
 
 /DRAFT — pending author revision./ Decision D17's second backend over the rebuild's core tree: ~machine_sender~ connects a Beman Execution sender that runs ~eval::machine~'s own trampoline to completion, then dispatches the result onto ~set_value~, ~set_error~, and ~set_stopped~, D13's three channels spent again. The tempting alternative — forking a call's argument list into sibling senders, the pivot's trick — was rejected on a concrete cost recorded in DIV-0016: the machine is single-owner state, and reproducing that trick would mean rebuilding a recursive evaluator in the one place R5 spent a whole phase removing recursion from. Nothing here is ~constexpr~ (DIV-0015, accepted-permanent), and the one ~when_all~ demonstration joins two independent whole programs, never one program's own arguments.
 
+** [[file:phase-32-extracting-the-kit.org][Phase 32 — Extracting the Kit, and a Bar That Measured the Wrong Thing]]
+
+/DRAFT — pending author revision./ Step R8, the rebuild plan's last step: checking ~docs/cl-rebuild-plan.md~ §5's years-old kit specification against the actual code rather than re-quoting it. ~parser/~ turns out to have no ~cl~ client at all — the reader is hand-written recursive descent, not a combinator stack — so DIV-0028 leaves it unmoved while ~foundation/~'s nine named files extract, three of them as supersets rather than exact copies. Seventeen files land in ~smd::kit::foundation~ as forwarding shims, not nine: the first pass drew the kit's boundary on whether a second implementation of ~foldable~/~traversable~/~monoid~/~identity~ already existed, mistaking a sibling project's unfinished refactor for evidence about this code's generality, and the repository owner overturned it before the step closed.
+
 * Table of Contents
 
 #+toc: headlines 1

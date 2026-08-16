@@ -1,0 +1,125 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:nil arch:headline author:t
+#+options: broken-links:nil c:nil creator:nil d:(not "LOGBOOK") date:t e:t
+#+options: email:nil f:t inline:t num:t p:nil pri:nil prop:nil stat:t tags:t
+#+options: tasks:t tex:t timestamp:t title:t toc:nil todo:t |:t
+#+options: html5-fancy:t
+#+bibliography: references.bib
+#+TITLE: Building a Compile-Time Scheme in C++26: Phase 32 - Extracting the Kit, and a Bar That Measured the Wrong Thing
+#+AUTHOR: Steve Downey
+#+DATE: 2026-08-15
+
+*DRAFT --- pending author revision*
+
+#+begin_abstract
+Step R8 is "extract the kit," and =docs/cl-rebuild-plan.md= §5 had already named the kit's contents years of steps ago: nine =foundation/= files plus four =parser/= files, copied with what it called essentially zero drift between =smdscheme= and the sibling =compile-time-forth= repository.
+Checking that sentence against the actual code changed the scope three ways.
+=parser/= turns out to have no client in this tree at all (=cl='s reader is hand-written recursive descent, not a =parser<T>= stack), so four of §5's thirteen names do not move (DIV-0028).
+Of the nine =foundation/= files that do, three had grown past "zero drift" during an earlier merge and travel forward as supersets.
+And "the third working client" was never going to mean three tenants: =smdscheme= is never edited in place, =compile-time-forth= is a separate repository, so what ships is one real client, with a diff as evidence rather than a migration.
+The interesting mistake was mine, not the plan's: I drew the kit's boundary on whether a second implementation of a typeclass already existed, and had to be shown that the absence I was reading as evidence was really just another project's unfinished refactor.
+#+end_abstract
+
+#+MACRO: TEASER_END
+{{TEASER_END}}
+#+html: <nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-31-driving-the-machine.org][Phase 31 - Driving the Machine, Not Forking It ←]]
+#+html: </nav>
+
+
+* A spec written before any of the answers were known
+
+§5 of the rebuild plan is old.
+It named the kit's contents (=static_vector=, =result=, =parse_error=, =source_pos=, =source_span=, =arena_box=, =functor=, =applicative=, =alternative=, plus =cursor=, =parser=, =alt=, =parser_ops=) back when =cl= did not exist yet, on the strength of a two-way diff between =smdscheme= and =compile-time-forth= that ran 7 to 15 changed lines per file.
+Two independent copies with no semantic divergence is the signal the plan read as "this wants to be a library," and it said extraction happens "once Common Lisp is the third working client."
+
+A plan can say what belongs in a kit before anyone checks it against real code.
+R8's job was doing that checking, against code that did not exist when the sentence was written.
+Not all of it survived.
+
+* Half the list was never a client
+
+=cl='s reader (=src/smd/cl/reader/cursor.hpp=) is a hand-rolled, readtable-driven recursive descent.
+No =parser<F>= wrapper, no =alt= combinator, =parse_state= folded straight into the cursor instead of living beside a generic =parser= type.
+Grep across =reader=, =elaborator=, =eval=, =sender=, =symbol=, and =conformance= turns up all nine =foundation/= names and not one =parser<T>=, =alt=, or =parser_ops=.
+R3 chose that shape a long time ago and nothing since has revisited it; nobody recorded the choice as a rejection of the combinator style, it just is one, by omission.
+
+So =parser/= stays exactly where it sits in =smdscheme= and =forth=: undiffed, unmoved.
+DIV-0028 records it, and =cl='s reader isn't at fault here; it's tested and oracle-verified.
+The gap sits in what §5 assumed would already be true by the time this step ran.
+
+The nine =foundation/= files fare better, but not for free.
+Diffing all three copies (=smdscheme=, =forth=, and =cl='s own R1-era union) shows six of them genuinely unchanged in substance: =source_pos=, =source_span=, =functor=, =applicative=, =alternative=, and =arena_box= at a handful of lines.
+The other three grew.
+=static_vector= picked up =filled=, =append_range=, and =pop_back= somewhere in R1's merge; =result= picked up =value_type=, equality, and =and_then=; =parse_error='s equality became a three-way best-of.
+None of the additions names a Lisp-specific type, so all three travel with the extraction as supersets instead of staying cl-only.
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-32::src/smd/kit/foundation/static_vector.hpp::049b5617-cc33-4d2f-b479-fc81fb2a62ba]] :lines 2- :src cpp :end "049b5617-cc33-4d2f-b479-fc81fb2a62ba end"
+
+=filled=, =append_range=, =pop_back= are the growth; nothing else in the class changed shape to get them.
+
+And "third working client" promises more than this repository can deliver.
+=smdscheme= cannot be repointed at the kit without breaking the one hard rule among the three trees; =compile-time-forth= is a separate repository this project can read but not edit.
+What ships is =smd::kit::foundation=, a real second build target, =cl.foundation= as its one real, tested, working client, and the three-way diff as evidence the other two copies could adopt it unchanged if their own maintainers ever chose to.
+That is smaller than "third client" implies, and it's also the whole of what was ever actually available to build here.
+
+* Same namespace, new address
+
+Every consumer under =src/smd/cl= reaches =foundation::result= by unqualified lookup through =smd::cl::foundation=, a sibling namespace to =smd::cl::reader=, =smd::cl::eval=, and the rest.
+Renaming that namespace to =smd::kit= to match where the code now lives would have broken every one of those call sites silently, so the seventeen headers under =src/smd/cl/foundation/= became forwarding shims instead: same include path, same guard, same namespace, a =using= for each name the header used to define outright.
+
+#+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-32::src/smd/cl/foundation/result.hpp::80e2bedd-55e3-42e1-b835-55384ff35836]] :lines 2- :src cpp :end "80e2bedd-55e3-42e1-b835-55384ff35836 end"
+
+No file outside =src/smd/cl/foundation/= changed.
+Not =reader=, not =elaborator=, not =eval=, not =sender=, not =core=, nothing. The two things a caller can depend on, the include path and the qualified name, are both untouched.
+The extraction is invisible from every angle except the one file doing the forwarding.
+
+* The bar I got wrong
+
+Thirteen files under =src/smd/cl/foundation/= had never existed in either older copy: =foldable=, =traversable=, =monoid=, =identity=, =node_f=, =topo_fold=, =trampoline=, =fold_left_short=, =result_instances=, =static_vector_instances=, =tagged_tree=, =tagged_tree_instances=, =tagged_tree_schemes=.
+Five of those name an AST type outright (=node_f=, =topo_fold=, the three =tagged_tree*= files), and §5 excludes anything AST-shaped by name.
+That part was easy and it stayed easy.
+
+The other eight I got wrong on the first pass.
+I left =foldable=, =traversable=, =monoid=, =identity=, =fold_left_short=, =trampoline=, and the two instance adapters that depend on them, in =cl=, reasoning that neither =smdscheme= nor =compile-time-forth= had ever needed a Foldable or Traversable instance, so they looked like a sample of one: generic in shape, sure, but unproven, because nothing had proven them against a second implementation the way the other nine had been proven.
+That's a real test; it's just not §5's test.
+§5's actual bar is "generic in shape and free of language-specific types," and the two-independent-copies diff was only ever offered as evidence for that bar, for the nine files where the evidence happened to exist.
+I had quietly swapped the bar for the evidence, and then applied the evidence to files where it had never been collected, and called the absence a result.
+
+The absence measured =compile-time-forth='s backlog.
+It said nothing about this code's shape.
+Nobody has done the algebraic refactoring over there yet; the sibling project's own schedule was the line item I was reading as a property of =foldable.hpp=.
+Re-run §5's own test instead of the proxy and all eight pass outright: the four typeclasses are the same CPO shape as =functor=/=applicative=/=alternative= pointed at a different pair of operations, =fold_left_short= and =trampoline= are algorithms over an abstract range and an abstract state machine that name neither Scheme nor Lisp, and the two instance adapters were only ever waiting on their typeclasses and their datatypes both landing in the kit at once.
+Once =result= and =static_vector= are kit-owned and so are the four typeclasses they instantiate, an adapter between them is kit material by the same argument.
+All eight moved, in a second commit, after I overturned the first.
+
+One trace of the correction was still sitting in the tree at this step's merge.
+=result.hpp='s own shim comment narrated =result_instances.hpp= as staying behind in =cl= "because =foldable=/=traversable= have exactly one implementation." That was true when the sentence was first written and false two files and one correction later; nobody had gone back to fix it before the merge landed, so it was wrong about the layout, not just the reasoning behind it.
+A follow-up commit outside R8, prompted by this post's own draft, has since corrected the wording; the tag this post pins to predates that fix, so the mistake described here is what a reader looking at this commit would actually have found.
+Small, harmless, and just the kind of thing a mid-step reversal leaves lying around until someone reads two files side by side.
+
+Seventeen headers moved in the end, eight more than §5's original list.
+The correction also dissolved something instead of working around it a second time: once a type and every typeclass it instantiates share a namespace, a specialization of =functor_typeclass= or =foldable_typeclass= for that type is ordinary same-namespace code again, no reopening required.
+=tagged_tree_instances.hpp= still needs the reopening trick, honestly, because =tagged_tree= itself stayed in =cl= while the typeclasses it instantiates did not; that workaround was never wrong, it just marks one file now instead of three.
+
+* What stayed out, for a reason that never wavered
+
+=node_f=, =topo_fold=, and the =tagged_tree*= files were excluded on the first pass and the corrected one alike, and the reason didn't move an inch between the two: they name an AST type.
+Naming an AST type is what actually excludes them, and the question that turned out to be the wrong one to ask about the other eight (whether a second implementation already existed) was never the reason these five were out.
+Put the two groups side by side and they look identical from outside the diff: eight files held back on day one, five files held back on day one, all thirteen justified the same way, "no second implementation exists yet."
+Only one of those two justifications was actually correct.
+
+* Where that leaves the plan
+
+§6 lists R8 as the plan's last phase, and there's no R9 waiting behind it.
+=docs/cl-rebuild-closing-note.md= covers that whole arc, from §1's three complaints through here.
+This post stays with the one step that happened to land last.
+What R8 itself leaves open is narrower: whether =parser/= ever gets a =cl= client worth revisiting DIV-0028 for, and whether a kit with one real tenant is a kit anyone else will ever actually reach for.
+Both questions belong to whoever comes back to this tree next.
+
+#+html: <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+[[file:index.org][↑ Series Index]] | [[file:phase-31-driving-the-machine.org][← Phase 31 - Driving the Machine, Not Forking It]]
+#+html: </nav>
+
+* References
+
+#+print_bibliography:
