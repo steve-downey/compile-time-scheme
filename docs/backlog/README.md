@@ -46,3 +46,4 @@ A backlog file is where the argument goes instead, so the code stays clean and t
 | [BL-0001](BL-0001-elaborator-as-fold-fix-algebra.md) | Rewrite the elaborators as `fold_fix` algebras | landed — R1 deleted `fold_fix`, R3 shipped the schemes, R4 the elaborator |
 | [BL-0002](BL-0002-compile-time-arena-sizing.md) | Size the node arena from a compile-time measurement | open — unblocked by D14, revisit in R1 |
 | [BL-0003](BL-0003-implicit-block-elision-as-a-cata.md) | Elide a `defun`'s implicit block by a `cata`, not an evaluator case | open — wants R6's corpus first |
+| [BL-0004](BL-0004-retire-the-cl-foundation-forwarding-shims.md) | Retire the seventeen `cl/foundation` forwarding shims left by R8 | open — for removal, but not while the kit boundary could still move |
