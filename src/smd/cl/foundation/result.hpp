@@ -4,11 +4,10 @@
 // smd::kit::foundation::result, extracted to the shared constexpr
 // substrate. and_then travelled with it — it is generic over any result<T>,
 // even though its doc comment still narrates the elaborator decision (D15)
-// that motivated writing it. result_instances.hpp (the Functor/Applicative
-// typeclass adapter for this type) stays in smd::cl::foundation: it also
-// depends on foldable.hpp/traversable.hpp, which have exactly one
-// implementation so far and have not earned kit membership by the same
-// two-independent-copies test the nine files here already passed. The
+// that motivated writing it. result_instances.hpp (the typeclass adapter
+// for this type) travelled with it, along with foldable.hpp and
+// traversable.hpp: both the datatype and every typeclass the adapter
+// instantiates are kit-owned, so the adapter is kit material too. The
 // include path and the names below are unchanged for every existing caller
 // in this tree; only the definition moved.
 #ifndef SRC_SMD_CL_FOUNDATION_RESULT_HPP
