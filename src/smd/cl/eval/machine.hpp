@@ -676,10 +676,13 @@ constexpr auto machine<Limits, CoreTree, SymbolTable>::run(int root)
     pending_ = outcome{nil_value(known_)};
     auto const steps = foundation::trampoline(
         *this, Limits.steps, [](machine &m) { return m.step(); });
-    if (!steps.has_value()) {
-        return outcome{steps.error()};
-    }
-    return pending_;
+    // The trampoline's success value is a step count, which says only that
+    // the machine halted; what the program produced is in pending_.
+    // Substituting one for the other is a map over the effect, and widening
+    // the surviving error channel into outcome's is to_outcome's job —
+    // spelling that widening out here made a second copy of it.
+    return to_outcome(
+        foundation::fmap([this](int) { return pending_; }, steps));
 }
 
 template <limits Limits, class CoreTree, class SymbolTable>

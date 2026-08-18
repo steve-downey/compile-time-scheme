@@ -11,6 +11,7 @@
 #include <smd/cl/eval/value.hpp>
 #include <smd/cl/foundation/parse_error.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/reader/cursor.hpp>
 #include <smd/cl/reader/datum.hpp>
 #include <smd/cl/reader/read.hpp>
@@ -113,22 +114,30 @@ template <int DatumNodes, int DatumList, class SymbolTable, class CoreTree>
         return foundation::parse_error{{}, "no forms to read"};
     }
     while (!cur.empty()) {
-        auto const read_r =
-            reader::read_datum<DatumNodes, DatumList>(cur, symbols);
-        if (!read_r.has_value()) {
-            return read_r.error();
+        // Read, elaborate and record one form: three steps each taking the
+        // previous one's output, which is what and_then is for. The
+        // capacity check belongs inside the chain rather than between two
+        // ladders, because running out of room is one more way this step
+        // fails and not a separate kind of event.
+        auto const stepped = foundation::and_then(
+            reader::read_datum<DatumNodes, DatumList>(cur, symbols),
+            [&](auto const &read) -> foundation::result<reader::cursor> {
+                return foundation::and_then(
+                    elaborator::elaborate_into(read.value, symbols, program),
+                    [&](int root) -> foundation::result<reader::cursor> {
+                        if (roots.size() >= roots.capacity()) {
+                            return foundation::parse_error{
+                                {}, "too many top-level forms"};
+                        }
+                        roots.push_back(root);
+                        return detail::skip_between_forms(
+                            read.rest, reader::standard_readtable);
+                    });
+            });
+        if (!stepped.has_value()) {
+            return stepped.error();
         }
-        auto const root_r =
-            elaborator::elaborate_into(read_r.value().value, symbols, program);
-        if (!root_r.has_value()) {
-            return root_r.error();
-        }
-        if (roots.size() >= roots.capacity()) {
-            return foundation::parse_error{{}, "too many top-level forms"};
-        }
-        roots.push_back(root_r.value());
-        cur = detail::skip_between_forms(read_r.value().rest,
-                                         reader::standard_readtable);
+        cur = stepped.value();
     }
     return roots;
 }

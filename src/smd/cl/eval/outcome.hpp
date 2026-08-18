@@ -8,6 +8,7 @@
 #include <smd/cl/foundation/result.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
 
+#include <concepts>
 #include <utility>
 #include <variant>
 
@@ -132,7 +133,21 @@ constexpr auto outcome::as_unwind() const -> unwind const & {
 /// function at all, which is the point of the split: an unwind in flight
 /// has nowhere to go in a type that has only value and error, and pretending
 /// otherwise is what the sentinel messages were for.
-[[nodiscard]] constexpr auto to_outcome(foundation::result<value> const &r)
+///
+/// The @c has_value test here is not a D15 ladder but the natural
+/// transformation itself, and this is the one place it is written. Widening
+/// is not a Monad operation: @c bind stays inside one effect, and the whole
+/// content of this function is that it does not. Callers holding a
+/// @c result of something already outcome-shaped — @c machine::run, whose
+/// answer is the pending outcome rather than the trampoline's step count —
+/// get the collapse from @p T being @ref outcome itself.
+///
+/// @tparam T The result's success type; anything an @ref outcome can be
+///           built from, which is @ref value, @ref unwind, or an
+///           @ref outcome already.
+template <class T>
+    requires std::constructible_from<outcome, T const &>
+[[nodiscard]] constexpr auto to_outcome(foundation::result<T> const &r)
     -> outcome {
     if (!r.has_value()) {
         return outcome{r.error()};

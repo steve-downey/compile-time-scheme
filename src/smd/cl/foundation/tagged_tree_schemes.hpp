@@ -15,6 +15,7 @@
 
 #include <smd/cl/foundation/node_f.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/foundation/static_vector.hpp>
 #include <smd/cl/foundation/tagged_tree.hpp>
 #include <smd/cl/foundation/topo_fold.hpp>
@@ -98,16 +99,21 @@ template <class A, class Alg, class Leaf, class Tag, int MaxNodes,
 cata_short(tagged_tree<Leaf, Tag, MaxNodes, MaxChildren> const &tree, Alg alg)
     -> result<A> {
     assert(tree.root() >= 0);
-    auto done = fold_up_short<A, MaxNodes>(
+    auto const done = fold_up_short<A, MaxNodes>(
         tree.nodes(),
         [&alg](static_vector<A, MaxNodes> const &results,
                auto const &node) -> result<A> {
             return std::invoke(alg, detail::materialize(results, node));
         });
-    if (!done.has_value()) {
-        return done.error();
-    }
-    return done.value()[tree.root()];
+    // Selecting the root out of the finished column is a map over the
+    // effect, not a decision about it: fold_up_short has already stopped at
+    // the first failing layer, and this only has to carry that verdict
+    // outward. result's Functor instance is what does the carrying.
+    return fmap(
+        [&tree](static_vector<A, MaxNodes> const &column) -> A {
+            return column[tree.root()];
+        },
+        done);
 }
 
 /// Paramorphism over a @ref tagged_tree: @ref cata, except the algebra
@@ -161,17 +167,21 @@ template <class A, class Alg, class Leaf, class Tag, int MaxNodes,
 para_short(tagged_tree<Leaf, Tag, MaxNodes, MaxChildren> const &tree, Alg alg)
     -> result<A> {
     assert(tree.root() >= 0);
-    auto done = fold_up_short<A, MaxNodes>(
+    auto const done = fold_up_short<A, MaxNodes>(
         tree.nodes(),
         [&](static_vector<A, MaxNodes> const &results,
             auto const &node) -> result<A> {
             return std::invoke(alg, tree, results.size(),
                                detail::materialize(results, node));
         });
-    if (!done.has_value()) {
-        return done.error();
-    }
-    return std::move(done).value()[tree.root()];
+    // As in @ref cata_short: a map over the effect, not a decision about
+    // it. The std::move this replaced never moved anything — result::value
+    // returns a const reference, so the subscript copied either way.
+    return fmap(
+        [&tree](static_vector<A, MaxNodes> const &column) -> A {
+            return column[tree.root()];
+        },
+        done);
 }
 
 // d284e784-4e9f-4a7a-83db-8bfd2c8d82c0
