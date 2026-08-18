@@ -16,6 +16,15 @@ The shims are: `static_vector`, `result`, `parse_error`, `source_pos`,
 `foldable`, `traversable`, `monoid`, `identity`, `fold_left_short`,
 `trampoline`, `result_instances`, `static_vector_instances`.
 
+Eighteen since the Monad typeclass landed: `monad` forwards
+`smd::kit::foundation::monad`, `monad_typeclass` and the `bind`/`join`
+CPOs. It is the one shim that never had a `cl`-side definition to forward
+from — the typeclass was written in the kit directly, because `result` and
+its other typeclasses were already there — so it exists purely so that
+`cl` code spells its includes the way the rest of `cl` does. That makes it
+the cheapest of the eighteen to retire and the least informative about
+whether the kit boundary has settled.
+
 Staying in `src/smd/cl/foundation/` as real files, not shims:
 `node_f`, `topo_fold`, `tagged_tree`, `tagged_tree_instances`,
 `tagged_tree_schemes`. These name an AST type and are correctly outside

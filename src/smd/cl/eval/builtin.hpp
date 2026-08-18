@@ -9,6 +9,7 @@
 #include <smd/cl/foundation/fold_left_short.hpp>
 #include <smd/cl/foundation/parse_error.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
 #include <smd/cl/symbol/symbol_table.hpp>
 

@@ -6,6 +6,7 @@
 
 #include <smd/cl/core/ast.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/reader/read.hpp>
 #include <smd/cl/symbol/symbol_table.hpp>
 

@@ -18,6 +18,7 @@
 
 #include <smd/kit/foundation/applicative.hpp>
 #include <smd/kit/foundation/functor.hpp>
+#include <smd/kit/foundation/monad.hpp>
 
 #include <functional>
 #include <type_traits>
@@ -80,9 +81,40 @@ struct identity_applicative_map : applicative<identity_applicative_impl> {
     using identity_applicative_impl::pure;
 };
 
+/// Monad @c Impl for @ref identity: there is no failure to skip, so @c bind
+/// is function application under the wrapper.
+///
+/// The trivial monad is worth registering rather than only describing. It
+/// gives the laws in <smd/kit/foundation/monad.test.cpp> a second instance
+/// to hold against, which is what makes them tests of the typeclass rather
+/// than of @ref result, and it is the effect @c traverse already uses to say
+/// "no effect at all".
+struct identity_monad_impl {
+    template <class V>
+    constexpr auto pure(this auto &&, V &&value)
+        -> identity<std::remove_cvref_t<V>> {
+        return identity<std::remove_cvref_t<V>>{std::forward<V>(value)};
+    }
+
+    template <class T, class F>
+    constexpr auto bind(this auto &&, identity<T> const &id, F &&f) {
+        return std::invoke(std::forward<F>(f), id.value);
+    }
+};
+
+/// Monad instance map for @ref identity.
+struct identity_monad_map : monad<identity_monad_impl> {
+    using identity_monad_impl::bind;
+    using identity_monad_impl::pure;
+};
+
 /// Registers the Functor instance for @ref identity.
 template <class T>
 inline constexpr auto functor_typeclass<identity<T>> = identity_functor_map{};
+
+/// Registers the Monad instance for @ref identity.
+template <class T>
+inline constexpr auto monad_typeclass<identity<T>> = identity_monad_map{};
 
 /// Registers the Applicative instance for @ref identity.
 template <class T>

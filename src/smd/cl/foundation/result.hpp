@@ -2,14 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Forwarding shim (step R8): smd::cl::foundation::result now names
 // smd::kit::foundation::result, extracted to the shared constexpr
-// substrate. and_then travelled with it — it is generic over any result<T>,
-// even though its doc comment still narrates the elaborator decision (D15)
-// that motivated writing it. result_instances.hpp (the typeclass adapter
-// for this type) travelled with it, along with foldable.hpp and
-// traversable.hpp: both the datatype and every typeclass the adapter
-// instantiates are kit-owned, so the adapter is kit material too. The
-// include path and the names below are unchanged for every existing caller
-// in this tree; only the definition moved.
+// substrate. result_instances.hpp (the typeclass adapter for this type)
+// travelled with it, along with foldable.hpp and traversable.hpp: both the
+// datatype and every typeclass the adapter instantiates are kit-owned, so
+// the adapter is kit material too.
+//
+// and_then travelled with it too and has since moved again, into
+// result_instances.hpp, where it is a spelling of the Monad instance's bind
+// rather than a second copy of it. A caller that says and_then wants that
+// header now; this one no longer names it.
 #ifndef SRC_SMD_CL_FOUNDATION_RESULT_HPP
 #define SRC_SMD_CL_FOUNDATION_RESULT_HPP
 
@@ -24,7 +25,6 @@
 
 namespace smd::cl::foundation {
 
-using smd::kit::foundation::and_then;
 using smd::kit::foundation::result;
 
 } // namespace smd::cl::foundation

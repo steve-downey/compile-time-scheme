@@ -5,6 +5,7 @@
 
 #include <smd/cl/foundation/parse_error.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/foundation/source_pos.hpp>
 #include <smd/cl/reader/cursor.hpp>
 #include <smd/cl/reader/datum.hpp>
@@ -44,6 +45,12 @@ namespace detail {
 /// header's public entry points spell it @c detail::and_then. The calls
 /// inside this namespace would find it by argument-dependent lookup
 /// regardless — @c result is a @c foundation type.
+///
+/// @c and_then is now a spelling of the Monad instance's @c bind rather
+/// than its own implementation, which is why nothing in this header had to
+/// change when the typeclass arrived. Keeping the domain name is what buys
+/// that: the @c bind CPO is an object, so ADL would not have found it and
+/// this using-declaration would have had to become load-bearing.
 using foundation::and_then;
 
 /// Everything one read shares: the tree being built, the symbol table
@@ -197,15 +204,33 @@ template <class Ctx>
                     return parse_state<int>{id, cur.bump()};
                 });
         }
-        auto const element = read_node(cur, ctx);
-        if (!element.has_value()) {
-            return element;
+        // Read one element and record it: two steps, the second taking the
+        // first's output, which is a bind. Running out of room is one more
+        // way reading an element fails, so the check belongs inside the
+        // chain rather than in a second ladder after it.
+        auto const stepped = and_then(
+            read_node(cur, ctx),
+            [&](parse_state<int> const &element) -> foundation::result<cursor> {
+                if (children.size() >= children.capacity()) {
+                    return foundation::parse_error{cur.position(),
+                                                   "too many elements"};
+                }
+                children.push_back(element.value);
+                return element.rest;
+            });
+        // The one test that survives, and the reason it is not the ladder
+        // D15 rules out: this asks whether to take another turn of an
+        // unfold whose length nothing knows until the `)` arrives. Under
+        // strict evaluation a traversal can only stop by asking the effect
+        // whether it has already failed — the same argument
+        // fold_left_short's short_circuit_effect rests on — and bind, which
+        // skips work but not iteration, cannot answer it. Removing this
+        // means making the loop itself monadic, over a parser that carries
+        // its own state; that is the combinator layer's job, not this one's.
+        if (!stepped.has_value()) {
+            return stepped.error();
         }
-        if (children.size() >= children.capacity()) {
-            return foundation::parse_error{cur.position(), "too many elements"};
-        }
-        children.push_back(element.value().value);
-        cur = element.value().rest;
+        cur = stepped.value();
     }
 }
 

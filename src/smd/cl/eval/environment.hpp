@@ -6,6 +6,7 @@
 #include <smd/cl/eval/heap.hpp>
 #include <smd/cl/eval/value.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/symbol/symbol_id.hpp>
 
 #include <algorithm>

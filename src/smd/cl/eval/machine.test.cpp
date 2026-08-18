@@ -11,6 +11,7 @@
 #include <smd/cl/eval/outcome.hpp>
 #include <smd/cl/eval/value.hpp>
 #include <smd/cl/foundation/result.hpp>
+#include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/reader/read.hpp>
 
 #include <catch2/catch_test_macros.hpp>

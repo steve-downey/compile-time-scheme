@@ -21,14 +21,18 @@
 // alone to bring result/parse_error/fmap into scope).
 #include <smd/cl/foundation/applicative.hpp>
 #include <smd/cl/foundation/functor.hpp>
+#include <smd/cl/foundation/monad.hpp>
 #include <smd/cl/foundation/result.hpp>
 
 namespace smd::cl::foundation {
 
+using smd::kit::foundation::and_then;
 using smd::kit::foundation::result_applicative_impl;
 using smd::kit::foundation::result_applicative_map;
 using smd::kit::foundation::result_functor_impl;
 using smd::kit::foundation::result_functor_map;
+using smd::kit::foundation::result_monad_impl;
+using smd::kit::foundation::result_monad_map;
 
 } // namespace smd::cl::foundation
 

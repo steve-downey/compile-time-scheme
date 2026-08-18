@@ -16,6 +16,7 @@ target_sources(
                 foldable.hpp
                 functor.hpp
                 identity.hpp
+                monad.hpp
                 monoid.hpp
                 node_f.hpp
                 parse_error.hpp
@@ -48,6 +49,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             foldable.test.cpp
             functor.test.cpp
             identity.test.cpp
+            monad.test.cpp
             monoid.test.cpp
             node_f.test.cpp
             parse_error.test.cpp

@@ -23,6 +23,8 @@ using smd::kit::foundation::identity_applicative_impl;
 using smd::kit::foundation::identity_applicative_map;
 using smd::kit::foundation::identity_functor_impl;
 using smd::kit::foundation::identity_functor_map;
+using smd::kit::foundation::identity_monad_impl;
+using smd::kit::foundation::identity_monad_map;
 
 } // namespace smd::cl::foundation
 

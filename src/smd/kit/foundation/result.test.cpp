@@ -7,6 +7,7 @@
 
 #include <smd/kit/foundation/result.hpp>
 #include <smd/kit/foundation/result.hpp> // test 2nd include OK
+#include <smd/kit/foundation/result_instances.hpp>
 
 #include <catch2/catch_test_macros.hpp>
 

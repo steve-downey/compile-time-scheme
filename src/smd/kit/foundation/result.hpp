@@ -14,8 +14,6 @@
 
 #include <smd/kit/foundation/parse_error.hpp>
 
-#include <functional>
-#include <type_traits>
 #include <utility>
 #include <variant>
 
@@ -83,29 +81,17 @@ constexpr auto result<T>::error() const -> foundation::parse_error const & {
     return std::get<foundation::parse_error>(data_);
 }
 
-/// Monadic sequencing for @ref result: applies @p f to the success value of
-/// @p step, or passes @p step's error through unchanged.
-///
-/// Decision D15 (docs/cl-rebuild-plan.md) rules out the
-/// `if (!r.has_value()) return r;` ladder and names two replacements:
-/// @c traverse where there is a structure to thread the effect through, and
-/// @c fold_left_short where a sequence must stop early. This is the third
-/// shape, and the one neither covers — a single step whose input is the
-/// previous step's output, with no structure and no sequence. It began as
-/// the reader's private @c detail::and_then and was promoted to the
-/// substrate when the elaborator needed the same shape; extracted here
-/// because nothing about it is specific to a reader or an elaborator.
-///
-/// @tparam T The step's success type.
-/// @tparam F Callable with signature @c result<U>(T const &).
-template <class T, class F>
-[[nodiscard]] constexpr auto and_then(result<T> const &step, F &&f) {
-    using out_type = std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
-    if (!step.has_value()) {
-        return out_type{step.error()};
-    }
-    return std::invoke(std::forward<F>(f), step.value());
-}
+// Monadic sequencing for result — spelled and_then here since R3, and still
+// spelled that way — is now the Monad instance's bind, and and_then a
+// forwarder to it, both in <smd/kit/foundation/result_instances.hpp>. It
+// began as the reader's private detail::and_then and was promoted to the
+// substrate when the elaborator needed the same shape; what moved this time
+// is only which file holds it, because a datatype does not carry its own
+// typeclass adaptation (docs/CODING_RULES.md, Typeclass Design).
+//
+// Callers spelling and_then need that header rather than this one. Nothing
+// else changed for them: and_then is still a function template, so argument
+// -dependent lookup still finds it from a result argument.
 // 6dc68d44-18f5-450d-98f2-e7833f38f0aa end
 
 } // namespace smd::kit::foundation
