@@ -28,7 +28,8 @@ struct box {
 
 struct box_monad_impl {
     template <class V>
-    constexpr auto pure(this auto &&, V &&value) -> box<std::remove_cvref_t<V>> {
+    constexpr auto pure(this auto &&, V &&value)
+        -> box<std::remove_cvref_t<V>> {
         return box<std::remove_cvref_t<V>>{std::forward<V>(value)};
     }
 
