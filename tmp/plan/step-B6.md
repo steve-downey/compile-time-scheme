@@ -178,7 +178,7 @@ grep -n 'and_then' src/smd/cl/reader/detail/forms.hpp        # expect 0
 ./.build/*/*/cl_reader_test "*Symbol*" "*Keyword*" "*Quote*" 2>/dev/null | tail -6
 ```
 
-And the one that matters most, through the outside oracle A1 and A2 built:
+And the one that matters most, through the outside oracle A4 and A5 built:
 
 ```sh
 ./.build/*/*/cl_conformance_test "*ReaderDifferential*" 2>/dev/null | tail -5
@@ -209,7 +209,7 @@ token scan -- and scan_token and classify_number are not touched here or
 anywhere in this series. The comment at the bind site says so, because
 that is the cheapest defence the behaviour will ever get.
 
-The differential A1 and A2 built reads 1+ with SBCL as well as with this
+The differential A4 and A5 built reads 1+ with SBCL as well as with this
 reader and compares what both print. That is the first time this
 project's most load-bearing reader behaviour has been checked against
 something other than its own opinion.

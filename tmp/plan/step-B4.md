@@ -1,4 +1,4 @@
-# Step B4 — choice and bounded repetition; `read_delimited` retires the ladder
+# Step B4 — choice and bounded repetition; `read_delimited` onto the combinator layer
 
 ## Project context
 
@@ -22,30 +22,64 @@ the two intertoken-space skippers.
 - Existing reader tests and the conformance corpus pass unchanged. Adding a
   case is fine; **changing an existing expectation is a halt**.
 
-## Why
+## Why, and what changed under this step since it was first written
 
-This is the step the whole change was argued for. `read_delimited`, in
-`src/smd/cl/reader/detail/forms.hpp`, contains:
+**The D15 ladder this step was written to remove is already gone.** Since
+this plan was first drafted, commit `93e4bc7` rewrote `read_delimited`'s
+element step from the `if (!element.has_value()) { return element; }` ladder
+D15 forbids into an `and_then` chain:
 
 ```cpp
-auto const element = read_node(cur, ctx);
-if (!element.has_value()) {
-    return element;
+auto const stepped = and_then(
+    read_node(cur, ctx),
+    [&](parse_state<int> const &element) -> foundation::result<cursor> {
+        if (children.size() >= children.capacity()) {
+            return foundation::parse_error{cur.position(), "too many elements"};
+        }
+        children.push_back(element.value);
+        return element.rest;
+    });
+if (!stepped.has_value()) {
+    return stepped.error();
 }
+cur = stepped.value();
 ```
 
-Decision D15 names that construct as the thing recursion schemes exist to
-replace: "error propagation is a scheme's short-circuiting carrier, never an
-`if (!r.has_value()) return r;` ladder." It is a live violation of a ratified
-rule, in the newest reader in the repository, and the argument for the whole
-series is that a ladder is correct by vigilance where a carrier is correct by
-construction.
+That commit's own message explains, correctly, why the surviving
+`stepped.has_value()` is not the ladder D15 rules out: it is the unfold's
+loop-continuation test, not a short-circuit-on-error idiom — "a traversal
+can only stop by asking the effect whether it has already failed … and
+bind, which skips work but not iteration, cannot answer it." **Do not
+re-litigate that; it is correct, and it is not this step's job to remove.**
 
-Note what the surrounding code already does: the same function's two exit paths
-go through `and_then`. The ladder is not there because the author did not know
-better; it is there because the loop is an unfold and there was no combinator
-for "repeat until the closing delimiter, short-circuiting on failure". This
-step provides one.
+**What this step still does, and it is real work, not nothing.** The element
+step is a `bind` now, but it still lives inside a hand-written
+`while (true)` loop carrying a comment claiming a "substrate generic
+algorithm" exemption:
+
+```cpp
+typename Ctx::child_list children;
+// Substrate generic algorithm: the reader's element unfold. The
+// elements do not exist as a structure until this loop reads them,
+// so this produces what traverse later consumes.
+while (true) {
+```
+
+That comment is the same claim B3 found and rejected for `skip.hpp`'s two
+loops, for the same reason: `docs/cpp-rules.md`'s exception is for the
+substrate's own generic algorithms, and this loop is in the reader, not the
+substrate. `93e4bc7`'s own commit message says as much about itself: "that
+last test goes when the loop itself becomes monadic over a parser carrying
+its own state, which is the combinator layer's work and not this one's." **This
+step is that combinator-layer work.** The deliverable is not "remove the
+ladder" — it is "replace the raw `while (true)` and its false exemption with
+the bounded, diagnosing repetition this step builds," the same move B3 made
+for the skippers, applied to the one loop B3 could not touch because the
+combinator it needs did not exist yet.
+
+The two traps below are exactly as sharp as they were before the ladder was
+removed — they are about the *repetition's* behaviour at its two edges
+(too many elements, and running out of input), not about the ladder.
 
 ## Two traps, and they are opposite
 
@@ -153,8 +187,13 @@ elements in source order, with the cursor after the closing delimiter.
 
 The loop becomes: repeat, bounded and diagnosing, of "skip intertoken space,
 then either the closing delimiter — which ends the repetition — or one
-`read_node`". The `if (!element.has_value()) return element;` ladder disappears
-into the repetition's short-circuit. Constrain the function with
+`read_node`". What disappears into the repetition is not a ladder — `93e4bc7`
+already turned the element step into the `and_then`/`bind` chain quoted
+above — it is the raw `while (true)` and the "substrate generic algorithm"
+comment over it, which was never true of a loop in the reader. Build the new
+repetition's element step **from** that existing `bind` rather than
+rewriting it from scratch; it is already the right shape; it is only the
+loop wrapped around it that this step replaces. Constrain the function with
 `reader_context` while you are in it, as B2's pattern establishes.
 
 Watch the element order. `docs/cpp-rules.md` is explicit that invariant **I2** —
@@ -170,10 +209,15 @@ the step's centre and the post's. Update the `smd::kit::parser` section in
 place: the primitive set grows again; the two repetitions differ deliberately
 and why; the choice diagnostics assessment from part 1.
 
-Also record, at the anchor over `read_delimited`, that D15's ladder is gone
-from the reader. Then check: `grep -rn 'has_value()) {' src/smd/cl/reader/` and
-say in your handoff whether any remain, and in which function, so the step that
-owns each one knows.
+Also record, at the anchor over `read_delimited`, that the function is now
+fully onto the combinator layer — the `bind` `93e4bc7` already gave its
+element step, plus the repetition this step gives its loop — and that D15's
+ladder had already left the function before this step touched it; this
+step's contribution is removing the last raw loop and its inaccurate
+exemption claim, not the ladder. Then check:
+`grep -rn 'has_value()) {' src/smd/cl/reader/` and say in your handoff
+whether any remain, and in which function, so the step that owns each one
+knows.
 
 ## Declared file scope
 
@@ -207,7 +251,9 @@ git diff --name-only cl-parser-combinators..HEAD | grep 'cl/.*\.test\.cpp$'
 Must return nothing.
 
 ```sh
-grep -n 'has_value()) {' src/smd/cl/reader/detail/forms.hpp     # expect 0
+grep -cE '\bwhile\b|\bfor\b' src/smd/cl/reader/detail/forms.hpp    # expect 0
+grep -n 'Substrate generic algorithm' src/smd/cl/reader/detail/forms.hpp   # expect 0
+grep -n 'has_value()) {' src/smd/cl/reader/detail/forms.hpp     # expect 0 (already 0 before this step)
 grep -n 'too many elements' src/smd/cl/reader/detail/forms.hpp src/smd/kit/parser/repeat.hpp
 grep -n "expected ')'" src/smd/cl/reader/detail/forms.hpp
 ```
@@ -222,17 +268,24 @@ trusting the suite count.
 ```sh
 git add -A
 git commit -F - <<'EOF'
-cl: read_delimited loses the check ladder D15 forbids
+cl: read_delimited's last raw loop becomes a repetition
 
-    auto const element = read_node(cur, ctx);
-    if (!element.has_value()) { return element; }
+read_delimited's D15 ladder -- if (!element.has_value()) return
+element; -- was already gone before this step: 93e4bc7 turned the
+element step into an and_then chain, leaving one has_value() as the
+unfold's loop-continuation test rather than the short-circuit-on-error
+idiom D15 forbids. That commit said as much of itself: the remaining
+raw while loop is the combinator layer's work, not that one's. This
+step is that work.
 
-D15 names that construct as the thing recursion schemes exist to
-replace, and it was sitting in the newest reader in the repository. The
-same function's other two exits already go through and_then, so this was
-never ignorance: the loop is an unfold and there was no combinator for
-"repeat until the closing delimiter, short-circuiting on failure". Now
-there is, and the ladder disappears into it.
+The loop carried a "substrate generic algorithm" comment claiming an
+exemption docs/cpp-rules.md grants only to the substrate's own generic
+algorithms, from code that lives in the reader. B3 found and rejected
+the same claim over skip.hpp's two loops; this is the one loop B3
+could not touch because the repetition it needed did not exist yet.
+It does now: the existing bind-based element step slots into a
+bounded, diagnosing repetition, and the while loop and its comment
+both go.
 
 The repetition is deliberately not the obvious one. The retired layer's
 many<Capacity> stops at capacity and succeeds, which would silently

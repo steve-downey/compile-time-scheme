@@ -57,8 +57,10 @@ quietly widened its scope rather than proposing a change to an earlier one.
   0, and `docs/compiler_architecture.org` is the living document it checks
   against the worktree. Thirteen steps moved, split and deleted files; a rename
   silently orphans a transclude and turns the living document into dead
-  narrative. A3 is the step that restructured this most; check its work last,
-  against the final tree, not against the tree it ran on.
+  narrative. **A1** is the step that restructured this most (it moved 31 of
+  the document's 39 transclusions out to a pinned history document, ahead of
+  A3's deletion); check its work last, against the final tree, not against
+  the tree it ran on.
 - The two `checklist.md` files stayed distinct: `tmp/plan/checklist.md` never
   appears in any step's diff.
 
@@ -117,11 +119,13 @@ Three rows are worth naming individually:
 
 - **B1** is the measured floor: pure code motion, no logic. Everything else
   costs at least that.
-- **A3** is a documentation-only change that still paid the full matrix. If it
+- **A1** is a documentation-only change that still paid the full matrix. If it
   cost as much as a code step, the per-step verify command is too coarse and
   that is the single most actionable finding this run can produce.
-- **A4** and **B8** each ran extra commands (`make testinstall`, the D30
-  before-and-after builds) and should not be read as ordinary rows.
+- **A2**, **A3**, and **B8** each ran extra commands beyond the standard
+  `make test-matrix` (`make testinstall` for A2 and A3 — recorded for the
+  trend, not gating either step; the D30 before-and-after builds for B8) and
+  should not be read as ordinary rows.
 
 ## 5. Promote and distil
 
@@ -146,13 +150,16 @@ Capture what changes a future decision:
 
 - The measured floor for one step, once the verify loop is paid.
 - Which verify commands dominate, and whether a cheaper subset still catches
-  regressions. Note in particular whether the ~409-second cold-worktree
-  `make test-matrix` could be replaced for most steps by a warm build or a
+  regressions. Note in particular whether the ~440-second cold-worktree
+  `make test-matrix` (re-measured 2026-08-20; row zero was 409 s against an
+  earlier commit) could be replaced for most steps by a warm build or a
   narrower ctest selection, and what that would give up.
 - The split between edit cost and verify cost, since that decides whether
   splitting a hot step helps or hurts.
-- What Phase A's deletion did to the numbers: 1118 ctest entries before, and
-  whatever A5 recorded after. That is a rare clean before-and-after on a build's
+- What Phase A's deletion did to the numbers: 1123 ctest entries before (not
+  1118 — `metrics.jsonl`'s second baseline row is the one this run's steps
+  were actually sized against), and whatever **A3** recorded after. That is
+  a rare clean before-and-after on a build's
   cost and it should be in the memory entry.
 - The amendments: which step's design was revised, prompted by which step, and
   what the revision cost. That is a better measure of decomposition quality than
@@ -169,9 +176,13 @@ the first time it is created and leave it alone after.
 ## 6. What the owner needs, in the report
 
 - Whether Phase A's governance change — retiring `smdlisp`'s never-edited rule,
-  recorded as D32 — is stated consistently across `AGENTS.md`, `CLAUDE.md`,
+  recorded as **D22** (not D32; that number was withdrawn and folded into D22
+  when this plan was amended before any step ran — see `tmp/plan/README.md`
+  "Governance") — is stated consistently across `AGENTS.md`, `CLAUDE.md`,
   the root `checklist.md` and `docs/cl-rebuild-plan.md`, or whether one of them
-  still contradicts the others.
+  still contradicts the others. Also confirm A3's decision record is honest
+  about the tension with `docs/cl-language-scoping.md`'s own unratified,
+  differently-sequenced proposed D22, rather than silently agreeing with it.
 - The list B8's handoff carries: where the executed series diverged from
   `docs/cl-parser-scoping.md` § 4, so the note can be amended in one pass. The
   recommendations in `tmp/plan/README.md` are the pre-run version of that list;

@@ -1,352 +1,326 @@
-# Step A1 — a `prin1`-shaped printer for `cl` datums, proved against SBCL
+# Step A1 — freeze both iterations as tags, and pin their architecture prose
 
 ## Project context
 
 `compile-time-scheme` is a compile-time compiler proof of concept in C++26 on
-GCC16. `src/smd/cl/` is the live tree: a Common Lisp front end whose reader
-builds a `datum_tree`, elaborated to a core tree and run by a small-step
-machine. `src/smd/kit/foundation/` is the shared constexpr substrate.
+GCC16. Three front-end trees exist: `src/smd/smdscheme/` (the original Scheme
+front end, dead-ended), `src/smd/smdlisp/` (the Common Lisp pivot), and
+`src/smd/cl/` (the live rebuild). Phase A retires the first two, **now, as its
+first act** — see "Why this step is first" below — and A3 deletes them.
 
 **Integration branch: `retire-three-trees`** (exists, branched off `main`).
 
-**Reserved for this step, use these and no others:** blog phase **33**,
-divergence number **DIV-0029**. An unused reservation is fine.
+**Reserved for this step:** blog phase **33**, divergence number **DIV-0029**.
+An unused reservation is fine.
 
-## Why
+## Why this step is first
 
-`src/smd/cl/` has no printer. Grepping the tree for `prin1`, `print_datum` or
-`to_string` finds only `conformance/sbcl_oracle.hpp`, which prints on SBCL's
-side of a comparison, never on ours. The consequence is that nothing in this
-project can say what a datum tree *is* in a form a human or another Lisp can
-read, and so the only differential evidence the reader has is
-`reader/oracle_compare.test.cpp` — a structural comparison against `smdlisp`,
-another implementation in this same repository, written by the same hand,
-which decision D16 is explicit is not what external authority means.
+The original decomposition of this plan built a replacement reader oracle
+(printer plus SBCL differential) before retiring anything, on the theory that
+the old oracle should not go away before the new one exists. That theory is
+wrong for this repository, for a reason that has nothing to do with oracles:
+**the owner's overriding priority is that agents keep getting hung up on not
+touching the dead trees and doing strategically wrong things, sometimes
+silently, while those trees are still in the worktree.** That cost dominates
+every other consideration in this plan's ordering. The deletion goes first.
 
-A printer changes that. Once a datum renders as text, SBCL's `prin1` becomes
-available as a reader oracle, and D16's "differential oracle running a
-reference implementation" applies to the reader and not only to the evaluator.
+It cannot go completely first, though, without breaking something this
+project already promises: `docs/compiler_architecture.org` is a **living**
+document, and `scripts/verify-transclusions.sh` deliberately resolves its
+links against the worktree, not against a tag, because a living document is
+supposed to roll forward and an orphaned link should be caught immediately.
+Verified by direct count on this tree: the document carries **39**
+`[[file:…]]` transclusion links, and **31** of them point at code A3 is about
+to delete — 28 directly under `smdscheme` or `smdlisp` by path, plus 3 more
+at `src/examples/godbolt_lisp.cpp` and `godbolt_lisp_ffi.cpp`, which A2
+removes. (The plan this fan-out started from said 37 and 31; the 31 held, the
+37 did not — recount before trusting either number again if the document
+changes further before this step runs.) Delete the trees with the document as
+it stands and the very next `verify-transclusions.sh` run — which every later
+step's acceptance gate runs — reports 31 failures. Suppressing that check
+would be exactly the wrong fix: the check is right, and the document is what
+would be wrong.
 
-Step A2 builds that differential out. This step lands the printer **and its
-first real oracle comparison together**, deliberately: a printer whose only
-witness is a test written against its own output is exactly the evidence D16
-rejects, and a wrong guess about the rendering should surface here rather than
-one step later.
+So this step, and only this step, precedes the deletion. It does not delete
+anything and it does not touch a line of C++. It freezes the code the
+soon-to-be-dead prose describes, moves that prose to the document category
+this project already has for finished, non-rolling-forward writing, and
+repoints its links at the freeze. After this step the two trees can be
+deleted and every word ever written about them still resolves.
 
 ## Setup
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree add ../step-a1-cl-printer -b step-a1-cl-printer retire-three-trees
-cd ../step-a1-cl-printer
+git worktree add ../step-a1-freeze-iterations -b step-a1-freeze-iterations retire-three-trees
+cd ../step-a1-freeze-iterations
 git submodule update --init --recursive
 ```
 
-A fresh worktree has no submodules and no build directory. The submodule init
-is required — `vendor/execution` and `vendor/task` are `add_subdirectory`
-dependencies and CMake will not configure without them.
-
 ## Verify GREEN baseline
 
-A cold worktree build of both legs takes about **7 minutes** and produces a
-**~550 KB** log. Never read it raw.
+Your inbound handoff, if any, carries the exact wall time and ctest count
+measured before this run started; `tmp/plan/README.md`'s two baseline rows are
+not on your read path, but the number is the same one either way.
 
 ```sh
-date +%s
 make test-matrix > /tmp/verify-A1-base.log 2>&1; echo "exit=$?"
-date +%s
 grep -E '=== test-matrix|tests passed|Total Test time' /tmp/verify-A1-base.log
-wc -c /tmp/verify-A1-base.log
+./scripts/verify-transclusions.sh
 ```
 
-Expected: exit 0, and **two** lines reading `100% tests passed out of 1118`,
-one for `CONFIG=Debug` and one for `CONFIG=Asan`. If the baseline is not green,
-stop and write `blocked-A1.md`.
+Both legs `100% tests passed`. The transclusion check exits 0, reporting
+**142** resolved transclusions and **1** recorded `WARN` about a UUID
+occurring three times in `phase-12-cps.org` — that warning is expected, is
+documented in `docs/blog/pins.md`, and is not a failure. Not green ⇒ write
+`blocked-A1.md`.
 
 ## What already exists that this step builds on
 
-- `src/smd/cl/reader/datum.hpp` — `datum_atom` is a `std::variant` of
-  `datum_fixnum`, `datum_symbol`, `datum_keyword`, `datum_character`,
-  `datum_string`, `datum_tower`; `datum_branch` is an enum of `list`, `vector`,
-  `quote`, `function`, `backquote`, `unquote`, `unquote_splice`;
-  `datum_tree<MaxNodes, MaxList>` is a `foundation::tagged_tree` over the two.
-  The anchor `23ee18c4-af42-42b1-b97a-3513b932e5ef` covers both declarations.
-- `src/smd/cl/foundation/tagged_tree_schemes.hpp` — `cata` (anchor
-  `11011910-7c9b-42e5-bc50-53bbfd3242d9`) and `cata_short`. `cata_short`'s
-  algebra is `result<A>(node_f<Leaf, Tag, A, MaxChildren> const&)`, the leftmost
-  failure wins, and nothing past it is visited.
-- `src/smd/cl/foundation/static_vector.hpp` — a forwarding shim onto
-  `smd::kit::foundation::static_vector`, with `push_back`, `append_range`,
-  `size`, `capacity`.
-- `src/smd/cl/symbol/symbol_table.hpp` — `name(symbol_id)` returns the interned
-  name. Symbol names are already upcased by the reader (`token.hpp`'s
-  `to_upper_char`, decision DIV-0001), and a keyword's name is interned *with*
-  its leading colon.
-- `src/smd/cl/conformance/sbcl_oracle.hpp` — `find_sbcl_version()` and
-  `sbcl_prin1(form)`, both `inline`, both runtime-only. Anchors
-  `29a14fe5-7268-446e-9489-7ec8df52494c` and
-  `1e9c6a05-3f50-4a61-8552-e879e2053d2d`.
-- `docs/compiler_architecture.org` § "The Common Lisp Rebuild: =smd::cl=" is
-  where this step records its durable facts.
+- `docs/blog/pins.md` — the tag naming and pinning convention. Existing tags
+  are `blog/phase-N`, annotated, one per post. Read the "The mapping" table
+  and the paragraph beginning "Phase 21 is the first post whose tag was
+  created *before* its prose"; that is the convention you are extending.
+- `scripts/verify-transclusions.sh` — two document categories, two policies.
+  `posts_glob` (default `docs/blog/phase-*.org`) resolves
+  `[[orgit-file:REPO::REV::PATH::UUID]]` links against `REV` with `git show`.
+  `living_glob` (default `docs/compiler_architecture.org`) resolves
+  `[[file:PATH::UUID]]` links against the worktree, and **fails** if it finds
+  an `orgit-file:` link. `md_globs` is already an array; `posts_glob` is a
+  single string.
+- `docs/compiler_architecture.org`, as it stands: `* Phase 1: Applicative
+  Parser Combinators` through `* Phase 7: Data Reification with C++26
+  Reflection` — seven top-level sections, seven transclusions, all into
+  `smdscheme` — followed by `* The Common Lisp Layer: =smd::smdlisp=` and its
+  nine subsections, 24 transclusions, 21 into `smdlisp` and 3 into
+  `src/examples/godbolt_lisp.cpp`/`godbolt_lisp_ffi.cpp`. What survives:
+  `* Introduction` and `* The Common Lisp Rebuild: =smd::cl=` with its five
+  `cl` and `kit` transclusions.
 
 ## The change
 
-### 1. A new component, `src/smd/cl/printer/prin1.hpp`
+### 1. Two annotated tags, at this step's merge commit
 
-Namespace `smd::cl::printer`. Header-only, `constexpr`, guarded
-`SRC_SMD_CL_PRINTER_PRIN1_HPP`, with the canonical prolog.
+The trees must still exist at the tagged commit, so tag **after** you merge
+this step and **before** A3 deletes anything. Put the exact commands in your
+handoff so the orchestrator runs them at the right moment, and put them here
+in the commit message too:
 
-**It is a catamorphism.** `docs/cpp-rules.md` is not negotiable here: "a
-recursion over a tree is a catamorphism … not by hand-written recursive
-descent." Use `foundation::cata_short`, whose carrier is the rendered text and
-whose failure channel is buffer overflow. A hand-written recursive `print_node`
-is a defect in this repository, not a style preference.
-
-Suggested shape — the carrier is a fixed-capacity character buffer, so the
-algebra concatenates children's already-rendered text:
-
-```cpp
-/// Maximum characters one rendered datum may occupy.
-inline constexpr int max_print_chars = 512;
-
-using print_text = foundation::static_vector<char, max_print_chars>;
-
-template <int MaxNodes, int MaxList, class SymbolTable>
-[[nodiscard]] constexpr auto prin1(reader::datum_tree<MaxNodes, MaxList> const &tree,
-                                   SymbolTable const &symbols)
-    -> foundation::result<print_text>;
+```sh
+git tag -a iteration/smdscheme-final -m 'The Scheme front end, final state before deletion from trunk.'
+git tag -a iteration/smdlisp-final   -m 'The Common Lisp pivot, final state before deletion from trunk.'
 ```
 
-Note the cost this shape carries: `cata_short` materialises one carrier per
-node, so the fold holds `MaxNodes * max_print_chars` bytes. At the test sizes
-below that is 32 KB and fine. **Record this as a provisional decision** in the
-architecture doc — what was actually needed when it was made, and that a
-consumer wanting a 256-node tree at full width is what would justify revisiting
-it. An abstraction nobody dared touch and one nobody needed to touch look
-identical from outside.
+The `iteration/` prefix is new and deliberate: these are not blog-post pins
+and should not sort among `blog/phase-*`. Record the naming and its reason in
+`docs/blog/pins.md` under a new heading.
 
-The algebra dispatches the leaf variant with `std::visit` and the branch tag
-with a `switch`. That is allowed: `std::visit` "may dispatch the alternatives
-of a single node inside an algebra; it must not drive the recursion."
+**Ordering problem, and how to solve it.** The links you write in part 2 must
+name a revision that exists when you write them, but the tags name this
+step's own merge commit, which does not exist yet. Do this: create the two
+tags on your **worktree branch's** final commit before merging, verify the
+links resolve against them, and note in your handoff that the `--no-ff` merge
+makes the tagged commit an ancestor of `retire-three-trees`, which is all
+`git show REV:PATH` needs. Do not move or re-point the tags afterwards.
 
-### 2. The rendering, and what is deliberately not in it
+### 2. A new pinned document, `docs/history/architecture-iterations.org`
 
-**In scope.** These are pinned by the oracle in part 3 and by unit tests:
+Move, do not rewrite, the two blocks named above out of
+`docs/compiler_architecture.org`.
 
-| datum | rendering | note |
-|---|---|---|
-| `datum_fixnum` | decimal digits, `-` prefix when negative | |
-| `datum_symbol` | the interned name verbatim | already upcased |
-| `datum_keyword` | the interned name verbatim | already carries the colon |
-| `datum_string` | `"…"`, with `\` before `"` and before `\` | |
-| `datum_character` | `#\` then the character | see the trap below |
-| `datum_tower` | the stored spelling | see the trap below |
-| `list`, non-empty | `(` elements separated by one space `)` | |
-| `list`, empty | `NIL` | **not** `()`; SBCL prints `NIL` |
-| `vector` | `#(` elements separated by one space `)` | |
-| `quote` | `(QUOTE ` child `)` | see the trap below |
-| `function` | `(FUNCTION ` child `)` | |
+Give the new document a short preface saying what it is: prose about two
+finished iterations, pinned at `iteration/smdscheme-final` and
+`iteration/smdlisp-final`, kept because the argument it makes is still the
+argument, and moved out of the living document because it does not roll
+forward.
 
-**Out of scope, and say so in the header's doc comment.** A full ANSI printer
-is not wanted; a canonical structural rendering sufficient for differential
-comparison is:
+Convert every moved link from the living form to the pinned form:
 
-- `|…|` multiple-escape quoting of symbol names. `cl` upcases unescaped names
-  (DIV-0001) so the common case round-trips; a name needing escapes does not,
-  and the printer does not pretend otherwise.
-- `*print-circle*`, `*print-level*`, `*print-length*`, packages, readtable case
-  other than upcase, and pretty-printer layout.
-- `backquote`, `unquote`, `unquote_splice`. Render them as `` ` ``, `,` and
-  `,@` prefixes so the printer is total, but they are **excluded from every
-  oracle comparison**: SBCL 2.2.9 prints these as `SB-INT:QUASIQUOTE` and
-  `#S(SB-IMPL::COMMA …)`, which is implementation-specific and which ANSI
-  permits. Excluding them is principled, not a dodge.
-
-### 3. Three traps, all confirmed against SBCL 2.2.9.debian on this machine
-
-These were measured, not guessed. Getting them wrong is the likely failure of
-this step.
-
-**Quote is a list, not an apostrophe, unless the pretty printer is on.** With
-`*print-pretty*` nil, SBCL prints `'x` as `(QUOTE X)` and `#'car` as
-`(FUNCTION CAR)`. With it on, `'X` and `#'CAR`. Pin `*print-pretty*` to `nil`
-in the oracle call and render the list forms; that is the ANSI-defined reading
-of the syntax and does not depend on a printer variable's default.
-
-**The empty list prints as `NIL`.** `(prin1 (read-from-string "()"))` gives
-`NIL`. A `list` branch with zero children renders `NIL`.
-
-**A tower renders its spelling, and SBCL renders a value.** `datum_tower`
-stores the token's spelling and radix (decision D19: readable before
-executable). SBCL prints `#x1f` as `31`, `2/4` as `1/2` and `1.50` as `1.5`.
-The printer is right to print the spelling and the oracle is right to print the
-value; they simply do not agree except on canonical decimal spellings. So the
-comparison corpus uses only canonical decimal towers, and the step file for A2
-carries that restriction forward. Do not "fix" the printer to normalise —
-normalising is the evaluator's job and this reader has no numeric tower yet.
-
-One more, smaller: SBCL 2.2.9 prints the space character as `#\` followed by a
-literal space, not `#\Space`, while `#\Newline` and `#\Tab` do print by name.
-Keep `#\Space` out of the compared corpus and note it; matching one SBCL
-build's character-name table is not what this printer is for.
-
-### 4. `src/smd/cl/printer/CMakeLists.txt`
-
-Model it on `src/smd/cl/reader/CMakeLists.txt`. An `INTERFACE` library
-`cl.printer` with a `FILE_SET HEADERS` named `cl_printer_headers`, linking
-`cl.foundation cl.reader cl.symbol`; a `cl_printer_test` executable under
-`if(SCHEMEPOC_ENABLE_TESTING)` with `catch_discover_tests`. Add
-`add_subdirectory(printer)` to `src/smd/cl/CMakeLists.txt` after `reader`.
-
-### 5. `src/smd/cl/printer/prin1.test.cpp`
-
-Write these **first**. Double-include the header, then the bootstrap
-`REQUIRE(true)` test, per `docs/cpp-rules.md`. Then `static_assert`-backed
-`constexpr` cases for every row of the table above, plus buffer-overflow
-diagnosis. `constexpr` contracts get compile-time tests alongside the runtime
-ones — both, not either.
-
-### 6. The first oracle comparison
-
-Add to `src/smd/cl/conformance/sbcl_oracle.hpp` one new `inline` function
-beside the existing two — **do not modify** `sbcl_prin1` or
-`find_sbcl_version`, which the corpus differential already uses:
-
-```cpp
-/// Reads @p source with SBCL's own reader and returns what `prin1` prints for
-/// the resulting object, with the pretty printer off so the quote family
-/// renders as the list forms ANSI defines rather than as reader syntax.
-[[nodiscard]] inline auto sbcl_read_print(std::string_view source)
-    -> std::optional<std::string>;
+```org
+[[file:../src/smd/smdlisp/closure/env.hpp::<uuid>]]
 ```
 
-It builds `(let ((*print-pretty* nil)) (prin1 (read-from-string "…")))`,
-escaping `source` for both the shell (reuse `detail::shell_quote`) and the Lisp
-string literal (backslash and double quote), and runs it through
-`detail::run_shell_capture` exactly as `sbcl_prin1` does.
+becomes
 
-Then add `src/smd/cl/conformance/reader_differential.test.cpp`: for **eight to
-twelve** source strings, read with `cl::reader::read`, render with
-`printer::prin1`, and compare against `sbcl_read_print` of the same string.
-Cover a fixnum, a symbol, a keyword, a string with an embedded quote, a
-character, a flat list, a nested list, the empty list, a vector, `'x`, and
-`1+` — the last is DIV-0003's whole-token classification, and this is the first
-time an outside implementation has ever confirmed it.
+```org
+[[orgit-file:<repo>::iteration/smdlisp-final::src/smd/smdlisp/closure/env.hpp::<uuid>]]
+```
 
-**It must SKIP, not fail, when SBCL is absent.** Guard every test case on
-`find_sbcl_version()` and call Catch2's `SKIP` exactly as
-`conformance/sbcl_differential.test.cpp` does. A missing oracle is a fact about
-the environment, not a defect, and this test is a member of the default suite.
-SBCL 2.2.9.debian is on `PATH` in this environment, so you will see it run.
+Take the exact `orgit-file:` spelling — the repository field in particular,
+and whether the path is repo-relative — from a working example in
+`docs/blog/phase-32-extracting-the-kit.org`. Do not invent the shape; copy it.
+Note that pinned paths are **repo-relative** (`src/smd/…`) where living paths
+are **document-relative** (`../src/smd/…`), because `git show REV:PATH` takes
+the former. Getting that wrong is the likely failure of this step and the
+verifier catches it.
 
-Add the new test to `cl_conformance_test`'s `target_sources`, and add
-`cl.printer` to `cl.conformance`'s `target_link_libraries`.
+What stays in `docs/compiler_architecture.org`: `* Introduction` (reworded to
+say the earlier iterations moved, and where), and `* The Common Lisp Rebuild:
+=smd::cl=` with its five surviving `cl` and `kit` transclusions.
 
-### 7. Anchors and the architecture doc
+Also fix the two plain `[[file:cl-limitations.md][…]]` hyperlinks if the
+section holding them moves — those point at a document, not into a tree, and
+must keep resolving from wherever they land.
 
-Land `uuidgen` anchors around the printer's algebra and around
-`sbcl_read_print`, and name them in your handoff. Add a subsection under
-`docs/compiler_architecture.org` § "The Common Lisp Rebuild: =smd::cl=" that
-records, in place: that the printer is a `cata_short` and why; the carrier-size
-decision, marked provisional as above; and the three traps in part 3, which are
-durable facts about the oracle rather than about this step.
+### 3. Teach the verifier about the new document
+
+`scripts/verify-transclusions.sh` must check the new file in the **posts**
+category, not the living one. Turn `posts_glob` into a `posts_globs` array in
+the same idiom the file already uses for `md_globs`:
+
+```sh
+if [[ -n "${1:-}" ]]; then
+    posts_globs=("$1")
+else
+    posts_globs=('docs/blog/phase-*.org' 'docs/history/architecture-iterations.org')
+fi
+```
+
+and iterate it the way `md_globs` is iterated, keeping the existing
+`shellcheck disable=SC2048` comment pattern and the deliberate unquoted
+expansion. Keep the `$1` override working. Update the file's header comment,
+which currently says the posts category is `docs/blog/phase-*.org`; it is now
+two things and the comment should say which and why.
+
+`make lint` runs `shellcheck`, so a mistake here is caught cheaply.
+
+### 4. Correct the prose that this step falsifies
+
+- `docs/cl-limitations.md` asserts that `docs/compiler_architecture.org` is
+  unaffected by `smdlisp` being frozen. Find that line — it is around line
+  147 — and correct it: the document *did* transclude `smdlisp`, and as of
+  this step that prose lives in `docs/history/architecture-iterations.org`,
+  pinned. Append a dated note rather than editing in place if the file's own
+  convention is append-only; check its style first.
+- `docs/blog/pins.md` gains the `iteration/` heading from part 1.
+
+Do **not** touch `AGENTS.md`, `CLAUDE.md`, `checklist.md`, or
+`docs/cl-rebuild-plan.md`. The governance change — retiring the `smdlisp`
+never-edited rule, and the D22 decision record — belongs with the deletion in
+A3, where it takes effect.
+
+### 5. Anchors
+
+You are moving anchor *references*, not anchors. No source file changes, so
+no new `uuidgen` output is needed unless you choose to anchor a region of the
+new history document itself, which is not required. Say so in your handoff.
 
 ## Declared file scope
 
 ```
-src/smd/cl/printer/prin1.hpp                             (new)
-src/smd/cl/printer/prin1.test.cpp                        (new)
-src/smd/cl/printer/CMakeLists.txt                        (new)
-src/smd/cl/CMakeLists.txt                                (add_subdirectory)
-src/smd/cl/conformance/sbcl_oracle.hpp                   (one new function)
-src/smd/cl/conformance/reader_differential.test.cpp      (new)
-src/smd/cl/conformance/CMakeLists.txt                    (link + test source)
-docs/compiler_architecture.org                           (new subsection)
+docs/compiler_architecture.org                     (sections removed; Introduction reworded)
+docs/history/architecture-iterations.org           (new; the moved sections, repinned)
+docs/blog/pins.md                                  (new heading for iteration/ tags)
+docs/cl-limitations.md                             (one corrected claim)
+scripts/verify-transclusions.sh                    (posts_globs array + header comment)
 ```
+
+No C++ changes. Two git tags, created on the branch tip before merge.
 
 ## Verify GREEN after
 
 ```sh
+./scripts/verify-transclusions.sh > /tmp/vt-A1.log 2>&1; echo "exit=$?"
+cat /tmp/vt-A1.log
+make lint
 make test-matrix > /tmp/verify-A1-after.log 2>&1; echo "exit=$?"
 grep -E '=== test-matrix|tests passed|Total Test time' /tmp/verify-A1-after.log
 wc -c /tmp/verify-A1-after.log
-make lint
-./scripts/verify-transclusions.sh
 ```
 
-Both legs green, with a test count **above** 1118 (you added tests and removed
-none). `make lint` and the transclusion check both exit 0.
+The transclusion check is the real gate for this step and it is 2 seconds, so
+run it early and often. It must exit 0 and report the same 142 resolved
+transclusions as the baseline — you moved links, you did not drop any. A drop
+in the count means a link was lost silently. The one documented `WARN`
+remains. `make test-matrix` cannot regress from a documentation change, but
+run it: this step merges on the matrix like every other.
 
 ## Spot checks
 
 ```sh
-grep -rn "cata_short\|cata<" src/smd/cl/printer/prin1.hpp     # the fold, not recursion
-grep -rn "print_node\|recurse" src/smd/cl/printer/prin1.hpp   # must find nothing
-grep -c "static_assert" src/smd/cl/printer/prin1.test.cpp     # compile-time cases exist
-grep -n "SKIP" src/smd/cl/conformance/reader_differential.test.cpp
-./.build/*/*/cl_conformance_test "*ReaderDifferential*" 2>/dev/null | tail -5
+git tag --list 'iteration/*'
+git show iteration/smdlisp-final:src/smd/smdlisp/closure/env.hpp | head -3
+grep -c 'orgit-file:' docs/history/architecture-iterations.org
+grep -c 'file:\.\./src/smd/smdscheme\|file:\.\./src/smd/smdlisp' docs/compiler_architecture.org
 ```
 
-The last one should report the SBCL version it ran against, not a skip.
+The last must print **0**: no living link may name either dead tree.
+
+```sh
+grep -c '\[\[file:' docs/compiler_architecture.org
+grep -c 'orgit-file:' docs/history/architecture-iterations.org
+```
+
+The two counts must sum to 39 (5 surviving in the living doc + 3 examples +
+31 moved — recount and reconcile if either number has drifted since this step
+file was written).
 
 ## Commit and merge back
 
 ```sh
 git add -A
 git commit -F - <<'EOF'
-cl: a printer, so the reader can face an outside oracle
+docs: move the finished iterations out of the living document, first
 
-The rebuild tree had no way to say what a datum tree is. Nothing under
-src/smd/cl/ rendered a datum as text, so the reader's only differential
-evidence was a structural comparison against smdlisp -- another
-implementation in this repository, written by the same hand, which is
-precisely not what D16 means by external authority.
+This plan retires both dead trees before it does anything else --
+that ordering, not the order this fan-out originally shipped with, is
+the point, because the cost of agents getting hung up on trees they
+must not touch outweighs every sequencing argument that put a
+replacement oracle first.
 
-printer::prin1 is a cata_short over the datum tree, not a recursive
-descent: the carrier is the rendered text and the failure channel is
-buffer overflow. It renders the subset a differential needs and says in
-its own doc comment what it does not render, because a full ANSI printer
-is a different and much larger thing.
+compiler_architecture.org carries 39 transclusions and 31 of them
+point into the two trees that are about to leave trunk. The verifier
+checks that document against the worktree on purpose -- a living
+document is supposed to roll forward, and an orphaned anchor should be
+caught before the prose around it goes dead -- so deleting the trees
+with the document as it stands would have produced 31 honest failures
+on the very next run.
 
-It arrives with its first oracle comparison rather than ahead of one. A
-printer whose only witness is a test written against its own output is
-the evidence D16 rejects, so sbcl_read_print lands beside it and eleven
-source strings are read, printed and compared against SBCL 2.2.9.
+The prose is not what is wrong. This project already has the
+mechanism for finished writing about frozen code: the orgit-file: pin
+the blog posts use, resolved against a tag instead of the worktree. So
+the sections move to docs/history/architecture-iterations.org and
+their links repoint at iteration/smdscheme-final and
+iteration/smdlisp-final, two annotated tags created here while the
+code still exists. verify-transclusions.sh learns the new file belongs
+to the pinned category, a two-line change because md_globs was already
+an array and posts_glob was the odd one out.
 
-Three of SBCL's answers were surprising enough to record in the
-architecture doc: the quote family prints as (QUOTE X) once the pretty
-printer is off, the empty list prints as NIL, and a tower prints its
-value where this reader prints its spelling -- so the compared corpus
-holds canonical decimal spellings only.
+Nothing is deleted and nothing is rewritten. After this the trees can
+go and every word written about them still resolves.
 EOF
 
+git tag -a iteration/smdscheme-final -m 'The Scheme front end, final state before deletion from trunk.'
+git tag -a iteration/smdlisp-final   -m 'The Common Lisp pivot, final state before deletion from trunk.'
+
+./scripts/verify-transclusions.sh   # links must resolve against the new tags
+
 git checkout retire-three-trees
-git merge --no-ff step-a1-cl-printer
+git merge --no-ff step-a1-freeze-iterations
 ```
+
+Do not push the tags; `AGENTS.md` says do not push unless instructed. Name
+them in your handoff so the orchestrator pushes them with the branch.
 
 ## Record measurements
 
-After the merge, before cleanup — the numbers and the worktree still exist.
+After the merge, before cleanup.
 
 ```sh
 cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
-{"step":"A1","lane":null,"outcome":"green","wall_seconds":<end-start>,"attempts":<n>,
- "verify":{"command":"make test-matrix","exit_code":0,"wall_seconds":<measured>,
- "log_bytes":$(wc -c < /tmp/verify-A1-after.log),"summary_lines_read":<n>},
- "diff":$(git diff --shortstat 1ace4ad..HEAD | \
-   awk '{printf "{\"files_changed\":%s,\"insertions\":%s,\"deletions\":%s}",$1,$4,$6}'),
- "out_of_scope":[],"note":""}
+{"step":"A1","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + verify-transclusions.sh","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-A1-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
 EOF
 ```
 
-One line, valid JSON — collapse the whitespace. Substitute real measured
-numbers; do not estimate any of them.
+If the 409-second-class matrix dominated a change that could not possibly
+affect it, say so in `note` — the integration review is looking for exactly
+that shape.
 
 ## Cleanup
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree remove ../step-a1-cl-printer
+git worktree remove ../step-a1-freeze-iterations
 ```
 
 Mark A1 done in
@@ -354,10 +328,13 @@ Mark A1 done in
 
 ## Handoff
 
-Read `tmp/plan/step-A2.md`, then write `tmp/plan/handoff-A2.md` (≤ ~150 lines)
-in the main checkout. A2 builds the reader differential out into a real corpus
-and retires `reader/oracle_compare.test.cpp`, so tell it: the exact signature
-and semantics of `sbcl_read_print`; the anchor names you landed; every SBCL
-answer that surprised you beyond the three above; and anything about
-`printer::prin1`'s shape that A2 would otherwise have to rediscover. Reference
-architecture facts by anchor rather than restating them.
+Read `tmp/plan/step-A2.md`, then write `tmp/plan/handoff-A2.md` (≤ ~150
+lines). A2 neutralises every build consumer of the dead trees — examples,
+the install test, the exported package — so the deletion in A3 is a pure
+subtraction. Tell it: the two tag names, confirmed resolving; that
+`src/examples/godbolt_lisp.cpp` and `godbolt_lisp_ffi.cpp` are now
+transcluded only from the pinned history document, so deleting them outright
+(A2 does not replace them — that is `docs/backlog/BL-0005-…`) breaks no
+living link; the exact `orgit-file:` spelling you used, in case A2 or A3
+needs another pin; and any surprise in `verify-transclusions.sh`'s glob
+handling.

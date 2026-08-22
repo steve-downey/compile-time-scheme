@@ -1,239 +1,289 @@
-# Step A4 — re-point the examples, the install test, and the exported package
+# Step A4 — a `prin1`-shaped printer for `cl` datums, proved against SBCL
 
 ## Project context
 
 `compile-time-scheme` is a compile-time compiler proof of concept in C++26 on
-GCC16. `src/smd/cl/` is the live tree; `src/smd/kit/` is the shared constexpr
-substrate extracted in step R8. `src/smd/smdscheme/` and `src/smd/smdlisp/`
-are the two finished iterations, frozen as tags by A3 and deleted by A5.
+GCC16. `src/smd/cl/` is the live tree: a Common Lisp front end whose reader
+builds a `datum_tree`, elaborated to a core tree and run by a small-step
+machine. `src/smd/kit/foundation/` is the shared constexpr substrate. As of
+A1–A3, `src/smd/cl/` and `src/smd/kit/` are the only trees in `src/smd/`
+besides `fixpoint`; `smdscheme` and `smdlisp` are gone from the worktree and
+live only at `iteration/smdscheme-final` and `iteration/smdlisp-final`.
 
-**Integration branch: `retire-three-trees`.**
+**Integration branch: `retire-three-trees`** (exists, branched off `main`).
 
 **Reserved for this step:** blog phase **36**, divergence number **DIV-0032**.
+An unused reservation is fine.
 
-## Why
+## Why, and why it runs fourth rather than first
 
-Everything the project shows the outside world still points at the dead trees.
+`src/smd/cl/` has no printer. Grepping the tree for `prin1`, `print_datum` or
+`to_string` finds only `conformance/sbcl_oracle.hpp`, which prints on SBCL's
+side of a comparison, never on ours. Until A2 retired it, the reader's only
+differential evidence was `reader/oracle_compare.test.cpp` — a structural
+comparison against `smdlisp`, another implementation in this same
+repository, written by the same hand, which decision D16 is explicit is not
+what external authority means. A3 has since deleted that comparison's other
+half along with the rest of `smdlisp`. Right now, between A3 and this step,
+the reader has **no** differential oracle at all — that is a real, temporary
+gap this plan opened deliberately, on the owner's direction that removing the
+dead trees mattered more than sequencing a replacement first. This step is
+where the gap starts closing.
 
-All **eleven** programs under `src/examples/` use one or the other, so the
-demonstration surface of a Common Lisp compiler that runs at compile time
-demonstrates the *previous* Common Lisp compiler. All **six** files under
-`installtest/` link `smd::smdscheme`, so the check that the installed package
-is usable checks a package built from code that is about to stop existing. And
-the exported package itself is eight `smdscheme.*` targets plus `smd.fixpoint`;
-no `cl.*` or `kit.*` target is installed at all, which means the live tree has
-never been install-tested.
+A printer changes what is possible here. Once a datum renders as text, SBCL's
+`prin1` becomes available as a reader oracle, and D16's "differential oracle
+running a reference implementation" applies to the reader and not only to the
+evaluator.
 
-That last one is the real finding. The deletion is not just removing dead
-weight — it exposes that the tree the project actually works in has no
-installed-package coverage. This step is where that gets fixed, and it is why
-this step has a positive deliverable rather than being a deletion.
+A5 builds the differential out into a real corpus. This step lands the
+printer **and its first real oracle comparison together**, deliberately: a
+printer whose only witness is a test written against its own output is
+exactly the evidence D16 rejects, and a wrong guess about the rendering
+should surface here rather than one step later.
 
 ## Setup
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree add ../step-a4-repoint-consumers -b step-a4-repoint-consumers retire-three-trees
-cd ../step-a4-repoint-consumers
+git worktree add ../step-a4-cl-printer -b step-a4-cl-printer retire-three-trees
+cd ../step-a4-cl-printer
 git submodule update --init --recursive
 ```
 
+A fresh worktree has no submodules and no build directory. The submodule init
+is required — `vendor/execution` and `vendor/task` are `add_subdirectory`
+dependencies and CMake will not configure without them.
+
 ## Verify GREEN baseline
 
-Two commands here, not one. `make testinstall` is **not** part of
-`make test-matrix` and this step is the reason that matters.
+Your inbound handoff carries the exact ctest count and cold `make test-matrix`
+wall time measured after A3's deletion; both are much lower than the
+pre-Phase-A figures.
 
 ```sh
+date +%s
 make test-matrix > /tmp/verify-A4-base.log 2>&1; echo "exit=$?"
+date +%s
 grep -E '=== test-matrix|tests passed|Total Test time' /tmp/verify-A4-base.log
-make testinstall > /tmp/installtest-A4-base.log 2>&1; echo "exit=$?"
-grep -nE 'fatal error|CMake Error|^FAILED|tests passed' /tmp/installtest-A4-base.log | head -20
+wc -c /tmp/verify-A4-base.log
 ```
 
-`make testinstall` does a `RelWithDebInfo` build, an install, and a separate
-CMake configure of `installtest/` against the installed package. It takes about
-110 seconds and its log is roughly **7 MB** of template diagnostics. Never
-`cat` or `tail` it — grep as shown.
-
-**`make testinstall` is already red, and this was measured on `main` before the
-plan was written.** It exits 2 with:
-
-```
-.install/include/smd/smdscheme/closure/cps_code.hpp:6:10:
-    fatal error: smd/smdscheme/closure/pairs.hpp: No such file or directory
-```
-
-`pairs.hpp` was never added to `smdscheme.closure`'s installed `FILE_SET`, so
-the installed package has been unusable for as long as nobody ran the check.
-Three of the six install tests fail on it.
-
-**Do not fix that.** It is a defect in a tree being deleted, and this step
-deletes its last consumer. What it means for you is that your baseline is red
-in a known way, that your after-state should be **green** because the install
-tests will no longer touch `smdscheme` at all, and that turning it green is a
-real deliverable of this step rather than an accident. If your after-state is
-red for a *different* reason, that is yours and you must fix it or halt.
-
-If `make test-matrix` is not green, stop and write `blocked-A4.md`.
+Expected: exit 0, and two `100% tests passed` lines at the post-deletion
+count your handoff names. If the baseline is not green, stop and write
+`blocked-A4.md`.
 
 ## What already exists that this step builds on
 
-- `src/examples/CMakeLists.txt` — 11 `add_executable` blocks, each with an
-  `install(TARGETS …)` under component `smdscheme.smdscheme.examples` or
-  `smdlisp.smdlisp.examples`, an `add_test(NAME examples_<name> …)`, and
-  `set_tests_properties`. Every one of the 11 references a dead tree. Read the
-  file; copy the shape of one block rather than inventing a new one.
-- `installtest/CMakeLists.txt` — `find_package(schemepoc.schemepoc REQUIRED …)`
-  then a helper `add_installtest(name src)` that links `smd::smdscheme` and
-  registers a ctest. Six calls.
-- Top-level `CMakeLists.txt` — the `beman_install_library(schemepoc.schemepoc
-  TARGETS … NAMESPACE smd::)` block listing eight `smdscheme.*` targets and
-  `smd.fixpoint`.
-- `Makefile` target `testinstall`, which drives the whole install check.
-- `src/smd/cl/` targets, from `src/smd/cl/*/CMakeLists.txt`: `cl.foundation`,
-  `cl.symbol`, `cl.reader`, `cl.core`, `cl.elaborator`, `cl.eval`,
-  `cl.conformance`, `cl.sender`, plus A1's `cl.printer`. `src/smd/kit/` provides
-  `kit.foundation`. All are `INTERFACE` libraries.
-- Your inbound handoff confirms the two `iteration/*` tags resolve and that
-  `godbolt_lisp.cpp` and `godbolt_lisp_ffi.cpp` are transcluded only from the
-  pinned history document, so deleting them breaks nothing.
+- `src/smd/cl/reader/datum.hpp` — `datum_atom` is a `std::variant` of
+  `datum_fixnum`, `datum_symbol`, `datum_keyword`, `datum_character`,
+  `datum_string`, `datum_tower`; `datum_branch` is an enum of `list`,
+  `vector`, `quote`, `function`, `backquote`, `unquote`, `unquote_splice`;
+  `datum_tree<MaxNodes, MaxList>` is a `foundation::tagged_tree` over the
+  two. The anchor `23ee18c4-af42-42b1-b97a-3513b932e5ef` covers both
+  declarations.
+- `src/smd/cl/foundation/tagged_tree_schemes.hpp` — `cata` (anchor
+  `11011910-7c9b-42e5-bc50-53bbfd3242d9`) and `cata_short`. `cata_short`'s
+  algebra is `result<A>(node_f<Leaf, Tag, A, MaxChildren> const&)`, the
+  leftmost failure wins, and nothing past it is visited.
+- `src/smd/cl/foundation/static_vector.hpp` — a forwarding shim onto
+  `smd::kit::foundation::static_vector`, with `push_back`, `append_range`,
+  `size`, `capacity`.
+- `src/smd/cl/symbol/symbol_table.hpp` — `name(symbol_id)` returns the
+  interned name. Symbol names are already upcased by the reader
+  (`token.hpp`'s `to_upper_char`, decision DIV-0001), and a keyword's name is
+  interned *with* its leading colon.
+- `src/smd/cl/conformance/sbcl_oracle.hpp` — `find_sbcl_version()` and
+  `sbcl_prin1(form)`, both `inline`, both runtime-only. Anchors
+  `29a14fe5-7268-446e-9489-7ec8df52494c` and
+  `1e9c6a05-3f50-4a61-8552-e879e2053d2d`. This header is unaffected by A1–A3.
+- `docs/compiler_architecture.org` § "The Common Lisp Rebuild: =smd::cl=" is
+  where this step records its durable facts.
 
 ## The change
 
-### 1. One new example, then delete the eleven
+### 1. A new component, `src/smd/cl/printer/prin1.hpp`
 
-Write `src/examples/godbolt_cl.cpp` first. It demonstrates `smd::cl` doing at
-compile time what `godbolt_arithmetic.cpp` and `godbolt_lisp.cpp` demonstrated
-for the earlier trees: a source string, read and elaborated and evaluated in a
-`constexpr` context, with the result pinned by a `static_assert` so the program
-is its own proof. Keep it short — this is a demonstration artifact, and
-`docs/CODING_RULES.md` asks for "short executable examples for transclusion".
+Namespace `smd::cl::printer`. Header-only, `constexpr`, guarded
+`SRC_SMD_CL_PRINTER_PRIN1_HPP`, with the canonical prolog.
 
-Look at `src/smd/cl/conformance/driver.hpp`'s `evaluate_program` for the
-entry point that reads, elaborates and runs a source string in one call; that is
-almost certainly what the example should use rather than assembling the pipeline
-by hand.
+**It is a catamorphism.** `docs/cpp-rules.md` is not negotiable here: "a
+recursion over a tree is a catamorphism … not by hand-written recursive
+descent." Use `foundation::cata_short`, whose carrier is the rendered text
+and whose failure channel is buffer overflow. A hand-written recursive
+`print_node` is a defect in this repository, not a style preference.
 
-Then delete all eleven existing `.cpp` files and rewrite
-`src/examples/CMakeLists.txt` down to the single `godbolt_cl` block, keeping the
-existing block's shape: `add_executable`, `target_link_libraries`, an
-`install(TARGETS …)` with a component name matching the new package
-(`schemepoc.schemepoc.examples` unless you find a better fit in
-`infra/cmake/beman-install-library.cmake`), `add_test(NAME examples_godbolt_cl …)`,
-and whatever `set_tests_properties` the neighbours carried.
+Suggested shape — the carrier is a fixed-capacity character buffer, so the
+algebra concatenates children's already-rendered text:
 
-### 2. Export the live trees
+```cpp
+/// Maximum characters one rendered datum may occupy.
+inline constexpr int max_print_chars = 512;
 
-Rewrite the top-level `beman_install_library` target list. The eight
-`smdscheme.*` targets go. What replaces them is `kit.foundation` and the `cl.*`
-targets, plus `smd.fixpoint` which is unaffected:
+using print_text = foundation::static_vector<char, max_print_chars>;
 
-```cmake
-beman_install_library(
-    schemepoc.schemepoc
-    TARGETS
-        kit.foundation
-        cl.foundation
-        cl.symbol
-        cl.reader
-        cl.printer
-        cl.core
-        cl.elaborator
-        cl.eval
-        cl.conformance
-        cl.sender
-        smd.fixpoint
-    NAMESPACE smd::
-)
+template <int MaxNodes, int MaxList, class SymbolTable>
+[[nodiscard]] constexpr auto prin1(reader::datum_tree<MaxNodes, MaxList> const &tree,
+                                   SymbolTable const &symbols)
+    -> foundation::result<print_text>;
 ```
 
-Check that list against the actual `add_library` names in
-`src/smd/cl/*/CMakeLists.txt` and `src/smd/kit/foundation/CMakeLists.txt` rather
-than trusting it; A1 added one and the set may have moved. Every listed target
-must be installable — `beman_install_library` needs each to have a
-`FILE_SET HEADERS`, which the `cl.*` targets do.
+Note the cost this shape carries: `cata_short` materialises one carrier per
+node, so the fold holds `MaxNodes * max_print_chars` bytes. At the test
+sizes below that is 32 KB and fine. **Record this as a provisional decision**
+in the architecture doc — what was actually needed when it was made, and
+that a consumer wanting a 256-node tree at full width is what would justify
+revisiting it. An abstraction nobody dared touch and one nobody needed to
+touch look identical from outside.
 
-`cl.conformance` is a judgement call: it pulls in `sbcl_oracle.hpp`, which
-shells out to a subprocess. If installing it is awkward, leave it out and say
-why in your handoff — an installed package that cannot run the conformance
-harness is a defensible scope, an installed package that fails to configure is
-not.
+The algebra dispatches the leaf variant with `std::visit` and the branch tag
+with a `switch`. That is allowed: `std::visit` "may dispatch the
+alternatives of a single node inside an algebra; it must not drive the
+recursion."
 
-### 3. Re-point the install test
+### 2. The rendering, and what is deliberately not in it
 
-Delete `installtest/test.cpp`, `test_foundation.cpp`, `test_reader.cpp`,
-`test_elaborator.cpp`, `test_closure.cpp`, `test_sender.cpp` — all six exercise
-`smdscheme` only.
+**In scope.** These are pinned by the oracle in part 3 and by unit tests:
 
-Write replacements against the live trees. Three is enough and mirrors what the
-old set was doing at a smaller surface:
+| datum | rendering | note |
+|---|---|---|
+| `datum_fixnum` | decimal digits, `-` prefix when negative | |
+| `datum_symbol` | the interned name verbatim | already upcased |
+| `datum_keyword` | the interned name verbatim | already carries the colon |
+| `datum_string` | `"…"`, with `\` before `"` and before `\` | |
+| `datum_character` | `#\` then the character | see the trap below |
+| `datum_tower` | the stored spelling | see the trap below |
+| `list`, non-empty | `(` elements separated by one space `)` | |
+| `list`, empty | `NIL` | **not** `()`; SBCL prints `NIL` |
+| `vector` | `#(` elements separated by one space `)` | |
+| `quote` | `(QUOTE ` child `)` | see the trap below |
+| `function` | `(FUNCTION ` child `)` | |
 
-- `installtest/test_kit_foundation.cpp` — includes several
-  `<smd/kit/foundation/*.hpp>` headers and exercises `static_vector`, `result`
-  and `source_pos` in a `constexpr` context.
-- `installtest/test_cl_reader.cpp` — includes `<smd/cl/reader/read.hpp>` and
-  `<smd/cl/printer/prin1.hpp>`, reads a datum and renders it.
-- `installtest/test_cl_eval.cpp` — includes `<smd/cl/conformance/driver.hpp>`
-  or the evaluator headers directly and evaluates one form.
+**Out of scope, and say so in the header's doc comment.** A full ANSI
+printer is not wanted; a canonical structural rendering sufficient for
+differential comparison is:
 
-These are install tests, not unit tests: what they prove is that the headers are
-reachable, self-contained and compile against the *installed* include tree. Keep
-them small and do not use Catch2 — the existing six do not, and the installed
-package does not carry it.
+- `|…|` multiple-escape quoting of symbol names. `cl` upcases unescaped names
+  (DIV-0001) so the common case round-trips; a name needing escapes does not,
+  and the printer does not pretend otherwise.
+- `*print-circle*`, `*print-level*`, `*print-length*`, packages, readtable
+  case other than upcase, and pretty-printer layout.
+- `backquote`, `unquote`, `unquote_splice`. Render them as `` ` ``, `,` and
+  `,@` prefixes so the printer is total, but they are **excluded from every
+  oracle comparison**: SBCL 2.2.9 prints these as `SB-INT:QUASIQUOTE` and
+  `#S(SB-IMPL::COMMA …)`, which is implementation-specific and which ANSI
+  permits. Excluding them is principled, not a dodge.
 
-Update `installtest/CMakeLists.txt`'s `add_installtest` helper to link the right
-target instead of `smd::smdscheme`. Note the existing comment explaining that
-everything links `smd::smdscheme` "so they transitively pick up the
-`-freflection` flag and the full sub-library include tree" — the `cl.*` targets
-may not carry `-freflection` at all, which would be fine (reflection lives in
-`smdscheme/reflection/` and is going away) but check rather than assume, and if
-a compile flag was arriving transitively and now is not, that is a real finding
-for your handoff.
+### 3. Three traps, all confirmed against SBCL 2.2.9.debian on this machine
 
-### 4. Anchors
+These were measured, not guessed. Getting them wrong is the likely failure
+of this step.
 
-Land anchors around `godbolt_cl.cpp`'s demonstrated form and its
-`static_assert`, so the post can transclude the thing the step is actually
-about. Record in `docs/compiler_architecture.org` § "The Common Lisp Rebuild:
-=smd::cl=", in place and at an anchor, the fact this step exposed: the live tree
-had no installed-package coverage until now, and the exported target set is
-`kit.foundation` plus the `cl.*` libraries.
+**Quote is a list, not an apostrophe, unless the pretty printer is on.**
+With `*print-pretty*` nil, SBCL prints `'x` as `(QUOTE X)` and `#'car` as
+`(FUNCTION CAR)`. With it on, `'X` and `#'CAR`. Pin `*print-pretty*` to
+`nil` in the oracle call and render the list forms; that is the
+ANSI-defined reading of the syntax and does not depend on a printer
+variable's default.
+
+**The empty list prints as `NIL`.** `(prin1 (read-from-string "()"))` gives
+`NIL`. A `list` branch with zero children renders `NIL`.
+
+**A tower renders its spelling, and SBCL renders a value.** `datum_tower`
+stores the token's spelling and radix (decision D19: readable before
+executable). SBCL prints `#x1f` as `31`, `2/4` as `1/2` and `1.50` as `1.5`.
+The printer is right to print the spelling and the oracle is right to print
+the value; they simply do not agree except on canonical decimal spellings.
+So the comparison corpus uses only canonical decimal towers, and A5's step
+file carries that restriction forward. Do not "fix" the printer to
+normalise — normalising is the evaluator's job and this reader has no
+numeric tower yet.
+
+One more, smaller: SBCL 2.2.9 prints the space character as `#\` followed by
+a literal space, not `#\Space`, while `#\Newline` and `#\Tab` do print by
+name. Keep `#\Space` out of the compared corpus and note it; matching one
+SBCL build's character-name table is not what this printer is for.
+
+### 4. `src/smd/cl/printer/CMakeLists.txt`
+
+Model it on `src/smd/cl/reader/CMakeLists.txt`. An `INTERFACE` library
+`cl.printer` with a `FILE_SET HEADERS` named `cl_printer_headers`, linking
+`cl.foundation cl.reader cl.symbol`; a `cl_printer_test` executable under
+`if(SCHEMEPOC_ENABLE_TESTING)` with `catch_discover_tests`. Add
+`add_subdirectory(printer)` to `src/smd/cl/CMakeLists.txt` after `reader`.
+
+`cl.printer` is **not** added to the top-level `beman_install_library`
+export list. A2 shrank that list to `smd.fixpoint` alone and exporting the
+live trees is `docs/backlog/BL-0005-…`, scheduled after Phase B — this step
+builds and tests `cl.printer` in the normal tree like everything else, it
+does not install it.
+
+### 5. `src/smd/cl/printer/prin1.test.cpp`
+
+Write these **first**. Double-include the header, then the bootstrap
+`REQUIRE(true)` test, per `docs/cpp-rules.md`. Then `static_assert`-backed
+`constexpr` cases for every row of the table above, plus buffer-overflow
+diagnosis. `constexpr` contracts get compile-time tests alongside the
+runtime ones — both, not either.
+
+### 6. The first oracle comparison
+
+Add to `src/smd/cl/conformance/sbcl_oracle.hpp` one new `inline` function
+beside the existing two — **do not modify** `sbcl_prin1` or
+`find_sbcl_version`, which A5's corpus differential will use too:
+
+```cpp
+/// Reads @p source with SBCL's own reader and returns what `prin1` prints for
+/// the resulting object, with the pretty printer off so the quote family
+/// renders as the list forms ANSI defines rather than as reader syntax.
+[[nodiscard]] inline auto sbcl_read_print(std::string_view source)
+    -> std::optional<std::string>;
+```
+
+It builds `(let ((*print-pretty* nil)) (prin1 (read-from-string "…")))`,
+escaping `source` for both the shell (reuse `detail::shell_quote`) and the
+Lisp string literal (backslash and double quote), and runs it through
+`detail::run_shell_capture` exactly as `sbcl_prin1` does.
+
+Then add `src/smd/cl/conformance/reader_differential.test.cpp`: for **eight
+to twelve** source strings, read with `cl::reader::read`, render with
+`printer::prin1`, and compare against `sbcl_read_print` of the same string.
+Cover a fixnum, a symbol, a keyword, a string with an embedded quote, a
+character, a flat list, a nested list, the empty list, a vector, `'x`, and
+`1+` — the last is DIV-0003's whole-token classification, and this is the
+first time an outside implementation has ever confirmed it.
+
+**It must SKIP, not fail, when SBCL is absent.** Guard every test case on
+`find_sbcl_version()` and call Catch2's `SKIP` exactly as
+`conformance/sbcl_differential.test.cpp` does. A missing oracle is a fact
+about the environment, not a defect, and this test is a member of the
+default suite. SBCL 2.2.9.debian is on `PATH` in this environment, so you
+will see it run.
+
+Add the new test to `cl_conformance_test`'s `target_sources`, and add
+`cl.printer` to `cl.conformance`'s `target_link_libraries`.
+
+### 7. Anchors and the architecture doc
+
+Land `uuidgen` anchors around the printer's algebra and around
+`sbcl_read_print`, and name them in your handoff. Add a subsection under
+`docs/compiler_architecture.org` § "The Common Lisp Rebuild: =smd::cl=" that
+records, in place: that the printer is a `cata_short` and why; the
+carrier-size decision, marked provisional as above; and the three traps in
+part 3, which are durable facts about the oracle rather than about this
+step.
 
 ## Declared file scope
 
 ```
-src/examples/godbolt_cl.cpp                (new)
-src/examples/advanced_reflection_ffi.cpp   (deleted)
-src/examples/advanced_sender_ffi.cpp       (deleted)
-src/examples/fibonacci_graph.cpp           (deleted)
-src/examples/godbolt_arithmetic.cpp        (deleted)
-src/examples/godbolt_ffi.cpp               (deleted)
-src/examples/godbolt_lambda.cpp            (deleted)
-src/examples/godbolt_lisp.cpp              (deleted)
-src/examples/godbolt_lisp_ffi.cpp          (deleted)
-src/examples/hello.cpp                     (deleted)
-src/examples/lisp_sender_graph_demo.cpp    (deleted)
-src/examples/sender_graph_demo.cpp         (deleted)
-src/examples/CMakeLists.txt                (rewritten to one target)
-installtest/test.cpp                       (deleted)
-installtest/test_foundation.cpp            (deleted)
-installtest/test_reader.cpp                (deleted)
-installtest/test_elaborator.cpp            (deleted)
-installtest/test_closure.cpp               (deleted)
-installtest/test_sender.cpp                (deleted)
-installtest/test_kit_foundation.cpp        (new)
-installtest/test_cl_reader.cpp             (new)
-installtest/test_cl_eval.cpp               (new)
-installtest/CMakeLists.txt                 (helper + six calls become three)
-CMakeLists.txt                             (beman_install_library target list)
-docs/compiler_architecture.org             (in-place, at an anchor)
+src/smd/cl/printer/prin1.hpp                             (new)
+src/smd/cl/printer/prin1.test.cpp                        (new)
+src/smd/cl/printer/CMakeLists.txt                        (new)
+src/smd/cl/CMakeLists.txt                                (add_subdirectory)
+src/smd/cl/conformance/sbcl_oracle.hpp                   (one new function)
+src/smd/cl/conformance/reader_differential.test.cpp      (new)
+src/smd/cl/conformance/CMakeLists.txt                    (link + test source)
+docs/compiler_architecture.org                           (new subsection)
 ```
-
-The two dead trees themselves are **not** in scope. They still build and still
-run their tests after this step; A5 deletes them. If you find yourself needing
-to edit anything under `src/smd/smdscheme/` or `src/smd/smdlisp/`, stop —
-`src/smd/smdlisp/**` is never edited, and needing to is a signal the step order
-is wrong. Write `blocked-A4.md`.
 
 ## Verify GREEN after
 
@@ -241,91 +291,84 @@ is wrong. Write `blocked-A4.md`.
 make test-matrix > /tmp/verify-A4-after.log 2>&1; echo "exit=$?"
 grep -E '=== test-matrix|tests passed|Total Test time' /tmp/verify-A4-after.log
 wc -c /tmp/verify-A4-after.log
-make testinstall > /tmp/installtest-A4-after.log 2>&1; echo "exit=$?"
-grep -nE 'fatal error|CMake Error|^FAILED|tests passed' /tmp/installtest-A4-after.log | head -20
 make lint
 ./scripts/verify-transclusions.sh
 ```
 
-The ctest count drops by ten — eleven example tests out, one in — and by six
-installtest entries, which are in a separate CMake project and were never in the
-matrix count anyway. Both matrix legs must read `100% tests passed`.
-
-**`make testinstall` should now exit 0**, where the baseline exited 2. The
-`pairs.hpp` failure goes away because the install tests no longer include
-anything from `smdscheme`. If it is still red, read the grep output: a *new*
-failure is yours to fix or to halt on, and the likeliest cause is a `cl.*` or
-`kit.*` target you listed in the export set whose `FILE_SET HEADERS` is missing
-a header — the same class of bug as the one you inherited, which is worth
-noticing.
+Both legs green, with a test count **above** your inbound baseline (you added
+tests and removed none). `make lint` and the transclusion check both exit 0.
 
 ## Spot checks
 
 ```sh
-grep -rn "smdscheme\|smdlisp" src/examples/ installtest/ CMakeLists.txt
+grep -rn "cata_short\|cata<" src/smd/cl/printer/prin1.hpp     # the fold, not recursion
+grep -rn "print_node\|recurse" src/smd/cl/printer/prin1.hpp   # must find nothing
+grep -c "static_assert" src/smd/cl/printer/prin1.test.cpp     # compile-time cases exist
+grep -n "SKIP" src/smd/cl/conformance/reader_differential.test.cpp
+./.build/*/*/cl_conformance_test "*ReaderDifferential*" 2>/dev/null | tail -5
 ```
 
-Must return nothing.
-
-```sh
-ls src/examples/*.cpp                    # exactly one
-ls installtest/*.cpp                     # exactly three
-grep -n "TARGETS" -A14 CMakeLists.txt    # the new export set
-./.build/*/*/godbolt_cl 2>/dev/null || echo "check the built path"
-```
+The last one should report the SBCL version it ran against, not a skip.
 
 ## Commit and merge back
 
 ```sh
 git add -A
 git commit -F - <<'EOF'
-build: point the examples, the install test and the package at cl
+cl: a printer, so the reader can face an outside oracle
 
-Everything this project showed the outside world still pointed at the
-two trees that are leaving. All eleven examples used smdscheme or
-smdlisp, so the demonstration of a Common Lisp compiler that runs at
-compile time demonstrated the previous one. All six installtest files
-linked smd::smdscheme.
+A3 deleted smdlisp along with reader/oracle_compare.test.cpp's other
+half, and between A3 and this step the reader had no differential
+oracle at all -- a gap this plan opened on purpose, because the owner
+weighed removing the dead trees above sequencing their replacement
+first.
 
-The third one is the finding worth keeping. The exported package was
-eight smdscheme targets plus fixpoint -- no cl target and no kit target
-was installed at all, so the tree the project actually works in had
-never been install-tested. That was invisible while the old exports
-still passed.
+printer::prin1 is a cata_short over the datum tree, not a recursive
+descent: the carrier is the rendered text and the failure channel is
+buffer overflow. It renders the subset a differential needs and says
+in its own doc comment what it does not render, because a full ANSI
+printer is a different and much larger thing.
 
-So this is not a deletion. godbolt_cl.cpp replaces the eleven with one
-example that reads, elaborates and evaluates a form in a constexpr
-context and pins the answer with a static_assert. The package now
-exports kit.foundation and the cl libraries, and three install tests
-compile against the installed include tree to prove those headers are
-reachable and self-contained where they never had to be before.
+It arrives with its first oracle comparison rather than ahead of one.
+A printer whose only witness is a test written against its own output
+is the evidence D16 rejects, so sbcl_read_print lands beside it and
+eleven source strings are read, printed and compared against SBCL
+2.2.9.
 
-The trees themselves still build here. A5 removes them.
+Three of SBCL's answers were surprising enough to record in the
+architecture doc: the quote family prints as (QUOTE X) once the
+pretty printer is off, the empty list prints as NIL, and a tower
+prints its value where this reader prints its spelling -- so the
+compared corpus holds canonical decimal spellings only.
 EOF
 
 git checkout retire-three-trees
-git merge --no-ff step-a4-repoint-consumers
+git merge --no-ff step-a4-cl-printer
 ```
 
 ## Record measurements
 
-After the merge, before cleanup.
+After the merge, before cleanup — the numbers and the worktree still exist.
 
 ```sh
 cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
-{"step":"A4","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + make testinstall","exit_code":0,"wall_seconds":<measured>,"log_bytes":<sum of both logs>,"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
+{"step":"A4","lane":null,"outcome":"green","wall_seconds":<end-start>,"attempts":<n>,
+ "verify":{"command":"make test-matrix","exit_code":0,"wall_seconds":<measured>,
+ "log_bytes":$(wc -c < /tmp/verify-A4-after.log),"summary_lines_read":<n>},
+ "diff":$(git diff --shortstat <A3 merge commit>..HEAD | \
+   awk '{printf "{\"files_changed\":%s,\"insertions\":%s,\"deletions\":%s}",$1,$4,$6}'),
+ "out_of_scope":[],"note":""}
 EOF
 ```
 
-Sum both verify logs for `log_bytes` and both wall times for the verify wall
-time, and say in `note` that this step's verify is two commands — the
-integration review needs to know why this row is heavier than its neighbours.
+One line, valid JSON — collapse the whitespace. Substitute real measured
+numbers; do not estimate any of them.
 
 ## Cleanup
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree remove ../step-a4-repoint-consumers
+git worktree remove ../step-a4-cl-printer
 ```
 
 Mark A4 done in
@@ -333,9 +376,11 @@ Mark A4 done in
 
 ## Handoff
 
-Read `tmp/plan/step-A5.md`, then write `tmp/plan/handoff-A5.md` (≤ ~150 lines).
-A5 deletes both trees. Tell it: the new exported target set, exactly as it
-landed; whether `cl.conformance` is in it and why; whether `-freflection` was
-arriving transitively through `smd::smdscheme` and what happened to it; the
-baseline and after results of `make testinstall`; and the new example's target
-name and ctest name, because A5's ctest count arithmetic depends on it.
+Read `tmp/plan/step-A5.md`, then write `tmp/plan/handoff-A5.md` (≤ ~150
+lines). A5 builds the reader differential out into a real corpus and records
+what `conformance/sbcl_differential.test.cpp` actually validates. Tell it:
+the exact signature and semantics of `sbcl_read_print`; the anchor names you
+landed; every SBCL answer that surprised you beyond the three above; and
+anything about `printer::prin1`'s shape that A5 would otherwise have to
+rediscover. Reference architecture facts by anchor rather than restating
+them.

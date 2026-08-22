@@ -171,7 +171,7 @@ grep -n 'unknown character name\|expected character after' src/smd/cl/reader/det
 ```
 
 The conformance differential is the other witness here, and it is the one that
-catches a rendering-visible change: A1 and A2 compare `cl`'s printed strings
+catches a rendering-visible change: A4 and A5 compare `cl`'s printed strings
 and characters against SBCL.
 
 ```sh

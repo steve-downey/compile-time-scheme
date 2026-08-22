@@ -1,116 +1,147 @@
-# Step A2 — the reader-layer cl-vs-SBCL differential replaces the `smdlisp` one
+# Step A2 — neutralise the dead trees' build consumers
 
 ## Project context
 
 `compile-time-scheme` is a compile-time compiler proof of concept in C++26 on
-GCC16. `src/smd/cl/` is the live tree. `src/smd/smdlisp/` is the pivot-era
-front end: the behavioural oracle for the rebuild, and **never edited** — that
-one is a rule, not a preference (`AGENTS.md` § "Which trees you may edit").
-This step removes a *consumer* of it from `cl`; it does not touch it.
+GCC16. `src/smd/cl/` is the live tree; `src/smd/kit/` is the shared constexpr
+substrate. `src/smd/smdscheme/` and `src/smd/smdlisp/` are the two finished
+iterations, frozen as tags by A1 and deleted by A3. This step is the one that
+makes A3 a pure subtraction rather than a step that also has to fix a broken
+build.
 
 **Integration branch: `retire-three-trees`.**
 
 **Reserved for this step:** blog phase **34**, divergence number **DIV-0030**.
 
-## Why
+## Why this step, and why it does less than it sounds like
 
-Two things are true about `src/smd/cl/reader/oracle_compare.test.cpp`, and
-together they say it has done its job.
+Every consumer this step touches builds against a tree A3 is about to remove,
+so if this step does not run first, A3's own build breaks the moment
+`git rm -r` runs — `src/examples/` links `smdscheme.smdscheme` and
+`smdlisp.smdlisp` by name, and the top-level `beman_install_library` call
+names eight `smdscheme.*` targets that would simply not exist as CMake
+targets. **This is not optional cleanup; without it `make test-matrix`
+cannot configure once A3 deletes the trees.**
 
-**It is not external authority.** Decision D16 says correctness evidence comes
-from "a differential oracle running a reference implementation". `smdlisp` is
-not a reference implementation; it is the previous iteration of this same
-project. A1 gave the reader a real one, and this step finishes the swap.
+What this step deliberately does **not** do is replace what it removes with a
+`cl`-equivalent. A new example that demonstrates `smd::cl`, an export list
+that installs `kit.foundation` and the `cl.*` targets, and install tests that
+prove the installed headers are reachable are all real, positive work — and
+all three are `docs/backlog/BL-0005-export-live-trees-and-turn-testinstall-green.md`,
+scheduled after Phase B rather than inside this deletion. The reason is
+`make testinstall`: it is **already red on `main`**, for a pre-existing
+reason unrelated to anything in this plan —
 
-**Its independence is already eroding.** `agree_on_keyword` compares
-`syms.name(my_kw->id).substr(1)` against `their_kw->name.view()`, because the
-two readers represent a keyword's name differently. That `.substr(1)` is the
-comparison being adjusted to keep agreeing — a differential that is being
-tuned toward agreement has stopped being evidence, whichever side is right.
+```
+.install/include/smd/smdscheme/closure/cps_code.hpp:6:10:
+    fatal error: smd/smdscheme/closure/pairs.hpp: No such file or directory
+```
 
-And it is the last thing in `src/smd/cl/` that reaches into either dead tree.
-Verified by grep: apart from prose in comments, `oracle_compare.test.cpp` and
-the `smdlisp.reader` link line in `src/smd/cl/reader/CMakeLists.txt` are the
-only mentions of `smdscheme` or `smdlisp` anywhere under `src/smd/cl/`.
-Retiring it is what makes A5's deletion a deletion rather than a migration.
+— and `make testinstall` is not part of `make test-matrix`'s acceptance gate
+(they are separate CMake projects; see `docs/verification-matrix.md`). Fixing
+it is not a precondition for anything else in this plan, so bundling it into
+the largest, riskiest step in the plan would only add risk for no gate this
+plan actually needs to pass. **`make testinstall` stays red for the whole of
+this plan and is not an acceptance signal** — say this again in your handoff,
+because it is the fact most likely to be misread as a regression this step
+introduced.
 
 ## Setup
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree add ../step-a2-reader-differential -b step-a2-reader-differential retire-three-trees
-cd ../step-a2-reader-differential
+git worktree add ../step-a2-neutralise-consumers -b step-a2-neutralise-consumers retire-three-trees
+cd ../step-a2-neutralise-consumers
 git submodule update --init --recursive
 ```
 
 ## Verify GREEN baseline
 
-Cold: about **7 minutes**, **~550 KB** of log. Never read it raw.
-
 ```sh
 make test-matrix > /tmp/verify-A2-base.log 2>&1; echo "exit=$?"
 grep -E '=== test-matrix|tests passed|Total Test time' /tmp/verify-A2-base.log
-wc -c /tmp/verify-A2-base.log
+make testinstall > /tmp/installtest-A2-base.log 2>&1; echo "exit=$?"
+grep -nE 'fatal error|CMake Error|^FAILED|tests passed' /tmp/installtest-A2-base.log | head -20
 ```
 
-Both legs `100% tests passed`, at A1's count. Not green ⇒ `blocked-A2.md`.
+Both `make test-matrix` legs green. `make testinstall` reproduces the
+pre-existing exit-2 failure above — that is the expected baseline, not a
+defect for you to fix. Never `cat` or `tail` its log; it runs to megabytes of
+template diagnostics. If `make test-matrix` is not green, stop and write
+`blocked-A2.md`.
 
 ## What already exists that this step builds on
 
-- A1's `src/smd/cl/printer/prin1.hpp`, `sbcl_read_print` in
-  `src/smd/cl/conformance/sbcl_oracle.hpp`, and
-  `src/smd/cl/conformance/reader_differential.test.cpp` with its first handful
-  of cases. Your inbound handoff names the anchors and any oracle surprise A1
-  found; `docs/compiler_architecture.org` § "The Common Lisp Rebuild:
-  =smd::cl=" carries the durable facts, including the three oracle traps.
-  Read that subsection by name, not the whole document.
-- `src/smd/cl/reader/read.test.cpp` — 490 lines, `constexpr` cases behind
-  `static_assert` plus runtime `TEST_CASE` mirrors.
-- `src/smd/cl/conformance/corpus.hpp` — `satisfies(corpus_case const&)` calls
-  `evaluate_program(c.source)`. It checks an **evaluated outcome** and never
-  inspects a datum tree, so the corpus does not cover the reader layer at all
-  and cannot be pointed at it. This is why the reader needs its own
-  differential rather than a corpus flag.
+- `src/examples/CMakeLists.txt` — 11 `add_executable` blocks. All eleven
+  reference `smdscheme.smdscheme`, `smdscheme.sender`, `smdlisp.smdlisp`, or
+  `smdlisp.sender`. `src/CMakeLists.txt` has an unconditional
+  `add_subdirectory(examples)`; that call stays.
+- `installtest/CMakeLists.txt` — a `find_package(schemepoc.schemepoc
+  REQUIRED …)`, a helper `add_installtest(name src)` that links
+  `smd::smdscheme`, and six calls to it: `test_smdscheme`, `test_foundation`,
+  `test_reader`, `test_elaborator`, `test_closure`, `test_sender`, each
+  backed by a `.cpp` file under `installtest/` that includes only
+  `smdscheme` headers.
+- Top-level `CMakeLists.txt` — one `beman_install_library(schemepoc.schemepoc
+  TARGETS … NAMESPACE smd::)` block naming eight `smdscheme.*` targets plus
+  `smd.fixpoint`.
+- `src/smd/cl/reader/oracle_compare.test.cpp` — 28 `CHECK`s across six
+  substantive `TEST_CASE`s, all fixed string literals, no generated input,
+  and the **only** thing under `src/smd/cl/` that includes either dead tree:
+  `#include <smd/smdlisp/reader/read_datum.hpp>` and
+  `#include <smd/smdscheme/parser/cursor.hpp>` (verified by direct grep — it
+  reaches into *both* trees, not only `smdlisp` as an earlier pass at this
+  plan assumed). `src/smd/cl/reader/CMakeLists.txt` links `cl_reader_test`
+  against `smdlisp.reader` alongside `cl.reader Catch2::Catch2WithMain`.
+- `docs/compiler_architecture.org` § "The Common Lisp Rebuild: =smd::cl=",
+  where A1 records the frozen-tree tags. Read that section, not the whole
+  document.
 
 ## The change
 
-### 1. Broaden `reader_differential.test.cpp` into a real corpus
+### 1. Delete the eleven examples, without a replacement
 
-Extend A1's handful into a table of source strings with a provenance-style
-comment, in the same file. Aim for **forty to sixty** cases, not hundreds: this
-shells out to SBCL once per case and each subprocess costs tens of
-milliseconds.
+```sh
+git rm src/examples/*.cpp
+```
 
-Cover, at minimum, every input `oracle_compare.test.cpp` tested — they are
-listed in part 2 — plus what it never could, because `smdlisp` has no such
-syntax: strings with escapes, character literals, vectors, and the decimal
-tower spellings. Group the table so a reader can see which cases are the
-retired file's inheritance and which are new coverage.
+Rewrite `src/examples/CMakeLists.txt` down to a stub: keep
+`include(GNUInstallDirs)` and add a comment that the eleven `smdscheme`/
+`smdlisp` examples are gone and a `cl`-equivalent is
+`docs/backlog/BL-0005-export-live-trees-and-turn-testinstall-green.md`, not
+this step. Remove every `add_executable`, `install(TARGETS …)`,
+`add_test(NAME examples_… …)` and `set_tests_properties` block. The file
+ends up close to empty; that is correct, not a sign something was missed.
 
-Carry A1's exclusions forward and say why in a comment, so nobody re-adds them:
-backquote, unquote and unquote-splice (SBCL renders these as
-`SB-INT:QUASIQUOTE` and `#S(SB-IMPL::COMMA …)`, implementation-specific and
-ANSI-permitted); non-decimal and non-canonical tower spellings (the printer
-prints a spelling, SBCL prints a value); and `#\Space` (SBCL 2.2.9 prints `#\`
-plus a literal space rather than the name).
+### 2. Neutralise the install test
 
-**Errors are a separate table.** `oracle_compare.test.cpp`'s `ErrorsAgree`
-checked that both readers reject `""`, `")"`, `"(1 2"`, `"'"`, `"("`. The SBCL
-equivalent is that `read-from-string` signals, which `sbcl_read_print` must
-report distinguishably from a successful parse. Either return `nullopt` from a
-signalling read or return a sentinel string the way `sbcl_prin1` returns
-`SBCL-ERROR`; whichever A1 chose, follow it, and if A1 did not have to choose,
-choose the sentinel and say so in your handoff. Then assert that `cl` also
-fails, without comparing message text — `cl`'s diagnostics are its own
-(DIV-0027) and pinning them against SBCL's condition text is out of scope.
+```sh
+git rm installtest/test.cpp installtest/test_foundation.cpp \
+       installtest/test_reader.cpp installtest/test_elaborator.cpp \
+       installtest/test_closure.cpp installtest/test_sender.cpp
+```
 
-The SKIP discipline is unchanged and is not optional: guard on
-`find_sbcl_version()`, `SKIP` when absent, never fail.
+In `installtest/CMakeLists.txt`, remove the six `add_installtest(...)` call
+lines **and** the `add_installtest` helper function definition — its body
+hardcodes `target_link_libraries(${name} PRIVATE smd::smdscheme)`, and
+leaving that string sitting unused is exactly the kind of stale reference the
+sweep in A3 has to reason about. BL-0005 will write its own helper against
+`kit::foundation`/`cl.*` targets rather than reuse this one, so nothing is
+lost by removing it now. Keep the `find_package` call — the project still
+needs to configure against the installed package — and add a one-line
+comment pointing at BL-0005 where the helper and its six calls used to be.
 
-### 2. Delete `src/smd/cl/reader/oracle_compare.test.cpp`
+Do not try to make `make testinstall` pass here. After this step it should at
+least **configure** without error (`find_package` succeeds against a package
+that no longer claims a `smd::smdscheme` target, and nothing tries to link
+one), which is a different and lesser thing than green — zero installed
+tests is expected, not a regression to chase.
 
-**First confirm nothing is lost.** The file is 28 `CHECK`s across six
-substantive `TEST_CASE`s, all fixed string literals, no generated input:
+### 3. Confirm nothing is lost, then delete `oracle_compare.test.cpp`
+
+This has already been checked once, while this plan was being revised, and
+the check is worth repeating yourself rather than trusting a plan file. The
+file's six `TEST_CASE`s are:
 
 - `Fixnums`: `42`, `-7`, `0`, `"  42"`, `"; comment\n42"`
 - `SymbolsFoldAlike`: `foo`, `cAr`, `t`, `nil`, `+`, `1+`, `2buffer`
@@ -119,63 +150,82 @@ substantive `TEST_CASE`s, all fixed string literals, no generated input:
 - `QuoteFamily`: `'x`, `#'car`, `` `x ``, `,x`, `,@x`
 - `ErrorsAgree`: `""`, `)`, `(1 2`, `'`, `(`
 
-Every one of these is already covered by `src/smd/cl/reader/read.test.cpp`.
-The one that looked like an exception is not: the comment-inside-a-list case is
-covered at `read.test.cpp`'s `skips_comments_and_whitespace`, which reads
-`(1 ; comment\n 2 #|mid|# 3)` and checks the arity. **Verify that yourself**
-before deleting — grep for `skips_comments_and_whitespace` — and if you find a
-case genuinely uncovered, port it into `read.test.cpp` rather than dropping it.
+Every one of these is already covered by `src/smd/cl/reader/read.test.cpp` or
+`src/smd/cl/reader/number.test.cpp`. The bare fixnum literal `0` is pinned in
+`number.test.cpp` (`fixnum_of("0", 10, 0)`), not in `read.test.cpp` — confirm
+with `grep -n '"0"' src/smd/cl/reader/number.test.cpp` before relying on it.
+The comment-inside-a-list case is covered by `read.test.cpp`'s
+`skips_comments_and_whitespace`, which reads
+`(1 ; comment\n 2 #|mid|# 3)` and checks the arity is 3 — confirm with
+`grep -n skips_comments_and_whitespace -A6 src/smd/cl/reader/read.test.cpp`.
+If you find a case genuinely uncovered that these two greps do not turn up,
+port it into `read.test.cpp` rather than dropping it, and say so in your
+handoff.
 
-Then remove `oracle_compare.test.cpp` from `cl_reader_test`'s `target_sources`
-in `src/smd/cl/reader/CMakeLists.txt`, and remove `smdlisp.reader` from that
+Then:
+
+```sh
+git rm src/smd/cl/reader/oracle_compare.test.cpp
+```
+
+Remove `oracle_compare.test.cpp` from `cl_reader_test`'s `target_sources` in
+`src/smd/cl/reader/CMakeLists.txt`, and remove `smdlisp.reader` from that
 target's `target_link_libraries`, leaving `cl.reader Catch2::Catch2WithMain`.
 
-### 3. Record what `conformance/sbcl_differential.test.cpp` actually is
+This is the step that makes A3's later claim true: after this change,
+`grep -rn "smdlisp\|smdscheme" src/smd/cl/` should return **only** comment
+prose — no `#include`, no qualified name, no CMake target. Run that grep
+yourself before merging and put the result in your handoff; A3 depends on it
+being empty of anything but prose.
 
-This is a correction, and it wants a divergence record rather than a rename.
+### 4. Shrink the exported package to what still exists
 
-Despite its name that file is **not** a cl-vs-SBCL differential.
-`check_against_sbcl` compares SBCL's output against the corpus's own
-expectation strings and never runs `cl` at all; it also skips every case whose
-channel is not `expect_fixnum` or `expect_boolean`. What it validates is the
-corpus — that the expectations transcribed from `pfdietz/ansi-test` and from
-the specification are what a real Common Lisp actually produces. That is
-genuinely worth having and it is not what the file name says.
+In the top-level `CMakeLists.txt`, rewrite the `beman_install_library` call:
 
-Write `docs/divergences/DIV-0030-corpus-differential-validates-the-corpus.md`
-following `docs/divergences/TEMPLATE.md`, classified `process` per
-`docs/divergences/README.md`'s taxonomy, and add its row to that README's
-table. Say what the file does, what its name implies, why the two came apart
-(it was written before `cl` could print anything, so comparing `cl`'s output
-was not available to it), and that A1 and A2 supply the differential the name
-promised at the reader layer while the evaluator layer still has only the
-corpus check.
+```cmake
+beman_install_library(
+    schemepoc.schemepoc
+    TARGETS
+        smd.fixpoint
+    NAMESPACE smd::
+)
+```
 
-Do **not** rename the file or its `TEST_CASE`s. A rename churns CMake and every
-recorded ctest name for no behavioural gain; add a corrected paragraph to the
-file's own header comment pointing at DIV-0030, which is the append-a-dated-note
-convention this project already uses.
+This is **not** "export the live trees" — that is BL-0005, deliberately
+postponed. This is the minimum edit that keeps `make install` (and therefore
+`make testinstall`'s configure step) from naming a target that no longer
+exists once A3 runs. `kit.foundation` and the `cl.*` targets stay unexported
+until BL-0005 schedules the install-test coverage that justifies exporting
+them.
 
-### 4. Anchors and the architecture doc
+### 5. Anchors
 
-Land anchors around the new corpus table and around the error table. Update the
-A1 subsection of `docs/compiler_architecture.org` **in place** to record that
-the reader's differential authority is now SBCL and that the `smdlisp`
-comparison is retired — a paragraph, at the anchor, not a new section.
+Nothing new to anchor: this step deletes build wiring and test code, it does
+not add a component. Say so in your handoff.
 
 ## Declared file scope
 
 ```
-src/smd/cl/conformance/reader_differential.test.cpp      (broadened)
-src/smd/cl/conformance/sbcl_oracle.hpp                   (error reporting, if A1 left it open)
-src/smd/cl/conformance/sbcl_differential.test.cpp        (header comment only)
-src/smd/cl/reader/oracle_compare.test.cpp                (deleted)
-src/smd/cl/reader/CMakeLists.txt                         (drop source and smdlisp.reader)
-src/smd/cl/reader/read.test.cpp                          (only if a case is genuinely uncovered)
-docs/divergences/DIV-0030-corpus-differential-validates-the-corpus.md   (new)
-docs/divergences/README.md                               (one table row)
-docs/compiler_architecture.org                           (in-place paragraph)
+src/examples/*.cpp                          (all eleven, deleted)
+src/examples/CMakeLists.txt                 (reduced to a stub + a comment)
+installtest/test.cpp                        (deleted)
+installtest/test_foundation.cpp             (deleted)
+installtest/test_reader.cpp                 (deleted)
+installtest/test_elaborator.cpp             (deleted)
+installtest/test_closure.cpp                (deleted)
+installtest/test_sender.cpp                 (deleted)
+installtest/CMakeLists.txt                  (six calls removed; helper kept)
+src/smd/cl/reader/oracle_compare.test.cpp   (deleted)
+src/smd/cl/reader/CMakeLists.txt            (drop source and smdlisp.reader)
+src/smd/cl/reader/read.test.cpp             (only if a case is genuinely uncovered)
+CMakeLists.txt                              (beman_install_library TARGETS list)
 ```
+
+The two dead trees themselves are **not** in scope. They still build and
+still run their tests after this step; A3 deletes them. If you find yourself
+needing to edit anything under `src/smd/smdscheme/` or `src/smd/smdlisp/`,
+stop — `src/smd/smdlisp/**` is never edited, and needing to touch either tree
+is a signal something is out of order. Write `blocked-A2.md`.
 
 ## Verify GREEN after
 
@@ -183,30 +233,42 @@ docs/compiler_architecture.org                           (in-place paragraph)
 make test-matrix > /tmp/verify-A2-after.log 2>&1; echo "exit=$?"
 grep -E '=== test-matrix|tests passed|Total Test time' /tmp/verify-A2-after.log
 wc -c /tmp/verify-A2-after.log
+make testinstall > /tmp/installtest-A2-after.log 2>&1; echo "exit=$?"
+grep -nE 'fatal error|CMake Error|^FAILED|tests passed' /tmp/installtest-A2-after.log | head -20
 make lint
 ./scripts/verify-transclusions.sh
 ```
 
-The test count moves in two directions at once here — six `TEST_CASE`s leave
-and the differential's grow — so do not treat a lower count as a failure. What
-must hold is that both legs are `100% tests passed` and that the named
-`OracleCompareTest` cases are gone.
+The ctest count moves in two directions at once: eleven example tests leave
+and six `OracleCompareTest` cases leave, but nothing replaces them yet — the
+count drops and that is expected, not a regression. Both matrix legs must
+still read `100% tests passed`.
+
+`make testinstall`'s exact exit code may change from the baseline's 2 to
+something else now that `find_package` no longer sees a claimed
+`smd::smdscheme` target — **this is not a gate**. Do not spend the step
+chasing it to green; that is BL-0005's job, scheduled after Phase B.
 
 ## Spot checks
+
+```sh
+grep -rn "smdlisp\|smdscheme" src/examples/ installtest/ CMakeLists.txt
+```
+
+Must return nothing.
 
 ```sh
 grep -rn "smdlisp\|smdscheme" src/smd/cl/ | grep -v "^.*://"
 ```
 
-This must return **only** comment prose. No `#include`, no
-`smd::smdlisp::`/`smd::smdscheme::` qualified name, no CMake target. That
-condition is what A5 depends on.
+Must return **only** comment prose — no `#include`, no qualified name, no
+CMake target. This is what A3 depends on.
 
 ```sh
+ls src/examples/*.cpp 2>/dev/null; echo "expect: no such file"
+ls installtest/*.cpp 2>/dev/null; echo "expect: no such file"
 test ! -f src/smd/cl/reader/oracle_compare.test.cpp && echo "retired"
-grep -n "skips_comments_and_whitespace" -A6 src/smd/cl/reader/read.test.cpp
-grep -c "SKIP" src/smd/cl/conformance/reader_differential.test.cpp
-./.build/*/*/cl_conformance_test "*ReaderDifferential*" 2>/dev/null | tail -5
+grep -n "TARGETS" -A3 CMakeLists.txt
 ```
 
 ## Commit and merge back
@@ -214,30 +276,36 @@ grep -c "SKIP" src/smd/cl/conformance/reader_differential.test.cpp
 ```sh
 git add -A
 git commit -F - <<'EOF'
-cl: retire the smdlisp reader differential for an SBCL one
+build: neutralise every consumer of the two dead trees
 
-D16 asks for a differential oracle running a reference implementation.
-oracle_compare.test.cpp compared the rebuild's reader against smdlisp,
-which is the previous iteration of this same project rather than a
-reference implementation, and the comparison had begun to be tuned to
-keep agreeing: agree_on_keyword took .substr(1) off one side's name
-because the two trees represent a keyword differently.
+A3 deletes smdscheme and smdlisp. Without this step first, that
+deletion breaks the build outright: eleven examples link smdscheme.*
+or smdlisp.* by name, the top-level export list names eight
+smdscheme.* targets that would not exist, and
+reader/oracle_compare.test.cpp is the one file under src/smd/cl/ that
+includes either dead tree at all -- both of them, not only smdlisp as
+an earlier pass at this plan assumed.
 
-A1 made a real oracle reachable. This step builds it out to cover every
-input the retired file tested -- each already covered by read.test.cpp,
-checked before deleting -- plus the R3 syntax smdlisp never had, and it
-drops the last edge from src/smd/cl/ to either dead tree.
+This step does not replace what it removes. A cl-equivalent example,
+an export list that installs kit and cl, and install tests that prove
+the installed headers are reachable are real work, and all three are
+docs/backlog/BL-0005, scheduled after the parser-combinator phase
+rather than inside a tree deletion. The reason is that make testinstall
+is already red on main for an unrelated pre-existing reason and is not
+part of make test-matrix's acceptance gate, so there is no gate this
+plan needs that bundling the positive work here would satisfy any
+sooner -- only more risk in the plan's largest step.
 
-conformance/sbcl_differential.test.cpp keeps its name and gains a
-correction. It is not a cl-vs-SBCL differential and never was: it checks
-SBCL against the corpus's own expectation strings, which validates the
-corpus and is worth doing under an honest description. DIV-0030 records
-that, and records why the name outran the code -- the file predates the
-printer, so comparing cl's output was not something it could do.
+oracle_compare.test.cpp's coverage was checked against
+read.test.cpp and number.test.cpp before deleting it, not assumed:
+the bare fixnum literal 0 and the comment-inside-a-list case are both
+pinned elsewhere. Deleting it is what makes the next grep for
+smdlisp/smdscheme under src/smd/cl/ come back prose-only, which is
+what A3 depends on.
 EOF
 
 git checkout retire-three-trees
-git merge --no-ff step-a2-reader-differential
+git merge --no-ff step-a2-neutralise-consumers
 ```
 
 ## Record measurements
@@ -246,18 +314,15 @@ After the merge, before cleanup.
 
 ```sh
 cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
-{"step":"A2","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-A2-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
+{"step":"A2","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + make testinstall","exit_code":0,"wall_seconds":<measured>,"log_bytes":<sum of both logs>,"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":"testinstall is not a gate; recorded for the trend, not the verdict"}
 EOF
 ```
-
-`diff` from `git diff --shortstat <A1 merge commit>..HEAD`. One line of valid
-JSON. Real measured numbers only.
 
 ## Cleanup
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree remove ../step-a2-reader-differential
+git worktree remove ../step-a2-neutralise-consumers
 ```
 
 Mark A2 done in
@@ -265,10 +330,11 @@ Mark A2 done in
 
 ## Handoff
 
-Read `tmp/plan/step-A3.md`, then write `tmp/plan/handoff-A3.md` (≤ ~150 lines).
-A3 tags both dead iterations and moves their architecture prose into a pinned
-history document. Tell it: the exact output of the `smdlisp|smdscheme` grep in
-the spot checks, because A3 and A5 both rely on that set being empty of real
-references; how `sbcl_read_print` signals a read error, if you settled it; and
-anything you learned about `docs/compiler_architecture.org`'s structure while
-editing it in place.
+Read `tmp/plan/step-A3.md`, then write `tmp/plan/handoff-A3.md` (≤ ~150
+lines). A3 deletes both trees. Tell it: the exact result of the
+`smdlisp|smdscheme` grep over `src/smd/cl/` — it must be prose-only, and A3's
+own deletion depends on that; whether you found a genuinely-uncovered
+`oracle_compare.test.cpp` case and ported it; that `make testinstall` is not
+a gate and its exact post-A2 exit code/behaviour, so A3 does not mistake a
+change there for something it caused; and the new (shrunk) contents of the
+top-level `beman_install_library` TARGETS list.
