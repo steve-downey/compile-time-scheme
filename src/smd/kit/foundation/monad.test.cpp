@@ -41,7 +41,9 @@ constexpr auto halve(int n) -> result<int> {
 // instance. The laws are the same laws; only one of the two instances can
 // witness what happens on failure.
 constexpr auto negate(int n) -> identity<int> { return identity<int>{-n}; }
-constexpr auto increment(int n) -> identity<int> { return identity<int>{n + 1}; }
+constexpr auto increment(int n) -> identity<int> {
+    return identity<int>{n + 1};
+}
 
 constexpr auto add = [](int a, int b) { return a + b; };
 
@@ -72,7 +74,8 @@ static_assert(bind(identity<int>{5}, identity_pure) == identity<int>{5});
 
 // Associativity: (m >>= f) >>= g == m >>= (\x -> f x >>= g)
 static_assert(bind(bind(result<int>{8}, halve), halve) ==
-              bind(result<int>{8}, [](int n) { return bind(halve(n), halve); }));
+              bind(result<int>{8},
+                   [](int n) { return bind(halve(n), halve); }));
 static_assert(bind(bind(result<int>{8}, halve), halve) == result<int>{2});
 static_assert(bind(bind(result<int>{12}, halve), halve) ==
               bind(result<int>{12},

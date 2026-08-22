@@ -77,9 +77,10 @@ struct monad : protected Impl {
     /// @tparam N Second monadic value type.
     template <class M, class N>
     constexpr auto then(this auto &&self, M &&first, N &&second) {
-        return self.bind(
-            std::forward<M>(first),
-            [second = std::forward<N>(second)](auto const &) { return second; });
+        return self.bind(std::forward<M>(first),
+                         [second = std::forward<N>(second)](auto const &) {
+                             return second;
+                         });
     }
 
     /// Applicative application, derived from @c bind and @c pure as the
