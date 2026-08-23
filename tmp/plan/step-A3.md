@@ -10,13 +10,18 @@ both dead trees as tags and moved their architecture prose to a pinned
 document. A2 removed every build consumer that would otherwise break the
 moment this step runs. This step removes the trees.
 
-**Integration branch: `retire-three-trees`.** This is Phase A's last step;
+**Integration branch: `cl-retire-trees`.** This is Phase A's last step;
 the branch merges to `main` after it, and the owner reviews before Phase B
 opens.
 
-**Reserved for this step:** blog phase **35**, divergence number **DIV-0031**,
-and decision record **D22** (see part 5 for why this number, and why not
-D32).
+**Reserved for this step:** blog phase **36**, divergence number **DIV-0032**.
+
+**You do not write a decision record.** A0 already wrote **D32**, in
+`docs/cl-language-scoping.md`'s dated amendment section; this step *executes*
+it and appends the dated execution note. Part 5 says exactly what that means.
+Note that D32 and DIV-0032 are unrelated things that happen to share a number:
+`D32` is the decision, `DIV-0032` is your reserved divergence number, and
+nothing requires you to spend the latter.
 
 ## Why this is Phase A's headline step, and why it runs third
 
@@ -37,11 +42,16 @@ glossed. `AGENTS.md` says it "is the behavioural oracle for the rebuild and
 is **never edited**, from step R1 onward. That one is the rule." The root
 `checklist.md` says the same. Deleting it retires a stated rule, and doing
 that quietly, as an incidental consequence of tidying up, would be the worst
-version of this. **The owner has already decided this**, in the plainest
-terms available: retiring `smdlisp` and its never-edited rule is authorized,
-outright, not conditional on this step building a replacement oracle first —
-A4 and A5 build that replacement, but they follow this step rather than
-gating it. Part 5 records the decision as D22, ratified.
+version of this. **It has already been decided, and not by you.** A0 wrote
+decision **D32** — `smdlisp` is retired to a tag before the parity phase, not
+as its merge criterion — which overrides the sequencing of the ratified D22 in
+`docs/cl-language-scoping.md` while leaving D22's goal intact. Retiring the
+never-edited rule is authorized outright and is not conditional on this step
+building a replacement oracle first; A4 and A5 build that replacement, but
+they follow this step rather than gating it. Read D32 in the amendment section
+of `docs/cl-language-scoping.md` — that named section only, not the whole
+document — before you start part 4. It is the argument you are executing and
+it is not restated here.
 
 There is also a mechanical reason the two trees cannot be separated:
 `smdlisp` **links** `smdscheme`. `smdlisp.smdlisp` depends on
@@ -54,7 +64,7 @@ Deleting one tree and keeping the other does not build.
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree add ../step-a3-delete-dead-trees -b step-a3-delete-dead-trees retire-three-trees
+git worktree add ../step-a3-delete-dead-trees -b step-a3-delete-dead-trees cl-retire-trees
 cd ../step-a3-delete-dead-trees
 git submodule update --init --recursive
 ```
@@ -168,8 +178,10 @@ disk, and say in your handoff that the CI docs job is unverified locally.
 
 ### 4. Retire the rule, in the places that state it
 
-Four documents assert the three-tree structure. Change all four in one pass
-so none is left contradicting the others.
+**Five** documents assert the three-tree structure or the `smdlisp` freeze.
+Change all five in one pass so none is left contradicting the others. A0
+deliberately left every one of them alone, because the rule was still true
+then; it stops being true here, all at once.
 
 - **`AGENTS.md`** § "Which trees you may edit" — three trees become one.
   `src/smd/cl/**` is the live tree and the only tree. Keep the section rather
@@ -181,55 +193,58 @@ so none is left contradicting the others.
   in practice". Also the § "Source layout" line naming `<package>` as
   "`smdscheme`, `smdlisp`, or `fixpoint`", which omits `cl` and `kit`
   already.
-- **Root `checklist.md`** — the line asserting `src/smd/smdlisp/**` is frozen
-  as a behavioural oracle and never edited. Correct it rather than deleting
-  it; say what replaced the oracle role and when. Also add this phase's
-  entries to whatever section tracks the rebuild's steps, matching the
-  file's existing format.
+- **Root `checklist.md`** — A0 rewrote the frozen-oracle sentence into a rule
+  with a scheduled end date, naming D32 and this step. The date has arrived:
+  make the sentence past tense and say what replaced the oracle role and when.
+  A0 already added this plan's step entries, so you do **not** add a section —
+  you tick your own A3 line like every other step.
+- **`docs/backlog/README.md`** — its "## Rules" section says
+  "`src/smd/smdlisp/**` is frozen from step R1 onward as the rebuild's
+  behavioural oracle." That is a rule statement, not an item status, and it is
+  the fifth place. A0 edited only that file's Items table and left this line
+  for you deliberately. Backlog files are refined **in place**, not appended
+  to — check `docs/backlog/README.md`'s own Rules section before editing it.
 - **`docs/cl-limitations.md`** and **`docs/cl-rebuild-plan.md`** — append a
   dated note, never edit in place, per this project's convention for these
   documents. `docs/cl-rebuild-plan.md` § 8's "Whether `smdlisp` is eventually
-  retired…" open question gets its dated resolution here, pointing at D22.
-  `docs/cl-pivot-plan.md` is historical and is left alone.
+  retired…" open question gets its dated resolution here, pointing at D32 in
+  `docs/cl-language-scoping.md`. `docs/cl-pivot-plan.md` is historical and is
+  left alone.
 
-### 5. The decision record, and why it is D22, not D32
+### 5. Execute D32, and record that you did
 
-Add to `docs/cl-rebuild-plan.md` § 2, after D21:
+**Do not write a new decision record and do not renumber anything.** A0 wrote
+**D32 — `smdlisp` is retired to a tag before the parity phase, not as its
+merge criterion** — into `docs/cl-language-scoping.md`'s dated amendment
+section, next to the ratified D22 whose sequencing it overrides. That is the
+whole governance change and it is already on trunk. An earlier draft of this
+plan had this step author the record as "D22", colliding with the existing
+ratified D22; that draft was written when the language note was still an
+unratified proposal, and it is wrong now. If you find yourself about to add a
+decision to `docs/cl-rebuild-plan.md` § 2, stop — you are following the old
+draft.
 
-**D22 — The two earlier iterations are retired to tags, and trunk carries one
-front end.** Say that `smdlisp`'s never-edited rule protected its role as the
-rebuild's behavioural oracle; that A2 removed the reader's last consumer of
-that role and A4/A5 give it to SBCL instead, which is what D16 asked for; that
-a tag is a stronger freeze than a rule because it cannot be slipped; and that
-`smdlisp` could not have been kept anyway once `smdscheme` went, because it
-links it.
+What you owe D32 is one thing: **append a dated execution note to it**, in the
+same amendment section, saying that this step carried it out, at this commit,
+and giving the two facts D32 itself could only predict —
 
-**Why D22 and not D32.** The plan this fan-out grew from reserved **D32** for
-this record, specifically to avoid colliding with D22–D26, proposed and still
-unratified in `docs/cl-language-scoping.md` (PR #48, not present on this
-branch). That caution has been overridden directly by the owner: D-numbering
-is bookkeeping, the governance question of whether `smdlisp` is retired is
-already answered, and the owner's own words were to "pick one, or both, and
-say they were done." This step takes **D22**.
+- the two `iteration/*` tags exist and resolve (you verify this in the
+  baseline and again in the spot checks), so the source programs D32 defers to
+  the C-series lanes are genuinely reachable; and
+- the ctest count before and after this deletion, because D32's cost argument
+  was made in the abstract and this is the number it was about.
 
-Say plainly, in the record itself, why this creates a visible tension and how
-it resolves: `docs/cl-language-scoping.md`'s proposed D22 argues the
-opposite sequencing — that `smdlisp` should be kept as a differential oracle
-through a full language-parity phase (its C1–C5), and retired only once that
-phase closes the gap between `cl` and `smdlisp`'s object-language surface.
-This step's D22 supersedes that framing rather than extending it: the owner
-has decided the tree comes down now, using SBCL rather than `smdlisp`-parity
-tracking as the reader's oracle, and the language-parity work `smdlisp`
-would have made cheaper (§2.1's spine — function values, lambda lists,
-lexical and special binding, macros) proceeds without it, at whatever cost
-that turns out to have. That is a real cost, not a free renumbering, and this
-record should say so rather than pretend the two D22s agree.
+Keep it to a few lines. It is a dated note under an existing record, not a
+second record.
 
-Then, separately: **D32 is withdrawn, folded into D22, and the number is not
-to be reused.** Whoever ratifies `docs/cl-language-scoping.md` should treat
-its own proposed D22–D26 as needing renumbering around this one, not the
-reverse — this D22 lands first, on trunk, ratified; theirs is still a
-proposal.
+One thing worth stating in that note because nobody else will be positioned
+to: **`smdlisp` could not have been kept even if D22's sequencing had won.**
+`smdlisp.smdlisp` links `smdscheme.foundation` and `smdscheme.parser`, and six
+of `smdlisp`'s seven sub-library `CMakeLists.txt` files link a `smdscheme.*`
+target. Keeping `smdlisp` through the C-series would have meant keeping
+`smdscheme` too — both trees, not one — and `smdscheme`'s deletion was never
+in question. That is a mechanical fact D22 did not have in front of it, and it
+makes the override cheaper than it looked.
 
 ### 6. The kit's provenance comments
 
@@ -261,9 +276,13 @@ src/smd/kit/foundation/*.hpp                (14 provenance comments)
 src/smd/kit/foundation/*.test.cpp           (provenance comments, same edit)
 AGENTS.md                                   (three trees become one)
 CLAUDE.md                                   (project and layout sections)
-checklist.md                                (the frozen-oracle line; step entries)
+checklist.md                                (frozen-oracle line to past tense;
+                                             tick your own A3 line)
+docs/backlog/README.md                      (the Rules section's freeze line)
 docs/cl-limitations.md                      (dated note)
-docs/cl-rebuild-plan.md                     (dated note; decision D22)
+docs/cl-rebuild-plan.md                     (dated note resolving § 8's open
+                                             question, pointing at D32)
+docs/cl-language-scoping.md                 (dated execution note under D32)
 ```
 
 ## Verify GREEN after
@@ -335,18 +354,19 @@ that outweighs the sequencing argument that would have built the
 replacement oracle first.
 
 smdscheme was already slated for this. smdlisp was not, and its rule
-is worth retiring out loud rather than quietly. D22 records that a
-tag is a stronger freeze than a rule because it cannot be slipped,
-and that the two trees could not have been separated anyway --
-smdlisp links smdscheme.foundation and smdscheme.parser. It also
-records, honestly, that docs/cl-language-scoping.md's own unratified
-proposal for D22 argued the opposite sequencing -- smdlisp kept
-through a language-parity phase, retired only once that phase closed
-the gap. This D22 supersedes that framing rather than agreeing with
-it; the owner decided the tree comes down now, on SBCL as the
-reader's oracle instead. D32, the number this plan first reserved for
-this record specifically to avoid that collision, is withdrawn and
-folded in here so it is not reused.
+is worth retiring out loud rather than quietly -- which is why the
+decision is D32, written in the step before this one, next to the
+ratified D22 whose sequencing it overrides, rather than smuggled in
+here as a consequence of tidying up. This step only carries it out,
+and adds the two numbers D32 could not have: that both iteration tags
+resolve, and what the deletion did to the test count.
+
+One thing worth saying that D32 argued in the abstract. Keeping
+smdlisp through a parity phase was never actually on the table:
+smdlisp.smdlisp links smdscheme.foundation and smdscheme.parser, and
+six of its seven sub-library CMakeLists files link a smdscheme target,
+so keeping it meant keeping both trees. smdscheme's deletion was never
+in question.
 
 The rest is the consumers nothing in the test matrix would have
 caught: mrdocs' input roots, antora's namespace list, and the two
@@ -355,7 +375,7 @@ terms. Those run in CI on a different job, and would have gone red a
 week later with no obvious cause.
 EOF
 
-git checkout retire-three-trees
+git checkout cl-retire-trees
 git merge --no-ff step-a3-delete-dead-trees
 ```
 

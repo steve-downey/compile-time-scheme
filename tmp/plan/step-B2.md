@@ -9,7 +9,7 @@ headers under `src/smd/cl/reader/detail/` plus an umbrella.
 
 **Integration branch: `cl-parser-combinators`.**
 
-**Reserved for this step:** blog phase **39**, divergence number **DIV-0035**.
+**Reserved for this step:** blog phase **40**, divergence number **DIV-0036**.
 
 ## Phase B's standing constraints
 

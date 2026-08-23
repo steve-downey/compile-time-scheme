@@ -5,9 +5,25 @@ editing this file **in the main checkout by absolute path**, never inside your
 worktree. This is the fan-out's step tracker; the repository root
 `checklist.md` is a different file and a project deliverable.
 
+From A1 onward you also tick your step's line in the **root** `checklist.md`,
+inside your worktree, as part of your diff. A0 is what puts those lines there.
+The two files are not redundant: this one drives the fan-out, that one is how
+the repository describes itself to the next agent that reads `AGENTS.md`.
+
+## Phase 0 — reconciliation
+
+Integration branch: **`plan-reconciliation`, branched off `main`, and it merges
+to `main`**, not to a phase branch. This is the only step in the plan that does.
+See `tmp/plan/README.md` "Integration branches" for why.
+
+- [ ] A0 — `tmp/plan/step-A0.md` — rebase the record against reality: the root checklist, decision D32, three backlog items, and a dated amendment to each scoping note
+
 ## Phase A — retire the three-tree structure
 
-Integration branch: `retire-three-trees` (already created, off `main`).
+Integration branch: **`cl-retire-trees`**, created off `main` by the
+orchestrator **after A0 merges**. The older `retire-three-trees` branch points
+at `1ace4ad` and is nine commits stale; it is not this plan's branch. If your
+branch does not exist, that is the gate, not a defect: write `blocked-A1.md`.
 
 The deletion runs third, not last — see `tmp/plan/README.md` "The reorder" for
 why. A1 and A2 exist only to make A3 a clean subtraction; A4 and A5 restore
@@ -15,7 +31,7 @@ reader-layer differential evidence afterward rather than gating the deletion.
 
 - [ ] A1 — `tmp/plan/step-A1.md` — freeze both iterations as tags; move their architecture prose to a pinned history doc
 - [ ] A2 — `tmp/plan/step-A2.md` — neutralise the dead trees' build consumers (examples, install test, export list)
-- [ ] A3 — `tmp/plan/step-A3.md` — delete `smdscheme` and `smdlisp` from trunk (D22, ratified)
+- [ ] A3 — `tmp/plan/step-A3.md` — delete `smdscheme` and `smdlisp` from trunk, executing D32
 - [ ] A4 — `tmp/plan/step-A4.md` — a `prin1`-shaped printer for `cl` datums, proved against SBCL in the same step
 - [ ] A5 — `tmp/plan/step-A5.md` — broaden the SBCL reader differential into a real corpus
 

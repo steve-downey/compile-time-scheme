@@ -12,7 +12,7 @@ skippers, `read_delimited`, `read_string`, `read_character`.
 
 **Integration branch: `cl-parser-combinators`.**
 
-**Reserved for this step:** blog phase **43**, divergence number **DIV-0039**.
+**Reserved for this step:** blog phase **44**, divergence number **DIV-0040**.
 
 ## Phase B's standing constraints
 

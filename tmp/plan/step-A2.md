@@ -9,9 +9,9 @@ iterations, frozen as tags by A1 and deleted by A3. This step is the one that
 makes A3 a pure subtraction rather than a step that also has to fix a broken
 build.
 
-**Integration branch: `retire-three-trees`.**
+**Integration branch: `cl-retire-trees`.**
 
-**Reserved for this step:** blog phase **34**, divergence number **DIV-0030**.
+**Reserved for this step:** blog phase **35**, divergence number **DIV-0031**.
 
 ## Why this step, and why it does less than it sounds like
 
@@ -50,7 +50,7 @@ introduced.
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree add ../step-a2-neutralise-consumers -b step-a2-neutralise-consumers retire-three-trees
+git worktree add ../step-a2-neutralise-consumers -b step-a2-neutralise-consumers cl-retire-trees
 cd ../step-a2-neutralise-consumers
 git submodule update --init --recursive
 ```
@@ -214,7 +214,11 @@ installtest/test_reader.cpp                 (deleted)
 installtest/test_elaborator.cpp             (deleted)
 installtest/test_closure.cpp                (deleted)
 installtest/test_sender.cpp                 (deleted)
-installtest/CMakeLists.txt                  (six calls removed; helper kept)
+installtest/CMakeLists.txt                  (six calls AND the helper removed;
+                                             find_package kept — part 2 is
+                                             authoritative, an earlier draft of
+                                             this line said "helper kept" and
+                                             contradicted it)
 src/smd/cl/reader/oracle_compare.test.cpp   (deleted)
 src/smd/cl/reader/CMakeLists.txt            (drop source and smdlisp.reader)
 src/smd/cl/reader/read.test.cpp             (only if a case is genuinely uncovered)
@@ -304,7 +308,7 @@ smdlisp/smdscheme under src/smd/cl/ come back prose-only, which is
 what A3 depends on.
 EOF
 
-git checkout retire-three-trees
+git checkout cl-retire-trees
 git merge --no-ff step-a2-neutralise-consumers
 ```
 

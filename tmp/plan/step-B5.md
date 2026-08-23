@@ -11,7 +11,7 @@ and retired D15's ladder from `read_delimited`.
 
 **Integration branch: `cl-parser-combinators`.**
 
-**Reserved for this step:** blog phase **42**, divergence number **DIV-0038**.
+**Reserved for this step:** blog phase **43**, divergence number **DIV-0039**.
 
 ## Phase B's standing constraints
 

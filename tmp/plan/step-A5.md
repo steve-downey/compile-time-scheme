@@ -8,9 +8,9 @@ from trunk in A3 and survive only at `iteration/smdscheme-final` and
 `iteration/smdlisp-final`. A4 gave the reader a printer and a first SBCL
 oracle comparison. This is Phase A's last step.
 
-**Integration branch: `retire-three-trees`.**
+**Integration branch: `cl-retire-trees`.**
 
-**Reserved for this step:** blog phase **37**, divergence number **DIV-0033**.
+**Reserved for this step:** blog phase **38**, divergence number **DIV-0034**.
 
 ## Why
 
@@ -36,7 +36,7 @@ authority rather than only against this project's own tests.
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree add ../step-a5-reader-differential -b step-a5-reader-differential retire-three-trees
+git worktree add ../step-a5-reader-differential -b step-a5-reader-differential cl-retire-trees
 cd ../step-a5-reader-differential
 git submodule update --init --recursive
 ```
@@ -129,7 +129,7 @@ is the corpus — that the expectations transcribed from `pfdietz/ansi-test`
 and from the specification are what a real Common Lisp actually produces.
 That is genuinely worth having and it is not what the file name says.
 
-Write `docs/divergences/DIV-0033-corpus-differential-validates-the-corpus.md`
+Write `docs/divergences/DIV-0034-corpus-differential-validates-the-corpus.md`
 following `docs/divergences/TEMPLATE.md`, classified `process` per
 `docs/divergences/README.md`'s taxonomy, and add its row to that README's
 table. Say what the file does, what its name implies, why the two came apart
@@ -140,7 +140,7 @@ only the corpus check.
 
 Do **not** rename the file or its `TEST_CASE`s. A rename churns CMake and
 every recorded ctest name for no behavioural gain; add a corrected paragraph
-to the file's own header comment pointing at DIV-0033, which is the
+to the file's own header comment pointing at DIV-0034, which is the
 append-a-dated-note convention this project already uses.
 
 ### 3. Anchors and the architecture doc
@@ -157,7 +157,7 @@ deletion opened.
 src/smd/cl/conformance/reader_differential.test.cpp      (broadened)
 src/smd/cl/conformance/sbcl_oracle.hpp                   (error reporting, if A4 left it open)
 src/smd/cl/conformance/sbcl_differential.test.cpp        (header comment only)
-docs/divergences/DIV-0033-corpus-differential-validates-the-corpus.md   (new)
+docs/divergences/DIV-0034-corpus-differential-validates-the-corpus.md   (new)
 docs/divergences/README.md                               (one table row)
 docs/compiler_architecture.org                           (in-place paragraph)
 ```
@@ -209,12 +209,12 @@ conformance/sbcl_differential.test.cpp keeps its name and gains a
 correction. It is not a cl-vs-SBCL differential and never was: it
 checks SBCL against the corpus's own expectation strings, which
 validates the corpus and is worth doing under an honest description.
-DIV-0033 records that, and records why the name outran the code -- the
+DIV-0034 records that, and records why the name outran the code -- the
 file predates the printer, so comparing cl's output was not something
 it could do.
 EOF
 
-git checkout retire-three-trees
+git checkout cl-retire-trees
 git merge --no-ff step-a5-reader-differential
 ```
 
@@ -243,7 +243,7 @@ Mark A5 done in
 
 ## Handoff — this one goes to a human, not only to B1
 
-Phase A ends here. `retire-three-trees` merges to `main` and the owner
+Phase A ends here. `cl-retire-trees` merges to `main` and the owner
 reviews before Phase B opens; `cl-parser-combinators` does not exist yet and
 the B1 agent is told to halt if it is absent.
 
@@ -259,7 +259,17 @@ pages that A3 could not verify locally.
 Also write, at the top of that handoff, a short **gate note** for the
 owner: what Phase A changed, in the order it actually ran (freeze, neutralise,
 delete, printer, differential — not the build-the-oracle-first order this
-plan started with), what it deleted, and the one decision that is his to
-confirm rather than a worker's — retiring `smdlisp`'s never-edited rule,
-recorded as D22, and the tension that record names between this D22 and the
-different, unratified D22 proposed in `docs/cl-language-scoping.md`.
+plan started with), what it deleted, and the one thing that is his to confirm
+rather than a worker's — **decision D32**, written at A0 and executed at A3,
+which retires `smdlisp` to a tag *before* the parity phase rather than as its
+merge criterion, overriding the sequencing of the ratified D22 it sits beside
+in `docs/cl-language-scoping.md`.
+
+Say, in two or three lines and without arguing the case again, what D32
+deferred rather than discarded: the roughly 120 evaluated behaviour cases
+`smdlisp` holds for `LET`, `SETQ`, `CATCH`, `TAGBODY`, `DEFMACRO` and multiple
+values, none of which the 75-entry corpus reaches, now readable out of
+`iteration/smdlisp-final` by every C-series lane that wants source programs.
+Whether that deferral was the right call is the judgement the gate exists for,
+and the owner should be able to see it in the handoff rather than having to
+find D32 to know it was made.

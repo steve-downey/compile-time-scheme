@@ -22,7 +22,7 @@ This is `AGENTS.md` § "Reading contract" applied to this fan-out.
 **Tier 2 — this step only. Bounded, rewritten per step, consumed once.**
 
 6. `tmp/plan/checklist.md` — find the **first unchecked step**. It names your
-   step file exactly; step identifiers are `A1`–`A5` and `B1`–`B8`.
+   step file exactly; step identifiers are `A0`–`A5` and `B1`–`B8`.
 7. `tmp/plan/step-<id>.md` for that step, and **only** that one.
 8. `tmp/plan/handoff-<id>.md` addressed to your step, if it exists.
    The first step of a phase has no inbound handoff; that is normal, not a
@@ -33,8 +33,12 @@ This is `AGENTS.md` § "Reading contract" applied to this fan-out.
 
 9. `docs/compiler_architecture.org` — the living architecture doc. Open the
    **named section** your step file points at. Never read it front to back.
-10. `docs/cl-rebuild-plan.md`, `docs/cl-parser-scoping.md`,
-    `docs/divergences/DIV-NNNN-*.md` — only the specific record your step names.
+10. `docs/cl-rebuild-plan.md`, `docs/cl-language-scoping.md`,
+    `docs/cl-parser-scoping.md`, `docs/divergences/DIV-NNNN-*.md`,
+    `docs/backlog/BL-NNNN-*.md` — only the specific record or named section your
+    step points at. All five directories are large and none of them is a read
+    path; `docs/backlog/README.md` says outright that a worker executing a step
+    should never open that directory unless told to.
 
 **Do not** read other steps' files, earlier handoffs, `tmp/plan/README.md`,
 `tmp/plan/INTEGRATION-REVIEW.md`, or `docs/history/handoff-archive.md`.
@@ -52,7 +56,8 @@ spelunking through `git log` or through earlier steps' files to reconstruct it.
    step file gives. If the baseline is not green, stop and write `blocked-NN.md`.
 4. Implement the change.
 5. Verify GREEN again. Run the spot checks.
-6. Commit, merge back to the integration branch with `--no-ff`.
+6. Commit, merge back to the integration branch with `--no-ff`. (A0 is the one
+   step whose integration branch is `main` itself; its step file says so.)
 7. **Append one record to `metrics.jsonl`** (see below) — after the merge,
    before cleanup, while the numbers and the worktree still exist.
 8. Remove the worktree.
@@ -63,9 +68,22 @@ spelunking through `git log` or through earlier steps' files to reconstruct it.
     `tmp/plan/handoff-NN.md`, in the main checkout by absolute path.
 
 Note there are **two** files called `checklist.md` and they are different things.
-`tmp/plan/checklist.md` is this fan-out's step tracker and is never part of a
-step's diff. The repository root `checklist.md` is a project deliverable and is
-edited inside the worktree **only** when your step file explicitly says so.
+
+`tmp/plan/checklist.md` is this fan-out's step tracker. You mark it in the main
+checkout by absolute path and it is **never** part of a step's diff.
+
+The repository root `checklist.md` is a project deliverable. Step A0 adds this
+plan's fourteen steps to it; from A1 onward **every step ticks its own line
+there, inside its worktree, as part of its diff.** Treat the root
+`checklist.md` as a standing addition to your declared file scope — for your
+own line and nothing else. It is not an out-of-scope touch and does not go in
+`out_of_scope`. Anything more than your own line in that file needs your step
+file to say so explicitly (A0 and A3 do).
+
+The reason this is worth a paragraph: `AGENTS.md` says "work only the next
+unchecked step in `checklist.md`", and until A0 runs there is no such step. A
+root checklist that goes stale for fourteen steps is the defect this plan opens
+by fixing.
 
 ## Verify commands, and how to read their output
 
@@ -160,9 +178,28 @@ These cannot alter behaviour for any existing caller in this tree:
   repo-relative path.
 - Widening a parameter you already call through from a concrete type to the
   concept it already models, when no other caller exists.
+- Correcting a header-guard macro that disagrees with the file's repo-relative
+  path, per `docs/cpp-rules.md`'s guard rule. (`src/smd/fixpoint/` uses
+  `INCLUDED_SMD_FIXPOINT_*` by local convention and is **not** wrong.)
+- Fixing a `markdownlint` violation `make lint` reports in a Markdown or org
+  file you already edited.
+- Adding the index-table row in `docs/divergences/README.md` or
+  `docs/backlog/README.md` for a `DIV-` or `BL-` file you created in this step.
+  Both directories require the row; creating the file without it is the
+  incomplete edit, not the row.
 
-Record each one in three places: your handoff, the commit message, and the
-`out_of_scope` array of your `metrics.jsonl` record.
+Two documentation conventions are **not** incidental-fix territory and getting
+them backwards is the most likely way to make this list do harm:
+
+- `docs/divergences/**` is **append-only**. A dated note, never an edit in
+  place. Its `README.md` index table is the exception — that is a table and
+  you edit the row.
+- `docs/backlog/**` is the opposite. Its own `README.md` says "Refine an item
+  in place. Do not append status logs to it."
+
+Record each pre-authorized fix in three places: your handoff, the commit
+message, and the `out_of_scope` array of your `metrics.jsonl` record. The
+standing root-`checklist.md` tick is the one exception and does not go there.
 
 ### Ask — halt and request permission
 
@@ -208,7 +245,12 @@ Stop, do **not** mark the checklist, and write `tmp/plan/blocked-NN.md` if:
 - you are about to weaken the verification to make it pass — skipping a test,
   suppressing a warning, loosening an assertion, commenting out failing code,
   changing an existing test's expectation; or
-- you would have to edit `src/smd/smdlisp/**`, which is never edited.
+- you would have to edit `src/smd/smdlisp/**`, which is never edited **until
+  step A3 deletes it**. Before A3, editing it is a halt. From A3 onward the
+  tree does not exist and the question cannot arise. Do not read this rule as
+  permission to reach into `src/smd/smdscheme/**` either: it is not frozen by
+  rule, but `AGENTS.md` is explicit that a bug found there is fixed in
+  `src/smd/cl/`, never there.
 
 Changing an existing test's expectation is a **halt**, always. Adding a new case
 is fine.

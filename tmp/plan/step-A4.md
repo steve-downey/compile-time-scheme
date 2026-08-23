@@ -10,9 +10,9 @@ A1–A3, `src/smd/cl/` and `src/smd/kit/` are the only trees in `src/smd/`
 besides `fixpoint`; `smdscheme` and `smdlisp` are gone from the worktree and
 live only at `iteration/smdscheme-final` and `iteration/smdlisp-final`.
 
-**Integration branch: `retire-three-trees`** (exists, branched off `main`).
+**Integration branch: `cl-retire-trees`** (exists, branched off `main`).
 
-**Reserved for this step:** blog phase **36**, divergence number **DIV-0032**.
+**Reserved for this step:** blog phase **37**, divergence number **DIV-0033**.
 An unused reservation is fine.
 
 ## Why, and why it runs fourth rather than first
@@ -45,7 +45,7 @@ should surface here rather than one step later.
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree add ../step-a4-cl-printer -b step-a4-cl-printer retire-three-trees
+git worktree add ../step-a4-cl-printer -b step-a4-cl-printer cl-retire-trees
 cd ../step-a4-cl-printer
 git submodule update --init --recursive
 ```
@@ -342,7 +342,7 @@ prints its value where this reader prints its spelling -- so the
 compared corpus holds canonical decimal spellings only.
 EOF
 
-git checkout retire-three-trees
+git checkout cl-retire-trees
 git merge --no-ff step-a4-cl-printer
 ```
 

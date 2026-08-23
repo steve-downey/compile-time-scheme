@@ -11,7 +11,7 @@ consumer.
 **Integration branch: `cl-parser-combinators`.** This is the last
 implementation step; the integration review follows and is not a code step.
 
-**Reserved for this step:** blog phase **45**, divergence number **DIV-0041**.
+**Reserved for this step:** blog phase **46**, divergence number **DIV-0042**.
 
 ## Phase B's standing constraints
 
@@ -146,18 +146,33 @@ notice a section that transcludes something a later step moved.
 
 ### 4. The project checklist
 
-Add Phase A's and Phase B's steps to the repository root `checklist.md`,
-matching the file's existing format. This is the project's status document, not
-the fan-out's tracker; both exist and they are different files.
+A0 added this plan's fourteen steps to the repository root `checklist.md` and
+every step since has ticked its own line, so there is nothing to add here —
+tick B8's line and check that the other thirteen are ticked. If any is not, say
+which in your handoff; a step that merged without ticking is a small thing but
+it is the kind of small thing the integration review is looking for.
 
-### 5. What you do not do
+This is the project's status document, not the fan-out's tracker; both exist,
+they are different files, and `tmp/plan/checklist.md` is still marked in the
+main checkout by absolute path.
 
-Do **not** edit `docs/cl-parser-scoping.md`. It is a proposal the owner
-ratifies, its § 4 phase sketch does not match the plan that was actually
-executed, and correcting someone's unratified proposal from inside an
-implementation step is the wrong direction. Instead, list in your final handoff
-exactly where the executed series diverged from § 4 — that list is what the
-owner amends the note from, in one pass.
+### 5. `docs/cl-parser-scoping.md` — report, do not amend
+
+Do **not** edit `docs/cl-parser-scoping.md`, but not for the reason an earlier
+draft of this file gave. That draft said the note was an unratified proposal
+and correcting it from inside an implementation step was the wrong direction.
+It is ratified now, and A0 already appended a dated amendment section
+correcting § 4's phase sketch and replacing § 6's amendment mechanism.
+
+So the reason has changed and the instruction has not. A0's amendment says how
+the plan *differed from the sketch*; what you have, and nobody else does, is
+how the executed series differed from **the plan**. Those are different lists
+and they want different authors. List yours in your final handoff — which
+primitive arrived in which step against what B2–B7 predicted, which reader
+function resisted conversion, whether the layer stopped growing after B4 as
+the plan guessed it might. The owner folds that into the note in one pass, and
+the integration review reconciles your list against A0's rather than emitting
+both.
 
 ## Declared file scope
 
@@ -168,7 +183,8 @@ docs/compiler_architecture.org                (measurement subsection; the
 docs/divergences/DIV-0028-parser-combinator-layer-has-no-cl-client.md
                                               (dated note appended)
 docs/divergences/README.md                    (one row)
-checklist.md                                  (project status, root)
+checklist.md                                  (tick B8's line only; A0 put
+                                               the entries there)
 ```
 
 No source changes. If you find yourself wanting one, it belongs to whichever

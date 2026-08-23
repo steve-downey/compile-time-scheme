@@ -10,7 +10,7 @@ context, and converted `read_radix_number` onto it.
 
 **Integration branch: `cl-parser-combinators`.**
 
-**Reserved for this step:** blog phase **40**, divergence number **DIV-0036**.
+**Reserved for this step:** blog phase **41**, divergence number **DIV-0037**.
 
 ## Phase B's standing constraints
 

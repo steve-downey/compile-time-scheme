@@ -11,12 +11,12 @@ and `iteration/smdlisp-final` and no longer exist in the worktree.
 **Integration branch: `cl-parser-combinators`.**
 
 **If that branch does not exist, stop and write `blocked-B1.md`.** Phase A ends
-at a deliberate human gate: `retire-three-trees` merges to `main`, the owner
+at a deliberate human gate: `cl-retire-trees` merges to `main`, the owner
 reviews the deletion of two trees and the retirement of the `smdlisp`
 never-edited rule, and only then is Phase B's branch created off `main`. An
 absent branch is the gate, not a defect.
 
-**Reserved for this step:** blog phase **38**, divergence number **DIV-0034**.
+**Reserved for this step:** blog phase **39**, divergence number **DIV-0035**.
 
 ## Phase B's standing constraints — these apply to every B step
 
@@ -65,8 +65,10 @@ git submodule update --init --recursive
 ## Verify GREEN baseline
 
 Your inbound handoff carries the exact ctest count and cold matrix wall time
-after Phase A's deletion; both are much lower than the 1118 and ~7 minutes the
-plan was written against.
+after Phase A's deletion; both are much lower than the pre-Phase-A figures the
+plan was sized against — 1123 ctest entries per leg and roughly 440 s for a
+cold fresh worktree. A3 deleted around 800 test cases, so expect a large drop
+in both. Trust the handoff's numbers over these.
 
 ```sh
 make test-matrix > /tmp/verify-B1-base.log 2>&1; echo "exit=$?"

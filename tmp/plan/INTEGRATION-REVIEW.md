@@ -9,7 +9,7 @@ worker contract can stay as tight as it is.
 
 It is a **judgement read, not a rerun of the GREEN checks**. Every step already
 left both matrix legs passing. Re-running them proves nothing new; what no
-single cleared agent could see is whether thirteen locally-correct steps add up
+single cleared agent could see is whether fourteen locally-correct steps add up
 to one coherent change.
 
 Write your findings into this file, replacing this brief.
@@ -55,10 +55,10 @@ quietly widened its scope rather than proposing a change to an earlier one.
   step's file, or an earlier handoff.
 - **Every transclusion still resolves.** `scripts/verify-transclusions.sh` exits
   0, and `docs/compiler_architecture.org` is the living document it checks
-  against the worktree. Thirteen steps moved, split and deleted files; a rename
+  against the worktree. Fourteen steps moved, split and deleted files; a rename
   silently orphans a transclude and turns the living document into dead
   narrative. **A1** is the step that restructured this most (it moved 31 of
-  the document's 39 transclusions out to a pinned history document, ahead of
+  the document's 37 transclusions out to a pinned history document, ahead of
   A3's deletion); check its work last, against the final tree, not against
   the tree it ran on.
 - The two `checklist.md` files stayed distinct: `tmp/plan/checklist.md` never
@@ -119,9 +119,11 @@ Three rows are worth naming individually:
 
 - **B1** is the measured floor: pure code motion, no logic. Everything else
   costs at least that.
-- **A1** is a documentation-only change that still paid the full matrix. If it
-  cost as much as a code step, the per-step verify command is too coarse and
-  that is the single most actionable finding this run can produce.
+- **A0** and **A1** are documentation-only changes that could not possibly move
+  a test and paid the full matrix anyway. A0 in particular touches no file
+  under `src/`. If either cost as much as a code step, the per-step verify
+  command is too coarse, and that is the single most actionable finding this
+  run can produce — more actionable than anything in section 1.
 - **A2**, **A3**, and **B8** each ran extra commands beyond the standard
   `make test-matrix` (`make testinstall` for A2 and A3 — recorded for the
   trend, not gating either step; the D30 before-and-after builds for B8) and
@@ -175,18 +177,29 @@ the first time it is created and leave it alone after.
 
 ## 6. What the owner needs, in the report
 
-- Whether Phase A's governance change — retiring `smdlisp`'s never-edited rule,
-  recorded as **D22** (not D32; that number was withdrawn and folded into D22
-  when this plan was amended before any step ran — see `tmp/plan/README.md`
-  "Governance") — is stated consistently across `AGENTS.md`, `CLAUDE.md`,
-  the root `checklist.md` and `docs/cl-rebuild-plan.md`, or whether one of them
-  still contradicts the others. Also confirm A3's decision record is honest
-  about the tension with `docs/cl-language-scoping.md`'s own unratified,
-  differently-sequenced proposed D22, rather than silently agreeing with it.
-- The list B8's handoff carries: where the executed series diverged from
-  `docs/cl-parser-scoping.md` § 4, so the note can be amended in one pass. The
-  recommendations in `tmp/plan/README.md` are the pre-run version of that list;
-  reconcile the two rather than emitting both.
+- **Whether the governance change is stated consistently in all six of its
+  homes.** It is decision **D32**, written at A0 into
+  `docs/cl-language-scoping.md`'s amendment section beside the ratified D22
+  whose sequencing it overrides, and executed at A3. Check `AGENTS.md`,
+  `CLAUDE.md`, the root `checklist.md`, `docs/backlog/README.md`'s Rules
+  section, `docs/cl-rebuild-plan.md` § 8's dated resolution, and D32's own
+  execution note. Six documents, one rule retired; any one of them still
+  asserting the `smdlisp` freeze is a finding.
+  Watch specifically for a worker that followed this plan's **earlier draft**,
+  which had A3 author the retirement as "D22" in `docs/cl-rebuild-plan.md` § 2.
+  If a second D22 exists anywhere, that draft leaked through, and it is a
+  collision with a ratified decision rather than a cosmetic one.
+- **Whether D32's deferral held up.** D32 did not discard `smdlisp`'s oracle
+  value; it deferred the harvest to the C-series lanes and left the source
+  programs at `iteration/smdlisp-final`. Confirm the tag resolves and that D32
+  carries the standing lane obligation in checkable words. This is the one
+  decision in the run that a later phase, not this one, will prove right or
+  wrong — say what would show it was wrong, so the C-series planner has it.
+- **Reconcile the two divergence lists against `docs/cl-parser-scoping.md`.**
+  A0 appended an amendment saying how this plan differed from § 4's sketch;
+  B8's handoff says how execution differed from this plan. They are different
+  lists with different authors and the owner amends the note from both.
+  Reconcile them into one rather than emitting two.
 - The pre-existing rot named at the end of `README.md` — `schemepoc.org` and the
   two scripts hardcoding `src/smd/schemepoc/` — which nothing in this run
   touched and which should become backlog entries.

@@ -8,9 +8,14 @@ front end, dead-ended), `src/smd/smdlisp/` (the Common Lisp pivot), and
 `src/smd/cl/` (the live rebuild). Phase A retires the first two, **now, as its
 first act** — see "Why this step is first" below — and A3 deletes them.
 
-**Integration branch: `retire-three-trees`** (exists, branched off `main`).
+**Integration branch: `cl-retire-trees`,** created off `main` by the
+orchestrator after A0 merged. **If it does not exist, stop and write
+`blocked-A1.md`** — that is the gate between A0 and Phase A, not a defect. Do
+**not** substitute the older `retire-three-trees` branch: it points at
+`1ace4ad`, nine commits behind `main`, and branching from it would silently
+lose the Monad typeclass and both scoping notes that this plan is built on.
 
-**Reserved for this step:** blog phase **33**, divergence number **DIV-0029**.
+**Reserved for this step:** blog phase **34**, divergence number **DIV-0030**.
 An unused reservation is fine.
 
 ## Why this step is first
@@ -29,14 +34,27 @@ project already promises: `docs/compiler_architecture.org` is a **living**
 document, and `scripts/verify-transclusions.sh` deliberately resolves its
 links against the worktree, not against a tag, because a living document is
 supposed to roll forward and an orphaned link should be caught immediately.
-Verified by direct count on this tree: the document carries **39**
-`[[file:…]]` transclusion links, and **31** of them point at code A3 is about
-to delete — 28 directly under `smdscheme` or `smdlisp` by path, plus 3 more
-at `src/examples/godbolt_lisp.cpp` and `godbolt_lisp_ffi.cpp`, which A2
-removes. (The plan this fan-out started from said 37 and 31; the 31 held, the
-37 did not — recount before trusting either number again if the document
-changes further before this step runs.) Delete the trees with the document as
-it stands and the very next `verify-transclusions.sh` run — which every later
+Counted directly on `main` at `1d66c54`, and **count it the same way yourself
+before you trust any number here**, because the obvious grep answers a
+different question than the one that matters:
+
+```sh
+grep -o '\[\[file:' docs/compiler_architecture.org | wc -l          # 39
+grep -o '\[\[file:[^]:]*::' docs/compiler_architecture.org | wc -l  # 37
+```
+
+**39 `[[file:` occurrences, of which 37 are code transclusions** — the ones
+carrying a `::<uuid>` — and **2 are plain document hyperlinks** to
+`cl-limitations.md`, which have no UUID and are not transclusions at all. An
+earlier pass at this plan reported 39 transclusions; it was counting the first
+grep. The verifier only cares about the 37.
+
+Of those 37, **31 point at code A3 is about to delete**: 7 under
+`src/smd/smdscheme/`, 21 under `src/smd/smdlisp/`, and 3 at
+`src/examples/godbolt_lisp.cpp` / `godbolt_lisp_ffi.cpp`, which A2 removes. The
+remaining **6** point into `src/smd/cl/` and `src/smd/kit/` and stay. Delete the
+trees with the document as it stands and the very next
+`verify-transclusions.sh` run — which every later
 step's acceptance gate runs — reports 31 failures. Suppressing that check
 would be exactly the wrong fix: the check is right, and the document is what
 would be wrong.
@@ -52,16 +70,16 @@ deleted and every word ever written about them still resolves.
 
 ```sh
 cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree add ../step-a1-freeze-iterations -b step-a1-freeze-iterations retire-three-trees
+git worktree add ../step-a1-freeze-iterations -b step-a1-freeze-iterations cl-retire-trees
 cd ../step-a1-freeze-iterations
 git submodule update --init --recursive
 ```
 
 ## Verify GREEN baseline
 
-Your inbound handoff, if any, carries the exact wall time and ctest count
-measured before this run started; `tmp/plan/README.md`'s two baseline rows are
-not on your read path, but the number is the same one either way.
+Your inbound handoff from A0 carries the exact wall time and ctest count it
+measured. The number to expect is **1123** entries per leg; A0 changed no code,
+so nothing should have moved it.
 
 ```sh
 make test-matrix > /tmp/verify-A1-base.log 2>&1; echo "exit=$?"
@@ -93,9 +111,9 @@ documented in `docs/blog/pins.md`, and is not a failure. Not green ⇒ write
   Reflection` — seven top-level sections, seven transclusions, all into
   `smdscheme` — followed by `* The Common Lisp Layer: =smd::smdlisp=` and its
   nine subsections, 24 transclusions, 21 into `smdlisp` and 3 into
-  `src/examples/godbolt_lisp.cpp`/`godbolt_lisp_ffi.cpp`. What survives:
-  `* Introduction` and `* The Common Lisp Rebuild: =smd::cl=` with its five
-  `cl` and `kit` transclusions.
+  `src/examples/godbolt_lisp.cpp`/`godbolt_lisp_ffi.cpp`. Seven plus 24 is the
+  31 that move. What survives: `* Introduction` and `* The Common Lisp
+  Rebuild: =smd::cl=` with its **six** `cl` and `kit` transclusions.
 
 ## The change
 
@@ -120,7 +138,7 @@ name a revision that exists when you write them, but the tags name this
 step's own merge commit, which does not exist yet. Do this: create the two
 tags on your **worktree branch's** final commit before merging, verify the
 links resolve against them, and note in your handoff that the `--no-ff` merge
-makes the tagged commit an ancestor of `retire-three-trees`, which is all
+makes the tagged commit an ancestor of `cl-retire-trees`, which is all
 `git show REV:PATH` needs. Do not move or re-point the tags afterwards.
 
 ### 2. A new pinned document, `docs/history/architecture-iterations.org`
@@ -158,9 +176,12 @@ What stays in `docs/compiler_architecture.org`: `* Introduction` (reworded to
 say the earlier iterations moved, and where), and `* The Common Lisp Rebuild:
 =smd::cl=` with its five surviving `cl` and `kit` transclusions.
 
-Also fix the two plain `[[file:cl-limitations.md][…]]` hyperlinks if the
-section holding them moves — those point at a document, not into a tree, and
-must keep resolving from wherever they land.
+**The two plain `[[file:cl-limitations.md][…]]` hyperlinks are a trap.** They
+carry no UUID, so `verify-transclusions.sh` never looks at them and cannot tell
+you if you break them. Both sit in the `smdlisp` section, so both move — and
+the new document lives one directory deeper, in `docs/history/`, which means a
+document-relative `cl-limitations.md` becomes `../cl-limitations.md`. Fix them
+by hand and check them by hand; nothing downstream will.
 
 ### 3. Teach the verifier about the new document
 
@@ -194,10 +215,13 @@ two things and the comment should say which and why.
   convention is append-only; check its style first.
 - `docs/blog/pins.md` gains the `iteration/` heading from part 1.
 
-Do **not** touch `AGENTS.md`, `CLAUDE.md`, `checklist.md`, or
-`docs/cl-rebuild-plan.md`. The governance change — retiring the `smdlisp`
-never-edited rule, and the D22 decision record — belongs with the deletion in
-A3, where it takes effect.
+Do **not** touch `AGENTS.md`, `CLAUDE.md`, the root `checklist.md` beyond
+ticking your own A1 line, `docs/cl-rebuild-plan.md`, or either scoping note.
+The governance change splits between two other steps and neither half is
+yours: A0 already wrote decision **D32**, which retires `smdlisp`'s
+never-edited rule, and A3 executes it in the four documents that state the
+rule. Restating it here would leave three documents disagreeing for two
+steps.
 
 ### 5. Anchors
 
@@ -247,13 +271,17 @@ grep -c 'file:\.\./src/smd/smdscheme\|file:\.\./src/smd/smdlisp' docs/compiler_a
 The last must print **0**: no living link may name either dead tree.
 
 ```sh
-grep -c '\[\[file:' docs/compiler_architecture.org
-grep -c 'orgit-file:' docs/history/architecture-iterations.org
+grep -o '\[\[file:[^]:]*::' docs/compiler_architecture.org | wc -l   # expect 6
+grep -o 'orgit-file:' docs/history/architecture-iterations.org | wc -l # expect 31
+grep -c 'cl-limitations.md' docs/compiler_architecture.org \
+        docs/history/architecture-iterations.org             # expect 2 across both
 ```
 
-The two counts must sum to 39 (5 surviving in the living doc + 3 examples +
-31 moved — recount and reconcile if either number has drifted since this step
-file was written).
+Six surviving transclusions plus 31 moved is the 37 you started with. Note the
+greps count **occurrences**, not matching lines — `grep -c` counts lines and
+would give you a different and wrong answer. Reconcile rather than adjust if
+either number has drifted: a link that vanishes silently is the one failure
+this step can have that nothing downstream will catch.
 
 ## Commit and merge back
 
@@ -268,7 +296,7 @@ the point, because the cost of agents getting hung up on trees they
 must not touch outweighs every sequencing argument that put a
 replacement oracle first.
 
-compiler_architecture.org carries 39 transclusions and 31 of them
+compiler_architecture.org carries 37 transclusions and 31 of them
 point into the two trees that are about to leave trunk. The verifier
 checks that document against the worktree on purpose -- a living
 document is supposed to roll forward, and an orphaned anchor should be
@@ -295,7 +323,7 @@ git tag -a iteration/smdlisp-final   -m 'The Common Lisp pivot, final state befo
 
 ./scripts/verify-transclusions.sh   # links must resolve against the new tags
 
-git checkout retire-three-trees
+git checkout cl-retire-trees
 git merge --no-ff step-a1-freeze-iterations
 ```
 

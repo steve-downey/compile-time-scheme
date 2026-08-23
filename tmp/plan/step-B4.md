@@ -11,7 +11,7 @@ the two intertoken-space skippers.
 
 **Integration branch: `cl-parser-combinators`.**
 
-**Reserved for this step:** blog phase **41**, divergence number **DIV-0037**.
+**Reserved for this step:** blog phase **42**, divergence number **DIV-0038**.
 
 ## Phase B's standing constraints
 
