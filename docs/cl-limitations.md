@@ -144,7 +144,8 @@ These do not change any program's observable behavior; they are recorded so a la
 
 - **Blog transclusion anchors originally pointed at the authoring worktree, not `main`** ([DIV-0004](divergences/DIV-0004-orgit-transclusion-worktree-path.md), superseded).
   This was a transitional issue in how published blog posts resolved `orgit:` links against a step's own worktree before merge; it is now fully superseded by `docs/epistolary-pinning-plan.md`'s `orgit-file:` tag-pinning scheme, which resolves posts against a `blog/phase-NN` git tag instead of a filesystem path.
-  `docs/compiler_architecture.org` (this consolidation's other deliverable) is unaffected either way: it is a *living* document that transcludes via plain `file:` links resolved against the worktree, by design (see `scripts/verify-transclusions.sh`), not a pinned post.
+  `docs/compiler_architecture.org` (this consolidation's other deliverable) was not unaffected, as an earlier version of this note claimed: it did transclude `smdlisp` code, in "The Common Lisp Layer" section, via the same worktree-resolved plain `file:` links the living document still uses for its current section.
+  As of step A1 of the tree-retirement plan (`tmp/plan/`), that section moved to `docs/history/architecture-iterations.org`, pinned against the `iteration/smdlisp-final` tag taken immediately before the `smdlisp` tree left trunk — the living document keeps only the prose for `smd::cl`, the current rebuild, and its worktree-resolved `file:` links (see `scripts/verify-transclusions.sh`) now name only trees that still exist.
 
 ## Cross-reference: every divergence doc
 
