@@ -69,6 +69,7 @@ Five classes:
 | DIV-0026 | GCC trunk r16-8246 misfolds memchr-lowered `find` | `toolchain` | GCC defect; keep the predicate-search workaround in `reader/number.hpp` |
 | DIV-0027 | elaborator/evaluator diagnostics carry no source position | `scope-decision` | needs a position/span column on `tagged_tree`; reader and foundation work |
 | DIV-0028 | parser combinator layer has no `cl` client | `process` | accepted-permanent; `parser/` stays unextracted until `cl`'s reader adopts the combinator style or a fourth front end needs it |
+| DIV-0029 | superseding a ratified decision | `process` | accepted-permanent; establishes the pattern D32 (`docs/cl-language-scoping.md`) follows |
 
 There is no DIV-0005; the number was never issued.
 

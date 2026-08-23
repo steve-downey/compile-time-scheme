@@ -1,7 +1,7 @@
 # BL-0002: size the node arena from a compile-time measurement
 
-- **Status:** open — unblocked by D14, revisit during step R1 of `docs/cl-rebuild-plan.md`
-- **Date:** 2026-07-30, updated 2026-07-31
+- **Status:** closed — superseded by D14, checked 2026-08-23 against the code
+- **Date:** 2026-07-30, updated 2026-07-31, closed 2026-08-23
 - **Origin:** the question "could the array-backed bump allocator be garbage collected at compile time to minimise unused runtime space?" (2026-07-30). Investigating it produced the finding below: there is no garbage, but there is a large amount of dead *capacity*.
 - **Frozen-tree impact:** none.
 
@@ -10,11 +10,18 @@
 Decision D14 — capacity is not part of type identity — is the general form of this item.
 This document measures one symptom of the coupling; D14 removes the cause.
 
-The sequencing that follows: do **not** implement two-pass sizing on `smdlisp`.
+The sequencing that followed: do **not** implement two-pass sizing on `smdlisp`.
 Design `src/smd/cl/` so that capacity is a property of storage rather than of the types stored, which makes the measurement either unnecessary or trivial.
-Revisit this document during R1, when the substrate's storage model is being chosen, and close it if D14 makes it moot.
 
-The measurements below stay useful regardless: they are the evidence for how much the current coupling costs.
+## Closed, 2026-08-23
+
+R1 landed and nobody had revisited this item since; the question was answerable against the tree rather than deferrable again, so it was checked directly.
+`grep -rln "MaxNodes\|Capacity" src/smd/cl --include=*.hpp` outside `src/smd/cl/foundation/` returns nothing — no runtime value type in `src/smd/cl/` carries a capacity template parameter.
+`src/smd/cl/eval/value.hpp`'s `value` variant (`value_fixnum`, `value_character`, `value_symbol`, `value_string`, `value_cons`, …) is capacity-free.
+`src/smd/cl/core/ast.hpp` states the rule at the type it could have broken: `core_ast<MaxNodes, MaxChildren>` is the storage alias over `foundation::tagged_tree`, and its per-node leaf and tag types are documented as "a constant rather than a template parameter, for the same reason" (D14).
+`datum_tree<MaxNodes, MaxList>` being parameterised is not a counter-example, per the same reasoning: that is storage, which is where D14 puts capacity.
+D14 holds in the tree as built; this item's question has an answer and does not need a future revisit condition.
+The measurements below stay useful regardless: they are the evidence for how much the *old*, `smdscheme`-era coupling cost, not a live measurement of `src/smd/cl/`.
 
 ## What
 

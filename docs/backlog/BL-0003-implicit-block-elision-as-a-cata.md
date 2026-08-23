@@ -1,7 +1,7 @@
 # BL-0003: elide the implicit block by a `cata`, not by an evaluator special case
 
-- **Status:** open
-- **Date:** 2026-08-06
+- **Status:** open — R6 landed; revisit condition restated 2026-08-23 below
+- **Date:** 2026-08-06, restated 2026-08-23
 - **Origin:** phase 28 names the optimization and declines it ("Omitting the block when a body contains no `return-from` is a real optimization, it's obvious, and it isn't done"); reconsidering it against R1–R4's substrate moves it out of the evaluator entirely.
 - **Frozen-tree impact:** none.
 
@@ -77,3 +77,20 @@ Schedule it when a corpus entry or a demo program recurses deep enough that
 first time the optimization is worth more than the code it costs. Close it as
 declined if proper tail calls arrive by another route (a tail-position analysis
 in emission would subsume it, and would want the same `cata`).
+
+## Status against R6, 2026-08-23
+
+R6 landed `conformance/corpus.hpp` with 75 entries, of which the relevant ones
+are `block.1`, `block.4`, `block.8`, `return-from.1`, `return-from.unaimed`,
+`defun.1`, `defun.wrong-arity`, and the recursive-`defun` acceptance witness
+`defun.recursive` (`(+ 1 (conformance-len (cdr l)))` over a short list).
+None of them recurses anywhere near `limits::frames` (256, `src/smd/cl/eval/machine.hpp`):
+`defun.recursive` is the deepest, and it is a handful of frames on a short
+list, the same shape as R5's own acceptance witness.
+So the corpus this item wanted did land, and it did not change the answer:
+nothing in it forces the optimization yet, and the original decision criteria
+still has not fired.
+The checkable next condition therefore stays exactly the one already stated
+above — a corpus entry or demo program that reaches `limits::frames` for a
+`return-from`-free body — restated here only to record that R6's landing was
+checked and did not close it, rather than being silently skipped again.

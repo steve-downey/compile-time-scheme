@@ -1,6 +1,6 @@
 # Scoping note for adopting parser combinators
 
-- **Status:** proposal, awaiting ratification. Nothing here is authoritative yet.
+- **Status:** ratified by merge, PR #50, 2026-08-22. As provisionally as anything here — later facts and experience can override an earlier decision.
 - **Date:** 2026-08-16
 - **Precedes:** `docs/cl-language-scoping.md`, whose phase sketch this displaces to second position.
 - **Closes on landing:** DIV-0028.
@@ -163,3 +163,27 @@ That is a correction to an unratified proposal rather than to a landed decision,
 1. **This document, ratified** — D27 through D31, with D29 given a deliberate answer.
 2. **`tmp/plan/`**, the execution fan-out for P1–P10, produced alongside this note so the shape can be judged with it rather than after it. Cleared agents execute in sequence with disk handoff, per `AGENTS.md`'s step-brief contract; each step's merge criterion is `make test-matrix`, both legs.
 3. **`docs/cl-language-plan.md`** and the C-series after, unchanged in substance but second in order.
+
+---
+
+# Amendment, 2026-08-23: the phase sketch against the plan actually written
+
+§ 4 already carries one dated correction ("Corrected 2026-08-16, against the execution plan in `tmp/plan/`"), fixing the P1-creates / P10-extracts contradiction, the numbers lane, and why intertoken space is serial. That correction's P1–P10 list is left as it stands below; this is a second, later pass, found only once `tmp/plan/`'s steps were written against the code rather than against the note.
+
+**1. § 4's P1–P10 assumed the three-tree repository.** Most of what made the sketch wide was keeping two dead front ends alive. Its shape — narrow, then wide, then narrow — survives; its content does not. What was P1–P10 becomes a series following a precursor phase that retires the dead trees first (`tmp/plan/` Phase A).
+
+**2. P3 should be deleted.** "`cl` retires its duplicates; `cursor.hpp` becomes a kit shim" presupposes a duplicate, and there is no third tree left to duplicate against. `src/smd/cl/reader/cursor.hpp` includes only `<smd/cl/foundation/source_pos.hpp>` and is fully independent: nothing to reconcile, only a decision about where the one cursor lives. That is one paragraph inside the step introducing the combinator layer, not a phase of its own.
+
+**3. P1 and P2 should not exist as written.** "Kit parser core (serial)" then "kit choice and facade (serial)" builds the whole layer in two steps and first uses it in P5 or P6, maximising the guesses validated too late. The plan actually written adds one primitive at a time, each in the step with the reader function that needs it: `bind` with `read_radix_number`, `skip_many` with the intertoken skippers, choice and bounded repetition with `read_delimited`. If the layer stops growing after the third, that is a fact worth having, and the layered P1/P2 version could not have produced it.
+
+**4. There is no `parser_ops` facade, and § 4's P2 should stop promising one.** The retired `ParserApplicative`/`ParserAlternative` facade had exactly one client, `smdscheme`, which is being deleted. Rebuilding it for a layer with one consumer is R8's lesson repeated; a facade wants a second client first.
+
+**5. § 4's numbering needs replacing.** It reserves "phases 33–42 and DIV-0029 through DIV-0033" for ten steps. The plan actually written is fourteen steps: blog phases **33–46** and **DIV-0029 through DIV-0042**, one pair reserved per step up front so concurrent lanes cannot collide on the next number.
+
+**6. § 2's Gap 1 and D28 need a landed-code correction.** § 2 says "the layer has no bind," and D28 proposes adding one. Both were true of the retired `smdscheme` layer, and remain true of it — but a Monad typeclass landed in `smd::kit::foundation` (`ae3c33a`) independently of this series, with `result<T>` already registered as an instance. D28's call is still right; the mechanism is smaller than either § 2 or the plan's first cut anticipated: the step registers `parser<F>` as a second instance of a typeclass that already exists, rather than inventing `bind` from nothing.
+
+Two things in § 4 and § 5 were re-checked against the code and **hold exactly as written**, and are worth saying so because an amendment that lists only faults reads as a repudiation, which this is not: there is no numbers lane, and `scan_token`/`classify_number` stay out of scope for the whole series, because classifying a whole token *is* the mechanism by which DIV-0003 holds. And both § 5 traps are real — `many<Capacity>` stops at capacity and *succeeds* where `read_delimited` diagnoses `"too many elements"`, and `skip_block_comment` lets an unterminated `#|` run to end of input where the natural combinator fails at the comment.
+
+**One correction that is not about § 4.** § 3's D31 names `reader/oracle_compare.test.cpp`'s "SBCL differential" as part of the acceptance witness. That file was never an SBCL differential — it compared against `smdlisp`. `tmp/plan/` steps A4 and A5 build a real SBCL differential; A2 deletes the retired file. The witness D31 asks for exists after Phase A of `tmp/plan/`, and not before.
+
+**§ 6 prescribes a mechanism that no longer exists.** It says amending the language note is "a correction to an unratified proposal rather than to a landed decision, so it is a second commit on the same branch rather than a divergence record." Both scoping notes are now ratified and merged, and that branch is gone. What this project actually does instead, checkable in `docs/divergences/`: no divergence record has ever superseded a decision; the only precedent for superseding one is decision-on-decision written into a plan document — D11 retiring D1, D21 relaxing what D11 carried forward. So the mechanism is a new decision record appended to the note that owns the decision being overridden, which is exactly what D32 (`docs/cl-language-scoping.md`, amendment of 2026-08-23) does for D22. § 6's prescription is replaced by that.

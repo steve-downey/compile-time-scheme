@@ -1,6 +1,6 @@
 # Scoping note for the language plan
 
-- **Status:** proposal, awaiting ratification. Nothing here is authoritative yet.
+- **Status:** ratified by merge, PR #48, 2026-08-22. As provisionally as anything here — later facts and experience can override an earlier decision, and D32 below is the first exercise of exactly that.
 - **Date:** 2026-08-16
 - **Successor to:** `docs/cl-rebuild-plan.md`, closed by `docs/cl-rebuild-closing-note.md` at step R8.
 
@@ -181,3 +181,23 @@ Two artifacts, in order, and the second is not started until the first is ratifi
 **2. `docs/cl-language-plan.md`,** written against the ratified decisions — the successor plan proper, in the form `docs/cl-rebuild-plan.md` established: why, the decision records, what the divergences say now, test architecture, the phase list, the blog column, open questions. Plus `checklist.md` entries for its steps.
 
 **3. The execution fan-out,** produced by the `plan-fanout` skill once the phase list is fixed: a `tmp/plan/` directory of `AGENT-PROMPT.md`, `checklist.md`, `step-NN.md` files, `README.md` and `INTEGRATION-REVIEW.md`, for cleared agents to execute in sequence with disk-based handoff, per the ratified mechanism and `AGENTS.md`'s step-brief contract. Each step's merge criterion is `make test-matrix`, both legs, per `docs/verification-matrix.md`.
+
+---
+
+# Amendment, 2026-08-23: D32 overrides D22's sequencing
+
+**Note under D22 (§3):** D32 below supersedes this decision's sequencing — see D32. D22's goal survives; only the order changes.
+
+**D32 — `smdlisp` is retired to a tag before the parity phase, not as its merge criterion.**
+It supersedes D22's sequencing and leaves D22's goal intact: the C-series still closes § 1's table, it just does so without `smdlisp` in the worktree.
+`tmp/plan/` step A3 deletes `smdlisp` from trunk before the C-series' first step opens, which is a direct override of D22's ordering and earns a decision record of its own rather than arriving as a side effect of tidying up.
+
+- **The deciding reason is agent friction, and it is the owner's.** Agents keep getting hung up on not touching the dead trees and doing strategically wrong things, sometimes silently, while the trees are there to be gotten hung up on. That cost is paid continuously; D22's benefit is not.
+- **D22's oracle argument was measured before being overridden, and it was substantially right.** `conformance/corpus.hpp` holds 75 entries, and because `satisfies()` runs `evaluate_program()` they reach exactly `cl`'s seven special operators and eighteen builtins and nothing else. `smdlisp` holds roughly 120 source-in / value-out evaluated cases covering precisely the gap — `LET`, `LET*`, `SETQ`, `LAMBDA`, `FUNCALL`/`APPLY`, `DEFMACRO` and backquote, `CATCH`/`THROW`, `TAGBODY`/`GO`, `DEFVAR`/`DEFPARAMETER`, multiple values. The corpus has none of it. What D22 wanted to keep is real.
+- **But `smdlisp` supplies source programs, never expectations.** D16 says correctness comes from external authority; D22's own second limit says that where `smdlisp` pins a `defect` it is "a wrong answer by design"; D26 says a lane's entries are "derived from the specification and checked against SBCL, not written afterwards to describe what was built." Harvesting its answers would need a provenance kind meaning "our earlier implementation agreed," putting "this implementation agrees with itself" back into the one artefact R6 built to remove it. SBCL is at `/usr/bin/sbcl` and the harness already runs, so every entry would be re-adjudicated against SBCL anyway.
+- **A tag supplies those source programs losslessly and for free.** After A1, `git show iteration/smdlisp-final:.../closure/eval_direct.test.cpp` prints all 96 of its cases. Harvesting now would land ~120 entries for operators that do not elaborate — a red build, or inert data, and inert data is what the tag already is.
+- **So the harvest is deferred to its consumer, which is where D26 puts it.** Standing obligation on every C-series lane, in these words: before writing a lane's conformance entries, read the corresponding `smdlisp` test file out of `iteration/smdlisp-final` for source programs, and take every expectation from SBCL or the specification.
+
+**Provisional.** Revisit if a C-series lane finds that reading source programs out of a tag is awkward enough in practice to be worth a real harvest step for that one file. An abstraction nobody dared touch and one nobody needed to touch look identical from outside.
+
+D32 does not need `DIV-0032` confused with it: `D32` is this decision record; `DIV-0032` is `tmp/plan/step-A3.md`'s reserved divergence number, and the two are unrelated. Step A3 executes D32 and appends the dated "executed at ..." note here; this amendment writes the decision, A3 does not re-write it.
