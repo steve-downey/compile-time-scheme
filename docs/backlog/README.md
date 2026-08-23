@@ -44,7 +44,7 @@ A backlog file is where the argument goes instead, so the code stays clean and t
 | ID | Title | Status |
 | --- | --- | --- |
 | [BL-0001](BL-0001-elaborator-as-fold-fix-algebra.md) | Rewrite the elaborators as `fold_fix` algebras | landed — R1 deleted `fold_fix`, R3 shipped the schemes, R4 the elaborator |
-| [BL-0002](BL-0002-compile-time-arena-sizing.md) | Size the node arena from a compile-time measurement | open — unblocked by D14, revisit in R1 |
-| [BL-0003](BL-0003-implicit-block-elision-as-a-cata.md) | Elide a `defun`'s implicit block by a `cata`, not an evaluator case | open — wants R6's corpus first |
-| [BL-0004](BL-0004-retire-the-cl-foundation-forwarding-shims.md) | Retire the seventeen `cl/foundation` forwarding shims left by R8 | open — for removal, but not while the kit boundary could still move |
+| [BL-0002](BL-0002-compile-time-arena-sizing.md) | Size the node arena from a compile-time measurement | closed — superseded by D14, checked 2026-08-23 |
+| [BL-0003](BL-0003-implicit-block-elision-as-a-cata.md) | Elide a `defun`'s implicit block by a `cata`, not an evaluator case | open — R6 landed and did not force it; revisit condition restated 2026-08-23 |
+| [BL-0004](BL-0004-retire-the-cl-foundation-forwarding-shims.md) | Retire the eighteen `cl/foundation` forwarding shims left by R8 and the Monad typeclass | open — for removal, but not while the kit boundary could still move |
 | [BL-0005](BL-0005-export-live-trees-and-turn-testinstall-green.md) | Export `kit` and `cl`, re-point `installtest/`, turn `make testinstall` green | open — postponed out of the combinator plan; `testinstall` stays red meanwhile |

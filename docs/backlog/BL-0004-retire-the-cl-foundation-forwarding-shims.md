@@ -1,29 +1,29 @@
 # BL-0004: retire the `cl/foundation` forwarding shims
 
 - **Status:** open — scheduled for removal in principle, deliberately not yet
-- **Date:** 2026-08-16
-- **Origin:** step R8 (`bd3d884`), which extracted `smd::kit::foundation` and left seventeen forwarding headers behind so that no caller had to change. Owner's direction on the day R8 landed: schedule the removal now that the extraction is confirmed working, but leave the shims in place while there is still room for regrets.
-- **Frozen-tree impact:** none. The shims are `src/smd/cl/foundation/**`, which is the live tree. `src/smd/smdscheme/**` keeps its own independent copies and is not a client of the kit; `src/smd/smdlisp/**` depends on `smdscheme.foundation` and is unaffected.
+- **Date:** 2026-08-16, corrected 2026-08-23
+- **Origin:** step R8 (`bd3d884`), which extracted `smd::kit::foundation` and left eighteen forwarding headers behind so that no caller had to change. Owner's direction on the day R8 landed: schedule the removal now that the extraction is confirmed working, but leave the shims in place while there is still room for regrets.
+- **Frozen-tree impact:** scheduled to change at step A3. Today: the shims are `src/smd/cl/foundation/**`, which is the live tree; `src/smd/smdscheme/**` keeps its own independent copies and is not a client of the kit; `src/smd/smdlisp/**` depends on `smdscheme.foundation` and is unaffected. `tmp/plan/` step A3 deletes both trees from trunk, after which neither clause means anything — the shims' only remaining context is where the kit boundary sits, which is the actual question this item turns on.
 
 ## What
 
-Delete the seventeen forwarding headers in `src/smd/cl/foundation/` that
+Delete the eighteen forwarding headers in `src/smd/cl/foundation/` that
 re-export `smd::kit::foundation` names, and repoint every `cl` caller at
 `<smd/kit/foundation/…>` directly.
 
 The shims are: `static_vector`, `result`, `parse_error`, `source_pos`,
 `source_span`, `arena_box`, `functor`, `applicative`, `alternative`,
 `foldable`, `traversable`, `monoid`, `identity`, `fold_left_short`,
-`trampoline`, `result_instances`, `static_vector_instances`.
+`trampoline`, `result_instances`, `static_vector_instances`, and `monad`.
 
-Eighteen since the Monad typeclass landed: `monad` forwards
-`smd::kit::foundation::monad`, `monad_typeclass` and the `bind`/`join`
-CPOs. It is the one shim that never had a `cl`-side definition to forward
-from — the typeclass was written in the kit directly, because `result` and
-its other typeclasses were already there — so it exists purely so that
-`cl` code spells its includes the way the rest of `cl` does. That makes it
-the cheapest of the eighteen to retire and the least informative about
-whether the kit boundary has settled.
+`monad` is the eighteenth, added once the Monad typeclass landed in the kit
+independently of this item. It forwards `smd::kit::foundation::monad`,
+`monad_typeclass` and the `bind`/`join` CPOs, and it is the one shim that
+never had a `cl`-side definition to forward from — the typeclass was written
+in the kit directly, because `result` and its other typeclasses were already
+there — so it exists purely so that `cl` code spells its includes the way the
+rest of `cl` does. That makes it the cheapest of the eighteen to retire and
+the least informative about whether the kit boundary has settled.
 
 Staying in `src/smd/cl/foundation/` as real files, not shims:
 `node_f`, `topo_fold`, `tagged_tree`, `tagged_tree_instances`,
@@ -39,9 +39,10 @@ not `cl.foundation`, so a text grep understates the affected set.
 ## Why it is not done
 
 R8 chose shims so that the extraction was invisible to every caller,
-which made a seventeen-file move verifiable as a refactor: if nothing
-outside `src/smd/cl/foundation/` changed and the suite still passed at
-1118 tests on both matrix legs, the move was behaviour-preserving. That
+which made the move verifiable as a refactor: if nothing outside
+`src/smd/cl/foundation/` changed and the suite still passed at 1118
+tests on both matrix legs, the move was behaviour-preserving — a count
+now eighteen shims, one more than R8 itself moved (see "Evidence"). That
 was the right call for landing it.
 
 It is not the right end state. Every kit type now has two spellings, and
@@ -53,9 +54,13 @@ real use, they are pure cost.
 
 ## Evidence
 
-- Seventeen shim headers, verified by `ls src/smd/cl/foundation/*.hpp`
-  against the kit's contents at `19c8702`: 22 headers in
-  `cl/foundation`, of which 5 are the AST group and 17 forward.
+- Eighteen shim headers today, verified by
+  `grep -l 'Forwarding shim' src/smd/cl/foundation/*.hpp | wc -l`.
+  R8 itself landed 17 of them, verified by `ls src/smd/cl/foundation/*.hpp`
+  against the kit's contents at `19c8702`: 22 headers in `cl/foundation`,
+  of which 5 are the AST group and 17 forward. The eighteenth, `monad.hpp`,
+  arrived independently once the Monad typeclass landed in the kit
+  (`ae3c33a`) — see "What" above.
 - The extraction touched no file outside `src/smd/kit/`,
   `src/smd/cl/foundation/`, the docs, `checklist.md` and two
   `CMakeLists.txt` — confirmed from `git show --stat bd3d884`. That is
@@ -81,7 +86,7 @@ real use, they are pure cost.
 ## Cost and risk
 
 Mechanical and wide: an include-path rewrite across six `cl` areas plus
-a `CMakeLists.txt` link-line audit, followed by deleting seventeen files.
+a `CMakeLists.txt` link-line audit, followed by deleting eighteen files.
 No semantics change, so `make test-matrix` on both legs is the whole
 verification, and `make compile-headers` catches any header that was
 relying on a shim for transitive includes — which is the one real risk,

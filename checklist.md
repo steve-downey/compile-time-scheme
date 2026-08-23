@@ -95,7 +95,7 @@
 ## Common Lisp rebuild (docs/cl-rebuild-plan.md)
 
 Supersedes the pivot's decision set with D11–D17.
-`src/smd/smdlisp/**` is frozen as a behavioural oracle from R1 onward and is never edited.
+`src/smd/smdlisp/**` is frozen as a behavioural oracle from R1 onward and is never edited — decision D32 (`docs/cl-language-scoping.md`) retires that rule at step A3 of the plan added below, but the rule holds until then.
 
 Every phase ships a blog post as a deliverable (D20), drafted by an agent that did not do the work and reviewed by a clean agent running the `voice` skill.
 R0–R4 landed before that was recorded; `docs/history/blog-backfill-plan.md` covers the arrears as steps B5–B11.
@@ -109,7 +109,7 @@ R0–R4 landed before that was recorded; `docs/history/blog-backfill-plan.md` co
 - [x] No step: the two invariants of a `tagged_tree`, and `from_nodes`' unchecked precondition — a reconsideration of phase 28's Mendler argument, `is_children_before_parent` and three asserts (+ phase 29)
 - [x] Step R6: conformance corpus and differential oracle (D16) (brief: `step-brief-r6.md`) (+ phase 30)
 - [x] Step R7: sender backend (D17) (+ phase 31)
-- [x] Step R8: extract the kit — `smd::kit::foundation` (seventeen `foundation/` files; `parser/` has no `cl` client, DIV-0028) (+ phase 32)
+- [x] Step R8: extract the kit — `smd::kit::foundation` (R8 moved seventeen `foundation/` files; eighteen forwarding shims now, since `monad.hpp` landed; `parser/` has no `cl` client, DIV-0028) (+ phase 32)
 
 ## Blog backfill (docs/history/blog-backfill-plan.md)
 
@@ -123,3 +123,25 @@ B6–B10 are independent of each other and depend only on B5.
 - [x] Step B9: blog phase 26 — R3, reader and core AST
 - [x] Step B10: blog phase 27 — R4, elaboration as three schemes
 - [x] Step B11: `docs/blog/index.org` entries, `docs/blog/pins.md` rows and third-era note, `make blog-md` and transclusion verification green
+
+## Plan reconciliation and reader combinators (tmp/plan/)
+
+Executed as a `tmp/plan/` fan-out rather than hand-driven, per `tmp/plan/checklist.md`.
+Phase 0 (A0) merges to `main` directly.
+Phase A (A1–A5) merges to integration branch `cl-retire-trees`, created off `main` after A0.
+Phase B (B1–B8) merges to integration branch `cl-parser-combinators`, created off `main` after Phase A's gate.
+
+- [x] Step A0: rebase the record against reality — the root checklist, decision D32, three backlog items, and a dated amendment to each scoping note
+- [ ] Step A1: freeze both iterations as tags; move their architecture prose to a pinned history doc
+- [ ] Step A2: neutralise the dead trees' build consumers (examples, install test, export list)
+- [ ] Step A3: delete `smdscheme` and `smdlisp` from trunk, executing D32
+- [ ] Step A4: a `prin1`-shaped printer for `cl` datums, proved against SBCL in the same step
+- [ ] Step A5: broaden the SBCL reader differential into a real corpus
+- [ ] Step B1: split `read.hpp` into component headers plus an umbrella (mechanical, zero behavioural diff)
+- [ ] Step B2: `smd::kit::parser`: a Monad instance over a context-threaded parser, with `read_radix_number` as its first client
+- [ ] Step B3: intertoken space and comments onto the layer
+- [ ] Step B4: choice and bounded repetition; `read_delimited` onto the combinator layer
+- [ ] Step B5: text: strings and character literals
+- [ ] Step B6: forms: the quote family and token data
+- [ ] Step B7: sharpsign dispatch and `read_node`
+- [ ] Step B8: integration: the D30 measurement, DIV-0028 dissolved, architecture section, project checklist
