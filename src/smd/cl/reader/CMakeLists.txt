@@ -28,14 +28,13 @@ if(SCHEMEPOC_ENABLE_TESTING)
             cursor.test.cpp
             datum.test.cpp
             number.test.cpp
-            oracle_compare.test.cpp
             read.test.cpp
             readtable.test.cpp
             token.test.cpp
     )
     target_link_libraries(
         cl_reader_test
-        PRIVATE cl.reader smdlisp.reader Catch2::Catch2WithMain
+        PRIVATE cl.reader Catch2::Catch2WithMain
     )
 
     include(Catch)

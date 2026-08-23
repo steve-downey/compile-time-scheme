@@ -133,7 +133,7 @@ Phase B (B1–B8) merges to integration branch `cl-parser-combinators`, created 
 
 - [x] Step A0: rebase the record against reality — the root checklist, decision D32, three backlog items, and a dated amendment to each scoping note
 - [x] Step A1: freeze both iterations as tags; move their architecture prose to a pinned history doc
-- [ ] Step A2: neutralise the dead trees' build consumers (examples, install test, export list)
+- [x] Step A2: neutralise the dead trees' build consumers (examples, install test, export list)
 - [ ] Step A3: delete `smdscheme` and `smdlisp` from trunk, executing D32
 - [ ] Step A4: a `prin1`-shaped printer for `cl` datums, proved against SBCL in the same step
 - [ ] Step A5: broaden the SBCL reader differential into a real corpus
