@@ -245,4 +245,3 @@ The second shows the Foreign Function Interface: an ordinary C++ function reacha
 ** Limitations
 
 This section states what the Common Lisp layer *is*; it deliberately does not restate everything it is not. [[file:../cl-limitations.md][=docs/cl-limitations.md=]] is the single consolidated record of every ANSI Common Lisp divergence across the reader, the evaluation model, control flow, macros, multiple values, the sender backend, and build/constexpr limits -- consult it rather than this section for the full, itemized list.
-
