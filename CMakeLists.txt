@@ -58,20 +58,7 @@ install(
     COMPONENT schemepoc.schemepoc_Development
 )
 
-beman_install_library(
-    schemepoc.schemepoc
-    TARGETS
-        smdscheme.smdscheme
-        smdscheme.sender
-        smdscheme.reflection
-        smdscheme.closure
-        smdscheme.elaborator
-        smdscheme.reader
-        smdscheme.parser
-        smdscheme.foundation
-        smd.fixpoint
-    NAMESPACE smd::
-)
+beman_install_library(schemepoc.schemepoc TARGETS smd.fixpoint NAMESPACE smd::)
 
 # Coverage
 configure_file("cmake/gcovr.cfg.in" gcovr.cfg @ONLY)
