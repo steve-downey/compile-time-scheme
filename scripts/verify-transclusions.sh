@@ -6,11 +6,13 @@
 #
 # Two document categories, two policies (docs/epistolary-pinning-plan.md):
 #
-#   posts   docs/blog/phase-*.org transclude via `orgit-file:' links pinned to
-#           a `blog/phase-NN' tag. Checked against that tag's tree, NOT the
-#           worktree -- a post's code is frozen at the revision its prose was
+#   posts   docs/blog/phase-*.org, plus docs/history/architecture-iterations.org,
+#           transclude via `orgit-file:' links pinned to a tag -- `blog/phase-NN'
+#           for a post, `iteration/<tree>-final' for the retired-iteration
+#           history doc. Checked against that tag's tree, NOT the worktree -- a
+#           pinned document's code is frozen at the revision its prose was
 #           written against, so later refactors may freely move or delete
-#           anchors without owing the published past anything.
+#           anchors without owing the pinned past anything.
 #
 #   living  docs/compiler_architecture.org transcludes via `file:' links and is
 #           SUPPOSED to roll forward. Checked against the worktree, so a rename
@@ -36,7 +38,11 @@ cd "${repo_root}"
 # The globs exist so the failure paths can be exercised against throwaway
 # fixtures without editing a real post; revisions and paths are still resolved
 # against this repository. Defaults are the real documents.
-posts_glob="${1:-docs/blog/phase-*.org}"
+if [[ -n "${1:-}" ]]; then
+    posts_globs=("$1")
+else
+    posts_globs=('docs/blog/phase-*.org' 'docs/history/architecture-iterations.org')
+fi
 living_glob="${2:-docs/compiler_architecture.org}"
 if [[ -n "${3:-}" ]]; then
     md_globs=("$3")
@@ -90,12 +96,15 @@ check_region() {
     checked=$((checked + 1))
 }
 
-echo "== posts: pinned transclusions (resolved against their blog/phase-NN tag) =="
-for post in ${posts_glob}; do
-    [[ -e "${post}" ]] || { fail "no posts matched ${posts_glob}"; break; }
-    # Reject any worktree-form link left in a post: it would roll forward.
+echo "== posts: pinned transclusions (resolved against their own pin tag) =="
+# posts_globs holds glob patterns, not filenames, so the expansion below is
+# deliberately unquoted, matching md_globs's idiom.
+# shellcheck disable=SC2048
+for post in ${posts_globs[*]}; do
+    [[ -e "${post}" ]] || { fail "no posts matched ${posts_globs[*]}"; break; }
+    # Reject any worktree-form link left in a pinned document: it would roll forward.
     if grep -q '\[\[orgit:' "${post}"; then
-        fail "${post}: worktree-form [[orgit:...]] link in a post; posts must pin via orgit-file:"
+        fail "${post}: worktree-form [[orgit:...]] link in a pinned document; it must pin via orgit-file:"
     fi
     while IFS= read -r link; do
         # link is orgit-file:REPO:REV:PATH:UUID once "::" is squashed to ":"
