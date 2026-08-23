@@ -48,7 +48,7 @@ The thesis of the pivot: **Common Lisp's control operators are the largest contr
 > **This is an orchestrator/design document. Step worker agents do NOT read it.**
 > It carries the dependency DAG and per-step specifications the orchestrator draws
 > from when dispatching a worker; the worker's own runtime reading contract lives in
-> `AGENTS.md`. (`docs/schemepoc-plan.md` is the superseded pre-pivot plan, historical
+> `AGENTS.md`. (`docs/history/schemepoc-plan.md` is the superseded pre-pivot plan, historical
 > only; `docs/history/handoff-archive.md` is the retired cumulative handoff log.)
 
 A worker agent reads a bounded, three-tier set — nothing that grows per step:
@@ -218,7 +218,7 @@ What the existing implementation contributes, by disposition.
 
 ## Untouched historical record
 
-- `src/smd/smdscheme/**` (frozen per D1), blog phases 0–13, `docs/schemepoc-plan.md`, `docs/cps-direction.md`, existing checklist history.
+- `src/smd/smdscheme/**` (frozen per D1), blog phases 0–13, `docs/history/schemepoc-plan.md`, `docs/cps-direction.md`, existing checklist history.
 
 ---
 
@@ -640,7 +640,7 @@ Read only your bounded reading set — nothing that grows per step:
   Tier 1 (rules pack): docs/codestyle.org, AGENTS.md, docs/CODING_RULES.md, CLAUDE.md
   Tier 2 (this step):  your lane's step-brief-<lane>.md, checklist.md
 Then read the step section pasted below (the orchestrator pastes it; do not open the full plan).
-Do NOT read docs/history/handoff-archive.md, docs/schemepoc-plan.md, or the full plan front to back.
+Do NOT read docs/history/handoff-archive.md, docs/history/schemepoc-plan.md, or the full plan front to back.
 Consult docs/compiler_architecture.org only by the anchor your step brief names. If you need a
 fact you do not have, that is a defect in your step brief — report it; do not go spelunking.
 

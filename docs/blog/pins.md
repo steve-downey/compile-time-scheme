@@ -52,7 +52,7 @@ and `sender_eval.hpp`'s `core_cons`/`when_all` arm.
 
 Phases 23–27 describe steps R0–R4, which merged without posts because the rebuild plan's
 phase list carried no blog deliverable. Decision D20 repaired that, and
-`docs/blog-backfill-plan.md` covers the arrears.
+`docs/history/blog-backfill-plan.md` covers the arrears.
 
 These five are retrospective like posts 5–12, but their pins are constructed rather than
 found, and the construction is the point. The rebuild tree carried **no UUID anchors at

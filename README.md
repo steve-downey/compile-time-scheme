@@ -100,7 +100,7 @@ make lint     # run pre-commit linters (clang-format, cmake, codespell, etc.)
 
 The `docs/` folder contains deeply explored architectural documentation explaining how the compiler transitions concepts across boundaries natively:
 - `docs/compiler_architecture.org`: Describes the phases from Parser through Closure Materialization.
-- `docs/schemepoc-plan.md`: The initial roadmap detailing the 34 chronological steps used to achieve this repository state.
+- `docs/history/schemepoc-plan.md`: The initial roadmap detailing the 34 chronological steps used to achieve this repository state.
 - `docs/Compile-Time Scheme-Light in C++26.md`: Preliminary research documentation that sets out the guiding philosophy of the project combining CPS, applicator parsers, and execution layers in C++26.
 - `docs/constexpr-allocations.md`: Details how `constexpr_box` and Arena identifiers resolve standard `std::vector` leaks at C++ boundaries.
 

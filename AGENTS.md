@@ -20,7 +20,7 @@ full plan re-read on every turn.
    `docs/compiler_architecture.org` (durable cross-step facts, by UUID anchor);
    `docs/cl-pivot-plan.md` (the active-plan dependency DAG — the orchestrator pastes
    the one step section a worker needs; workers do not open the full plan;
-   `docs/schemepoc-plan.md` is the superseded pre-pivot plan, historical only);
+   `docs/history/schemepoc-plan.md` is the superseded pre-pivot plan, historical only);
    `git log` / `docs/history/handoff-archive.md` (retired cumulative log — archival,
    not a read path).
 

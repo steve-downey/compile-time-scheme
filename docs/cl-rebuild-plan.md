@@ -373,7 +373,7 @@ What follows is only the per-phase sequence, which D20 fixes.
 An anchored region must exist at the commit its post pins to, and the post pins to the step's merge, so the anchors have to arrive with the code.
 The implementer is also the one who knows which regions are the step's centre.
 Anchors are real `uuidgen` output; the step brief records which regions got them; the set must leave `scripts/verify-transclusions.sh` green at the merge (D21, which retired the older rule that an existing pair is never deleted or nested).
-A step that lands no anchors leaves its post nothing to transclude, which is how R1–R4 ended up needing the backfill in `docs/blog-backfill-plan.md`.
+A step that lands no anchors leaves its post nothing to transclude, which is how R1–R4 ended up needing the backfill in `docs/history/blog-backfill-plan.md`.
 
 **2. The orchestrator tags the `--no-ff` merge, before dispatching anyone.**
 

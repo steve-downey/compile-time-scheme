@@ -98,7 +98,7 @@ Supersedes the pivot's decision set with D11–D17.
 `src/smd/smdlisp/**` is frozen as a behavioural oracle from R1 onward and is never edited.
 
 Every phase ships a blog post as a deliverable (D20), drafted by an agent that did not do the work and reviewed by a clean agent running the `voice` skill.
-R0–R4 landed before that was recorded; `docs/blog-backfill-plan.md` covers the arrears as steps B5–B11.
+R0–R4 landed before that was recorded; `docs/history/blog-backfill-plan.md` covers the arrears as steps B5–B11.
 
 - [x] Step R0: decisions, divergence classification, plan
 - [x] Step R1: substrate — `src/smd/cl/foundation`, short-circuiting fold, topological folds, typeclass instances, law tests, the test matrix
@@ -111,7 +111,7 @@ R0–R4 landed before that was recorded; `docs/blog-backfill-plan.md` covers the
 - [x] Step R7: sender backend (D17) (+ phase 31)
 - [x] Step R8: extract the kit — `smd::kit::foundation` (seventeen `foundation/` files; `parser/` has no `cl` client, DIV-0028) (+ phase 32)
 
-## Blog backfill (docs/blog-backfill-plan.md)
+## Blog backfill (docs/history/blog-backfill-plan.md)
 
 Phases 23–27, for steps R0–R4, which landed without posts.
 B6–B10 are independent of each other and depend only on B5.
