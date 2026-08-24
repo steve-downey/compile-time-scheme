@@ -15,7 +15,8 @@
 ## What
 
 Three things, done together because they are one deliverable (an installable,
-install-tested live package) even though only the third is currently red:
+install-tested live package). Note that **none** of them is red any more, and
+that is the problem rather than progress — see "Why it is not done":
 
 1. **A new example**, `src/examples/godbolt_cl.cpp`, replacing the eleven
    `smdscheme`/`smdlisp` examples the deletion step removed outright (it did
@@ -54,12 +55,23 @@ install-tested live package) even though only the third is currently red:
 
 ## Why it is not done
 
-`make testinstall` is already red on `main`, independent of this plan:
+`make testinstall` was red on `main` before the tree-retirement plan ran,
+independent of that plan:
 
 ```
 .install/include/smd/smdscheme/closure/cps_code.hpp:6:10:
     fatal error: smd/smdscheme/closure/pairs.hpp: No such file or directory
 ```
+
+**That failure is gone, and it did not get fixed.** Step A2 shrank the
+top-level export list to `smd.fixpoint` alone and deleted the six install
+tests; step A3 deleted the header the error names. `make testinstall` now
+exits **0** — it configures against a package that no longer claims a
+`smd::smdscheme` target, finds nothing to link, and passes with **zero
+installed tests**. A red signal became a green one by having nothing left to
+check, which is strictly worse than the failure it replaced: the failure was
+visible, and this is not. Anyone reading a green `make testinstall` between
+now and this item being scheduled is reading a vacuous truth.
 
 `pairs.hpp` was never added to `smdscheme.closure`'s installed `FILE_SET`, so
 the installed package has been unusable for as long as nobody ran the check.
