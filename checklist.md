@@ -136,7 +136,7 @@ Phase B (B1–B8) merges to integration branch `cl-parser-combinators`, created 
 - [x] Step A2: neutralise the dead trees' build consumers (examples, install test, export list)
 - [x] Step A3: delete `smdscheme` and `smdlisp` from trunk, executing D32
 - [x] Step A4: a `prin1`-shaped printer for `cl` datums, proved against SBCL in the same step
-- [ ] Step A5: broaden the SBCL reader differential into a real corpus
+- [x] Step A5: broaden the SBCL reader differential into a real corpus
 - [ ] Step B1: split `read.hpp` into component headers plus an umbrella (mechanical, zero behavioural diff)
 - [ ] Step B2: `smd::kit::parser`: a Monad instance over a context-threaded parser, with `read_radix_number` as its first client
 - [ ] Step B3: intertoken space and comments onto the layer
