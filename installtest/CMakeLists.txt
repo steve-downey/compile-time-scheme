@@ -15,20 +15,9 @@ find_package(
     NO_DEFAULT_PATH
 )
 
-# Helper to register an installtest executable.
-# All tests link to smd::smdscheme so they transitively pick up the
-# -freflection flag and the full sub-library include tree.
-function(add_installtest name src)
-    add_executable(${name} ${src})
-    target_link_libraries(${name} PRIVATE smd::smdscheme)
-    add_test(NAME ${name} COMMAND ${name})
-endfunction()
-
-add_installtest(test_smdscheme test.cpp)
-add_installtest(test_foundation test_foundation.cpp)
-add_installtest(test_reader test_reader.cpp)
-add_installtest(test_elaborator test_elaborator.cpp)
-add_installtest(test_closure test_closure.cpp)
-add_installtest(test_sender test_sender.cpp)
+# The add_installtest helper and its six calls used to live here, all
+# linking against the now-dead-ended reader tree (A3 removes it). Install-test
+# coverage against kit::foundation/cl.* is real, positive work, tracked as
+# docs/backlog/BL-0005-export-live-trees-and-turn-testinstall-green.md.
 
 set(CMAKE_SKIP_TEST_ALL_DEPENDENCY FALSE)

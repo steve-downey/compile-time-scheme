@@ -205,3 +205,23 @@ would be the bug, not the fix. The L3 rule stays useful only for
 against the worktree. A third encoding of a `&mdash;`-style HTML entity or an
 `#orgXXXXXXX` id may still differ run to run (see above); that is export churn,
 not drift, and is not worth committing.
+
+## `iteration/*` tags: a second tag family, deliberately not `blog/phase-*`
+
+Step A1 of the tree-retirement plan (`tmp/plan/`) introduced `iteration/smdscheme-final`
+and `iteration/smdlisp-final`, annotated tags naming the last commit at which
+`src/smd/smdscheme/` and `src/smd/smdlisp/` respectively still existed in trunk,
+created immediately before each tree's deletion.
+
+These are not blog pins and must not sort among `blog/phase-*`: no post is
+written against either tag, and neither names a step in the blog series. What
+they pin instead is `docs/history/architecture-iterations.org`, the document
+that took over Phases 1 through 7 and "The Common Lisp Layer" when those
+sections moved out of `docs/compiler_architecture.org` at the same step, for the
+same reason a blog post pins — the prose describes code that no longer rolls
+forward, so its transclusions must stop resolving against the worktree before
+the worktree stops having that code at all. `scripts/verify-transclusions.sh`
+checks this document in the same pinned-transclusion category as the blog
+posts, alongside `docs/blog/phase-*.org`, even though it lives under
+`docs/history/` and follows the `iteration/*` tag family rather than
+`blog/phase-*`.

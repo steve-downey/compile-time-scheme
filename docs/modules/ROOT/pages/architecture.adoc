@@ -1,5 +1,5 @@
 = Architecture
-:description: Pipeline stages and design rationale for smd.schemepoc.
+:description: Pipeline stages and design rationale for smd.cl.
 :sectanchors:
 :navtitle: Architecture
 
@@ -7,64 +7,63 @@
 
 === Reader
 
-The reader (`smd::smdscheme::reader`) parses Scheme source text into a
-datum tree using a combinator parser.  It does not classify special forms —
-all lists are initially treated as data.
+The reader (`smd::cl::reader`) parses Common Lisp source text into a datum
+tree.  It parses data only and does not classify special forms — all lists
+are initially treated as data.
 
-Source: `src/smd/smdscheme/reader/`
+Source: `src/smd/cl/reader/`
+
+=== Core
+
+The core AST (`smd::cl::core`) is the typed tree the elaborator produces
+and the evaluator consumes: `core_if`, `core_lambda`, `core_progn`, and the
+rest of the elaborated special-operator set, plus `core_call` for
+everything else.
+
+Source: `src/smd/cl/core/`
 
 === Elaborator
 
-The elaborator (`smd::smdscheme::elaborator`) walks the datum tree and
-classifies special forms (`if`, `lambda`, `define`, `quote`) into a typed
-core AST.  Applications of unknown head symbols become `core_application`.
+The elaborator (`smd::cl::elaborator`) walks the datum tree and classifies
+Common Lisp's special operators into the core AST.  This is the layer that
+knows the language; the reader upstream of it does not.
 
-Source: `src/smd/smdscheme/elaborator/`
+Source: `src/smd/cl/elaborator/`
 
-=== Closure Backend
+=== Eval
 
-The closure backend (`smd::smdscheme::closure`) provides two evaluators:
+The evaluator (`smd::cl::eval`) is a small-step machine, not a recursive
+tree-walker: `machine::step` is the coalgebra, `step_status` says whether a
+state is final, and a frame stack folds results back as it pops.  `builtin`,
+`environment`, `heap`, `outcome`, and `value` are the machine's supporting
+types.
 
-* `eval_direct` — a direct tree-walking interpreter.
-* `cps_code` / `compile_cps` — a CPS-transformed evaluator.
-
-Both share the `value`, `env`, and `closure` types.  The `closure_program`
-type wraps a compiled CPS expression into a callable object.
-
-Source: `src/smd/smdscheme/closure/`
+Source: `src/smd/cl/eval/`
 
 === Sender Backend
 
-The sender backend (`smd::smdscheme::sender`) evaluates expressions via
-Beman Execution26 senders (`just`, `then`, `when_all`).  This makes the
-execution plan a first-class sender graph that can be reflected and rendered.
+The sender backend (`smd::cl::sender`) evaluates programs via Beman
+Execution senders (`sender_v`'s vocabulary aliases, `machine_sender`,
+`run_sender`), making the execution plan a first-class sender graph.
 
-Source: `src/smd/smdscheme/sender/`
+Source: `src/smd/cl/sender/`
 
-=== Reflection Spike
+== Symbol
 
-The reflection module (`smd::smdscheme::reflection`) uses P2996 compile-time
-reflection (GCC16, `<meta>`) to reify closure environments as concrete
-aggregate types.
+The symbol table (`smd::cl::symbol`) interns names into stable
+`symbol_id`s (decision D12); identity is id comparison, not string
+comparison, and a symbol carries a value slot, a function slot, and a
+macro slot.
 
-Source: `src/smd/smdscheme/reflection/`
+Source: `src/smd/cl/symbol/`
 
 == Foundation
 
-All stages share the `smd::smdscheme::foundation` utilities:
+The pipeline stages share two layers of foundation utilities.
+`smd::kit::foundation` is the language-agnostic substrate extracted in step
+R8 (`static_vector<T, N>`, `arena_box<T>`, `result<T>`, the `functor` /
+`applicative` / `monad` typeclass objects); `smd::cl::foundation` adds what
+is specific to this front end, forwarding to `kit` wherever the two share a
+type.
 
-* `static_vector<T, N>` — fixed-capacity vector for constexpr contexts.
-* `arena_box<T>` / `tree_arena<T>` — arena allocator for tree nodes.
-* `fix<F>` — fixed-point type for recursive data.
-* `result<T>` — error-propagation type (value or `parse_error`).
-* `functor`, `applicative`, `alternative` — typeclass CRTP bases and CPOs.
-
-Source: `src/smd/smdscheme/foundation/`
-
-== Parser
-
-The parser layer (`smd::smdscheme::parser`) provides monadic combinators:
-`satisfy`, `char_p`, `map`, `lift2`, `sequence_left/right`, `alt`, `many`,
-`some`, `optional`, `lexeme`.  All parsers are `constexpr`.
-
-Source: `src/smd/smdscheme/parser/`
+Source: `src/smd/kit/foundation/` and `src/smd/cl/foundation/`

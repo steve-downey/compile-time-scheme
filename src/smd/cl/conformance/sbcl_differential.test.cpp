@@ -14,6 +14,17 @@
 // than fail when `sbcl` is not on `PATH` — an environment without SBCL
 // installed stays green, because a missing oracle is a fact about the
 // environment, not a defect in this project.
+//
+// Correction (A5, docs/divergences/DIV-0034): despite the name and the
+// paragraph above, `check_against_sbcl` here compares SBCL's output
+// against `expected_sbcl_text(c)` — the corpus's own hand-transcribed
+// expectation string — and never calls `evaluate_program` or any other
+// `cl` entry point. What this file validates is the corpus, not `cl`
+// against SBCL. The reader-layer differential the name promises lives in
+// `conformance/reader_differential.test.cpp` (A4, broadened A5); the
+// evaluator layer still has only this corpus check. See DIV-0034 for why
+// the name outran the code: this file predates `smd::cl::printer`, so
+// comparing `cl`'s own output was not available when it was written.
 
 #include <smd/cl/conformance/sbcl_oracle.hpp>
 #include <smd/cl/conformance/sbcl_oracle.hpp> // test 2nd include OK

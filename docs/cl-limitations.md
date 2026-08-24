@@ -144,9 +144,17 @@ These do not change any program's observable behavior; they are recorded so a la
 
 - **Blog transclusion anchors originally pointed at the authoring worktree, not `main`** ([DIV-0004](divergences/DIV-0004-orgit-transclusion-worktree-path.md), superseded).
   This was a transitional issue in how published blog posts resolved `orgit:` links against a step's own worktree before merge; it is now fully superseded by `docs/epistolary-pinning-plan.md`'s `orgit-file:` tag-pinning scheme, which resolves posts against a `blog/phase-NN` git tag instead of a filesystem path.
-  `docs/compiler_architecture.org` (this consolidation's other deliverable) is unaffected either way: it is a *living* document that transcludes via plain `file:` links resolved against the worktree, by design (see `scripts/verify-transclusions.sh`), not a pinned post.
+  `docs/compiler_architecture.org` (this consolidation's other deliverable) was not unaffected, as an earlier version of this note claimed: it did transclude `smdlisp` code, in "The Common Lisp Layer" section, via the same worktree-resolved plain `file:` links the living document still uses for its current section.
+  As of step A1 of the tree-retirement plan (`tmp/plan/`), that section moved to `docs/history/architecture-iterations.org`, pinned against the `iteration/smdlisp-final` tag taken immediately before the `smdlisp` tree left trunk — the living document keeps only the prose for `smd::cl`, the current rebuild, and its worktree-resolved `file:` links (see `scripts/verify-transclusions.sh`) now name only trees that still exist.
 
 ## Cross-reference: every divergence doc
 
 Every file under `docs/divergences/DIV-*.md` is referenced above, organized by theme rather than by number: DIV-0001, DIV-0002, DIV-0003, DIV-0004, DIV-0006, DIV-0007, DIV-0008, DIV-0009, DIV-0010, DIV-0011, DIV-0012, DIV-0013, DIV-0014, DIV-0015, DIV-0016, DIV-0017, DIV-0018, DIV-0019, DIV-0020, and DIV-0021.
 DIV-0005 does not exist (a gap in the numbering, not a missing reference); the sequence goes directly from DIV-0004 to DIV-0006.
+
+## Dated note, 2026-08-23: `smd::smdlisp` deleted from trunk (D32, step A3)
+
+This document's subject, `src/smd/smdlisp/**`, was deleted from trunk at step A3 of the tree-retirement plan (`tmp/plan/checklist.md`), executing decision D32 (`docs/cl-language-scoping.md`).
+Every entry above still describes real, checkable behaviour: the tree is frozen at the annotated tag `iteration/smdlisp-final` (`git show iteration/smdlisp-final:<path>`), unchanged from what these entries were written against.
+This document is not superseded and is not rewritten for the deletion — it stays the historical divergence record for the pivot's tree, exactly as before, only now read against a tag instead of a worktree.
+`src/smd/cl/**`'s own divergences from ANSI Common Lisp continue to be tracked per `docs/divergences/README.md`, not here.

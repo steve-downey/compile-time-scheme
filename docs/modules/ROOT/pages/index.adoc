@@ -1,13 +1,13 @@
-= smd.schemepoc
-:description: A compile-time Scheme-light compiler proof of concept targeting C++26 on GCC16.
+= smd.cl
+:description: A compile-time Common Lisp compiler proof of concept targeting C++26 on GCC16.
 :sectanchors:
 :url-repo: https://github.com/steve-downey/compile-time-scheme
-:page-tags: smd,schemepoc,cpp26,scheme,compiler
+:page-tags: smd,cl,cpp26,common-lisp,compiler
 :navtitle: Home
 
-`smd.schemepoc` is a compile-time Scheme-light compiler proof of concept
-targeting C++26 on GCC16.  It demonstrates that a full language pipeline —
-from source string to evaluated value — can be realised entirely within
+`smd.cl` is a compile-time Common Lisp compiler proof of concept targeting
+C++26 on GCC16.  It demonstrates that a full language pipeline — from
+source string to evaluated value — can be realised entirely within
 constexpr and compile-time contexts.
 
 == Pipeline
@@ -17,44 +17,40 @@ constexpr and compile-time contexts.
 source string
   → reader (datum tree)
   → elaborator (core AST)
-  → CPS / defunctionalized program
-  → closure backend (constexpr evaluation)
+  → eval (small-step machine)
   → Beman Execution sender backend
-  → reflection reification spike
 ----
 
 == Quick Example
 
 [source,cpp]
 ----
-#include <smd/smdscheme/smdscheme.hpp>
+#include <smd/cl/conformance/driver.hpp>
 
-// Compile the expression (+ 1 2) at compile time.
-// compiled_closure is a constexpr variable template.
-constexpr auto &prog = smd::smdscheme::compiled_closure<"(+ 1 2)">;
+// Run the expression (+ 1 2) through read -> elaborate -> eval.
+// evaluate_program is constexpr, so this evaluates at compile time.
+constexpr auto report = smd::cl::conformance::evaluate_program("(+ 1 2)");
 
-// Evaluate at runtime with a default environment.
-using Core = smd::smdscheme::closure::closure_program<32,16,...>::Core;
-auto env   = smd::smdscheme::closure::default_env<Core, 16>();
-auto result = prog(env);
-// result.value() == 3
+static_assert(report.how.is_value());
+// report.how.as_value() == smd::cl::eval::value{smd::cl::eval::value_fixnum{3}}
 ----
 
 == Documented Modules
 
 The API reference covers the non-reflection layers of the pipeline:
 
-* *foundation* — `fix`, `arena_box`, `static_vector`, `result`,
-  `functor`, `applicative`, `alternative` typeclass objects
-* *parser* — combinatorial parser primitives (`cursor`, `parser`,
-  `satisfy`, `alt`, `many`, `some`, `lift2`) and `parser_ops`
-* *reader* — datum types, atom parsers, `read_datum`
-* *elaborator* — core AST types (`core_if`, `core_lambda`, etc.) and `elaborate`
-* *closure* — runtime values, `env`, closures, `eval_direct`,
-  `compile_cps`, `closure_program`
+* *foundation* — `src/smd/kit/foundation`'s language-agnostic substrate
+  (`static_vector`, `arena_box`, `result`, `functor`, `applicative`,
+  `monad`) plus `src/smd/cl/foundation`'s front-end-specific additions
+* *symbol* — the interned symbol table, `symbol_id`, `symbol_table`
+* *reader* — datum types, `cursor`, `read_datum`
+* *core* — the core AST types (`core_if`, `core_lambda`, `core_progn`, etc.)
+* *elaborator* — `elaborate`, classifying datums into the core AST
+* *eval* — the small-step `machine`, `outcome`, `value`, `environment`
 
-The `sender` and `reflection` modules use GCC16-specific `*+-freflection+-*`
-and are not yet covered by the generated API reference.
+The `sender` module uses Beman Execution and is documented separately from
+the mrdocs-generated reference; reflection has not yet been ported to this
+front end.
 
 == Navigation
 

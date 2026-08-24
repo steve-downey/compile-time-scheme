@@ -95,7 +95,7 @@
 ## Common Lisp rebuild (docs/cl-rebuild-plan.md)
 
 Supersedes the pivot's decision set with D11–D17.
-`src/smd/smdlisp/**` is frozen as a behavioural oracle from R1 onward and is never edited — decision D32 (`docs/cl-language-scoping.md`) retires that rule at step A3 of the plan added below, but the rule holds until then.
+`src/smd/smdlisp/**` was frozen as a behavioural oracle from R1 onward and was never edited. Decision D32 (`docs/cl-language-scoping.md`) retired that rule at step A3 of the plan added below: the tree was deleted from trunk and is preserved instead at the annotated tag `iteration/smdlisp-final`, as a source of source programs only. Per D16, expectations come from SBCL or the specification, never from `smdlisp`'s own answers; the conformance corpus (`src/smd/cl/conformance`) is where those checked expectations live.
 
 Every phase ships a blog post as a deliverable (D20), drafted by an agent that did not do the work and reviewed by a clean agent running the `voice` skill.
 R0–R4 landed before that was recorded; `docs/history/blog-backfill-plan.md` covers the arrears as steps B5–B11.
@@ -132,11 +132,11 @@ Phase A (A1–A5) merges to integration branch `cl-retire-trees`, created off `m
 Phase B (B1–B8) merges to integration branch `cl-parser-combinators`, created off `main` after Phase A's gate.
 
 - [x] Step A0: rebase the record against reality — the root checklist, decision D32, three backlog items, and a dated amendment to each scoping note
-- [ ] Step A1: freeze both iterations as tags; move their architecture prose to a pinned history doc
-- [ ] Step A2: neutralise the dead trees' build consumers (examples, install test, export list)
-- [ ] Step A3: delete `smdscheme` and `smdlisp` from trunk, executing D32
-- [ ] Step A4: a `prin1`-shaped printer for `cl` datums, proved against SBCL in the same step
-- [ ] Step A5: broaden the SBCL reader differential into a real corpus
+- [x] Step A1: freeze both iterations as tags; move their architecture prose to a pinned history doc
+- [x] Step A2: neutralise the dead trees' build consumers (examples, install test, export list)
+- [x] Step A3: delete `smdscheme` and `smdlisp` from trunk, executing D32
+- [x] Step A4: a `prin1`-shaped printer for `cl` datums, proved against SBCL in the same step
+- [x] Step A5: broaden the SBCL reader differential into a real corpus
 - [ ] Step B1: split `read.hpp` into component headers plus an umbrella (mechanical, zero behavioural diff)
 - [ ] Step B2: `smd::kit::parser`: a Monad instance over a context-threaded parser, with `read_radix_number` as its first client
 - [ ] Step B3: intertoken space and comments onto the layer
