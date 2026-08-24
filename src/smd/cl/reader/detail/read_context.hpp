@@ -7,9 +7,13 @@
 #include <smd/cl/foundation/result.hpp>
 #include <smd/cl/foundation/result_instances.hpp>
 #include <smd/cl/foundation/source_pos.hpp>
+#include <smd/cl/reader/cursor.hpp>
 #include <smd/cl/reader/datum.hpp>
 #include <smd/cl/reader/readtable.hpp>
+#include <smd/cl/reader/token.hpp>
 #include <smd/cl/symbol/symbol_table.hpp>
+#include <smd/kit/foundation/monad.hpp>
+#include <smd/kit/parser/parser.hpp>
 
 #include <utility>
 
@@ -41,6 +45,15 @@ namespace detail {
 /// this using-declaration would have had to become load-bearing.
 using foundation::and_then;
 
+/// The Monad instance's own @c bind, reached the same way @ref
+/// parser::parser_instances.hpp asks every caller to reach it: a CPO is an
+/// object, not a function template, so argument-dependent lookup does not
+/// find it from a @c parser<F> argument the way it would for a function
+/// template. Brought in here, next to @c and_then above, so every step that
+/// converts a reader function after this one writes @c bind(token_p, …)
+/// unqualified instead of rediscovering this for itself.
+using smd::kit::foundation::bind;
+
 /// Everything one read shares: the tree being built, the symbol table
 /// names are interned into, and the readtable driving dispatch. The
 /// symbol-table type is a template parameter because slot types belong to
@@ -54,6 +67,36 @@ struct read_context {
     SymbolTable &symbols;   ///< Receives every interned name.
     readtable const &table; ///< Drives every character decision.
 };
+
+/// Names the shape a converting reader function needs from its context:
+/// refines @c kit::parser::parse_context, so a @ref cursor passed where a
+/// context belongs is still caught, and requires exactly the members this
+/// reader threads through today -- the tree being built, the symbol table,
+/// the readtable, and the tree's own child-list type.
+///
+/// Only @ref read_radix_number is constrained with this concept in this
+/// step; each later converting step constrains the functions it converts,
+/// so a wrong guess about the concept surfaces against one function rather
+/// than eleven (docs/cl-parser-scoping.md, D27-D31).
+template <class Ctx>
+concept reader_context =
+    smd::kit::parser::parse_context<Ctx> && requires(Ctx &ctx) {
+        ctx.tree;
+        ctx.symbols;
+        ctx.table;
+        typename Ctx::child_list;
+    };
+
+// 73be3f9e-5da8-4a69-b19c-b674b55f4e75
+/// The whole-token scan, lifted into the parser layer. @c scan_token itself
+/// is untouched -- DIV-0003 holds because a whole token is classified at
+/// once, and this only lifts that function's existing result into
+/// @c parser<F>'s vocabulary rather than replacing it.
+inline constexpr auto token_p =
+    smd::kit::parser::parser{[](cursor cur, reader_context auto &ctx) {
+        return scan_token(cur, ctx.table);
+    }};
+// 73be3f9e-5da8-4a69-b19c-b674b55f4e75 end
 
 /// Appends a leaf to the tree, surfacing a full tree as a @ref
 /// foundation::parse_error rather than tripping the capacity assert on

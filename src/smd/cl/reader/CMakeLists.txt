@@ -24,7 +24,7 @@ target_sources(
                 readtable.hpp
                 token.hpp
 )
-target_link_libraries(cl.reader INTERFACE cl.foundation cl.symbol)
+target_link_libraries(cl.reader INTERFACE cl.foundation cl.symbol kit.parser)
 
 if(SCHEMEPOC_ENABLE_TESTING)
     find_package(Catch2 REQUIRED)

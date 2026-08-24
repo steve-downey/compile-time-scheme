@@ -25,6 +25,16 @@ there — so it exists purely so that `cl` code spells its includes the way the
 rest of `cl` does. That makes it the cheapest of the eighteen to retire and
 the least informative about whether the kit boundary has settled.
 
+A nineteenth shim exists as of step B2, outside this item's literal title
+scope: `src/smd/cl/reader/cursor.hpp`, forwarding `cursor`, `parse_state`
+and `advance_while` to `smd::kit::parser`, added when B2 moved those three
+out of the reader so `parser<F>` could compose over the same cursor and
+parse_state the reader already had. It is `reader/`, not `foundation/`, but
+tracked here rather than opening a second item, for the same reason as the
+other eighteen: repointing every existing caller was not the point of that
+step, keeping the name alive so `read.test.cpp` and `cursor.test.cpp` did
+not have to change was.
+
 Staying in `src/smd/cl/foundation/` as real files, not shims:
 `node_f`, `topo_fold`, `tagged_tree`, `tagged_tree_instances`,
 `tagged_tree_schemes`. These name an AST type and are correctly outside

@@ -14,6 +14,8 @@
 #include <smd/cl/reader/number.hpp>
 #include <smd/cl/reader/readtable.hpp>
 #include <smd/cl/reader/token.hpp>
+#include <smd/kit/parser/parser.hpp>
+#include <smd/kit/parser/parser_instances.hpp>
 
 #include <algorithm>
 #include <cstddef>
@@ -21,46 +23,58 @@
 
 namespace smd::cl::reader::detail {
 
+using smd::kit::parser::parser;
+
 /// Reads a rational token in @p radix (the radix prefix already
 /// consumed): a fixnum when it fits, otherwise a tower spelling carrying
 /// the radix (decision D19). Float syntax is decimal-only, so anything
 /// but a rational here is an error.
-template <class Ctx>
+///
+/// The first real consumer of @ref parser's Monad instance: the radix
+/// parsed from the prefix decides how the following token is classified,
+/// which @c lift2 could never express, since it fixes both parsers before
+/// either runs. @ref token_p is @c bind's first argument; its continuation
+/// returns a second parser that classifies the scanned token and appends
+/// it to the tree, resuming from whatever cursor @c bind threads it --
+/// @c token_p's own rest, automatically, not a captured copy of it.
+template <reader_context Ctx>
 [[nodiscard]] constexpr auto read_radix_number(cursor cur, Ctx &ctx, int radix,
                                                foundation::source_pos where)
     -> foundation::result<parse_state<int>> {
-    return and_then(
-        scan_token(cur, ctx.table),
-        [&](parse_state<token_text> const &token)
-            -> foundation::result<parse_state<int>> {
+    auto const classify_and_add = [radix, where](token_text const &scanned) {
+        return parser{[radix, where, scanned](cursor rest,
+                                              reader_context auto &ctx)
+                          -> foundation::result<parse_state<int>> {
             auto const finish = [&](datum_atom atom) {
-                return and_then(
+                return bind(
                     add_leaf_checked(ctx, std::move(atom), where),
                     [&](int id) -> foundation::result<parse_state<int>> {
-                        return parse_state<int>{id, token.rest};
+                        return parse_state<int>{id, rest};
                     });
             };
-            if (token.value.has_escape) {
+            if (scanned.has_escape) {
                 return foundation::parse_error{
                     where, "expected a rational after radix prefix"};
             }
-            auto const classified = classify_number(token.value.view(), radix);
+            auto const classified = classify_number(scanned.view(), radix);
             switch (classified.cls) {
             case number_class::fixnum:
                 return finish(datum_atom{datum_fixnum{classified.value}});
             case number_class::bignum:
                 return finish(datum_atom{
-                    datum_tower{tower_kind::bignum, radix, token.value}});
+                    datum_tower{tower_kind::bignum, radix, scanned}});
             case number_class::ratio:
-                return finish(datum_atom{
-                    datum_tower{tower_kind::ratio, radix, token.value}});
+                return finish(
+                    datum_atom{datum_tower{tower_kind::ratio, radix, scanned}});
             case number_class::floating:
             case number_class::none:
                 break;
             }
             return foundation::parse_error{
                 where, "expected a rational after radix prefix"};
-        });
+        }};
+    };
+    return bind(token_p, classify_and_add)(cur, ctx);
 }
 
 /// Reads a sharpsign dispatch form (positioned at the `#`): the optional
