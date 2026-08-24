@@ -135,6 +135,43 @@ namespace detail {
 }
 // 1e9c6a05-3f50-4a61-8552-e879e2053d2d end
 
+// 8224cb8a-2946-42b1-9018-bf9624f0dcdc
+/// Reads @p source with SBCL's own reader and returns what `prin1` prints
+/// for the resulting object, with the pretty printer off so the quote
+/// family renders as the list forms ANSI defines rather than as reader
+/// syntax.
+///
+/// This is the reader's own oracle call, distinct from @ref sbcl_prin1
+/// (which evaluates a form and prints its *value*): here the form is never
+/// evaluated, only read and printed back, so this is a differential on
+/// `read`+`prin1` alone. Returns `nullopt` if SBCL is unreachable, and
+/// `SBCL-ERROR` if SBCL itself signals reading or printing @p source — a
+/// text no well-formed corpus entry's `prin1` output can collide with.
+[[nodiscard]] inline auto sbcl_read_print(std::string_view source)
+    -> std::optional<std::string> {
+    std::string lisp_literal = "\"";
+    for (char const c : source) {
+        if (c == '"' || c == '\\') {
+            lisp_literal += '\\';
+        }
+        lisp_literal += c;
+    }
+    lisp_literal += "\"";
+    std::string const script =
+        "(handler-case (let ((*print-pretty* nil)) (prin1 (read-from-string " +
+        lisp_literal + "))) (error () (princ \"SBCL-ERROR\")))";
+    std::string const command =
+        "sbcl --noinform --non-interactive --no-userinit --no-sysinit "
+        "--eval " +
+        detail::shell_quote(script) + " 2>/dev/null";
+    auto output = detail::run_shell_capture(command);
+    if (!output.has_value()) {
+        return std::nullopt;
+    }
+    return detail::trim(std::move(*output));
+}
+// 8224cb8a-2946-42b1-9018-bf9624f0dcdc end
+
 } // namespace smd::cl::conformance
 
 #endif

@@ -12,7 +12,14 @@ target_sources(
 )
 target_link_libraries(
     cl.conformance
-    INTERFACE cl.core cl.elaborator cl.eval cl.foundation cl.reader cl.symbol
+    INTERFACE
+        cl.core
+        cl.elaborator
+        cl.eval
+        cl.foundation
+        cl.printer
+        cl.reader
+        cl.symbol
 )
 
 if(SCHEMEPOC_ENABLE_TESTING)
@@ -21,7 +28,11 @@ if(SCHEMEPOC_ENABLE_TESTING)
     add_executable(cl_conformance_test)
     target_sources(
         cl_conformance_test
-        PRIVATE corpus.test.cpp driver.test.cpp sbcl_differential.test.cpp
+        PRIVATE
+            corpus.test.cpp
+            driver.test.cpp
+            reader_differential.test.cpp
+            sbcl_differential.test.cpp
     )
     target_link_libraries(
         cl_conformance_test
