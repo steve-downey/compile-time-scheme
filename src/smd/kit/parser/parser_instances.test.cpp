@@ -40,14 +40,13 @@ struct scale_context {
     int factor = 1;
 };
 
-constexpr auto char_val =
-    parser{[](cursor cur, parse_context auto &) -> parse_result<int> {
-        if (cur.empty()) {
-            return parse_error{cur.position(), "expected char"};
-        }
-        return parse_state<int>{static_cast<unsigned char>(cur.peek()),
-                                cur.bump()};
-    }};
+constexpr auto char_val = parser{[](cursor cur,
+                                    parse_context auto &) -> parse_result<int> {
+    if (cur.empty()) {
+        return parse_error{cur.position(), "expected char"};
+    }
+    return parse_state<int>{static_cast<unsigned char>(cur.peek()), cur.bump()};
+}};
 
 constexpr auto scaled_char =
     parser{[](cursor cur, scale_context &ctx) -> parse_result<int> {
@@ -86,10 +85,9 @@ constexpr auto double_p = [](int n) {
 // A second continuation, so associativity has two genuinely different
 // steps to chain.
 constexpr auto succ_p = [](int n) {
-    return parser{
-        [n](cursor cur, parse_context auto &) -> parse_result<int> {
-            return parse_state<int>{n + 1, cur};
-        }};
+    return parser{[n](cursor cur, parse_context auto &) -> parse_result<int> {
+        return parse_state<int>{n + 1, cur};
+    }};
 };
 
 } // namespace
@@ -113,9 +111,8 @@ static_assert([] {
 static_assert([] {
     no_context ctx{};
     auto const lhs = bind(bind(char_val, double_p), succ_p);
-    auto const rhs = bind(char_val, [](int n) {
-        return bind(double_p(n), succ_p);
-    });
+    auto const rhs =
+        bind(char_val, [](int n) { return bind(double_p(n), succ_p); });
     return same_parse(lhs, rhs, "a", ctx) && same_parse(lhs, rhs, "", ctx);
 }());
 
@@ -136,9 +133,8 @@ static_assert([] {
 static_assert([] {
     scale_context ctx{3};
     auto const lhs = bind(bind(scaled_char, double_p), succ_p);
-    auto const rhs = bind(scaled_char, [](int n) {
-        return bind(double_p(n), succ_p);
-    });
+    auto const rhs =
+        bind(scaled_char, [](int n) { return bind(double_p(n), succ_p); });
     return same_parse(lhs, rhs, "a", ctx) && same_parse(lhs, rhs, "", ctx);
 }());
 
@@ -171,8 +167,8 @@ TEST_CASE("ParserInstancesTest - MonadRightIdentity") {
 TEST_CASE("ParserInstancesTest - MonadAssociativity") {
     no_context ctx{};
     auto const lhs = bind(bind(char_val, double_p), succ_p);
-    auto const rhs = bind(
-        char_val, [](int n) { return bind(double_p(n), succ_p); });
+    auto const rhs =
+        bind(char_val, [](int n) { return bind(double_p(n), succ_p); });
     CHECK(same_parse(lhs, rhs, "a", ctx));
     CHECK(same_parse(lhs, rhs, "", ctx));
 }

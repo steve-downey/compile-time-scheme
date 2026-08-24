@@ -8,11 +8,7 @@ target_sources(
         FILE_SET kit_parser_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES
-                cursor.hpp
-                parse_context.hpp
-                parser.hpp
-                parser_instances.hpp
+            FILES cursor.hpp parse_context.hpp parser.hpp parser_instances.hpp
 )
 target_link_libraries(kit.parser INTERFACE kit.foundation)
 

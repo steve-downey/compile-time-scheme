@@ -93,8 +93,8 @@ template <class T>
 /// @tparam F Callable to apply to the parsed value.
 template <class P, class F>
 [[nodiscard]] constexpr auto map(P p, F f) {
-    return parser{[p = std::move(p), f = std::move(f)](
-                      cursor cur, parse_context auto &ctx) {
+    return parser{[p = std::move(p),
+                   f = std::move(f)](cursor cur, parse_context auto &ctx) {
         auto const r = p(cur, ctx);
         using R = std::remove_cvref_t<decltype(f(r.value().value))>;
         if (!r.has_value()) {

@@ -34,14 +34,13 @@ struct scale_context {
 
 // Ignores its context; runnable under any threaded context, including
 // no_context.
-constexpr auto char_val =
-    parser{[](cursor cur, parse_context auto &) -> parse_result<int> {
-        if (cur.empty()) {
-            return parse_error{cur.position(), "expected char"};
-        }
-        return parse_state<int>{static_cast<unsigned char>(cur.peek()),
-                                cur.bump()};
-    }};
+constexpr auto char_val = parser{[](cursor cur,
+                                    parse_context auto &) -> parse_result<int> {
+    if (cur.empty()) {
+        return parse_error{cur.position(), "expected char"};
+    }
+    return parse_state<int>{static_cast<unsigned char>(cur.peek()), cur.bump()};
+}};
 
 // Reads its context: the parsed value depends on scale_context::factor, so
 // this genuinely exercises the threaded context rather than ignoring it.

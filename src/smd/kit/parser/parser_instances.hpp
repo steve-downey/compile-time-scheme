@@ -40,12 +40,11 @@ struct parser_monad_impl {
 
     template <class F, class G>
     constexpr auto bind(this auto &&, parser<F> p, G g) {
-        return parser{[p = std::move(p), g = std::move(g)](
-                          cursor cur, parse_context auto &ctx) {
-            return foundation::bind(
-                p(cur, ctx), [&g, &ctx](auto const &state) {
-                    return g(state.value)(state.rest, ctx);
-                });
+        return parser{[p = std::move(p),
+                       g = std::move(g)](cursor cur, parse_context auto &ctx) {
+            return foundation::bind(p(cur, ctx), [&g, &ctx](auto const &state) {
+                return g(state.value)(state.rest, ctx);
+            });
         }};
     }
 };
