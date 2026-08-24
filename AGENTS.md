@@ -86,19 +86,20 @@ design around a constraint that does not exist.
 
 ## Which trees you may edit
 
-Three trees, three different reasons, and only one of them is a rule.
+`src/smd/cl/**` is the live tree, and now the only tree. The rebuild happens
+here, and a fix belongs here whatever tree the bug was found in.
 
-- `src/smd/cl/**` is the live tree. The rebuild happens here, and this is where a
-  fix belongs whatever tree the bug was found in.
-- `src/smd/smdlisp/**` is the behavioural oracle for the rebuild and is **never
-  edited**, from step R1 onward. That one is the rule. A disagreement between it
-  and `cl` is evidence to be explained, not a merge conflict to be resolved.
-- `src/smd/smdscheme/**` is no longer frozen by rule — decision D1 was retired by
-  D11 — but do not edit it. It is dead-ended and will be deleted from trunk at some
-  point. Read it, link it, copy from it; reuse is by copy into `cl`, never by
-  refactoring in place. If you find a bug in it, fix the bug in `cl` and leave
-  `smdscheme` as it stands. There is no divergence doc to file here, because there
-  is no good reason to touch it in the first place.
+The two earlier iterations, `src/smd/smdscheme/**` (the original Scheme-light
+front end) and `src/smd/smdlisp/**` (the Common Lisp pivot and, from step R1
+until decision D32, the rebuild's never-edited behavioural oracle), were
+deleted from trunk at step A3 of the tree-retirement plan
+(`tmp/plan/checklist.md`). Neither exists on disk any longer, so there is
+nothing left to accidentally edit. Both are frozen at the annotated tags
+`iteration/smdscheme-final` and `iteration/smdlisp-final` and remain readable
+there (`git show <tag>:<path>`), and their architecture prose is pinned to
+those tags in `docs/history/architecture-iterations.org`. Read them, link
+them, copy from them at the tag; reuse is by copy into `cl`, never by
+resurrecting the tree.
 
 ## The blog deliverable
 

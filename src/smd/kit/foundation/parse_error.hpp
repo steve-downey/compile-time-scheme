@@ -2,12 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Extracted in step R8 from smd::cl::foundation::parse_error, itself the
 // reviewed union of two independently-drifted copies:
-// src/smd/smdscheme/foundation/parse_error.hpp (compile-time-scheme) and
-// src/smd/forth/foundation/parse_error.hpp (compile-time-forth). The
-// equality below keeps the scheme copy's same-pointer fast path and the
-// forth copy's explicit null handling; the character loop both copies
-// carried is replaced by std::string_view comparison. All of that is a
-// strict quality improvement over either source copy, not a cl-specific
+// src/smd/smdscheme/foundation/parse_error.hpp (compile-time-scheme, at
+// iteration/smdscheme-final) and src/smd/forth/foundation/parse_error.hpp
+// (compile-time-forth). The equality below keeps the scheme copy's same-pointer
+// fast path and the forth copy's explicit null handling; the character loop
+// both copies carried is replaced by std::string_view comparison. All of that
+// is a strict quality improvement over either source copy, not a cl-specific
 // need, so it travels with the extraction.
 #ifndef SRC_SMD_KIT_FOUNDATION_PARSE_ERROR_HPP
 #define SRC_SMD_KIT_FOUNDATION_PARSE_ERROR_HPP

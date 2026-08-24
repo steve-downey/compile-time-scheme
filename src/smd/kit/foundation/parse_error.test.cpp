@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Moved in step R8 from src/smd/cl/foundation/parse_error.test.cpp, itself
 // the reviewed union of two prior copies of this test:
-// src/smd/smdscheme/foundation/parse_error.test.cpp (compile-time-scheme)
-// and src/smd/forth/foundation/parse_error.test.cpp (compile-time-forth).
+// src/smd/smdscheme/foundation/parse_error.test.cpp (compile-time-scheme, at
+// iteration/smdscheme-final) and src/smd/forth/foundation/parse_error.test.cpp
+// (compile-time-forth).
 
 #include <smd/kit/foundation/parse_error.hpp>
 #include <smd/kit/foundation/parse_error.hpp> // test 2nd include OK

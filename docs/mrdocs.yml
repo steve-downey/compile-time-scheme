@@ -6,11 +6,13 @@ source-root: ..
 # Scope: document the non-reflection layers only.  The sender/reflection
 # modules require GCC16 -freflection which mrdocs (clang-based) cannot parse.
 input:
-  - ../src/smd/smdscheme/foundation
-  - ../src/smd/smdscheme/parser
-  - ../src/smd/smdscheme/reader
-  - ../src/smd/smdscheme/elaborator
-  - ../src/smd/smdscheme/closure
+  - ../src/smd/kit/foundation
+  - ../src/smd/cl/foundation
+  - ../src/smd/cl/symbol
+  - ../src/smd/cl/reader
+  - ../src/smd/cl/core
+  - ../src/smd/cl/elaborator
+  - ../src/smd/cl/eval
 exclude-patterns:
   - '**/*.test.cpp'
   - '**/detail/**'

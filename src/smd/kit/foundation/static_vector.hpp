@@ -2,14 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Extracted in step R8 from smd::cl::foundation::static_vector, itself the
 // reviewed union of two independently-drifted copies:
-// src/smd/smdscheme/foundation/static_vector.hpp (compile-time-scheme) and
-// src/smd/forth/foundation/static_vector.hpp (compile-time-forth, which
-// contributed capacity()). The cl rebuild widened this further — filled(),
-// append_range(), pop_back(), and std::equal-based equality — on top of the
-// same <T, Capacity> shape both older copies already had; that widening is
-// judged a strict superset (D14 unaffected: Capacity is still the type's
-// own template parameter, not something borrowed from a stored value's
-// type) and travels with the extraction rather than staying cl-only.
+// src/smd/smdscheme/foundation/static_vector.hpp (compile-time-scheme, at
+// iteration/smdscheme-final) and src/smd/forth/foundation/static_vector.hpp
+// (compile-time-forth, which contributed capacity()). The cl rebuild widened
+// this further — filled(), append_range(), pop_back(), and std::equal-based
+// equality — on top of the same <T, Capacity> shape both older copies already
+// had; that widening is judged a strict superset (D14 unaffected: Capacity is
+// still the type's own template parameter, not something borrowed from a stored
+// value's type) and travels with the extraction rather than staying cl-only.
 #ifndef SRC_SMD_KIT_FOUNDATION_STATIC_VECTOR_HPP
 #define SRC_SMD_KIT_FOUNDATION_STATIC_VECTOR_HPP
 

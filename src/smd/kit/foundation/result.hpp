@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Extracted in step R8 from smd::cl::foundation::result, itself the reviewed
 // union of two independently-drifted copies:
-// src/smd/smdscheme/foundation/result.hpp (compile-time-scheme) and
-// src/smd/forth/foundation/result.hpp (compile-time-forth). The cl rebuild
-// added the value_type alias, equality, and and_then below; all three are
-// generic over any result<T> rather than Lisp-specific, so they travel with
-// the extraction. and_then's own doc comment still narrates the elaborator
-// decision (D15, docs/cl-rebuild-plan.md) that motivated writing it, because
-// that history is worth keeping, not because the function needs a Lisp.
+// src/smd/smdscheme/foundation/result.hpp (compile-time-scheme, at
+// iteration/smdscheme-final) and src/smd/forth/foundation/result.hpp
+// (compile-time-forth). The cl rebuild added the value_type alias, equality,
+// and and_then below; all three are generic over any result<T> rather than
+// Lisp-specific, so they travel with the extraction. and_then's own doc comment
+// still narrates the elaborator decision (D15, docs/cl-rebuild-plan.md) that
+// motivated writing it, because that history is worth keeping, not because the
+// function needs a Lisp.
 #ifndef SRC_SMD_KIT_FOUNDATION_RESULT_HPP
 #define SRC_SMD_KIT_FOUNDATION_RESULT_HPP
 
