@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Extracted in step R8 from smd::cl::foundation::source_pos, itself the
 // reviewed union of two independently-drifted copies:
-// src/smd/smdscheme/foundation/source_pos.hpp (compile-time-scheme) and
-// src/smd/forth/foundation/source_pos.hpp (compile-time-forth). Those two
-// copies were byte-identical apart from include guard, namespace, and
-// comment — the zero-drift signal decision R8 acts on.
+// src/smd/smdscheme/foundation/source_pos.hpp (compile-time-scheme, at
+// iteration/smdscheme-final) and src/smd/forth/foundation/source_pos.hpp
+// (compile-time-forth). Those two copies were byte-identical apart from include
+// guard, namespace, and comment — the zero-drift signal decision R8 acts on.
 #ifndef SRC_SMD_KIT_FOUNDATION_SOURCE_POS_HPP
 #define SRC_SMD_KIT_FOUNDATION_SOURCE_POS_HPP
 

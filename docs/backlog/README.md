@@ -31,8 +31,8 @@ A backlog file is where the argument goes instead, so the code stays clean and t
 
 ## Rules
 
-- State each item's blast radius against the current freezes.
-  D1's freeze on `src/smd/smdscheme/**` is retired by D11; `src/smd/smdlisp/**` is frozen from step R1 onward as the rebuild's behavioural oracle.
+- State each item's blast radius against the current tree.
+  `src/smd/cl/**` is the only tree; `src/smd/smdscheme/**` and `src/smd/smdlisp/**` were deleted from trunk at step A3 (D32) and are frozen at the tags `iteration/smdscheme-final` and `iteration/smdlisp-final`.
 - Refine an item in place.
   Do not append status logs to it.
 - Promoting an item: add a step to `checklist.md` and the plan, then record the step in the item's status line.

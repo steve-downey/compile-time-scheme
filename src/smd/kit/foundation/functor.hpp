@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Extracted in step R8 from smd::cl::foundation::functor, itself the
 // reviewed union of two independently-drifted copies:
-// src/smd/smdscheme/foundation/functor.hpp (compile-time-scheme) and
-// src/smd/forth/foundation/functor.hpp (compile-time-forth). Those two
-// copies differed only in include guard, namespace, and an "adapted by
-// copy" comment — the zero-drift signal decision R8 acts on.
+// src/smd/smdscheme/foundation/functor.hpp (compile-time-scheme, at
+// iteration/smdscheme-final) and src/smd/forth/foundation/functor.hpp
+// (compile-time-forth). Those two copies differed only in include guard,
+// namespace, and an "adapted by copy" comment — the zero-drift signal decision
+// R8 acts on.
 #ifndef SRC_SMD_KIT_FOUNDATION_FUNCTOR_HPP
 #define SRC_SMD_KIT_FOUNDATION_FUNCTOR_HPP
 

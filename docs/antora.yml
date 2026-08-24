@@ -11,10 +11,10 @@ ext:
   cpp-reference:
     config: docs/mrdocs.yml
     using-namespaces:
-      - smd::smdscheme
-      - smd::smdscheme::foundation
-      - smd::smdscheme::parser
-      - smd::smdscheme::reader
-      - smd::smdscheme::elaborator
-      - smd::smdscheme::closure
-      - smd::smdscheme::cps
+      - smd::kit::foundation
+      - smd::cl::foundation
+      - smd::cl::symbol
+      - smd::cl::reader
+      - smd::cl::core
+      - smd::cl::elaborator
+      - smd::cl::eval

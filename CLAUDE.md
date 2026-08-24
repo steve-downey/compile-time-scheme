@@ -4,23 +4,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-A compile-time compiler proof of concept targeting C++26 on GCC16, with two front ends over a shared foundation. Both follow the same staged pipeline:
+A compile-time compiler proof of concept targeting C++26 on GCC16. The live
+front end, `smd::cl` (`src/smd/cl/`), the Common Lisp rebuild, follows a
+staged pipeline:
 
 ```
 source string -> reader datum tree -> elaborated core tree
-  -> CPS / defunctionalized program -> closure backend
-  -> Beman Execution sender backend -> reflection reification spike
+  -> eval (small-step machine) -> Beman Execution sender backend
 ```
 
-- `smd::smdscheme` (`src/smd/smdscheme/`) — the original Scheme-light front end, plus the language-agnostic `foundation/` (`static_vector`, `result`, `arena_box`, `tree_arena`, `fix`, parser combinators) that both front ends build on.
-- `smd::smdlisp` (`src/smd/smdlisp/`) — the Common Lisp front end, and the active development tree.
+- `smd::cl` (`src/smd/cl/`) — the Common Lisp front end, and the active development tree.
+- `smd::kit::foundation` (`src/smd/kit/foundation/`) — the language-agnostic substrate (`static_vector`, `result`, `arena_box`, `tree_arena`, `fix`) extracted in step R8, shared by `cl` and by `smd::forth` in the sibling `compile-time-forth` repository.
 - `smd::fixpoint` (`src/smd/fixpoint/`) — standalone recursion-scheme playground.
 
-The reader parses data but does not classify special forms. The elaborator recognizes the language's special operators. CPS is the semantic center. The closure backend is the stable demo path. The sender backend uses Beman Execution vendored as a git submodule at `vendor/execution`. Reflection is isolated until explicitly integrated.
+The reader parses data but does not classify special forms. The elaborator recognizes the language's special operators. Evaluation is a small-step machine (`eval::machine`), not C++ recursion. The sender backend uses Beman Execution vendored as a git submodule at `vendor/execution`. Reflection has not yet been ported to this front end.
 
-**The D1 freeze on `src/smd/smdscheme/**` is retired** by decision D11 (`docs/cl-rebuild-plan.md`). Its rationale — that published blog phases transclude live code — was superseded when posts moved to `orgit-file:` links pinned to `blog/phase-NN` tags (`docs/blog/pins.md`). The UUID anchor rules have since been relaxed too, by decision D21: an anchor set belongs to the step that lands it, and the only surviving obligation is that it parses at that step's merge.
+**The D1 freeze on `src/smd/smdscheme/**` was retired** by decision D11 (`docs/cl-rebuild-plan.md`), before the tree was deleted outright. Its rationale — that published blog phases transclude live code — was superseded when posts moved to `orgit-file:` links pinned to `blog/phase-NN` tags (`docs/blog/pins.md`). The UUID anchor rules have since been relaxed too, by decision D21: an anchor set belongs to the step that lands it, and the only surviving obligation is that it parses at that step's merge.
 
-Retiring the freeze did not make `smdscheme` editable in practice, and `AGENTS.md` § "Which trees you may edit" is authoritative on all three trees. `src/smd/cl/**` is the live tree. `src/smd/smdlisp/**` is the behavioural oracle for the rebuild, from step R1 onward, and is never edited — that one is a rule. `src/smd/smdscheme/**` is dead-ended and slated for deletion from trunk: read it, link it, copy from it, but fix bugs in `cl` rather than there.
+`AGENTS.md` § "Which trees you may edit" is authoritative: `src/smd/cl/**` is the live tree, and now the only one. Its two predecessors, `src/smd/smdscheme/**` (the original Scheme-light front end) and `src/smd/smdlisp/**` (the Common Lisp pivot and, from step R1 until decision D32, the rebuild's never-edited behavioural oracle), were deleted from trunk at step A3 of the tree-retirement plan (`tmp/plan/checklist.md`). Both are frozen at the annotated tags `iteration/smdscheme-final` and `iteration/smdlisp-final` and remain readable there; their architecture prose is pinned to those tags in `docs/history/architecture-iterations.org`.
 
 Plans and status:
 
@@ -74,7 +75,7 @@ src/smd/<package>/<area>/<component>.test.cpp
 src/examples/                                 (example programs)
 ```
 
-`<package>` is `smdscheme`, `smdlisp`, or `fixpoint`. `<area>` is the pipeline stage — `foundation`, `parser`, `reader`, `elaborator`, `closure`, `macroexpand`, `sender`, `reflection` — each with its own `CMakeLists.txt`.
+`<package>` is `cl`, `kit`, or `fixpoint`. `<area>` is the pipeline stage — `foundation`, `symbol`, `reader`, `core`, `elaborator`, `eval`, `sender` — each with its own `CMakeLists.txt`.
 
 Do not create split `include/`, `src/`, and `tests/` trees.
 

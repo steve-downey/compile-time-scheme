@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 // Extracted in step R8 from smd::cl::foundation::arena_box, itself the
 // reviewed union of two independently-drifted copies:
-// src/smd/smdscheme/foundation/arena_box.hpp (compile-time-scheme) and
-// src/smd/forth/foundation/arena_box.hpp (compile-time-forth, which
-// contributed tree_arena's default capacity).
+// src/smd/smdscheme/foundation/arena_box.hpp (compile-time-scheme, at
+// iteration/smdscheme-final) and src/smd/forth/foundation/arena_box.hpp
+// (compile-time-forth, which contributed tree_arena's default capacity).
 #ifndef SRC_SMD_KIT_FOUNDATION_ARENA_BOX_HPP
 #define SRC_SMD_KIT_FOUNDATION_ARENA_BOX_HPP
 
