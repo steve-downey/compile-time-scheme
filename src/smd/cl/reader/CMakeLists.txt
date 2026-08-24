@@ -11,6 +11,14 @@ target_sources(
             FILES
                 cursor.hpp
                 datum.hpp
+                detail/forms.hpp
+                detail/node.hpp
+                detail/read_context.hpp
+                detail/read_node_fwd.hpp
+                detail/sharpsign.hpp
+                detail/skip.hpp
+                detail/text.hpp
+                detail/token_datum.hpp
                 number.hpp
                 read.hpp
                 readtable.hpp
