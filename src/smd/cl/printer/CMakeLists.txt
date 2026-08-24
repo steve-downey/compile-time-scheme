@@ -8,8 +8,7 @@ target_sources(
         FILE_SET cl_printer_headers
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
-            FILES
-                prin1.hpp
+            FILES prin1.hpp
 )
 target_link_libraries(cl.printer INTERFACE cl.foundation cl.reader cl.symbol)
 
@@ -17,11 +16,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
     find_package(Catch2 REQUIRED)
 
     add_executable(cl_printer_test)
-    target_sources(
-        cl_printer_test
-        PRIVATE
-            prin1.test.cpp
-    )
+    target_sources(cl_printer_test PRIVATE prin1.test.cpp)
     target_link_libraries(
         cl_printer_test
         PRIVATE cl.printer Catch2::Catch2WithMain

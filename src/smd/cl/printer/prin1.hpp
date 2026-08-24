@@ -62,8 +62,10 @@ namespace detail {
     return needed <= max_print_chars;
 }
 
-[[nodiscard]] constexpr auto view_of(print_text const &text) -> std::string_view {
-    return std::string_view(text.begin(), static_cast<std::size_t>(text.size()));
+[[nodiscard]] constexpr auto view_of(print_text const &text)
+    -> std::string_view {
+    return std::string_view(text.begin(),
+                            static_cast<std::size_t>(text.size()));
 }
 
 /// Renders @p text verbatim, diagnosing overflow rather than asserting.
@@ -106,23 +108,22 @@ namespace detail {
 /// Renders a string datum: `"..."`, with `\` before an embedded `"` or `\`.
 [[nodiscard]] constexpr auto render_string(std::string_view contents)
     -> foundation::result<print_text> {
-    int const body = std::ranges::fold_left(
-        contents, 0, [](int acc, char c) {
-            return acc + (c == '"' || c == '\\' ? 2 : 1);
-        });
+    int const body = std::ranges::fold_left(contents, 0, [](int acc, char c) {
+        return acc + (c == '"' || c == '\\' ? 2 : 1);
+    });
     if (!fits(2 + body)) {
         return overflow();
     }
     print_text out;
     out.push_back('"');
-    out = std::ranges::fold_left(
-        contents, std::move(out), [](print_text acc, char c) {
-            if (c == '"' || c == '\\') {
-                acc.push_back('\\');
-            }
-            acc.push_back(c);
-            return acc;
-        });
+    out = std::ranges::fold_left(contents, std::move(out),
+                                 [](print_text acc, char c) {
+                                     if (c == '"' || c == '\\') {
+                                         acc.push_back('\\');
+                                     }
+                                     acc.push_back(c);
+                                     return acc;
+                                 });
     out.push_back('"');
     return out;
 }
@@ -140,21 +141,21 @@ template <class SymbolTable>
             if constexpr (std::same_as<value_type, reader::datum_fixnum>) {
                 return render_fixnum(value.value);
             } else if constexpr (std::same_as<value_type,
-                                               reader::datum_symbol>) {
+                                              reader::datum_symbol>) {
                 return render_verbatim(symbols.name(value.id));
             } else if constexpr (std::same_as<value_type,
-                                               reader::datum_keyword>) {
+                                              reader::datum_keyword>) {
                 return render_verbatim(symbols.name(value.id));
             } else if constexpr (std::same_as<value_type,
-                                               reader::datum_character>) {
+                                              reader::datum_character>) {
                 return render_character(value.value);
             } else if constexpr (std::same_as<value_type,
-                                               reader::datum_string>) {
+                                              reader::datum_string>) {
                 return render_string(value.view());
             } else {
                 static_assert(std::same_as<value_type, reader::datum_tower>,
-                             "datum_atom gained an alternative this visitor "
-                             "does not know");
+                              "datum_atom gained an alternative this visitor "
+                              "does not know");
                 // A tower renders its spelling, not its value (decision
                 // D19: readable before executable) — see the architecture
                 // doc's note on why the oracle and this printer disagree
@@ -170,11 +171,11 @@ template <class SymbolTable>
 template <int MaxList>
 [[nodiscard]] constexpr auto
 join_delimited(std::string_view open,
-              foundation::static_vector<print_text, MaxList> const &children,
-              std::string_view close) -> foundation::result<print_text> {
+               foundation::static_vector<print_text, MaxList> const &children,
+               std::string_view close) -> foundation::result<print_text> {
     int const separators = std::max(children.size() - 1, 0);
     int total = static_cast<int>(open.size()) + static_cast<int>(close.size()) +
-               separators;
+                separators;
     total = std::ranges::fold_left(
         children, total,
         [](int acc, print_text const &child) { return acc + child.size(); });
@@ -191,9 +192,8 @@ join_delimited(std::string_view open,
 /// Renders `prefix`, one child's already-rendered text, then `suffix` — the
 /// shape shared by the one-child branches (`quote`, `function`, and the
 /// backquote family).
-[[nodiscard]] constexpr auto wrap(std::string_view prefix,
-                                  print_text const &child,
-                                  std::string_view suffix)
+[[nodiscard]] constexpr auto
+wrap(std::string_view prefix, print_text const &child, std::string_view suffix)
     -> foundation::result<print_text> {
     int const total = static_cast<int>(prefix.size()) + child.size() +
                       static_cast<int>(suffix.size());
@@ -279,11 +279,10 @@ template <int MaxNodes, int MaxList, class SymbolTable>
 [[nodiscard]] constexpr auto
 prin1(reader::datum_tree<MaxNodes, MaxList> const &tree,
       SymbolTable const &symbols) -> foundation::result<print_text> {
-    using layer =
-        foundation::node_f<reader::datum_atom, reader::datum_branch,
-                           print_text, MaxList>;
-    auto const algebra = [&symbols](layer const &node)
-        -> foundation::result<print_text> {
+    using layer = foundation::node_f<reader::datum_atom, reader::datum_branch,
+                                     print_text, MaxList>;
+    auto const algebra =
+        [&symbols](layer const &node) -> foundation::result<print_text> {
         if (auto const *leaf = std::get_if<reader::datum_atom>(&node)) {
             return detail::render_leaf(*leaf, symbols);
         }

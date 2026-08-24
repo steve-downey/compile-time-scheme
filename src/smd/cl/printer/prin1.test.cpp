@@ -29,8 +29,10 @@ constexpr int test_nodes = 96;
 constexpr int test_list = 8;
 using tree = datum_tree<test_nodes, test_list>;
 
-[[nodiscard]] constexpr auto text_view(print_text const &text) -> std::string_view {
-    return std::string_view(text.begin(), static_cast<std::size_t>(text.size()));
+[[nodiscard]] constexpr auto text_view(print_text const &text)
+    -> std::string_view {
+    return std::string_view(text.begin(),
+                            static_cast<std::size_t>(text.size()));
 }
 
 /// Reads @p source, renders it, and checks the render against @p expected —
@@ -112,7 +114,8 @@ constexpr auto backquote_family_is_total() -> bool {
 /// grows the rendered text by 8 characters per level from "X" (1 char),
 /// so the 64th wrap is the first to exceed max_print_chars (512):
 /// 1 + 8*63 = 505 fits, 1 + 8*64 = 513 does not.
-[[nodiscard]] constexpr auto sixty_four_nested_quotes() -> std::array<char, 65> {
+[[nodiscard]] constexpr auto sixty_four_nested_quotes()
+    -> std::array<char, 65> {
     std::array<char, 65> source{};
     std::ranges::fill(std::span(source).first(64), '\'');
     source[64] = 'x';
