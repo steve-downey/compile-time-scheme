@@ -111,3 +111,15 @@ Between step A3's deletion of =smdlisp= and this step, the reader had no differe
 Also recorded here because it was found while broadening this file, not because anything changed: =conformance/sbcl_differential.test.cpp=, despite its name, has never compared =cl= against SBCL -- it checks SBCL's output against the corpus's own transcribed expectation strings, which validates the corpus rather than this project's evaluator (DIV-0034). The evaluator layer accordingly still has no differential against an outside authority; only the reader layer does, as of this step.
 
 #+transclude: [[file:../src/smd/cl/conformance/reader_differential.test.cpp::05847dd9-bb9c-4e88-bb71-734ff3f3bf8a]] :lines 2- :src cpp :end "05847dd9-bb9c-4e88-bb71-734ff3f3bf8a end"
+
+** B1: the reader splits into =detail/= headers, so later steps have somewhere to stand
+
+=src/smd/cl/reader/read.hpp= (step R3) held eleven =Ctx=-templated functions, two public entry points, a character-name table, and two =using=-declarations in one file, which meant every step of Phase B's combinator conversion (=docs/cl-parser-scoping.md=, D27-D31) would have declared the same single file as its scope and diffed against a moving target. Step B1 splits it into eight headers under =src/smd/cl/reader/detail/= -- the directory and the =smd::cl::reader::detail= namespace agree, and none of the eight is big enough to need its own tests, so none gets one (=docs/cpp-rules.md='s promotion rule). =read.hpp= itself shrinks to an umbrella that pulls the eight in dependency order and keeps only the two public entry points, =read_datum= and =read=.
+
+#+transclude: [[file:../src/smd/cl/reader/read.hpp::e6e0bb21-34e0-44cb-92ef-79f8580a1581]] :lines 2- :src cpp :end "e6e0bb21-34e0-44cb-92ef-79f8580a1581 end"
+
+=detail/read_node_fwd.hpp= is what makes the split possible rather than merely mechanical. =read_wrapped=, =read_delimited= and =read_sharpsign= all call =read_node=, and =read_node= calls all three back -- a genuine mutual recursion across what are now separate headers. Every function on both sides of the cycle is a template, so a declaration is enough at each call site; the definition in =detail/node.hpp= need only be visible at the point of instantiation, which the umbrella guarantees by including =read_node_fwd.hpp= before every caller and =node.hpp= last, after everything =read_node= dispatches to.
+
+#+transclude: [[file:../src/smd/cl/reader/detail/read_node_fwd.hpp::8a2232b6-6436-4943-b35b-69e6df6faaa2]] :lines 2- :src cpp :end "8a2232b6-6436-4943-b35b-69e6df6faaa2 end"
+
+The move is mechanical by design and checked rather than trusted: no test file changed, the ctest count is identical to the pre-split baseline (311 entries, both legs), and =make compile-headers= -- with =CMAKE_VERIFY_INTERFACE_HEADER_SETS= on -- compiles each of the eight new headers as an independent translation unit, so none of them is accidentally self-contained only by luck of the umbrella's include order. =scan_token= and =classify_number= are untouched, per Phase B's standing constraint that whole-token classification (DIV-0003) stays structurally unbreakable rather than merely tested against.
