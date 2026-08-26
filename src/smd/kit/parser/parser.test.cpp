@@ -13,6 +13,7 @@
 
 using smd::kit::foundation::parse_error;
 using smd::kit::foundation::source_pos;
+using smd::kit::parser::char_p;
 using smd::kit::parser::cursor;
 using smd::kit::parser::map;
 using smd::kit::parser::no_context;
@@ -21,6 +22,7 @@ using smd::kit::parser::parse_result;
 using smd::kit::parser::parse_state;
 using smd::kit::parser::parser;
 using smd::kit::parser::pure;
+using smd::kit::parser::satisfy;
 
 TEST_CASE("ParserTest - HeaderIsIdempotent") { REQUIRE(true); }
 
@@ -168,4 +170,71 @@ TEST_CASE("ParserTest - ScaledCharReadsItsContext") {
     auto const r = scaled_char(cursor{"a"}, ctx);
     REQUIRE(r.has_value());
     CHECK(r.value().value == static_cast<int>('a') * 5);
+}
+
+// --- satisfy and char_p, for any threaded context. -------------------------
+
+static_assert([] {
+    no_context ctx{};
+    auto const digit =
+        satisfy([](char c) { return c >= '0' && c <= '9'; }, "expected digit");
+    auto const r = run(digit, "5x", ctx);
+    return r.has_value() && r.value().value == '5' &&
+           r.value().rest.remaining() == "x";
+}());
+
+static_assert([] {
+    no_context ctx{};
+    auto const digit =
+        satisfy([](char c) { return c >= '0' && c <= '9'; }, "expected digit");
+    auto const r = run(digit, "x5", ctx);
+    return !r.has_value() && r.error().where.offset == 0 &&
+           std::string_view{r.error().message} == "expected digit";
+}());
+
+static_assert([] {
+    no_context ctx{};
+    return run(char_p('('), "(rest", ctx).has_value() &&
+           run(char_p('('), "(rest", ctx).value().rest.remaining() == "rest" &&
+           !run(char_p('('), ")rest", ctx).has_value();
+}());
+
+TEST_CASE("ParserTest - SatisfyConsumesOneCharacterOnMatch") {
+    no_context ctx{};
+    auto const digit =
+        satisfy([](char c) { return c >= '0' && c <= '9'; }, "expected digit");
+    auto const r = run(digit, "5x", ctx);
+    REQUIRE(r.has_value());
+    CHECK(r.value().value == '5');
+    CHECK(r.value().rest.remaining() == "x");
+}
+
+TEST_CASE("ParserTest - SatisfyFailsAtCurrentPositionWithoutConsuming") {
+    no_context ctx{};
+    auto const digit =
+        satisfy([](char c) { return c >= '0' && c <= '9'; }, "expected digit");
+    auto const r = run(digit, "x5", ctx);
+    REQUIRE_FALSE(r.has_value());
+    CHECK(r.error().where.offset == 0);
+    CHECK(std::string_view{r.error().message} == "expected digit");
+}
+
+TEST_CASE("ParserTest - SatisfyFailsOnEmptyInput") {
+    no_context ctx{};
+    auto const digit =
+        satisfy([](char c) { return c >= '0' && c <= '9'; }, "expected digit");
+    CHECK_FALSE(run(digit, "", ctx).has_value());
+}
+
+TEST_CASE("ParserTest - CharPMatchesExactCharacter") {
+    no_context ctx{};
+    auto const r = run(char_p('('), "(rest", ctx);
+    REQUIRE(r.has_value());
+    CHECK(r.value().value == '(');
+    CHECK(r.value().rest.remaining() == "rest");
+}
+
+TEST_CASE("ParserTest - CharPFailsOnMismatch") {
+    no_context ctx{};
+    CHECK_FALSE(run(char_p('('), ")rest", ctx).has_value());
 }

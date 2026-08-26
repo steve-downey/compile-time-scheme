@@ -359,7 +359,18 @@ constexpr auto reports_errors() -> bool {
            fails_with("#5(1)", "sized #n(...) vectors not yet supported") &&
            fails_with("#5'x", "unexpected numeric argument after '#'") &&
            fails_with("1 2", "unexpected trailing input") &&
-           fails_with("|abc", "unterminated |");
+           fails_with("|abc", "unterminated |") &&
+           // D31 (docs/cl-parser-scoping.md): an unterminated `#|` block
+           // comment is not diagnosed at the comment. skip_block_comment
+           // consumes to end of input regardless of nesting depth, and it
+           // is the caller's end-of-input handling -- not the comment
+           // skipper -- that reports here. Pinned so a future combinator
+           // rewrite does not "improve" this into a diagnostic pointing at
+           // the unterminated comment itself, which read.test.cpp does not
+           // otherwise cover.
+           fails_with("#| unterminated", "unexpected end of input") &&
+           fails_with("#| outer #| inner |# still open",
+                      "unexpected end of input");
 }
 
 constexpr auto error_positions_track_lines() -> bool {

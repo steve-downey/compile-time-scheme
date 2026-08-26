@@ -3,6 +3,7 @@
 #ifndef SRC_SMD_KIT_PARSER_PARSER_HPP
 #define SRC_SMD_KIT_PARSER_PARSER_HPP
 
+#include <smd/kit/foundation/parse_error.hpp>
 #include <smd/kit/foundation/result.hpp>
 #include <smd/kit/parser/cursor.hpp>
 #include <smd/kit/parser/parse_context.hpp>
@@ -103,6 +104,36 @@ template <class P, class F>
         return parse_result<R>{
             parse_state<R>{f(r.value().value), r.value().rest}};
     }};
+}
+
+/// Returns a parser that succeeds when the next character satisfies @p pred,
+/// for any threaded context.
+///
+/// On success consumes one character. On failure reports @p expected at the
+/// current position.
+///
+/// @tparam Pred Predicate on @c char.
+/// @param pred     Predicate on @c char.
+/// @param expected Human-readable description of the expected token (used in
+///                 @ref foundation::parse_error::message).
+template <class Pred>
+[[nodiscard]] constexpr auto satisfy(Pred pred, char const *expected) {
+    return parser{[pred = std::move(pred), expected](
+                      cursor cur, parse_context auto &) -> parse_result<char> {
+        if (!cur.empty() && pred(cur.peek())) {
+            return parse_state<char>{cur.peek(), cur.bump()};
+        }
+        return foundation::parse_error{cur.position(), expected};
+    }};
+}
+
+/// Returns a parser that matches exactly the character @p expected, for any
+/// threaded context.
+///
+/// @param expected The character to match.
+[[nodiscard]] constexpr auto char_p(char expected) {
+    return satisfy([expected](char c) { return c == expected; },
+                   "expected char");
 }
 
 } // namespace smd::kit::parser
