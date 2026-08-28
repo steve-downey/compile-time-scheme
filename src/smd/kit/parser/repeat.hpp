@@ -3,10 +3,12 @@
 #ifndef SRC_SMD_KIT_PARSER_REPEAT_HPP
 #define SRC_SMD_KIT_PARSER_REPEAT_HPP
 
+#include <smd/kit/foundation/parse_error.hpp>
 #include <smd/kit/parser/cursor.hpp>
 #include <smd/kit/parser/parse_context.hpp>
 #include <smd/kit/parser/parser.hpp>
 
+#include <optional>
 #include <utility>
 #include <variant>
 
@@ -52,6 +54,65 @@ template <class P>
     }};
 }
 // 013cfe3b-6dfa-4f4b-b715-a59917e7715b end
+
+// cb8c05d7-14a2-42fb-a36c-1f9da8bf705a
+/// Runs @p step repeatedly, threading @p ctx, until it yields
+/// @c std::nullopt -- which ends the repetition successfully at that
+/// step's own rest cursor -- or until it fails, whose error this
+/// repetition propagates unchanged. A @c std::optional value @p step
+/// yields is otherwise discarded: this repetition supplies control flow
+/// only, not accumulation, the same division of labour @ref skip_many
+/// has with its own inner parser, which does not know what its caller
+/// does with a successful match either.
+///
+/// This is the diagnosing collecting repetition the retired iteration's
+/// `many<Capacity>` (`iteration/smdscheme-final`,
+/// `src/smd/smdscheme/parser/alt.hpp`) is not: that combinator loops
+/// until its inner parser fails and then always succeeds, so both
+/// "collected Capacity elements and there was more" and "ran out of
+/// input before the caller's own stopping condition was met" are silent
+/// truncation, never failure -- a caller relying on either to be
+/// diagnosed never finds out from that combinator, only from something
+/// else afterward, at the wrong position, with the wrong message. Here,
+/// @p step alone decides both what "stop" means (yielding
+/// @c std::nullopt) and what a capacity overflow means (failing, with
+/// whatever message and position it chooses, typically by checking its
+/// own accumulator before accepting a value) -- this repetition does not
+/// invent either policy, it only replaces the hand-written @c while(true)
+/// loop that would otherwise carry it. It is named @c many_until, not
+/// @c many_bounded or any other name suggesting it owns a capacity
+/// itself, so that its caller-supplied stopping condition is not mistaken
+/// for a truncating bound.
+///
+/// Guards a zero-consumption "keep going" value the same way @ref
+/// skip_many guards a zero-consumption success -- by stopping there
+/// rather than looping forever -- even though every known caller's own
+/// @p step always advances on a "keep going" value (reading one datum, or
+/// consuming a closing delimiter, always consumes at least one
+/// character): a future @p step that does not hold that property should
+/// not be able to hang a constexpr evaluation to find out.
+///
+/// @tparam P A parser over @c std::optional<T> for some @c T.
+template <class P>
+[[nodiscard]] constexpr auto many_until(P step) {
+    return parser{[step = std::move(step)](cursor cur, parse_context auto &ctx)
+                      -> parse_result<std::monostate> {
+        // Substrate generic algorithm: the repetition loop this
+        // combinator is built from, the collecting counterpart of
+        // skip_many's discarding one above.
+        while (true) {
+            auto const r = step(cur, ctx);
+            if (!r.has_value()) {
+                return parse_result<std::monostate>{r.error()};
+            }
+            if (!r.value().value.has_value() || r.value().rest == cur) {
+                return parse_state<std::monostate>{{}, r.value().rest};
+            }
+            cur = r.value().rest;
+        }
+    }};
+}
+// cb8c05d7-14a2-42fb-a36c-1f9da8bf705a end
 
 } // namespace smd::kit::parser
 
