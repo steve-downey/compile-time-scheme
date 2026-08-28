@@ -9,6 +9,7 @@ target_sources(
             TYPE HEADERS
             BASE_DIRS ${PROJECT_SOURCE_DIR}/src
             FILES
+                choice.hpp
                 cursor.hpp
                 parse_context.hpp
                 parser.hpp
@@ -24,6 +25,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
     target_sources(
         kit_parser_test
         PRIVATE
+            choice.test.cpp
             cursor.test.cpp
             parse_context.test.cpp
             parser.test.cpp
