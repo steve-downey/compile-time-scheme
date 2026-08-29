@@ -41,8 +41,8 @@ namespace smd::kit::parser {
 ///         @c parse_result as @p PA.
 template <class PA, class PB>
 [[nodiscard]] constexpr auto operator|(parser<PA> pa, parser<PB> pb) {
-    return parser{[pa = std::move(pa), pb = std::move(pb)](
-                      cursor cur, parse_context auto &ctx) {
+    return parser{[pa = std::move(pa),
+                   pb = std::move(pb)](cursor cur, parse_context auto &ctx) {
         auto const start = cur.position();
         auto const ra = pa(cur, ctx);
         if (ra.has_value()) {
@@ -88,8 +88,8 @@ template <class P>
         auto const r = p(cur, ctx);
         using T = std::remove_cvref_t<decltype(r.value().value)>;
         if (r.has_value()) {
-            return parse_result<std::optional<T>>{parse_state<std::optional<T>>{
-                r.value().value, r.value().rest}};
+            return parse_result<std::optional<T>>{
+                parse_state<std::optional<T>>{r.value().value, r.value().rest}};
         }
         if (r.error().where != start) {
             return parse_result<std::optional<T>>{r.error()};
