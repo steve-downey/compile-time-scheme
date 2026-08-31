@@ -11,6 +11,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <string>
 #include <string_view>
 #include <variant>
 
@@ -370,7 +371,21 @@ constexpr auto reports_errors() -> bool {
            // otherwise cover.
            fails_with("#| unterminated", "unexpected end of input") &&
            fails_with("#| outer #| inner |# still open",
-                      "unexpected end of input");
+                      "unexpected end of input") &&
+           // B5: read_character's own "expected character after #\\" was
+           // pinned nowhere before this step converted it onto bind.
+           fails_with("#\\", "expected character after #\\");
+}
+
+constexpr auto long_string_is_reported() -> bool {
+    // max_string_chars (src/smd/cl/reader/datum.hpp) is 128; one character
+    // past it must report "string too long" at the opening quote, not at
+    // the overflowing character. B5's many_until conversion of read_string
+    // preserves this, but no existing test pinned it before this step.
+    std::string text{"\""};
+    text.append(static_cast<std::size_t>(smd::cl::reader::max_string_chars) + 1,
+                'a');
+    return fails_with(text, "string too long");
 }
 
 constexpr auto error_positions_track_lines() -> bool {
@@ -449,6 +464,7 @@ static_assert(backquote_template_shape());
 static_assert(skips_comments_and_whitespace());
 static_assert(read_datum_leaves_the_rest());
 static_assert(reports_errors());
+static_assert(long_string_is_reported());
 static_assert(error_positions_track_lines());
 static_assert(capacity_errors_not_asserts());
 static_assert(list_capacity_error());
@@ -491,6 +507,7 @@ TEST_CASE("ReadTest - SequentialReads") { CHECK(read_datum_leaves_the_rest()); }
 
 TEST_CASE("ReadTest - Errors") {
     CHECK(reports_errors());
+    CHECK(long_string_is_reported());
     CHECK(error_positions_track_lines());
     CHECK(capacity_errors_not_asserts());
     CHECK(list_capacity_error());
