@@ -9,7 +9,7 @@ dependencies = []
 [dependency-groups]
 dev = [
   "clang-format==22.1.8",
-  "cmake==4.4.0",
+  "cmake==4.4.3",
   "copier>=9.17.0",
   "gcovr>=8.6",
   "mbake==1.4.6",
