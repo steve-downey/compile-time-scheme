@@ -14,7 +14,7 @@
 
 using smd::cl::foundation::alt;
 using smd::cl::foundation::alternative;
-using smd::cl::foundation::alternative_typeclass;
+using smd::cl::foundation::derive_alternative;
 
 TEST_CASE("AlternativeShimTest - HeaderIsIdempotent") { REQUIRE(true); }
 
@@ -39,19 +39,19 @@ struct logged_alternative_impl_t {
 };
 
 template <class T>
-struct logged_alternative_map : alternative<logged_alternative_impl_t<T>> {
+struct logged_alternative_map : derive_alternative<logged_alternative_impl_t<T>> {
     using logged_alternative_impl_t<T>::alt;
     using logged_alternative_impl_t<T>::empty;
 };
 
 } // namespace
 
-// alternative_typeclass now lives in smd::kit::foundation (step R8): a
+// alternative now lives in smd::kit::foundation (step R8): a
 // specialization must be declared where the primary template actually
 // lives, not merely where a using-declaration makes its name callable.
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto alternative_typeclass<logged<T>> =
+inline constexpr auto alternative<logged<T>> =
     logged_alternative_map<T>{};
 }
 

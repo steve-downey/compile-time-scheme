@@ -77,7 +77,7 @@ struct tagged_tree_functor_impl {
 };
 
 /// Functor instance map for @ref tagged_tree.
-struct tagged_tree_functor_map : functor<tagged_tree_functor_impl> {
+struct tagged_tree_functor_map : derive_functor<tagged_tree_functor_impl> {
     using tagged_tree_functor_impl::fmap;
 };
 
@@ -115,7 +115,7 @@ struct tagged_tree_foldable_impl {
 };
 
 /// Foldable instance map for @ref tagged_tree.
-struct tagged_tree_foldable_map : foldable<tagged_tree_foldable_impl> {
+struct tagged_tree_foldable_map : derive_foldable<tagged_tree_foldable_impl> {
     using tagged_tree_foldable_impl::fold_map;
     using tagged_tree_foldable_impl::fold_right;
 };
@@ -132,7 +132,7 @@ struct tagged_tree_foldable_map : foldable<tagged_tree_foldable_impl> {
 /// propagation that must stop visiting early, use @c fold_left_short.
 ///
 /// The effect type must name its carried type as @c value_type and have a
-/// registered @c applicative_typeclass instance; the carried type must be
+/// registered @c applicative instance; the carried type must be
 /// default-constructible (node storage is a @ref static_vector).
 // 8fabe263-2634-4144-abed-f69013131e52
 struct tagged_tree_traversable_impl {
@@ -148,7 +148,7 @@ struct tagged_tree_traversable_impl {
         using in_node =
             typename tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>::node_type;
         using out_nodes = static_vector<out_node, MaxNodes>;
-        auto const &tc = applicative_typeclass<effect_type>;
+        auto const &tc = applicative<effect_type>;
 
         // Every node maps to an effect carrying its image: a leaf runs f,
         // a branch is carried by pure, which has no effect of its own. The
@@ -185,7 +185,7 @@ struct tagged_tree_traversable_impl {
 // 8fabe263-2634-4144-abed-f69013131e52 end
 
 /// Traversable instance map for @ref tagged_tree.
-struct tagged_tree_traversable_map : traversable<tagged_tree_traversable_impl> {
+struct tagged_tree_traversable_map : derive_traversable<tagged_tree_traversable_impl> {
     using tagged_tree_traversable_impl::traverse;
 };
 
@@ -207,21 +207,21 @@ namespace smd::kit::foundation {
 /// Registers the Functor instance for @ref
 /// smd::cl::foundation::tagged_tree.
 template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
-inline constexpr auto functor_typeclass<
+inline constexpr auto functor<
     smd::cl::foundation::tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>> =
     smd::cl::foundation::tagged_tree_functor_map{};
 
 /// Registers the Foldable instance for @ref
 /// smd::cl::foundation::tagged_tree.
 template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
-inline constexpr auto foldable_typeclass<
+inline constexpr auto foldable<
     smd::cl::foundation::tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>> =
     smd::cl::foundation::tagged_tree_foldable_map{};
 
 /// Registers the Traversable instance for @ref
 /// smd::cl::foundation::tagged_tree.
 template <class Leaf, class Tag, int MaxNodes, int MaxChildren>
-inline constexpr auto traversable_typeclass<
+inline constexpr auto traversable<
     smd::cl::foundation::tagged_tree<Leaf, Tag, MaxNodes, MaxChildren>> =
     smd::cl::foundation::tagged_tree_traversable_map{};
 

@@ -23,7 +23,7 @@ namespace smd::kit::foundation {
 ///
 /// @tparam Impl Concrete implementation providing @c empty and @c alt.
 template <class Impl>
-struct alternative : protected Impl {
+struct derive_alternative : protected Impl {
     using Impl::alt;
     using Impl::empty;
 
@@ -40,12 +40,12 @@ struct alternative : protected Impl {
 /// Default is @c std::false_type{}, producing a compile error if @ref alt or
 /// @ref empty is called for an unregistered type.
 template <class T>
-inline constexpr auto alternative_typeclass = std::false_type{};
+inline constexpr auto alternative = std::false_type{};
 
 /// Customization-point object for the @c alt operation.
 ///
 /// Deduces the type from the first argument and dispatches through
-/// @c alternative_typeclass<A>. The NTTP @c TC may be pinned explicitly.
+/// @c alternative<A>. The NTTP @c TC may be pinned explicitly.
 struct alt_fn {
     /// Combines two alternative values.
     ///
@@ -53,7 +53,7 @@ struct alt_fn {
     /// @tparam B   Second operand type.
     /// @tparam TC  Typeclass instance (NTTP, defaults to lookup).
     template <class A, class B,
-              const auto &TC = alternative_typeclass<std::remove_cvref_t<A>>>
+              const auto &TC = alternative<std::remove_cvref_t<A>>>
     constexpr auto operator()(A &&a, B &&b) const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.alt(std::forward<A>(a), std::forward<B>(b));
@@ -73,7 +73,7 @@ struct empty_fn {
     /// @tparam T   The alternative type (explicit template argument required).
     /// @tparam TC  Typeclass instance (NTTP, defaults to lookup).
     template <class T,
-              const auto &TC = alternative_typeclass<std::remove_cvref_t<T>>>
+              const auto &TC = alternative<std::remove_cvref_t<T>>>
     constexpr auto operator()() const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.empty();

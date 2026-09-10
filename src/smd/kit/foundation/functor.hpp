@@ -22,7 +22,7 @@ namespace smd::kit::foundation {
 ///
 /// @tparam Impl Concrete implementation providing the @c fmap primitive.
 template <class Impl>
-struct functor : protected Impl {
+struct derive_functor : protected Impl {
     using Impl::fmap;
 
     /// Replaces every element of @p value with @p replacement, discarding
@@ -45,12 +45,12 @@ struct functor : protected Impl {
 /// Default value is @c std::false_type{}, which triggers a static_assert if
 /// @ref fmap is called with an unregistered type.
 template <class T>
-inline constexpr auto functor_typeclass = std::false_type{};
+inline constexpr auto functor = std::false_type{};
 
 /// Customization-point object for @c fmap.
 ///
 /// Deduces the container type @p T from the second argument and dispatches
-/// through @c functor_typeclass<T>. Callers may pin the typeclass instance
+/// through @c functor<T>. Callers may pin the typeclass instance
 /// via the NTTP default @c TC.
 struct fmap_fn {
     /// Applies @p f to every element of @p value, returning a new container.
@@ -61,7 +61,7 @@ struct fmap_fn {
     /// @param f     Function to apply element-wise.
     /// @param value Container to map over.
     template <class F, class T,
-              const auto &TC = functor_typeclass<std::remove_cvref_t<T>>>
+              const auto &TC = functor<std::remove_cvref_t<T>>>
     constexpr auto operator()(F &&f, T &&value) const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.fmap(std::forward<F>(f), std::forward<T>(value));

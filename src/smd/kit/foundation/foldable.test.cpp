@@ -14,11 +14,11 @@
 #include <utility>
 
 using smd::kit::foundation::all_monoid;
+using smd::kit::foundation::derive_foldable;
 using smd::kit::foundation::fold_left;
 using smd::kit::foundation::fold_map;
 using smd::kit::foundation::fold_right;
 using smd::kit::foundation::foldable;
-using smd::kit::foundation::foldable_typeclass;
 using smd::kit::foundation::length;
 using smd::kit::foundation::static_vector;
 using smd::kit::foundation::sum_monoid;
@@ -65,7 +65,7 @@ struct pair_box_foldable_impl {
     }
 };
 
-struct pair_box_foldable_map : foldable<pair_box_foldable_impl> {
+struct pair_box_foldable_map : derive_foldable<pair_box_foldable_impl> {
     using pair_box_foldable_impl::fold_map;
     using pair_box_foldable_impl::fold_right;
 };
@@ -74,7 +74,7 @@ struct pair_box_foldable_map : foldable<pair_box_foldable_impl> {
 
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto foldable_typeclass<pair_box<T>> = pair_box_foldable_map{};
+inline constexpr auto foldable<pair_box<T>> = pair_box_foldable_map{};
 }
 
 namespace {
@@ -148,7 +148,7 @@ TEST_CASE("FoldableTest - DerivedToVector") {
 }
 
 TEST_CASE("FoldableTest - TypeclassLookup") {
-    const auto &tc = foldable_typeclass<pair_box<int>>;
+    const auto &tc = foldable<pair_box<int>>;
     static_assert(
         !std::is_same_v<std::remove_cvref_t<decltype(tc)>, std::false_type>);
     CHECK(tc.length(one_two) == 2);

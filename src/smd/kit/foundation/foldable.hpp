@@ -41,7 +41,7 @@ namespace smd::kit::foundation {
 /// @tparam Impl Concrete implementation providing @c fold_map and
 ///              @c fold_right.
 template <class Impl>
-struct foldable : protected Impl {
+struct derive_foldable : protected Impl {
     using Impl::fold_map;
     using Impl::fold_right;
 
@@ -96,12 +96,12 @@ struct foldable : protected Impl {
 /// Default is @c std::false_type{}, producing a compile error if a Foldable
 /// operation is called for an unregistered type.
 template <class T>
-inline constexpr auto foldable_typeclass = std::false_type{};
+inline constexpr auto foldable = std::false_type{};
 
 /// Customization-point object for @c fold_map.
 ///
 /// Deduces the container type from the second argument and dispatches
-/// through @c foldable_typeclass<T>. The NTTP @c TC may be pinned explicitly.
+/// through @c foldable<T>. The NTTP @c TC may be pinned explicitly.
 struct fold_map_fn {
     /// Maps each element of @p container through @p f and combines the
     /// images with @p m, in the instance's documented traversal order.
@@ -111,7 +111,7 @@ struct fold_map_fn {
     /// @tparam M  Monoid instance object type.
     /// @tparam TC Typeclass instance (NTTP, defaults to lookup).
     template <class F, class T, class M,
-              const auto &TC = foldable_typeclass<std::remove_cvref_t<T>>>
+              const auto &TC = foldable<std::remove_cvref_t<T>>>
     constexpr auto operator()(F &&f, T const &container, M const &m) const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.fold_map(std::forward<F>(f), container, m);
@@ -125,7 +125,7 @@ inline constexpr fold_map_fn fold_map{};
 struct fold_left_fn {
     /// Left-folds @p container with @p f from @p init.
     template <class F, class Acc, class T,
-              const auto &TC = foldable_typeclass<std::remove_cvref_t<T>>>
+              const auto &TC = foldable<std::remove_cvref_t<T>>>
     constexpr auto operator()(F &&f, Acc init, T const &container) const
         -> Acc {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
@@ -141,7 +141,7 @@ inline constexpr fold_left_fn fold_left{};
 struct fold_right_fn {
     /// Right-folds @p container with @p f from @p init.
     template <class F, class Acc, class T,
-              const auto &TC = foldable_typeclass<std::remove_cvref_t<T>>>
+              const auto &TC = foldable<std::remove_cvref_t<T>>>
     constexpr auto operator()(F &&f, Acc init, T const &container) const
         -> Acc {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
@@ -157,7 +157,7 @@ inline constexpr fold_right_fn fold_right{};
 struct length_fn {
     /// Returns the number of elements in @p container.
     template <class T,
-              const auto &TC = foldable_typeclass<std::remove_cvref_t<T>>>
+              const auto &TC = foldable<std::remove_cvref_t<T>>>
     constexpr auto operator()(T const &container) const -> int {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.length(container);

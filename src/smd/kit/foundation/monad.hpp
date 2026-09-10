@@ -47,7 +47,7 @@ namespace smd::kit::foundation {
 ///
 /// @tparam Impl Concrete implementation providing @c bind and @c pure.
 template <class Impl>
-struct monad : protected Impl {
+struct derive_monad : protected Impl {
     using Impl::bind;
     using Impl::pure;
 
@@ -112,12 +112,12 @@ struct monad : protected Impl {
 /// Default is @c std::false_type{}, producing a compile error if @ref bind
 /// is called for an unregistered type.
 template <class T>
-inline constexpr auto monad_typeclass = std::false_type{};
+inline constexpr auto monad = std::false_type{};
 
 /// Customization-point object for the @c bind primitive.
 ///
 /// Deduces the monadic type from the first argument and dispatches through
-/// @c monad_typeclass<M>. The NTTP @c TC may be pinned explicitly.
+/// @c monad<M>. The NTTP @c TC may be pinned explicitly.
 struct bind_fn {
     /// Sequences @p m with @p f, which runs only if @p m succeeded.
     ///
@@ -125,7 +125,7 @@ struct bind_fn {
     /// @tparam F  Callable, @c Value -> @c Monadic<U>.
     /// @tparam TC Typeclass instance (NTTP, defaults to lookup).
     template <class M, class F,
-              const auto &TC = monad_typeclass<std::remove_cvref_t<M>>>
+              const auto &TC = monad<std::remove_cvref_t<M>>>
     constexpr auto operator()(M &&m, F &&f) const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.bind(std::forward<M>(m), std::forward<F>(f));
@@ -142,7 +142,7 @@ struct join_fn {
     /// @tparam MM A monadic value whose value type is itself monadic.
     /// @tparam TC Typeclass instance (NTTP, defaults to lookup).
     template <class MM,
-              const auto &TC = monad_typeclass<std::remove_cvref_t<MM>>>
+              const auto &TC = monad<std::remove_cvref_t<MM>>>
     constexpr auto operator()(MM &&nested) const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.join(std::forward<MM>(nested));

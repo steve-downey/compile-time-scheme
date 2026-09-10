@@ -15,7 +15,7 @@
 
 using smd::kit::foundation::alt;
 using smd::kit::foundation::alternative;
-using smd::kit::foundation::alternative_typeclass;
+using smd::kit::foundation::derive_alternative;
 
 TEST_CASE("AlternativeTest - HeaderIsIdempotent") { REQUIRE(true); }
 
@@ -46,7 +46,7 @@ struct logged_alternative_impl_t {
 };
 
 template <class T>
-struct logged_alternative_map : alternative<logged_alternative_impl_t<T>> {
+struct logged_alternative_map : derive_alternative<logged_alternative_impl_t<T>> {
     using logged_alternative_impl_t<T>::alt;
     using logged_alternative_impl_t<T>::empty;
 };
@@ -55,7 +55,7 @@ struct logged_alternative_map : alternative<logged_alternative_impl_t<T>> {
 
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto alternative_typeclass<logged<T>> =
+inline constexpr auto alternative<logged<T>> =
     logged_alternative_map<T>{};
 }
 
@@ -85,7 +85,7 @@ TEST_CASE("AlternativeTest - CrtpCombine") {
 }
 
 TEST_CASE("AlternativeTest - TypeclassLookup") {
-    const auto &tc = alternative_typeclass<logged<int>>;
+    const auto &tc = alternative<logged<int>>;
     static_assert(
         !std::is_same_v<std::remove_cvref_t<decltype(tc)>, std::false_type>);
 

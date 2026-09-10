@@ -12,9 +12,9 @@
 #include <type_traits>
 #include <utility>
 
+using smd::kit::foundation::derive_functor;
 using smd::kit::foundation::fmap;
 using smd::kit::foundation::functor;
-using smd::kit::foundation::functor_typeclass;
 
 TEST_CASE("FunctorTest - HeaderIsIdempotent") { REQUIRE(true); }
 
@@ -39,7 +39,7 @@ struct box_functor_impl {
     }
 };
 
-struct box_functor_map : functor<box_functor_impl> {
+struct box_functor_map : derive_functor<box_functor_impl> {
     using box_functor_impl::fmap;
 };
 
@@ -47,7 +47,7 @@ struct box_functor_map : functor<box_functor_impl> {
 
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto functor_typeclass<box<T>> = box_functor_map{};
+inline constexpr auto functor<box<T>> = box_functor_map{};
 }
 
 TEST_CASE("FunctorTest - CrtpFmap") {
@@ -65,7 +65,7 @@ TEST_CASE("FunctorTest - CrtpReplace") {
 }
 
 TEST_CASE("FunctorTest - TypeclassLookup") {
-    const auto &tc = functor_typeclass<box<int>>;
+    const auto &tc = functor<box<int>>;
     static_assert(
         !std::is_same_v<std::remove_cvref_t<decltype(tc)>, std::false_type>);
 

@@ -15,7 +15,7 @@
 #include <utility>
 
 using smd::kit::foundation::applicative;
-using smd::kit::foundation::applicative_typeclass;
+using smd::kit::foundation::derive_applicative;
 using smd::kit::foundation::invoke;
 
 TEST_CASE("ApplicativeTest - HeaderIsIdempotent") { REQUIRE(true); }
@@ -50,7 +50,7 @@ struct logged_applicative_impl {
     }
 };
 
-struct logged_applicative_map : applicative<logged_applicative_impl> {
+struct logged_applicative_map : derive_applicative<logged_applicative_impl> {
     using logged_applicative_impl::apply;
     using logged_applicative_impl::pure;
 };
@@ -59,7 +59,7 @@ struct logged_applicative_map : applicative<logged_applicative_impl> {
 
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto applicative_typeclass<logged<T>> =
+inline constexpr auto applicative<logged<T>> =
     logged_applicative_map{};
 }
 
@@ -116,7 +116,7 @@ TEST_CASE("ApplicativeTest - DiscardSecond") {
 }
 
 TEST_CASE("ApplicativeTest - TypeclassLookup") {
-    const auto &tc = applicative_typeclass<logged<int>>;
+    const auto &tc = applicative<logged<int>>;
     static_assert(
         !std::is_same_v<std::remove_cvref_t<decltype(tc)>, std::false_type>);
 

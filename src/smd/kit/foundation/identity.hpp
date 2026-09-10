@@ -8,8 +8,8 @@
 // generality. The corrected standard is docs/cl-rebuild-plan.md §5's own
 // test — generic in shape and free of language-specific types — which this
 // file passes outright. Moving it here also dissolves an awkwardness the
-// initial extraction had to work around: functor_typeclass and
-// applicative_typeclass already live in this namespace, so identity's own
+// initial extraction had to work around: functor and
+// applicative already live in this namespace, so identity's own
 // instances are now ordinary same-namespace specializations rather than a
 // separately-reopened block naming smd::cl::foundation::identity by
 // qualification.
@@ -54,7 +54,7 @@ struct identity_functor_impl {
 };
 
 /// Functor instance map for @ref identity.
-struct identity_functor_map : functor<identity_functor_impl> {
+struct identity_functor_map : derive_functor<identity_functor_impl> {
     using identity_functor_impl::fmap;
 };
 
@@ -76,7 +76,7 @@ struct identity_applicative_impl {
 };
 
 /// Applicative instance map for @ref identity.
-struct identity_applicative_map : applicative<identity_applicative_impl> {
+struct identity_applicative_map : derive_applicative<identity_applicative_impl> {
     using identity_applicative_impl::apply;
     using identity_applicative_impl::pure;
 };
@@ -103,22 +103,22 @@ struct identity_monad_impl {
 };
 
 /// Monad instance map for @ref identity.
-struct identity_monad_map : monad<identity_monad_impl> {
+struct identity_monad_map : derive_monad<identity_monad_impl> {
     using identity_monad_impl::bind;
     using identity_monad_impl::pure;
 };
 
 /// Registers the Functor instance for @ref identity.
 template <class T>
-inline constexpr auto functor_typeclass<identity<T>> = identity_functor_map{};
+inline constexpr auto functor<identity<T>> = identity_functor_map{};
 
 /// Registers the Monad instance for @ref identity.
 template <class T>
-inline constexpr auto monad_typeclass<identity<T>> = identity_monad_map{};
+inline constexpr auto monad<identity<T>> = identity_monad_map{};
 
 /// Registers the Applicative instance for @ref identity.
 template <class T>
-inline constexpr auto applicative_typeclass<identity<T>> =
+inline constexpr auto applicative<identity<T>> =
     identity_applicative_map{};
 
 } // namespace smd::kit::foundation

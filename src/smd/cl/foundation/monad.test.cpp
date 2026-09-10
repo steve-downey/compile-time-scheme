@@ -13,9 +13,9 @@
 #include <utility>
 
 using smd::cl::foundation::bind;
+using smd::cl::foundation::derive_monad;
 using smd::cl::foundation::join;
 using smd::cl::foundation::monad;
-using smd::cl::foundation::monad_typeclass;
 
 TEST_CASE("MonadShimTest - HeaderIsIdempotent") { REQUIRE(true); }
 
@@ -39,19 +39,19 @@ struct box_monad_impl {
     }
 };
 
-struct box_monad_map : monad<box_monad_impl> {
+struct box_monad_map : derive_monad<box_monad_impl> {
     using box_monad_impl::bind;
     using box_monad_impl::pure;
 };
 
 } // namespace
 
-// monad_typeclass lives in smd::kit::foundation: a specialization must be
+// monad lives in smd::kit::foundation: a specialization must be
 // declared where the primary template actually lives, not merely where a
 // using-declaration makes its name callable.
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto monad_typeclass<box<T>> = box_monad_map{};
+inline constexpr auto monad<box<T>> = box_monad_map{};
 }
 
 TEST_CASE("MonadShimTest - ForwardedBindCpoWorks") {

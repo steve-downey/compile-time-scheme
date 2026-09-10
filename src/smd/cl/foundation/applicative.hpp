@@ -14,7 +14,7 @@
 namespace smd::cl::foundation {
 
 using smd::kit::foundation::applicative;
-using smd::kit::foundation::applicative_typeclass;
+using smd::kit::foundation::derive_applicative;
 using smd::kit::foundation::invoke;
 using smd::kit::foundation::invoke_fn;
 

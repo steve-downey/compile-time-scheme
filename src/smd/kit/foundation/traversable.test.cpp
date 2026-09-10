@@ -15,14 +15,14 @@
 #include <type_traits>
 #include <utility>
 
-using smd::kit::foundation::applicative_typeclass;
+using smd::kit::foundation::applicative;
+using smd::kit::foundation::derive_traversable;
 using smd::kit::foundation::identity;
 using smd::kit::foundation::parse_error;
 using smd::kit::foundation::result;
 using smd::kit::foundation::sequence;
 using smd::kit::foundation::source_pos;
 using smd::kit::foundation::traversable;
-using smd::kit::foundation::traversable_typeclass;
 using smd::kit::foundation::traverse;
 
 TEST_CASE("TraversableTest - HeaderIsIdempotent") { REQUIRE(true); }
@@ -50,14 +50,14 @@ struct pair_box_traversable_impl {
         using effect_type =
             std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
         using B = typename effect_type::value_type;
-        auto const &tc = applicative_typeclass<effect_type>;
+        auto const &tc = applicative<effect_type>;
         return tc.invoke(
             [](B a, B b) { return pair_box<B>{std::move(a), std::move(b)}; },
             f(pb.first), f(pb.second));
     }
 };
 
-struct pair_box_traversable_map : traversable<pair_box_traversable_impl> {
+struct pair_box_traversable_map : derive_traversable<pair_box_traversable_impl> {
     using pair_box_traversable_impl::traverse;
 };
 
@@ -65,7 +65,7 @@ struct pair_box_traversable_map : traversable<pair_box_traversable_impl> {
 
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto traversable_typeclass<pair_box<T>> =
+inline constexpr auto traversable<pair_box<T>> =
     pair_box_traversable_map{};
 }
 
@@ -125,7 +125,7 @@ TEST_CASE("TraversableTest - ResultFailure") {
 TEST_CASE("TraversableTest - Sequence") { CHECK(sequence_collects()); }
 
 TEST_CASE("TraversableTest - TypeclassLookup") {
-    const auto &tc = traversable_typeclass<pair_box<int>>;
+    const auto &tc = traversable<pair_box<int>>;
     static_assert(
         !std::is_same_v<std::remove_cvref_t<decltype(tc)>, std::false_type>);
     auto traversed =

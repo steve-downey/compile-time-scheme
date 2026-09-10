@@ -110,7 +110,7 @@ constexpr auto make_terminating_partial(Function &&function) {
 ///
 /// @tparam Impl Concrete implementation providing @c pure and @c apply.
 template <class Impl>
-struct applicative : protected Impl {
+struct derive_applicative : protected Impl {
     using Impl::apply;
     using Impl::pure;
 
@@ -217,12 +217,12 @@ struct applicative : protected Impl {
 /// Default is @c std::false_type{}, producing a compile error if @ref invoke
 /// is called for an unregistered type.
 template <class T>
-inline constexpr auto applicative_typeclass = std::false_type{};
+inline constexpr auto applicative = std::false_type{};
 
 /// Customization-point object for the @c invoke operation.
 ///
 /// Deduces the applicative context type from the first argument and dispatches
-/// through @c applicative_typeclass<FirstArg>. The NTTP @c TC may be pinned
+/// through @c applicative<FirstArg>. The NTTP @c TC may be pinned
 /// explicitly for testing or alternate dispatch.
 struct invoke_fn {
     /// Applies @p function to one or more effectful arguments.
@@ -234,7 +234,7 @@ struct invoke_fn {
     /// @tparam TC        Typeclass instance (NTTP, defaults to lookup).
     template <
         class Function, class FirstArg, class... RestArgs,
-        const auto &TC = applicative_typeclass<std::remove_cvref_t<FirstArg>>>
+        const auto &TC = applicative<std::remove_cvref_t<FirstArg>>>
     constexpr auto operator()(Function &&function, FirstArg &&first_arg,
                               RestArgs &&...rest_args) const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;

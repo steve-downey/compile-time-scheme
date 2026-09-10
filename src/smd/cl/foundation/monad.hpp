@@ -16,10 +16,10 @@ namespace smd::cl::foundation {
 
 using smd::kit::foundation::bind;
 using smd::kit::foundation::bind_fn;
+using smd::kit::foundation::derive_monad;
 using smd::kit::foundation::join;
 using smd::kit::foundation::join_fn;
 using smd::kit::foundation::monad;
-using smd::kit::foundation::monad_typeclass;
 
 } // namespace smd::cl::foundation
 

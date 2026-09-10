@@ -35,7 +35,7 @@ namespace smd::kit::foundation {
 ///
 /// @tparam Impl Concrete implementation providing @c traverse.
 template <class Impl>
-struct traversable : protected Impl {
+struct derive_traversable : protected Impl {
     using Impl::traverse;
 
     /// Collects a container of effects into an effect of a container,
@@ -52,12 +52,12 @@ struct traversable : protected Impl {
 /// Default is @c std::false_type{}, producing a compile error if @ref
 /// traverse is called for an unregistered type.
 template <class T>
-inline constexpr auto traversable_typeclass = std::false_type{};
+inline constexpr auto traversable = std::false_type{};
 
 /// Customization-point object for @c traverse.
 ///
 /// Deduces the container type from the second argument and dispatches
-/// through @c traversable_typeclass<T>. The NTTP @c TC may be pinned
+/// through @c traversable<T>. The NTTP @c TC may be pinned
 /// explicitly.
 struct traverse_fn {
     /// Applies the effectful @p f to every element of @p container.
@@ -66,7 +66,7 @@ struct traverse_fn {
     /// @tparam T  Container type (deduced, used for typeclass lookup).
     /// @tparam TC Typeclass instance (NTTP, defaults to lookup).
     template <class F, class T,
-              const auto &TC = traversable_typeclass<std::remove_cvref_t<T>>>
+              const auto &TC = traversable<std::remove_cvref_t<T>>>
     constexpr auto operator()(F &&f, T const &container) const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.traverse(std::forward<F>(f), container);
@@ -80,7 +80,7 @@ inline constexpr traverse_fn traverse{};
 struct sequence_fn {
     /// Collects a container of effects into an effect of a container.
     template <class T,
-              const auto &TC = traversable_typeclass<std::remove_cvref_t<T>>>
+              const auto &TC = traversable<std::remove_cvref_t<T>>>
     constexpr auto operator()(T const &container) const {
         using tc_type = std::remove_cvref_t<decltype(TC)>;
         return tc_type{}.sequence(container);

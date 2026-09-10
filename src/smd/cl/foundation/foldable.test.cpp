@@ -11,9 +11,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+using smd::cl::foundation::derive_foldable;
 using smd::cl::foundation::fold_left;
 using smd::cl::foundation::foldable;
-using smd::cl::foundation::foldable_typeclass;
 using smd::cl::foundation::length;
 
 TEST_CASE("FoldableShimTest - HeaderIsIdempotent") { REQUIRE(true); }
@@ -40,19 +40,19 @@ struct pair_box_foldable_impl {
     }
 };
 
-struct pair_box_foldable_map : foldable<pair_box_foldable_impl> {
+struct pair_box_foldable_map : derive_foldable<pair_box_foldable_impl> {
     using pair_box_foldable_impl::fold_map;
     using pair_box_foldable_impl::fold_right;
 };
 
 } // namespace
 
-// foldable_typeclass now lives in smd::kit::foundation (step R8): a
+// foldable now lives in smd::kit::foundation (step R8): a
 // specialization must be declared where the primary template actually
 // lives, not merely where a using-declaration makes its name callable.
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto foldable_typeclass<pair_box<T>> = pair_box_foldable_map{};
+inline constexpr auto foldable<pair_box<T>> = pair_box_foldable_map{};
 }
 
 TEST_CASE("FoldableShimTest - ForwardedLengthAndFoldLeftCpoWork") {
