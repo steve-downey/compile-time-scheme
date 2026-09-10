@@ -3,29 +3,29 @@
 // Picked up from beman.transpose's monad-induced-monoids step
 // (include/beman/transpose/induced_monoid.hpp).
 //
-// EVIDENCE, NOT VOCABULARY. These are two monoids the kit's own typeclass
-// instances induce, not facilities anything here needs: a Monad induces a
-// monoid on its Kleisli arrows, and an Applicative induces a monoid on its
-// context, lifted from a monoid on the element. Both are named carriers with
-// their own Monoid registration, and neither registers anything for a raw
-// carrier. The header exists to show the mechanism carries the induction
-// without strain, and to record, once, the thing worth not rediscovering:
-// the categorical statement "a monad is a monoid in the category of
-// endofunctors" is inexpressible at monoid<T>, whose tensor is a product and
-// whose carrier is a type rather than a type constructor. The Kleisli
-// endomorphism monoid below is the value-level statement that survives that
-// gap -- evidence of the theorem, not the theorem itself.
+// Two monoids the kit's own typeclass instances induce: a Monad induces one
+// on its Kleisli arrows, and an Applicative induces one on its context,
+// lifted from a monoid on the element. Both are named carriers with their
+// own Monoid registration, and neither registers anything for a raw carrier.
+// Nothing else in the kit includes this header, and nothing is expected to.
+// It is here so the induction has somewhere it can be run.
 //
-// DELIBERATE DIVERGENCE FROM TRANSPOSE. Transpose erases its Kleisli arrows
-// through std::function, because a monoid's carrier must close under combine
-// and a bare lambda type does not. std::function is neither constexpr nor
-// allocation-free, and this kit is both, so the carrier here is a bounded
-// sequence of arrows under concatenation instead, interpreted by running
-// them through bind. That is the free monoid on the arrows, and running it
-// is Kleisli composition: run(fs ++ gs) == run(fs) >=> run(gs), by the
-// monad's own left-identity law. The laws are the same laws; only the
-// representation differs, and it differs for the reason this whole tree
-// exists.
+// The one thing it records that is not in the code: the categorical
+// statement "a monad is a monoid in the category of endofunctors" is
+// inexpressible at monoid<T>, whose tensor is a product and whose carrier is
+// a type rather than a type constructor. The Kleisli endomorphism monoid
+// below is the value-level statement that survives that gap. It witnesses
+// the theorem; it does not state it.
+//
+// One deliberate divergence from transpose. Transpose erases its Kleisli
+// arrows through std::function, because a monoid's carrier must close under
+// combine and a bare lambda type does not. std::function is neither
+// constexpr nor allocation-free, and this kit is both, so the carrier here
+// is a bounded sequence of arrows under concatenation, interpreted by
+// running them through bind. That is the free monoid on the arrows, and
+// running it is Kleisli composition: run(fs ++ gs) == run(fs) >=> run(gs),
+// by the monad's own left-identity law. Same laws, different
+// representation.
 #ifndef SRC_SMD_KIT_FOUNDATION_INDUCED_MONOID_HPP
 #define SRC_SMD_KIT_FOUNDATION_INDUCED_MONOID_HPP
 
@@ -45,7 +45,7 @@ namespace smd::kit::foundation {
 /// @p MonadObject is a type parameter rather than a value: every typeclass
 /// object in this kit is stateless and empty, so a registration that has no
 /// member to keep an instance in default-constructs a fresh one wherever it
-/// needs one. That construction is free, not a workaround.
+/// needs one, which costs nothing.
 ///
 /// The carrier holds the arrows rather than their composition. A composed
 /// closure would have a fresh type per composition, and a monoid's carrier
@@ -93,10 +93,9 @@ struct kleisli_endo {
 /// combine is forward Kleisli composition.
 ///
 /// The Kleisli-form monad laws — @c pure is the two-sided unit of @c >=>,
-/// and @c >=> is associative — are exactly this monoid's laws, which is the
-/// whole reason to name the carrier. It is the value-level statement of "a
-/// monad is a monoid in the category of endofunctors", and the only form of
-/// that statement this kit can make.
+/// and @c >=> is associative — are exactly this monoid's laws. That is what
+/// the carrier is named for; see the prolog for what it does and does not
+/// say about the categorical statement.
 template <class MonadObject, class A, std::size_t Capacity>
 struct kleisli_endo_monoid_t {
     using carrier = kleisli_endo<MonadObject, A, Capacity>;
