@@ -27,6 +27,7 @@ target_sources(
                 static_vector_instances.hpp
                 trampoline.hpp
                 traversable.hpp
+                typeclass_base.hpp
 )
 
 if(SCHEMEPOC_ENABLE_TESTING)
@@ -54,6 +55,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             static_vector_instances.test.cpp
             trampoline.test.cpp
             traversable.test.cpp
+            typeclass_base.test.cpp
     )
     target_link_libraries(
         kit_foundation_test
