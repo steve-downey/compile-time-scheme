@@ -63,8 +63,7 @@ struct logged_applicative_map : derive_applicative<logged_applicative_impl> {
 
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto applicative<logged<T>> =
-    logged_applicative_map{};
+inline constexpr auto applicative<logged<T>> = logged_applicative_map{};
 }
 
 TEST_CASE("ApplicativeTest - Pure") {
@@ -169,7 +168,8 @@ namespace {
 /// member has to reach invoke through the base.
 struct apply_only_impl {
     template <class V>
-    constexpr auto pure(this auto &&, V &&val) -> logged<std::remove_cvref_t<V>> {
+    constexpr auto pure(this auto &&, V &&val)
+        -> logged<std::remove_cvref_t<V>> {
         return logged<std::remove_cvref_t<V>>{"", std::forward<V>(val)};
     }
 
@@ -207,25 +207,26 @@ TEST_CASE("ApplicativeTest - DerivedMembersSurviveAnApplyOnlyImpl") {
         m.discard_second(logged<int>{"a", 1}, logged<int>{"b", 2});
     });
 
-    auto const lifted = m.lift_a2(sum2, logged<int>{"a", 1}, logged<int>{"b", 2});
+    auto const lifted =
+        m.lift_a2(sum2, logged<int>{"a", 1}, logged<int>{"b", 2});
     CHECK(lifted.value == 3);
     CHECK(lifted.log == "ab");
 
     CHECK(m.discard_first(logged<int>{"a", 1}, logged<int>{"b", 2}).value == 2);
-    CHECK(m.discard_second(logged<int>{"a", 1}, logged<int>{"b", 2}).value == 1);
+    CHECK(m.discard_second(logged<int>{"a", 1}, logged<int>{"b", 2}).value ==
+          1);
 }
 
 // --- The two concepts. ----------------------------------------------------
 
-static_assert(
-    smd::kit::foundation::applicative_object<logged_applicative_map, logged<int>>);
+static_assert(smd::kit::foundation::applicative_object<logged_applicative_map,
+                                                       logged<int>>);
 static_assert(
     smd::kit::foundation::applicative_object<apply_only_map, logged<int>>);
-static_assert(
-    smd::kit::foundation::applicative_impl<logged_applicative_impl, logged<int>>);
+static_assert(smd::kit::foundation::applicative_impl<logged_applicative_impl,
+                                                     logged<int>>);
 
 // The Impl on its own satisfies the minimal-basis concept and fails the
 // object concept: that gap is the bargain the CRTP base exists to keep.
-static_assert(
-    !smd::kit::foundation::applicative_object<logged_applicative_impl,
-                                              logged<int>>);
+static_assert(!smd::kit::foundation::applicative_object<logged_applicative_impl,
+                                                        logged<int>>);

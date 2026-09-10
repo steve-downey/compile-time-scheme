@@ -95,7 +95,8 @@ struct tagged_tree_foldable_impl {
              tagged_tree<Leaf, Tag, MaxNodes, MaxChildren> const &tree,
              M const &m) {
         return std::ranges::fold_left(
-            tree.leaves(), m.identity(), [&f, &m](auto acc, Leaf const &payload) {
+            tree.leaves(), m.identity(),
+            [&f, &m](auto acc, Leaf const &payload) {
                 return m.combine(std::move(acc), std::invoke(f, payload));
             });
     }
@@ -185,7 +186,8 @@ struct tagged_tree_traversable_impl {
 // 8fabe263-2634-4144-abed-f69013131e52 end
 
 /// Traversable instance map for @ref tagged_tree.
-struct tagged_tree_traversable_map : derive_traversable<tagged_tree_traversable_impl> {
+struct tagged_tree_traversable_map
+    : derive_traversable<tagged_tree_traversable_impl> {
     using tagged_tree_traversable_impl::traverse;
 };
 

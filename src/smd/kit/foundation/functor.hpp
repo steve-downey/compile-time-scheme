@@ -127,12 +127,11 @@ concept functor_impl = requires(Impl const &impl, Context const &context) {
 /// @c replace, and defers the failure to whenever code written much later
 /// first reaches it, three frames deep.
 template <class Obj, class Context>
-concept functor_object =
-    requires(Obj const &obj, Context const &context,
-             element_type_t<Context> const &element) {
-        obj.fmap(detail::probe_witness<element_type_t<Context>>{}, context);
-        obj.replace(context, element);
-    };
+concept functor_object = requires(Obj const &obj, Context const &context,
+                                  element_type_t<Context> const &element) {
+    obj.fmap(detail::probe_witness<element_type_t<Context>>{}, context);
+    obj.replace(context, element);
+};
 
 /// Operation object for Functor's @c fmap.
 ///

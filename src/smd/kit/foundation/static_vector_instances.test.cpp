@@ -75,7 +75,8 @@ constexpr auto fold_right_is_reverse_index_order() -> bool {
 }
 
 constexpr auto fold_map_and_length_agree() -> bool {
-    return fold_map([](int x) { return x; }, values_1_2_3(), sum_monoid<int>) == 6 &&
+    return fold_map([](int x) { return x; }, values_1_2_3(), sum_monoid<int>) ==
+               6 &&
            length(values_1_2_3()) == 3 && length(static_vector<int, 4>{}) == 0;
 }
 

@@ -177,8 +177,8 @@ struct sum {
     T value{};
 
     // HIDDEN FRIEND
-    friend constexpr auto operator==(sum const &, sum const &) -> bool =
-        default;
+    friend constexpr auto operator==(sum const &, sum const &)
+        -> bool = default;
 };
 
 /// @p T under multiplication, as a carrier with a registered instance.
@@ -187,8 +187,8 @@ struct product {
     T value{T{1}};
 
     // HIDDEN FRIEND
-    friend constexpr auto operator==(product const &, product const &) -> bool =
-        default;
+    friend constexpr auto operator==(product const &, product const &)
+        -> bool = default;
 };
 
 /// @p T under @c max, as a carrier with a registered instance.
@@ -197,8 +197,8 @@ struct maximum {
     T value{maximum_monoid_t<T>{}.identity()};
 
     // HIDDEN FRIEND
-    friend constexpr auto operator==(maximum const &, maximum const &) -> bool =
-        default;
+    friend constexpr auto operator==(maximum const &, maximum const &)
+        -> bool = default;
 };
 
 /// @p T under @c min, as a carrier with a registered instance.
@@ -207,8 +207,8 @@ struct minimum {
     T value{minimum_monoid_t<T>{}.identity()};
 
     // HIDDEN FRIEND
-    friend constexpr auto operator==(minimum const &, minimum const &) -> bool =
-        default;
+    friend constexpr auto operator==(minimum const &, minimum const &)
+        -> bool = default;
 };
 
 /// bool under disjunction, as a carrier with a registered instance.

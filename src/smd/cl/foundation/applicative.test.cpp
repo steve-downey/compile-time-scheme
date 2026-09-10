@@ -61,8 +61,7 @@ struct logged_applicative_map : derive_applicative<logged_applicative_impl> {
 // lives, not merely where a using-declaration makes its name callable.
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto applicative<logged<T>> =
-    logged_applicative_map{};
+inline constexpr auto applicative<logged<T>> = logged_applicative_map{};
 }
 
 TEST_CASE("ApplicativeShimTest - ForwardedInvokeCpoWorks") {

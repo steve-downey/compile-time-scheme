@@ -172,8 +172,8 @@ static_assert(identity_monad_map{}.fmap(twice, identity<int>{5}) ==
 // fmap and no replace. Wrapping it is the remedy, and as_functor is the one
 // visible free call that names which functor is meant.
 
-static_assert(!smd::kit::foundation::functor_object<result_monad_map,
-                                                    result<int>>);
+static_assert(
+    !smd::kit::foundation::functor_object<result_monad_map, result<int>>);
 static_assert(smd::kit::foundation::functor_object<
               decltype(result_monad_map{}.as_functor()), result<int>>);
 
@@ -208,13 +208,12 @@ static_assert(result_monad_map{}.kleisli(halve, result_pure)(8) == halve(8));
 // names the whole surface. An Impl satisfying the first need not satisfy
 // the second -- that gap is the bargain the CRTP base exists to keep.
 
-static_assert(smd::kit::foundation::monad_object<result_monad_map,
-                                                 result<int>>);
-static_assert(smd::kit::foundation::monad_object<identity_monad_map,
-                                                 identity<int>>);
 static_assert(
-    !smd::kit::foundation::monad_object<smd::kit::foundation::result_functor_map,
-                                        result<int>>);
+    smd::kit::foundation::monad_object<result_monad_map, result<int>>);
+static_assert(
+    smd::kit::foundation::monad_object<identity_monad_map, identity<int>>);
+static_assert(!smd::kit::foundation::monad_object<
+              smd::kit::foundation::result_functor_map, result<int>>);
 
 TEST_CASE("MonadTest - GroundedFmapAndAsFunctorAtRuntime") {
     CHECK(result_monad_map{}.fmap(twice, result<int>{5}) == result<int>{10});

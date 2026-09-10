@@ -129,7 +129,8 @@ inline constexpr auto monoid<kleisli_endo<MonadObject, A, Capacity>> =
 /// @c MonadObject is above.
 ///
 /// @tparam ApplicativeObject The Applicative instance object.
-/// @tparam Context           The context being lifted, e.g. @c result<sum<int>>.
+/// @tparam Context           The context being lifted, e.g. @c
+/// result<sum<int>>.
 template <class ApplicativeObject, class Context>
 struct lifted {
     Context value;

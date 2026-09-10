@@ -50,7 +50,8 @@ struct logged_alternative_impl_t {
 };
 
 template <class T>
-struct logged_alternative_map : derive_alternative<logged_alternative_impl_t<T>> {
+struct logged_alternative_map
+    : derive_alternative<logged_alternative_impl_t<T>> {
     using logged_alternative_impl_t<T>::alt;
     using logged_alternative_impl_t<T>::zero;
 };
@@ -59,8 +60,7 @@ struct logged_alternative_map : derive_alternative<logged_alternative_impl_t<T>>
 
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto alternative<logged<T>> =
-    logged_alternative_map<T>{};
+inline constexpr auto alternative<logged<T>> = logged_alternative_map<T>{};
 }
 
 TEST_CASE("AlternativeTest - CrtpEmpty") {
@@ -108,14 +108,11 @@ TEST_CASE("AlternativeTest - AltCpo") {
 
 // --- The two concepts. ----------------------------------------------------
 
-static_assert(
-    smd::kit::foundation::alternative_impl<logged_alternative_impl_t<int>,
-                                           logged<int>>);
-static_assert(
-    smd::kit::foundation::alternative_object<logged_alternative_map<int>,
-                                             logged<int>>);
+static_assert(smd::kit::foundation::alternative_impl<
+              logged_alternative_impl_t<int>, logged<int>>);
+static_assert(smd::kit::foundation::alternative_object<
+              logged_alternative_map<int>, logged<int>>);
 
 // The Impl has zero and alt and no derived combine.
-static_assert(
-    !smd::kit::foundation::alternative_object<logged_alternative_impl_t<int>,
-                                              logged<int>>);
+static_assert(!smd::kit::foundation::alternative_object<
+              logged_alternative_impl_t<int>, logged<int>>);

@@ -56,7 +56,9 @@ struct derive_monad : protected Impl {
     /// Embeds a plain value into the monadic context.
     template <class V>
     constexpr auto pure(this auto &&self, V &&value)
-        requires requires(Impl const &impl) { impl.pure(std::forward<V>(value)); }
+        requires requires(Impl const &impl) {
+            impl.pure(std::forward<V>(value));
+        }
     {
         return impl_of(self).pure(std::forward<V>(value));
     }
@@ -122,10 +124,12 @@ struct derive_monad : protected Impl {
             impl.join(std::forward<MM>(nested));
         } || requires(Impl const &impl) {
             impl.bind(std::forward<MM>(nested),
-                      [](auto const &inner) { return inner; });
+                      [](auto const & inner) { return inner; });
         }
     {
-        if constexpr (requires { impl_of(self).join(std::forward<MM>(nested)); }) {
+        if constexpr (requires {
+                          impl_of(self).join(std::forward<MM>(nested));
+                      }) {
             return impl_of(self).join(std::forward<MM>(nested));
         } else {
             return impl_of(self).bind(std::forward<MM>(nested),

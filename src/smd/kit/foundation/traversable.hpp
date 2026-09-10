@@ -57,7 +57,7 @@ struct derive_traversable : protected Impl {
     constexpr auto sequence(this auto &&self, T const &container)
         requires requires(Impl const &impl) { impl.sequence(container); } ||
                  requires {
-                     self.traverse([](auto const &effect) { return effect; },
+                     self.traverse([](auto const & effect) { return effect; },
                                    container);
                  }
     {
@@ -119,12 +119,11 @@ concept traversable_impl = requires(Impl const &impl, Context const &context) {
 /// @tparam ContextOfEffects A container of effects, for probing @c sequence.
 template <class Obj, class Context, class Effect,
           class ContextOfEffects = Context>
-concept traversable_object =
-    requires(Obj const &obj, Context const &context,
-             ContextOfEffects const &effects) {
-        obj.traverse(detail::probe_witness<Effect>{}, context);
-        obj.sequence(effects);
-    };
+concept traversable_object = requires(Obj const &obj, Context const &context,
+                                      ContextOfEffects const &effects) {
+    obj.traverse(detail::probe_witness<Effect>{}, context);
+    obj.sequence(effects);
+};
 
 /// Operation object for @c traverse.
 ///

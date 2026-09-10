@@ -82,6 +82,14 @@ Every source file opens with the repo-relative path and Emacs mode line, then SP
 ## Typeclasses
 
 - Instances are selected by variable template; a datatype and its typeclass adaptation are separate concerns.
+- The lookup variable takes the plain name — `functor<T>`, `monad<T>` — because it is the user-facing surface. The CRTP base takes the longer one, `derive_functor<Impl>`, which says what it does.
+- A base exposes an operation as its own member, never as `using Impl::op;`. A re-export re-forms the chain and the inner base's `impl_of` then sees a `self` typed as the outer wrapper, whose `Impl` is an inaccessible base.
+- Every derived operation probes `Impl` for a native version before deriving. Wrapping fills gaps; it never shadows a better operation the instance author wrote.
+- A derived member's *requires*-clause must name the same expression its body evaluates, with the same receiver. Address `Impl` only for one half of a mutually-derivable pair, or where routing through `self` is inaccessible; address `self` for anything the base can synthesize. A clause and body that disagree make the member vanish from overload resolution with no diagnostic.
+- Two concepts per typeclass. `*_object` is the class declaration and checks the whole surface, derived operations included; `*_impl` is the MINIMAL pragma and names only the complete basis. Conformance is structural either way — nothing requires deriving from the base.
+- Probing witnesses are declared, never defined: a probe appears only in an unevaluated operand, and defining it would demand a default-constructible result type.
+- A monoid gets a registration only where one instance is canonical. Numbers and booleans get none; the choice is spelled by naming a carrier (`sum<T>`, `any`).
+- `empty` is Foldable's predicate, the reading C++ already has. Alternative's identity is `zero`.
 - `fold_map` is the semantic centre; `fold_left`, `fold_right`, `length`, `to_vector` are derived where practical.
 - `traverse` is the minimal Traversable operation; it preserves shape, and effect order follows the documented Foldable order.
 - Traversal order is part of the instance contract; document it.

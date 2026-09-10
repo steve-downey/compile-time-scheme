@@ -204,14 +204,12 @@ inline constexpr auto foldable = std::false_type{};
 /// @c fold_left, @c length, @c empty and @c to_vector are all derived and
 /// belong to that concept alone.
 template <class Impl, class Context>
-concept foldable_impl =
-    requires(Impl const &impl, Context const &context,
-             element_type_t<Context> const &element) {
-        impl.fold_map([](auto const &) { return unit{}; }, context,
-                      unit_monoid);
-        impl.fold_right(detail::probe_witness2<element_type_t<Context>>{},
-                        element, context);
-    };
+concept foldable_impl = requires(Impl const &impl, Context const &context,
+                                 element_type_t<Context> const &element) {
+    impl.fold_map([](auto const &) { return unit{}; }, context, unit_monoid);
+    impl.fold_right(detail::probe_witness2<element_type_t<Context>>{}, element,
+                    context);
+};
 
 /// Deep object concept for a Foldable object over @p Context: satisfied when
 /// @p Obj provides the whole object surface — @c fold_map and @c fold_right,
@@ -221,18 +219,16 @@ concept foldable_impl =
 /// template argument, so probing it would pin an arbitrary output type into
 /// the concept rather than check the operation.
 template <class Obj, class Context>
-concept foldable_object =
-    requires(Obj const &obj, Context const &context,
-             element_type_t<Context> const &element) {
-        obj.fold_map([](auto const &) { return unit{}; }, context,
-                     unit_monoid);
-        obj.fold_right(detail::probe_witness2<element_type_t<Context>>{},
-                       element, context);
-        obj.fold_left(detail::probe_witness2<element_type_t<Context>>{},
-                      element, context);
-        obj.length(context);
-        obj.empty(context);
-    };
+concept foldable_object = requires(Obj const &obj, Context const &context,
+                                   element_type_t<Context> const &element) {
+    obj.fold_map([](auto const &) { return unit{}; }, context, unit_monoid);
+    obj.fold_right(detail::probe_witness2<element_type_t<Context>>{}, element,
+                   context);
+    obj.fold_left(detail::probe_witness2<element_type_t<Context>>{}, element,
+                  context);
+    obj.length(context);
+    obj.empty(context);
+};
 
 /// Operation object for @c fold_map.
 ///

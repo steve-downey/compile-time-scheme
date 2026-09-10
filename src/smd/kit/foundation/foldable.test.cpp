@@ -89,7 +89,8 @@ constexpr pair_box<int> one_two{1, 2};
 // fold_map is the semantic centre: map into a monoid, combine in order.
 constexpr auto fold_map_sums() -> bool {
     pair_box_foldable_map m{};
-    return m.fold_map([](int x) { return x * 10; }, one_two, sum_monoid<int>) == 30;
+    return m.fold_map([](int x) { return x * 10; }, one_two, sum_monoid<int>) ==
+           30;
 }
 
 // Derived fold_left visits first-then-second (order observable through a
@@ -182,10 +183,9 @@ TEST_CASE("FoldableTest - DerivedEmpty") {
 
 static_assert(
     smd::kit::foundation::foldable_impl<pair_box_foldable_impl, pair_box<int>>);
-static_assert(
-    smd::kit::foundation::foldable_object<pair_box_foldable_map, pair_box<int>>);
+static_assert(smd::kit::foundation::foldable_object<pair_box_foldable_map,
+                                                    pair_box<int>>);
 
 // The Impl has the two primitives and none of the derived surface.
-static_assert(
-    !smd::kit::foundation::foldable_object<pair_box_foldable_impl,
-                                           pair_box<int>>);
+static_assert(!smd::kit::foundation::foldable_object<pair_box_foldable_impl,
+                                                     pair_box<int>>);

@@ -12,17 +12,17 @@
 #include <limits>
 
 using smd::kit::foundation::all;
+using smd::kit::foundation::all_monoid;
 using smd::kit::foundation::any;
+using smd::kit::foundation::any_monoid;
 using smd::kit::foundation::maximum;
 using smd::kit::foundation::maximum_monoid_t;
 using smd::kit::foundation::minimum;
 using smd::kit::foundation::minimum_monoid_t;
 using smd::kit::foundation::monoid;
+using smd::kit::foundation::monoid_for;
 using smd::kit::foundation::product;
 using smd::kit::foundation::sum;
-using smd::kit::foundation::all_monoid;
-using smd::kit::foundation::any_monoid;
-using smd::kit::foundation::monoid_for;
 using smd::kit::foundation::sum_monoid;
 using smd::kit::foundation::unit;
 using smd::kit::foundation::unit_monoid;
@@ -92,8 +92,7 @@ static_assert(!smd::kit::foundation::has_instance_v<decltype(monoid<double>)>);
 // --- The named carriers, each registered under its own name. --------------
 
 static_assert(smd::kit::foundation::has_instance_v<decltype(monoid<unit>)>);
-static_assert(
-    smd::kit::foundation::has_instance_v<decltype(monoid<sum<int>>)>);
+static_assert(smd::kit::foundation::has_instance_v<decltype(monoid<sum<int>>)>);
 static_assert(
     smd::kit::foundation::has_instance_v<decltype(monoid<product<int>>)>);
 static_assert(smd::kit::foundation::has_instance_v<decltype(monoid<any>)>);
@@ -105,8 +104,7 @@ namespace {
 template <class Carrier>
 constexpr auto laws_hold(Carrier a, Carrier b, Carrier c) -> bool {
     auto const &m = monoid<Carrier>;
-    return m.combine(m.identity(), a) == a &&
-           m.combine(a, m.identity()) == a &&
+    return m.combine(m.identity(), a) == a && m.combine(a, m.identity()) == a &&
            m.combine(m.combine(a, b), c) == m.combine(a, m.combine(b, c));
 }
 

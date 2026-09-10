@@ -79,6 +79,18 @@ When older slideware guidance conflicts with these defaults, this file wins.
 - Lookup is via variable-template-selected typeclass objects.
 - Generic algorithms may also accept explicit or NTTP-pinned instance objects.
 - Datatypes and typeclass adaptations are separate concerns.
+- The lookup variable gets the plain name (`functor<T>`); the CRTP base that would collide with it gets the descriptive one (`derive_functor<Impl>`).
+- A base exposes every operation as its own member. Never `using Impl::op;` — that re-forms the inheritance chain and breaks two-deep composition, because the inner base's `impl_of` then addresses the outer wrapper.
+- Derived operations probe `Impl` for a native version before deriving, so an instance can beat a derivation without editing its primitives.
+- The *requires*-clause of a derived member names the same expression, on the same receiver, that its body evaluates. `Impl` is addressable only for one half of a mutually-derivable pair (`join`/`bind`, `fold_map`/`fold_right`, `invoke`/`ap`), or where `self`-routing is inaccessible (`monad`'s grounded `fmap`). Everything the base can synthesize is addressed through `self`. Where the two disagree the member is silently absent from overload resolution.
+- Each typeclass carries two concepts: a deep `*_object` concept checking the whole surface an algorithm may call, and a restricted `*_impl` concept naming only the minimal complete basis. An `Impl` satisfying the second and failing the first is the normal case, and the gap is what the CRTP base closes.
+- Monad grows only the *basis* operations of the classes it grounds, never their derived ones, so grounded instances track the grounded class's surface instead of drifting from it. `as_functor()` is how a monad object is presented where a Functor object is wanted.
+
+## Monoid Rules
+
+- A carrier is registered only where one instance is canonical. Numbers and booleans are not registered: where addition and multiplication, or conjunction and disjunction, both apply, the choice is spelled by naming a carrier (`sum<T>`, `product<T>`, `maximum<T>`, `minimum<T>`, `any`, `all`).
+- The unit is `identity()`, not `empty()`. `empty` belongs to Foldable, as the predicate.
+- `maximum`/`minimum` identities are the saturating bounds of the type — its infinities where it has them — never an adjoined element in a wider type.
 - Do not place Foldable, Applicative, or Traversable specialization logic directly into core data-structure headers unless that header is the designated adapter location.
 
 ## Foldable Rules

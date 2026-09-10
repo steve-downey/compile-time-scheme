@@ -124,10 +124,12 @@ static_assert(plain_functor_map{}.replace(box<int>{1}, 7) == box<int>{7});
 
 static_assert(smd::kit::foundation::functor_impl<box_functor_impl, box<int>>);
 static_assert(smd::kit::foundation::functor_object<box_functor_map, box<int>>);
-static_assert(smd::kit::foundation::functor_object<plain_functor_map, box<int>>);
+static_assert(
+    smd::kit::foundation::functor_object<plain_functor_map, box<int>>);
 
 // The Impl alone has fmap and no replace: it satisfies the minimal-basis
 // concept and fails the object concept. That gap is what the CRTP base is
 // for, and checking the derived surface at the gate is what moves the
 // failure from three frames deep to the call site.
-static_assert(!smd::kit::foundation::functor_object<box_functor_impl, box<int>>);
+static_assert(
+    !smd::kit::foundation::functor_object<box_functor_impl, box<int>>);

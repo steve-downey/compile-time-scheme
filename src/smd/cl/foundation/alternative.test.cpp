@@ -43,7 +43,8 @@ struct logged_alternative_impl_t {
 };
 
 template <class T>
-struct logged_alternative_map : derive_alternative<logged_alternative_impl_t<T>> {
+struct logged_alternative_map
+    : derive_alternative<logged_alternative_impl_t<T>> {
     using logged_alternative_impl_t<T>::alt;
     using logged_alternative_impl_t<T>::zero;
 };
@@ -55,8 +56,7 @@ struct logged_alternative_map : derive_alternative<logged_alternative_impl_t<T>>
 // lives, not merely where a using-declaration makes its name callable.
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto alternative<logged<T>> =
-    logged_alternative_map<T>{};
+inline constexpr auto alternative<logged<T>> = logged_alternative_map<T>{};
 }
 
 TEST_CASE("AlternativeShimTest - ForwardedAltCpoWorks") {

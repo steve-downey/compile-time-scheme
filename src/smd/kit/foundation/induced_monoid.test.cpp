@@ -65,8 +65,8 @@ constexpr auto kleisli_laws_hold(int input) -> bool {
 
     bool const left_unit = m.combine(m.identity(), f)(input) == f(input);
     bool const right_unit = m.combine(f, m.identity())(input) == f(input);
-    bool const associative =
-        m.combine(m.combine(f, g), h)(input) == m.combine(f, m.combine(g, h))(input);
+    bool const associative = m.combine(m.combine(f, g), h)(input) ==
+                             m.combine(f, m.combine(g, h))(input);
 
     return left_unit && right_unit && associative;
 }
@@ -112,8 +112,7 @@ using lifted_identity = lifted<identity_applicative_map, identity<sum<int>>>;
 template <class Carrier>
 constexpr auto lifted_laws_hold(Carrier a, Carrier b, Carrier c) -> bool {
     auto const &m = monoid<Carrier>;
-    return m.combine(m.identity(), a) == a &&
-           m.combine(a, m.identity()) == a &&
+    return m.combine(m.identity(), a) == a && m.combine(a, m.identity()) == a &&
            m.combine(m.combine(a, b), c) == m.combine(a, m.combine(b, c));
 }
 
@@ -124,10 +123,10 @@ constexpr auto lift(int n) -> lifted_result {
 } // namespace
 
 static_assert(lifted_laws_hold(lift(2), lift(3), lift(5)));
-static_assert(
-    lifted_laws_hold(lifted_identity{identity<sum<int>>{sum<int>{2}}},
-                     lifted_identity{identity<sum<int>>{sum<int>{3}}},
-                     lifted_identity{identity<sum<int>>{sum<int>{5}}}));
+static_assert(lifted_laws_hold(lifted_identity{identity<sum<int>>{sum<int>{2}}},
+                               lifted_identity{identity<sum<int>>{sum<int>{3}}},
+                               lifted_identity{
+                                   identity<sum<int>>{sum<int>{5}}}));
 
 static_assert(monoid<lifted_result>.combine(lift(2), lift(3)) == lift(5));
 static_assert(monoid<lifted_result>.identity() ==

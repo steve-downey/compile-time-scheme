@@ -61,7 +61,8 @@ struct pair_box_traversable_impl {
     }
 };
 
-struct pair_box_traversable_map : derive_traversable<pair_box_traversable_impl> {
+struct pair_box_traversable_map
+    : derive_traversable<pair_box_traversable_impl> {
     using pair_box_traversable_impl::traverse;
 };
 
@@ -69,8 +70,7 @@ struct pair_box_traversable_map : derive_traversable<pair_box_traversable_impl> 
 
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto traversable<pair_box<T>> =
-    pair_box_traversable_map{};
+inline constexpr auto traversable<pair_box<T>> = pair_box_traversable_map{};
 }
 
 namespace {
@@ -143,10 +143,8 @@ TEST_CASE("TraversableTest - TypeclassLookup") {
 // can rebind pair_box<int>'s element type to name pair_box<identity<int>>,
 // so the caller does.
 
-static_assert(
-    smd::kit::foundation::traversable_impl<pair_box_traversable_impl,
-                                           pair_box<int>, identity<int>>);
-static_assert(
-    smd::kit::foundation::traversable_object<pair_box_traversable_map,
-                                             pair_box<int>, identity<int>,
-                                             pair_box<identity<int>>>);
+static_assert(smd::kit::foundation::traversable_impl<
+              pair_box_traversable_impl, pair_box<int>, identity<int>>);
+static_assert(smd::kit::foundation::traversable_object<
+              pair_box_traversable_map, pair_box<int>, identity<int>,
+              pair_box<identity<int>>>);

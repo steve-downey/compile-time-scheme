@@ -133,9 +133,8 @@ struct derive_applicative : protected Impl {
                        std::forward<ArgInContext>(argument));
         }
     {
-        return impl_of(self).apply(
-            std::forward<FunctionInContext>(function),
-            std::forward<ArgInContext>(argument));
+        return impl_of(self).apply(std::forward<FunctionInContext>(function),
+                                   std::forward<ArgInContext>(argument));
     }
 
     /// Lifts @p function and applies it to one or more contextualized
@@ -173,8 +172,7 @@ struct derive_applicative : protected Impl {
     /// Lifts a binary function and applies it to two effectful arguments.
     /// Equivalent to @c invoke(function, a, b).
     template <class Function, class A, class B>
-    constexpr auto lift_a2(this auto &&self, Function &&function, A &&a,
-                           B &&b)
+    constexpr auto lift_a2(this auto &&self, Function &&function, A &&a, B &&b)
         requires requires(Impl const &impl) {
             impl.lift_a2(std::forward<Function>(function), std::forward<A>(a),
                          std::forward<B>(b));
@@ -220,9 +218,8 @@ struct derive_applicative : protected Impl {
                               std::forward<FunctionInContext>(function),
                               std::forward<ArgInContext>(argument));
                       }) {
-            return impl_of(self).ap(
-                std::forward<FunctionInContext>(function),
-                std::forward<ArgInContext>(argument));
+            return impl_of(self).ap(std::forward<FunctionInContext>(function),
+                                    std::forward<ArgInContext>(argument));
         } else {
             return self.apply(std::forward<FunctionInContext>(function),
                               std::forward<ArgInContext>(argument));
@@ -233,10 +230,10 @@ struct derive_applicative : protected Impl {
     /// returning the second. Logs/effects from both are preserved.
     template <class FirstArg, class SecondArg>
     constexpr auto discard_first(this auto &&self, FirstArg &&first,
-                      SecondArg &&second)
+                                 SecondArg &&second)
         requires requires(Impl const &impl) {
             impl.discard_first(std::forward<FirstArg>(first),
-                    std::forward<SecondArg>(second));
+                               std::forward<SecondArg>(second));
         } || requires {
             self.invoke(detail::probe_witness2<int>{},
                         std::forward<FirstArg>(first),
@@ -249,14 +246,13 @@ struct derive_applicative : protected Impl {
                               std::forward<SecondArg>(second));
                       }) {
             return impl_of(self).discard_first(std::forward<FirstArg>(first),
-                                    std::forward<SecondArg>(second));
+                                               std::forward<SecondArg>(second));
         } else {
             return self.invoke(
-[](const auto &, auto &&rhs) {
-                return std::forward<decltype(rhs)>(rhs);
-            },
-                std::forward<FirstArg>(first),
-                std::forward<SecondArg>(second));
+                [](const auto &, auto &&rhs) {
+                    return std::forward<decltype(rhs)>(rhs);
+                },
+                std::forward<FirstArg>(first), std::forward<SecondArg>(second));
         }
     }
 
@@ -264,10 +260,10 @@ struct derive_applicative : protected Impl {
     /// returning the first. Logs/effects from both are preserved.
     template <class FirstArg, class SecondArg>
     constexpr auto discard_second(this auto &&self, FirstArg &&first,
-                      SecondArg &&second)
+                                  SecondArg &&second)
         requires requires(Impl const &impl) {
             impl.discard_second(std::forward<FirstArg>(first),
-                    std::forward<SecondArg>(second));
+                                std::forward<SecondArg>(second));
         } || requires {
             self.invoke(detail::probe_witness2<int>{},
                         std::forward<FirstArg>(first),
@@ -279,15 +275,14 @@ struct derive_applicative : protected Impl {
                               std::forward<FirstArg>(first),
                               std::forward<SecondArg>(second));
                       }) {
-            return impl_of(self).discard_second(std::forward<FirstArg>(first),
-                                    std::forward<SecondArg>(second));
+            return impl_of(self).discard_second(
+                std::forward<FirstArg>(first), std::forward<SecondArg>(second));
         } else {
             return self.invoke(
-            [](auto &&lhs, const auto &) {
-                return std::forward<decltype(lhs)>(lhs);
-            },
-                std::forward<FirstArg>(first),
-                std::forward<SecondArg>(second));
+                [](auto &&lhs, const auto &) {
+                    return std::forward<decltype(lhs)>(lhs);
+                },
+                std::forward<FirstArg>(first), std::forward<SecondArg>(second));
         }
     }
 
@@ -332,13 +327,12 @@ inline constexpr auto applicative = std::false_type{};
 /// @c discard_second are all derived and belong to @ref applicative_object
 /// alone.
 template <class Impl, class Context>
-concept applicative_impl =
-    requires(Impl const &impl, Context const &context,
-             element_type_t<Context> const &element) {
-        impl.pure(element);
-        impl.apply(impl.pure(detail::probe_witness<element_type_t<Context>>{}),
-                   context);
-    };
+concept applicative_impl = requires(Impl const &impl, Context const &context,
+                                    element_type_t<Context> const &element) {
+    impl.pure(element);
+    impl.apply(impl.pure(detail::probe_witness<element_type_t<Context>>{}),
+               context);
+};
 
 /// Deep object concept for an Applicative object over @p Context: satisfied
 /// when @p Obj provides the whole object surface — @c pure and @c apply,
@@ -350,20 +344,18 @@ concept applicative_impl =
 /// exists for every callable, which is what the failure mode at issue — an
 /// operation missing entirely — actually needs.
 template <class Obj, class Context>
-concept applicative_object =
-    requires(Obj const &obj, Context const &context,
-             element_type_t<Context> const &element) {
-        obj.pure(element);
-        obj.apply(obj.pure(detail::probe_witness<element_type_t<Context>>{}),
-                  context);
-        obj.ap(obj.pure(detail::probe_witness<element_type_t<Context>>{}),
-               context);
-        obj.invoke(detail::probe_witness<element_type_t<Context>>{}, context);
-        obj.lift_a2(detail::probe_witness2<element_type_t<Context>>{}, context,
-                    context);
-        obj.discard_first(context, context);
-        obj.discard_second(context, context);
-    };
+concept applicative_object = requires(Obj const &obj, Context const &context,
+                                      element_type_t<Context> const &element) {
+    obj.pure(element);
+    obj.apply(obj.pure(detail::probe_witness<element_type_t<Context>>{}),
+              context);
+    obj.ap(obj.pure(detail::probe_witness<element_type_t<Context>>{}), context);
+    obj.invoke(detail::probe_witness<element_type_t<Context>>{}, context);
+    obj.lift_a2(detail::probe_witness2<element_type_t<Context>>{}, context,
+                context);
+    obj.discard_first(context, context);
+    obj.discard_second(context, context);
+};
 
 /// Operation object for the @c invoke operation.
 ///

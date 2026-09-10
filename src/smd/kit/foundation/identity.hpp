@@ -76,7 +76,8 @@ struct identity_applicative_impl {
 };
 
 /// Applicative instance map for @ref identity.
-struct identity_applicative_map : derive_applicative<identity_applicative_impl> {
+struct identity_applicative_map
+    : derive_applicative<identity_applicative_impl> {
     using identity_applicative_impl::apply;
     using identity_applicative_impl::pure;
 };
@@ -118,8 +119,7 @@ inline constexpr auto monad<identity<T>> = identity_monad_map{};
 
 /// Registers the Applicative instance for @ref identity.
 template <class T>
-inline constexpr auto applicative<identity<T>> =
-    identity_applicative_map{};
+inline constexpr auto applicative<identity<T>> = identity_applicative_map{};
 
 } // namespace smd::kit::foundation
 

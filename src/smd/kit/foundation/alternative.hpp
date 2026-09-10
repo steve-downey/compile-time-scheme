@@ -61,9 +61,7 @@ struct derive_alternative : protected Impl {
     constexpr auto combine(this auto &&self, A &&a, B &&b)
         requires requires(Impl const &impl) {
             impl.combine(std::forward<A>(a), std::forward<B>(b));
-        } || requires {
-            self.alt(std::forward<A>(a), std::forward<B>(b));
-        }
+        } || requires { self.alt(std::forward<A>(a), std::forward<B>(b)); }
     {
         if constexpr (requires {
                           impl_of(self).combine(std::forward<A>(a),

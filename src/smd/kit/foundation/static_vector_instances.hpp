@@ -77,7 +77,8 @@ struct static_vector_foldable_impl {
 };
 
 /// Foldable instance map for @ref static_vector.
-struct static_vector_foldable_map : derive_foldable<static_vector_foldable_impl> {
+struct static_vector_foldable_map
+    : derive_foldable<static_vector_foldable_impl> {
     using static_vector_foldable_impl::fold_map;
     using static_vector_foldable_impl::fold_right;
 };

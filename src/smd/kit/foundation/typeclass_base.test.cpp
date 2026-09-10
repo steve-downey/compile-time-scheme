@@ -79,8 +79,8 @@ struct unregistered {};
 
 TEST_CASE("TypeclassBaseTest - ElementTypeExtractsTheElementType") {
     STATIC_REQUIRE(std::is_same_v<kf::element_type_t<box<int>>, int>);
-    STATIC_REQUIRE(std::is_same_v<kf::element_type_t<box<double> const &>,
-                                  double>);
+    STATIC_REQUIRE(
+        std::is_same_v<kf::element_type_t<box<double> const &>, double>);
 }
 
 TEST_CASE("TypeclassBaseTest - HasInstanceSeesPastTheFalseTypeDefault") {
@@ -118,11 +118,10 @@ TEST_CASE("TypeclassBaseTest - ConstPropagatesThroughTheTwoDeepCall") {
 TEST_CASE("TypeclassBaseTest - ProbeWitnessesReportTheirResultType") {
     // Declared, never defined: these are checked for invocability and
     // return type, never called.
-    STATIC_REQUIRE(std::is_invocable_r_v<int, kf::detail::probe_witness<int>,
-                                         box<char>>);
-    STATIC_REQUIRE(std::is_invocable_r_v<bool,
-                                         kf::detail::probe_witness2<bool>, int,
-                                         char>);
+    STATIC_REQUIRE(
+        std::is_invocable_r_v<int, kf::detail::probe_witness<int>, box<char>>);
+    STATIC_REQUIRE(std::is_invocable_r_v<bool, kf::detail::probe_witness2<bool>,
+                                         int, char>);
     STATIC_REQUIRE_FALSE(
         std::is_invocable_v<kf::detail::probe_witness<int>, int, int>);
 }

@@ -154,8 +154,7 @@ inline constexpr auto functor<result<T>> = result_functor_map{};
 
 /// Registers the Applicative instance for @ref result.
 template <class T>
-inline constexpr auto applicative<result<T>> =
-    result_applicative_map{};
+inline constexpr auto applicative<result<T>> = result_applicative_map{};
 
 } // namespace smd::kit::foundation
 
