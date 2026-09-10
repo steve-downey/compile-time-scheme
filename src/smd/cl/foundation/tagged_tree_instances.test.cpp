@@ -91,7 +91,7 @@ constexpr auto fold_right_is_reverse_leaf_order() -> bool {
 }
 
 constexpr auto fold_map_and_length_agree() -> bool {
-    return fold_map([](int x) { return x; }, sample_tree(), sum_monoid) == 6 &&
+    return fold_map([](int x) { return x; }, sample_tree(), sum_monoid<int>) == 6 &&
            length(sample_tree()) == 3 && length(tree{}) == 0;
 }
 

@@ -57,7 +57,7 @@ struct static_vector_foldable_impl {
     constexpr auto fold_map(this auto &&, F &&f,
                             static_vector<T, Capacity> const &values,
                             M const &m) {
-        auto acc = m.empty();
+        auto acc = m.identity();
         for (auto const &element : values) { // substrate generic algorithm
             acc = m.combine(std::move(acc), std::invoke(f, element));
         }

@@ -89,7 +89,7 @@ constexpr pair_box<int> one_two{1, 2};
 // fold_map is the semantic centre: map into a monoid, combine in order.
 constexpr auto fold_map_sums() -> bool {
     pair_box_foldable_map m{};
-    return m.fold_map([](int x) { return x * 10; }, one_two, sum_monoid) == 30;
+    return m.fold_map([](int x) { return x * 10; }, one_two, sum_monoid<int>) == 30;
 }
 
 // Derived fold_left visits first-then-second (order observable through a
@@ -160,7 +160,7 @@ TEST_CASE("FoldableTest - TypeclassLookup") {
 }
 
 TEST_CASE("FoldableTest - Cpos") {
-    CHECK(fold_map([](int x) { return x; }, one_two, sum_monoid) == 3);
+    CHECK(fold_map([](int x) { return x; }, one_two, sum_monoid<int>) == 3);
     CHECK(fold_left([](int acc, int x) { return acc + x; }, 0, one_two) == 3);
     CHECK(fold_right([](int x, int acc) { return acc + x; }, 0, one_two) == 3);
     CHECK(length(one_two) == 2);

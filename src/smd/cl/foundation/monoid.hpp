@@ -15,16 +15,30 @@
 
 namespace smd::cl::foundation {
 
+using smd::kit::foundation::all;
 using smd::kit::foundation::all_monoid;
 using smd::kit::foundation::all_monoid_t;
+using smd::kit::foundation::any;
 using smd::kit::foundation::any_monoid;
 using smd::kit::foundation::any_monoid_t;
+using smd::kit::foundation::maximum;
+using smd::kit::foundation::maximum_monoid;
+using smd::kit::foundation::maximum_monoid_t;
+using smd::kit::foundation::minimum;
+using smd::kit::foundation::minimum_monoid;
+using smd::kit::foundation::minimum_monoid_t;
+using smd::kit::foundation::monoid;
 using smd::kit::foundation::monoid_for;
+using smd::kit::foundation::product;
+using smd::kit::foundation::product_monoid;
+using smd::kit::foundation::product_monoid_t;
+using smd::kit::foundation::sum;
 using smd::kit::foundation::sum_monoid;
 using smd::kit::foundation::sum_monoid_t;
 using smd::kit::foundation::unit;
 using smd::kit::foundation::unit_monoid;
 using smd::kit::foundation::unit_monoid_t;
+using smd::kit::foundation::wrapped_monoid_t;
 
 } // namespace smd::cl::foundation
 

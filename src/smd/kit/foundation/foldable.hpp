@@ -115,14 +115,14 @@ struct derive_foldable : protected Impl {
         requires requires(Impl const &impl) { impl.length(container); } ||
                  requires {
                      self.fold_map([](auto const &) { return 1; }, container,
-                                   sum_monoid);
+                                   sum_monoid<int>);
                  }
     {
         if constexpr (requires { impl_of(self).length(container); }) {
             return impl_of(self).length(container);
         } else {
             return self.fold_map([](auto const &) { return 1; }, container,
-                                 sum_monoid);
+                                 sum_monoid<int>);
         }
     }
 

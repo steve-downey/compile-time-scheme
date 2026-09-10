@@ -95,7 +95,7 @@ struct tagged_tree_foldable_impl {
              tagged_tree<Leaf, Tag, MaxNodes, MaxChildren> const &tree,
              M const &m) {
         return std::ranges::fold_left(
-            tree.leaves(), m.empty(), [&f, &m](auto acc, Leaf const &payload) {
+            tree.leaves(), m.identity(), [&f, &m](auto acc, Leaf const &payload) {
                 return m.combine(std::move(acc), std::invoke(f, payload));
             });
     }
