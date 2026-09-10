@@ -26,6 +26,10 @@ namespace {
 /// base's derived `combine` without pulling in a production type.
 template <class T>
 struct logged {
+    /// The carried type, which @c element_type_t reads to key the deep
+    /// object concepts.
+    using value_type = T;
+
     std::string log;
     T value;
 };
@@ -101,3 +105,17 @@ TEST_CASE("AlternativeTest - AltCpo") {
     CHECK(result.log == "a:b:");
     CHECK(result.value == 2);
 }
+
+// --- The two concepts. ----------------------------------------------------
+
+static_assert(
+    smd::kit::foundation::alternative_impl<logged_alternative_impl_t<int>,
+                                           logged<int>>);
+static_assert(
+    smd::kit::foundation::alternative_object<logged_alternative_map<int>,
+                                             logged<int>>);
+
+// The Impl has zero and alt and no derived combine.
+static_assert(
+    !smd::kit::foundation::alternative_object<logged_alternative_impl_t<int>,
+                                              logged<int>>);

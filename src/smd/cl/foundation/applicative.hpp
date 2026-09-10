@@ -13,8 +13,16 @@
 
 namespace smd::cl::foundation {
 
+using smd::kit::foundation::ap;
+using smd::kit::foundation::ap_fn;
 using smd::kit::foundation::applicative;
+using smd::kit::foundation::applicative_impl;
+using smd::kit::foundation::applicative_object;
 using smd::kit::foundation::derive_applicative;
+using smd::kit::foundation::discard_first;
+using smd::kit::foundation::discard_first_fn;
+using smd::kit::foundation::discard_second;
+using smd::kit::foundation::discard_second_fn;
 using smd::kit::foundation::invoke;
 using smd::kit::foundation::invoke_fn;
 

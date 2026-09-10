@@ -34,6 +34,10 @@ namespace {
 /// instance.
 template <class T>
 struct pair_box {
+    /// The carried type, which @c element_type_t reads to key the deep
+    /// object concepts.
+    using value_type = T;
+
     T first;
     T second;
 
@@ -132,3 +136,17 @@ TEST_CASE("TraversableTest - TypeclassLookup") {
         tc.traverse([](int x) { return identity<int>{x}; }, one_two);
     CHECK(traversed == identity<pair_box<int>>{one_two});
 }
+
+// --- The two concepts. ----------------------------------------------------
+//
+// The object concept takes the container of effects separately: nothing here
+// can rebind pair_box<int>'s element type to name pair_box<identity<int>>,
+// so the caller does.
+
+static_assert(
+    smd::kit::foundation::traversable_impl<pair_box_traversable_impl,
+                                           pair_box<int>, identity<int>>);
+static_assert(
+    smd::kit::foundation::traversable_object<pair_box_traversable_map,
+                                             pair_box<int>, identity<int>,
+                                             pair_box<identity<int>>>);

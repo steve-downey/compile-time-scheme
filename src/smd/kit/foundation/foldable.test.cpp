@@ -15,6 +15,7 @@
 
 using smd::kit::foundation::all_monoid;
 using smd::kit::foundation::derive_foldable;
+using smd::kit::foundation::empty;
 using smd::kit::foundation::fold_left;
 using smd::kit::foundation::fold_map;
 using smd::kit::foundation::fold_right;
@@ -32,6 +33,10 @@ namespace {
 /// in a production instance.
 template <class T>
 struct pair_box {
+    /// The carried type, which @c element_type_t reads to key the deep
+    /// object concepts.
+    using value_type = T;
+
     T first;
     T second;
 
@@ -160,3 +165,27 @@ TEST_CASE("FoldableTest - Cpos") {
     CHECK(fold_right([](int x, int acc) { return acc + x; }, 0, one_two) == 3);
     CHECK(length(one_two) == 2);
 }
+
+// --- The empty predicate, and the two concepts. ---------------------------
+//
+// Foldable's empty is the predicate -- "holds nothing" -- which is the
+// reading C++ already has for the name in std::empty, std::ranges::empty and
+// every container's own member. Alternative's identity element is zero. One
+// namespace holds the whole typeclass family, so the name had to go to one
+// of them, and it went to the one whose reading the host language already
+// fixes.
+
+TEST_CASE("FoldableTest - DerivedEmpty") {
+    CHECK_FALSE(empty(one_two));
+    CHECK_FALSE(pair_box_foldable_map{}.empty(one_two));
+}
+
+static_assert(
+    smd::kit::foundation::foldable_impl<pair_box_foldable_impl, pair_box<int>>);
+static_assert(
+    smd::kit::foundation::foldable_object<pair_box_foldable_map, pair_box<int>>);
+
+// The Impl has the two primitives and none of the derived surface.
+static_assert(
+    !smd::kit::foundation::foldable_object<pair_box_foldable_impl,
+                                           pair_box<int>>);

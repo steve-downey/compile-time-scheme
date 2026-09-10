@@ -96,12 +96,16 @@ namespace detail {
 /// is that one instantiation, parameterized by what the probed operation
 /// needs the callable to produce. Its presence in a concept is a witness
 /// that the operation exists, not a proof that it exists for every callable.
+///
+/// The call operator is declared and never defined. A probe is not meant to
+/// run — it appears only in the unevaluated operand of a requires-expression
+/// — and defining it would force @p Result to be default-constructible,
+/// which @c result<T> and every other carrier that must hold a value or an
+/// error is not.
 template <class Result>
 struct probe_witness {
     template <class Argument>
-    constexpr auto operator()(Argument const &) const -> Result {
-        return Result{};
-    }
+    auto operator()(Argument const &) const -> Result;
 };
 
 /// The two-argument counterpart of @ref probe_witness, for probing derived
@@ -111,12 +115,12 @@ struct probe_witness {
 /// its callable one argument at a time, and a callable invocable with either
 /// one argument or two would be accepted after the first and never reach the
 /// second, silently truncating the arity the probe means to exercise.
+///
+/// Declared and never defined, for the reason @ref probe_witness gives.
 template <class Result>
 struct probe_witness2 {
     template <class First, class Second>
-    constexpr auto operator()(First const &, Second const &) const -> Result {
-        return Result{};
-    }
+    auto operator()(First const &, Second const &) const -> Result;
 };
 
 } // namespace detail

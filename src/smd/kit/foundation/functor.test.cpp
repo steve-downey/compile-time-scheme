@@ -25,6 +25,10 @@ namespace {
 /// pulling in a production type.
 template <class T>
 struct box {
+    /// The carried type, which @c element_type_t reads to key the deep
+    /// object concepts.
+    using value_type = T;
+
     T value;
 
     friend constexpr auto operator==(box const &, box const &)
@@ -79,3 +83,51 @@ TEST_CASE("FunctorTest - FmapCpo") {
     auto b2 = fmap([](int x) { return x * 3; }, b);
     CHECK(b2.value == 9);
 }
+
+// --- Native preference on a derived operation. ----------------------------
+//
+// Wrapping fills gaps; it never shadows a better operation the instance
+// author supplied. An Impl that writes its own replace gets its own replace,
+// not the fmap-based derivation.
+
+namespace {
+
+/// A box functor whose Impl supplies a native replace that leaves a mark,
+/// so the two paths are distinguishable at the value level.
+struct marking_functor_impl {
+    template <class F, class T>
+    constexpr auto fmap(this auto &&, F &&func, box<T> const &b) {
+        return box{std::forward<F>(func)(b.value)};
+    }
+
+    template <class T, class U>
+    constexpr auto replace(this auto &&, box<T> const &, U &&replacement) {
+        return box<std::remove_cvref_t<U>>{
+            static_cast<std::remove_cvref_t<U>>(replacement + 100)};
+    }
+};
+
+struct marking_functor_map : derive_functor<marking_functor_impl> {
+    using marking_functor_impl::fmap;
+    using marking_functor_impl::replace;
+};
+
+/// The same functor without a native replace, so the derivation runs.
+struct plain_functor_map : derive_functor<box_functor_impl> {};
+
+} // namespace
+
+static_assert(marking_functor_map{}.replace(box<int>{1}, 7) == box<int>{107});
+static_assert(plain_functor_map{}.replace(box<int>{1}, 7) == box<int>{7});
+
+// --- The two concepts. ----------------------------------------------------
+
+static_assert(smd::kit::foundation::functor_impl<box_functor_impl, box<int>>);
+static_assert(smd::kit::foundation::functor_object<box_functor_map, box<int>>);
+static_assert(smd::kit::foundation::functor_object<plain_functor_map, box<int>>);
+
+// The Impl alone has fmap and no replace: it satisfies the minimal-basis
+// concept and fails the object concept. That gap is what the CRTP base is
+// for, and checking the derived surface at the gate is what moves the
+// failure from three frames deep to the call site.
+static_assert(!smd::kit::foundation::functor_object<box_functor_impl, box<int>>);

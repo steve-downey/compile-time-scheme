@@ -24,6 +24,10 @@ namespace {
 
 template <class T>
 struct logged {
+    /// The carried type, which @c element_type_t reads to key the deep
+    /// object concepts.
+    using value_type = T;
+
     std::string log;
     T value;
 };

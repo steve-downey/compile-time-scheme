@@ -21,6 +21,8 @@
 namespace smd::cl::foundation {
 
 using smd::kit::foundation::derive_foldable;
+using smd::kit::foundation::empty;
+using smd::kit::foundation::empty_fn;
 using smd::kit::foundation::fold_left;
 using smd::kit::foundation::fold_left_fn;
 using smd::kit::foundation::fold_map;
@@ -28,6 +30,8 @@ using smd::kit::foundation::fold_map_fn;
 using smd::kit::foundation::fold_right;
 using smd::kit::foundation::fold_right_fn;
 using smd::kit::foundation::foldable;
+using smd::kit::foundation::foldable_impl;
+using smd::kit::foundation::foldable_object;
 using smd::kit::foundation::length;
 using smd::kit::foundation::length_fn;
 

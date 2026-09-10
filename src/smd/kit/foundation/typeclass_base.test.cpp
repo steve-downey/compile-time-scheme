@@ -116,8 +116,13 @@ TEST_CASE("TypeclassBaseTest - ConstPropagatesThroughTheTwoDeepCall") {
 }
 
 TEST_CASE("TypeclassBaseTest - ProbeWitnessesReportTheirResultType") {
-    constexpr kf::detail::probe_witness<int> one{};
-    constexpr kf::detail::probe_witness2<bool> two{};
-    STATIC_REQUIRE(one(box<char>{'x'}) == 0);
-    STATIC_REQUIRE(two(1, 'c') == false);
+    // Declared, never defined: these are checked for invocability and
+    // return type, never called.
+    STATIC_REQUIRE(std::is_invocable_r_v<int, kf::detail::probe_witness<int>,
+                                         box<char>>);
+    STATIC_REQUIRE(std::is_invocable_r_v<bool,
+                                         kf::detail::probe_witness2<bool>, int,
+                                         char>);
+    STATIC_REQUIRE_FALSE(
+        std::is_invocable_v<kf::detail::probe_witness<int>, int, int>);
 }

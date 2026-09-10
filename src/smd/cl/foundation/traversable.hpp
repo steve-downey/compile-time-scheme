@@ -19,6 +19,8 @@ using smd::kit::foundation::derive_traversable;
 using smd::kit::foundation::sequence;
 using smd::kit::foundation::sequence_fn;
 using smd::kit::foundation::traversable;
+using smd::kit::foundation::traversable_impl;
+using smd::kit::foundation::traversable_object;
 using smd::kit::foundation::traverse;
 using smd::kit::foundation::traverse_fn;
 

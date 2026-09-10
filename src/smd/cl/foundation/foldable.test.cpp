@@ -22,6 +22,10 @@ namespace {
 
 template <class T>
 struct pair_box {
+    /// The carried type, which @c element_type_t reads to key the deep
+    /// object concepts.
+    using value_type = T;
+
     T first;
     T second;
 };

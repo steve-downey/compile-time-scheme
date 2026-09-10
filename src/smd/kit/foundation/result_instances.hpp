@@ -62,8 +62,13 @@ struct result_monad_impl {
         return result<std::remove_cvref_t<V>>{std::forward<V>(value)};
     }
 
+    // The return type is spelled out rather than deduced so that probing
+    // this bind -- which the Monad base's fmap clause does, with a callable
+    // that need not return a result<> at all -- checks the declaration
+    // instead of instantiating the body and hard-erroring inside it.
     template <class T, class F>
-    constexpr auto bind(this auto &&, result<T> const &step, F &&f) {
+    constexpr auto bind(this auto &&, result<T> const &step, F &&f)
+        -> std::remove_cvref_t<std::invoke_result_t<F &, T const &>> {
         using out_type =
             std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
         if (!step.has_value()) {
