@@ -17,8 +17,9 @@ The shims are: `static_vector`, `result`, `parse_error`, `source_pos`,
 `trampoline`, `result_instances`, `static_vector_instances`, and `monad`.
 
 `monad` is the eighteenth, added once the Monad typeclass landed in the kit
-independently of this item. It forwards `smd::kit::foundation::monad`,
-`monad_typeclass` and the `bind`/`join` CPOs, and it is the one shim that
+independently of this item. It forwards `smd::kit::foundation::derive_monad`,
+the `monad` lookup variable and the `bind`/`join`/`then`/`kleisli` operation
+objects, and it is the one shim that
 never had a `cl`-side definition to forward from — the typeclass was written
 in the kit directly, because `result` and its other typeclasses were already
 there — so it exists purely so that `cl` code spells its includes the way the

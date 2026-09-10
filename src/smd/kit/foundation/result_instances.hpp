@@ -37,7 +37,7 @@ struct result_functor_impl {
 };
 
 /// Functor instance map for @ref result.
-struct result_functor_map : functor<result_functor_impl> {
+struct result_functor_map : derive_functor<result_functor_impl> {
     using result_functor_impl::fmap;
 };
 
@@ -62,8 +62,13 @@ struct result_monad_impl {
         return result<std::remove_cvref_t<V>>{std::forward<V>(value)};
     }
 
+    // The return type is spelled out rather than deduced so that probing
+    // this bind -- which the Monad base's fmap clause does, with a callable
+    // that need not return a result<> at all -- checks the declaration
+    // instead of instantiating the body and hard-erroring inside it.
     template <class T, class F>
-    constexpr auto bind(this auto &&, result<T> const &step, F &&f) {
+    constexpr auto bind(this auto &&, result<T> const &step, F &&f)
+        -> std::remove_cvref_t<std::invoke_result_t<F &, T const &>> {
         using out_type =
             std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
         if (!step.has_value()) {
@@ -74,14 +79,14 @@ struct result_monad_impl {
 };
 
 /// Monad instance map for @ref result.
-struct result_monad_map : monad<result_monad_impl> {
+struct result_monad_map : derive_monad<result_monad_impl> {
     using result_monad_impl::bind;
     using result_monad_impl::pure;
 };
 
 /// Registers the Monad instance for @ref result.
 template <class T>
-inline constexpr auto monad_typeclass<result<T>> = result_monad_map{};
+inline constexpr auto monad<result<T>> = result_monad_map{};
 
 /// Monadic sequencing for @ref result, under the datatype's own name:
 /// applies @p f to the success value of @p step, or passes @p step's error
@@ -90,14 +95,14 @@ inline constexpr auto monad_typeclass<result<T>> = result_monad_map{};
 /// This is @ref result_monad_impl's @c bind reached through the @c bind CPO,
 /// and exists as a separate name on purpose. A typeclass is what lets the
 /// generic operation and the domain API be spelled differently: generic code
-/// says @c bind and dispatches on @c monad_typeclass, while a caller holding
+/// says @c bind and dispatches on @c monad, while a caller holding
 /// a concrete @ref result says @c and_then and gets it by argument-dependent
 /// lookup, which does not apply to the CPO because a CPO is an object.
 ///
 /// It lives beside the registration rather than in @c result.hpp, and that
 /// is a correctness requirement rather than a filing preference: the @c bind
 /// call below instantiates the default template argument
-/// @c monad_typeclass<result<T>>, which would select the primary
+/// @c monad<result<T>>, which would select the primary
 /// @c std::false_type in any translation unit that had not yet seen the
 /// specialization above. Specializing a variable template after a use that
 /// would have chosen it differently is ill-formed, no diagnostic required.
@@ -138,19 +143,18 @@ struct result_applicative_impl {
 };
 
 /// Applicative instance map for @ref result.
-struct result_applicative_map : applicative<result_applicative_impl> {
+struct result_applicative_map : derive_applicative<result_applicative_impl> {
     using result_applicative_impl::apply;
     using result_applicative_impl::pure;
 };
 
 /// Registers the Functor instance for @ref result.
 template <class T>
-inline constexpr auto functor_typeclass<result<T>> = result_functor_map{};
+inline constexpr auto functor<result<T>> = result_functor_map{};
 
 /// Registers the Applicative instance for @ref result.
 template <class T>
-inline constexpr auto applicative_typeclass<result<T>> =
-    result_applicative_map{};
+inline constexpr auto applicative<result<T>> = result_applicative_map{};
 
 } // namespace smd::kit::foundation
 

@@ -15,7 +15,7 @@
 #include <utility>
 
 using smd::cl::foundation::applicative;
-using smd::cl::foundation::applicative_typeclass;
+using smd::cl::foundation::derive_applicative;
 using smd::cl::foundation::invoke;
 
 TEST_CASE("ApplicativeShimTest - HeaderIsIdempotent") { REQUIRE(true); }
@@ -24,6 +24,10 @@ namespace {
 
 template <class T>
 struct logged {
+    /// The carried type, which @c element_type_t reads to key the deep
+    /// object concepts.
+    using value_type = T;
+
     std::string log;
     T value;
 };
@@ -45,20 +49,19 @@ struct logged_applicative_impl {
     }
 };
 
-struct logged_applicative_map : applicative<logged_applicative_impl> {
+struct logged_applicative_map : derive_applicative<logged_applicative_impl> {
     using logged_applicative_impl::apply;
     using logged_applicative_impl::pure;
 };
 
 } // namespace
 
-// applicative_typeclass now lives in smd::kit::foundation (step R8): a
+// applicative now lives in smd::kit::foundation (step R8): a
 // specialization must be declared where the primary template actually
 // lives, not merely where a using-declaration makes its name callable.
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto applicative_typeclass<logged<T>> =
-    logged_applicative_map{};
+inline constexpr auto applicative<logged<T>> = logged_applicative_map{};
 }
 
 TEST_CASE("ApplicativeShimTest - ForwardedInvokeCpoWorks") {

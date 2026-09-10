@@ -17,10 +17,10 @@
 #include <type_traits>
 #include <utility>
 
-using smd::cl::foundation::applicative_typeclass;
+using smd::cl::foundation::applicative;
+using smd::cl::foundation::derive_traversable;
 using smd::cl::foundation::identity;
 using smd::cl::foundation::traversable;
-using smd::cl::foundation::traversable_typeclass;
 using smd::cl::foundation::traverse;
 
 TEST_CASE("TraversableShimTest - HeaderIsIdempotent") { REQUIRE(true); }
@@ -41,24 +41,24 @@ struct box_traversable_impl {
         using effect_type =
             std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
         using B = typename effect_type::value_type;
-        auto const &tc = applicative_typeclass<effect_type>;
+        auto const &tc = applicative<effect_type>;
         return tc.invoke([](B mapped) { return box<B>{std::move(mapped)}; },
                          f(b.value));
     }
 };
 
-struct box_traversable_map : traversable<box_traversable_impl> {
+struct box_traversable_map : derive_traversable<box_traversable_impl> {
     using box_traversable_impl::traverse;
 };
 
 } // namespace
 
-// traversable_typeclass now lives in smd::kit::foundation (step R8): a
+// traversable now lives in smd::kit::foundation (step R8): a
 // specialization must be declared where the primary template actually
 // lives, not merely where a using-declaration makes its name callable.
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto traversable_typeclass<box<T>> = box_traversable_map{};
+inline constexpr auto traversable<box<T>> = box_traversable_map{};
 }
 
 TEST_CASE("TraversableShimTest - ForwardedTraverseCpoWorks") {

@@ -13,10 +13,14 @@
 
 namespace smd::cl::foundation {
 
+using smd::kit::foundation::derive_functor;
 using smd::kit::foundation::fmap;
 using smd::kit::foundation::fmap_fn;
 using smd::kit::foundation::functor;
-using smd::kit::foundation::functor_typeclass;
+using smd::kit::foundation::functor_impl;
+using smd::kit::foundation::functor_object;
+using smd::kit::foundation::replace;
+using smd::kit::foundation::replace_fn;
 
 } // namespace smd::cl::foundation
 

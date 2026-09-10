@@ -5,12 +5,15 @@
 #include <smd/kit/foundation/monad.hpp> // test 2nd include OK
 
 #include <smd/kit/foundation/applicative.hpp>
+#include <smd/kit/foundation/functor.hpp>
 #include <smd/kit/foundation/identity.hpp>
 #include <smd/kit/foundation/parse_error.hpp>
 #include <smd/kit/foundation/result.hpp>
 #include <smd/kit/foundation/result_instances.hpp>
 
 #include <catch2/catch_test_macros.hpp>
+
+#include <type_traits>
 
 using smd::kit::foundation::bind;
 using smd::kit::foundation::identity;
@@ -136,4 +139,85 @@ TEST_CASE("MonadTest - LawsHoldAtRuntimeToo") {
     CHECK(bind(identity<int>{8}, negate) == identity<int>{-8});
     CHECK(join(result<result<int>>{result<int>{3}}) == result<int>{3});
     CHECK(invoke(add, result<int>{2}, result<int>{3}) == result<int>{5});
+}
+
+// --- The Functor basis, grounded in the Monad instance. -------------------
+//
+// A monad is a functor, and derive_monad spells that as an operation:
+// fmap(f, ma) == bind(ma, pure . f). These pin the equality on both
+// registered instances, so the redundancy cannot drift.
+
+namespace {
+constexpr auto twice = [](int n) { return n * 2; };
+
+constexpr auto fmap_agrees_with_bind_and_pure(result<int> m) -> bool {
+    return result_monad_map{}.fmap(twice, m) ==
+           bind(m, [](int n) { return result_monad_map{}.pure(twice(n)); });
+}
+} // namespace
+
+static_assert(fmap_agrees_with_bind_and_pure(result<int>{5}));
+static_assert(fmap_agrees_with_bind_and_pure(result<int>{failure}));
+static_assert(result_monad_map{}.fmap(twice, result<int>{5}) ==
+              result<int>{10});
+static_assert(result_monad_map{}.fmap(twice, result<int>{failure}) ==
+              result<int>{failure});
+static_assert(identity_monad_map{}.fmap(twice, identity<int>{5}) ==
+              identity<int>{10});
+
+// --- as_functor: the presentation member. ---------------------------------
+//
+// A bare monad object correctly fails the deep functor_object concept: the
+// Monad base grows the Functor BASIS, never its derived surface, so it has
+// fmap and no replace. Wrapping it is the remedy, and as_functor is the one
+// visible free call that names which functor is meant.
+
+static_assert(
+    !smd::kit::foundation::functor_object<result_monad_map, result<int>>);
+static_assert(smd::kit::foundation::functor_object<
+              decltype(result_monad_map{}.as_functor()), result<int>>);
+
+static_assert(result_monad_map{}.as_functor().fmap(twice, result<int>{5}) ==
+              result<int>{10});
+static_assert(result_monad_map{}.as_functor().replace(result<int>{5}, 9) ==
+              result<int>{9});
+static_assert(result_monad_map{}.as_functor().replace(result<int>{failure},
+                                                      9) ==
+              result<int>{failure});
+
+// The functor it returns is derived from the object in hand, not looked up:
+// it is the same type whether or not functor<result<int>> is registered.
+static_assert(
+    std::is_same_v<decltype(result_monad_map{}.as_functor()),
+                   smd::kit::foundation::derive_functor<result_monad_map>>);
+
+// --- Kleisli composition. -------------------------------------------------
+
+static_assert(result_monad_map{}.kleisli(halve, halve)(8) == result<int>{2});
+static_assert(result_monad_map{}.kleisli(halve, halve)(7) ==
+              result<int>{failure});
+
+// pure is the two-sided unit of >=>, which is the Kleisli form of the two
+// identity laws above.
+static_assert(result_monad_map{}.kleisli(result_pure, halve)(8) == halve(8));
+static_assert(result_monad_map{}.kleisli(halve, result_pure)(8) == halve(8));
+
+// --- The two concepts. ----------------------------------------------------
+//
+// The Impl concept names the minimal complete basis; the object concept
+// names the whole surface. An Impl satisfying the first need not satisfy
+// the second -- that gap is the bargain the CRTP base exists to keep.
+
+static_assert(
+    smd::kit::foundation::monad_object<result_monad_map, result<int>>);
+static_assert(
+    smd::kit::foundation::monad_object<identity_monad_map, identity<int>>);
+static_assert(!smd::kit::foundation::monad_object<
+              smd::kit::foundation::result_functor_map, result<int>>);
+
+TEST_CASE("MonadTest - GroundedFmapAndAsFunctorAtRuntime") {
+    CHECK(result_monad_map{}.fmap(twice, result<int>{5}) == result<int>{10});
+    CHECK(result_monad_map{}.as_functor().replace(result<int>{5}, 9) ==
+          result<int>{9});
+    CHECK(result_monad_map{}.kleisli(halve, halve)(8) == result<int>{2});
 }
