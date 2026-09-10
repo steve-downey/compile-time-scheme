@@ -28,7 +28,7 @@ struct logged {
 
 template <class T>
 struct logged_alternative_impl_t {
-    constexpr auto empty(this auto &&) -> logged<T> {
+    constexpr auto zero(this auto &&) -> logged<T> {
         return logged<T>{"", T{}};
     }
 
@@ -41,7 +41,7 @@ struct logged_alternative_impl_t {
 template <class T>
 struct logged_alternative_map : derive_alternative<logged_alternative_impl_t<T>> {
     using logged_alternative_impl_t<T>::alt;
-    using logged_alternative_impl_t<T>::empty;
+    using logged_alternative_impl_t<T>::zero;
 };
 
 } // namespace

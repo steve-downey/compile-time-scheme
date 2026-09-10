@@ -31,11 +31,11 @@ struct logged {
 };
 
 /// Alternative @c Impl for @c logged<T>. Templated on @c T (rather than
-/// providing per-call member templates) because @c empty() must name
+/// providing per-call member templates) because @c zero() must name
 /// @c logged<T> in its return type with no argument to deduce it from.
 template <class T>
 struct logged_alternative_impl_t {
-    constexpr auto empty(this auto &&) -> logged<T> {
+    constexpr auto zero(this auto &&) -> logged<T> {
         return logged<T>{"", T{}};
     }
 
@@ -48,7 +48,7 @@ struct logged_alternative_impl_t {
 template <class T>
 struct logged_alternative_map : derive_alternative<logged_alternative_impl_t<T>> {
     using logged_alternative_impl_t<T>::alt;
-    using logged_alternative_impl_t<T>::empty;
+    using logged_alternative_impl_t<T>::zero;
 };
 
 } // namespace
@@ -61,7 +61,7 @@ inline constexpr auto alternative<logged<T>> =
 
 TEST_CASE("AlternativeTest - CrtpEmpty") {
     logged_alternative_map<int> m;
-    auto w = m.empty();
+    auto w = m.zero();
     CHECK(w.log.empty());
     CHECK(w.value == 0);
 }
@@ -89,7 +89,7 @@ TEST_CASE("AlternativeTest - TypeclassLookup") {
     static_assert(
         !std::is_same_v<std::remove_cvref_t<decltype(tc)>, std::false_type>);
 
-    auto w = tc.empty();
+    auto w = tc.zero();
     CHECK(w.log.empty());
     CHECK(w.value == 0);
 }
