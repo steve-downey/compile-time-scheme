@@ -12,6 +12,8 @@
 #include <smd/cl/reader/detail/read_node_fwd.hpp>
 #include <smd/cl/reader/detail/skip.hpp>
 #include <smd/cl/reader/readtable.hpp>
+#include <smd/kit/parser/parser.hpp>
+#include <smd/kit/parser/parser_instances.hpp>
 #include <smd/kit/parser/repeat.hpp>
 
 #include <optional>
@@ -19,26 +21,57 @@
 
 namespace smd::cl::reader::detail {
 
+// 086ca303-e32b-40bb-88fd-09a2cffaad61
 /// Reads the datum after a quote-family marker and wraps it in a
 /// one-child branch of @p kind.
-template <class Ctx>
+///
+/// The example @c docs/cl-parser-scoping.md § 1 leads with, and the
+/// shortest statement of what the last five steps were for. Before the
+/// layer existed this was @c and_then nested inside @c and_then -- the
+/// inner datum's result feeding a branch append, the branch append's
+/// result feeding a @ref parse_state -- which is @c bind written out by
+/// hand, twice, over two different monads that happened to share a
+/// spelling. Now the outer one is the parser Monad's own @c bind: @ref
+/// read_node lifted into a parser value, and a continuation that wraps
+/// whatever it produced.
+///
+/// Two positions have to stay apart and neither is checked by the types.
+/// The branch is recorded at @p where -- the *marker's* position, passed
+/// in by @ref read_sharpsign or by @ref read_node's readtable dispatch,
+/// not the inner datum's, which for `'x` is one character further on. The
+/// cursor the whole thing resumes from is the inner datum's rest, and that
+/// one is no longer written down at all: @c bind threads it into the
+/// continuation's parser, which is exactly the class of transcription
+/// mistake the conversion removes rather than merely avoids.
+///
+/// @ref read_node is still an ordinary function template reached through
+/// @c detail/read_node_fwd.hpp, wrapped here in a @c parser at each call
+/// rather than made a parser value that closes over itself. The mutual
+/// recursion is B7's to look at; this step only stops writing its bind out
+/// longhand.
+template <reader_context Ctx>
 [[nodiscard]] constexpr auto read_wrapped(cursor after_marker, Ctx &ctx,
                                           datum_branch kind,
                                           foundation::source_pos where)
     -> foundation::result<parse_state<int>> {
-    return and_then(
-        read_node(after_marker, ctx),
-        [&](parse_state<int> const &inner)
-            -> foundation::result<parse_state<int>> {
-            typename Ctx::child_list children;
-            children.push_back(inner.value);
-            return and_then(
-                add_branch_checked(ctx, kind, children, where),
-                [&](int id) -> foundation::result<parse_state<int>> {
-                    return parse_state<int>{id, inner.rest};
-                });
-        });
+    auto const node_p = smd::kit::parser::parser{
+        [](cursor c, reader_context auto &rc) { return read_node(c, rc); }};
+    auto const wrap_in_branch = [kind, where](int inner) {
+        return smd::kit::parser::parser{
+            [kind, where, inner](cursor rest, reader_context auto &rc)
+                -> foundation::result<parse_state<int>> {
+                typename Ctx::child_list children;
+                children.push_back(inner);
+                return bind(
+                    add_branch_checked(rc, kind, children, where),
+                    [rest](int id) -> foundation::result<parse_state<int>> {
+                        return parse_state<int>{id, rest};
+                    });
+            }};
+    };
+    return bind(node_p, wrap_in_branch)(after_marker, ctx);
 }
+// 086ca303-e32b-40bb-88fd-09a2cffaad61 end
 
 // 1fe3a27d-557b-46a2-92ae-3ccd155173d2
 /// Reads `)`-delimited elements (the opening delimiter already consumed)
