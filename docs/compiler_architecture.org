@@ -281,7 +281,7 @@ Whole =make test-matrix=, both legs, from an empty build directory with =ccache=
 | C++ translation units compiled | 140 | 152 |
 | ctest entries per leg | 326 | 379 |
 
-The 40% is not all conversion cost: twelve of the extra translation units are the kit's six new headers and their six test files, and 53 of the extra ctest entries come with them. The reader's own translation unit is the honest number, compiled alone with =-fsyntax-only= and the flags taken from =compile_commands.json=, three runs, minimum reported:
+The 40% is not all conversion cost, and the two extra rows say why: all twelve extra translation units are the kit's six new test files compiled once per configuration, and all 53 extra ctest entries are theirs -- seven new suites, none of them in =cl=. The reader's own translation unit is the honest number, compiled alone with =-fsyntax-only= and the flags taken from =compile_commands.json=, three runs, minimum reported:
 
 | =read.test.cpp= | before | after | ratio |
 |-----------------+--------+-------+-------|
