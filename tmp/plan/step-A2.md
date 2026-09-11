@@ -49,7 +49,7 @@ introduced.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-a2-neutralise-consumers -b step-a2-neutralise-consumers cl-retire-trees
 cd ../step-a2-neutralise-consumers
 git submodule update --init --recursive
@@ -317,7 +317,7 @@ git merge --no-ff step-a2-neutralise-consumers
 After the merge, before cleanup.
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"A2","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + make testinstall","exit_code":0,"wall_seconds":<measured>,"log_bytes":<sum of both logs>,"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":"testinstall is not a gate; recorded for the trend, not the verdict"}
 EOF
 ```
@@ -325,12 +325,12 @@ EOF
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-a2-neutralise-consumers
 ```
 
 Mark A2 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 

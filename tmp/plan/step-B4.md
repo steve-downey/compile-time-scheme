@@ -113,7 +113,7 @@ answers to the same question, both correct for their caller. Do not unify them.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-b4-delimited -b step-b4-delimited cl-parser-combinators
 cd ../step-b4-delimited
 git submodule update --init --recursive
@@ -308,7 +308,7 @@ git merge --no-ff step-b4-delimited
 ## Record measurements
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"B4","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + compile-headers","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-B4-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
 EOF
 ```
@@ -316,12 +316,12 @@ EOF
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-b4-delimited
 ```
 
 Mark B4 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 

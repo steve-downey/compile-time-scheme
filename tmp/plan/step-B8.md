@@ -52,7 +52,7 @@ that says what the reader is now.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-b8-close -b step-b8-close cl-parser-combinators
 cd ../step-b8-close
 git submodule update --init --recursive
@@ -77,7 +77,7 @@ was asked to record it, deliberately, because taking it here from git is more
 reliable than asking seven agents to remember.
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 base=$(git merge-base main cl-parser-combinators)
 git worktree add /tmp/b8-before "$base" --detach
 cd /tmp/b8-before && git submodule update --init --recursive
@@ -221,11 +221,22 @@ git diff --stat $(git merge-base main cl-parser-combinators)..HEAD -- \
     'src/smd/cl/**/*.test.cpp' 'src/smd/cl/conformance/'
 ```
 
-**This should be empty or near-empty.** It is D31's acceptance witness stated
-as a diff: the whole series changed no reader test and no corpus expectation.
-If it is not empty, find out which step changed what and put it in your handoff
-in bold — the integration review needs to know, and a changed expectation was
-supposed to be a halt.
+**It will not be empty, and that is not a failure.** What D31's acceptance
+witness actually claims is narrower than "no test file was touched": it is that
+the series changed **no existing expectation and no corpus entry**. Adding a
+case has been permitted throughout by `AGENT-PROMPT.md`'s standing rule, and
+three steps used it — B3 pinned the unterminated `#|` behaviour, B5 pinned the
+two text diagnostics and the capacity boundary, B6 pinned `read_wrapped`'s
+branch position. Each of those closed a diagnostic that **no test covered at
+all**, which is the opposite of weakening the witness: for those paths, a green
+matrix had been proving nothing.
+
+So read the diff, do not just measure it. For every hunk, classify it as an
+addition or a modification, and say which in your handoff. An addition is the
+series working as designed and belongs in the write-up as evidence. A changed
+expectation is a defect in an earlier step that its own step file called a
+halt — put that in your handoff **in bold**, name the step and the commit, and
+do not fix it yourself.
 
 ## Commit and merge back
 
@@ -258,14 +269,20 @@ the worse combinator, chosen because D31 said this series does not get
 to improve behaviour on the way past.
 EOF
 
-git checkout cl-parser-combinators
+Then merge **from inside your own worktree**, and only from there:
+
+```sh
+git checkout cl-parser-combinators        # in ../step-b8-close, NOT in main/
 git merge --no-ff step-b8-close
 ```
+
+The checkout at `/home/sdowney/src/compile-time-scheme/main` stays on `main` and
+is never switched off it — a standing rule of this repository.
 
 ## Record measurements
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"B8","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-B8-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":"D30 before/after builds are in this step's wall time"}
 EOF
 ```
@@ -277,13 +294,13 @@ this row as a documentation change that inexplicably cost an hour.
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-b8-close
 git worktree list          # /tmp/b8-before must be gone too
 ```
 
 Mark B8 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 
