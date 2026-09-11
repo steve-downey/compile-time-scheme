@@ -1,0 +1,200 @@
+**DRAFT &mdash; pending author revision**
+
+<div class="abstract" id="orgd6df585">
+<p>
+Step A4 lands <code>smd::cl::printer::prin1</code> and its first oracle comparison in the same commit.
+A printer whose only witness is a test written from its own output is the evidence D16 refuses, so the two arrive together or the printer arrives unproven.
+The reader has had no differential oracle since A2 cut the one it had and A3 deleted what it compared against, and that gap was opened deliberately.
+The printer is a <code>foundation::cata_short</code> over the datum tree: the carrier is one node's rendered text, and the failure channel is the text not fitting.
+Eleven source strings are read here, rendered, and compared against what SBCL 2.2.9.debian's own reader and <code>prin1</code> make of the same string.
+All eleven agreed on the first run, <code>1+</code> included, which is the first time an implementation that has never seen this repository has confirmed DIV-0003.
+Three of SBCL's answers were measured rather than guessed.
+With the pretty printer off <code>'x</code> prints as <code>(QUOTE X)</code>, the empty list prints as <code>NIL</code>, and a tower prints its value where this reader prints its spelling.
+The header documents one way to fail and the code has seven, six of which nothing the reader produces can reach.
+Its capacity note says 32 KiB, which is the figure for a 64-node tree; the test file declares 96 and holds 48.
+</p>
+
+</div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 36 - Deleting Both Front Ends, and the Run That Stopped Before Its First Edit ←](phase-36-deleting-both-front-ends.md)
+
+</nav>
+
+
+# No oracle at all, deliberately
+
+`src/smd/cl/reader/oracle_compare.test.cpp` compared this reader's datum trees against `smdlisp`'s, structurally. A2 retired it. A3 deleted the tree it compared against. From there until this step the reader had nothing outside itself to be checked against. Which was the plan. A4's own commit message puts the whole loss in A3. The log puts the file in A2's commit, `0ab485c`, and the tree it reached into in A3's.
+
+D16 had already said that comparison was not worth much. A second implementation in the same repository, written by the same hand, is not external authority, and the rule has said so since it was adopted. Being right about that is not the same as having a replacement. Until this step there wasn't one.
+
+The replacement needs a printer first. SBCL will read a string and tell you what it read, and what it tells you is text. Text can not be compared against a `datum_tree`. Before this reader can face an outside implementation, it has to be able to say what it read in the alphabet that implementation answers in.
+
+Grepping `src/smd/cl/` for `prin1`, `print_datum` or `to_string` before this step finds `conformance/sbcl_oracle.hpp` and the one test that calls it. Both print on SBCL's side of a comparison. Never on ours.
+
+
+# A printer is a fold
+
+`docs/cpp-rules.md` leaves no room here. A recursion over a tree is a catamorphism, not hand-written recursive descent. A `print_node` that calls itself is a defect here. The rules say so in those words.
+
+So the printer is a `foundation::cata_short`. The carrier is the rendered text of one node, and the failure channel is that text not fitting.
+
+```cpp
+/// Renders @p tree as `prin1` would, interning nothing and consulting
+/// @p symbols only to recover interned names.
+///
+/// This is a `foundation::cata_short`, not a hand-written recursive
+/// descent: the carrier is the rendered text of one node, and the failure
+/// channel is the one way rendering fails — the text would overflow
+/// @ref max_print_chars. See this header's own doc comment for what is
+/// deliberately not rendered.
+///
+/// @tparam MaxNodes    @p tree's node capacity.
+/// @tparam MaxList     @p tree's per-list element capacity.
+/// @tparam SymbolTable A table offering `name(symbol_id) const`.
+template <int MaxNodes, int MaxList, class SymbolTable>
+[[nodiscard]] constexpr auto
+prin1(reader::datum_tree<MaxNodes, MaxList> const &tree,
+      SymbolTable const &symbols) -> foundation::result<print_text> {
+    using layer = foundation::node_f<reader::datum_atom, reader::datum_branch,
+                                     print_text, MaxList>;
+    auto const algebra =
+        [&symbols](layer const &node) -> foundation::result<print_text> {
+        if (auto const *leaf = std::get_if<reader::datum_atom>(&node)) {
+            return detail::render_leaf(*leaf, symbols);
+        }
+        auto const &branch = std::get<
+            foundation::branch_f<reader::datum_branch, print_text, MaxList>>(
+            node);
+        return detail::render_branch(branch.tag, branch.children);
+    };
+    return foundation::cata_short<print_text>(tree, algebra);
+}
+```
+
+The algebra is a dozen lines and does no walking. Everything above it in the header renders one node in isolation: decimal digits, an interned name, a string with its quotes and backslashes escaped, `#\` and a character. `cata_short` hands it the children already rendered. A `std::visit` dispatches the leaf variant and a `switch` dispatches the branch tag. Both are allowed by the same rule that bans the recursion: a visit may choose among one node's alternatives, it may not drive anything.
+
+The shape has a cost, and the header says what it is. `cata_short` materialises one carrier per node. A fold over an `MaxNodes`-node tree holds `MaxNodes * max_print_chars` bytes of text at once, 512 characters a node, needed or not. Written down as provisional, with the condition that would revisit it named: a consumer that actually wants a wide tree printed out in full. Nothing wants that yet.
+
+
+# It could not land alone
+
+Apply D16 to a printer and there is nothing honest left to test it with. `prints_as("42", "42")` is a sentence the printer wrote about itself, and it goes on passing whatever the printer decides `42` should look like.
+
+However, the unit tests are all still there, thirteen ~static\_assert~s of them, and they are worth having. They pin the header's doc table row by row, and they run inside the constant evaluator, which a subprocess never will. What they can not do is say the table is right.
+
+So the oracle call lands in the same commit, beside the two that were already there.
+
+```cpp
+/// Reads @p source with SBCL's own reader and returns what `prin1` prints
+/// for the resulting object, with the pretty printer off so the quote
+/// family renders as the list forms ANSI defines rather than as reader
+/// syntax.
+///
+/// This is the reader's own oracle call, distinct from @ref sbcl_prin1
+/// (which evaluates a form and prints its *value*): here the form is never
+/// evaluated, only read and printed back, so this is a differential on
+/// `read`+`prin1` alone. Returns `nullopt` if SBCL is unreachable, and
+/// `SBCL-ERROR` if SBCL itself signals reading or printing @p source — a
+/// text no well-formed corpus entry's `prin1` output can collide with.
+[[nodiscard]] inline auto sbcl_read_print(std::string_view source)
+    -> std::optional<std::string> {
+    std::string lisp_literal = "\"";
+    for (char const c : source) {
+        if (c == '"' || c == '\\') {
+            lisp_literal += '\\';
+        }
+        lisp_literal += c;
+    }
+    lisp_literal += "\"";
+    std::string const script =
+        "(handler-case (let ((*print-pretty* nil)) (prin1 (read-from-string " +
+        lisp_literal + "))) (error () (princ \"SBCL-ERROR\")))";
+    std::string const command =
+        "sbcl --noinform --non-interactive --no-userinit --no-sysinit "
+        "--eval " +
+        detail::shell_quote(script) + " 2>/dev/null";
+    auto output = detail::run_shell_capture(command);
+    if (!output.has_value()) {
+        return std::nullopt;
+    }
+    return detail::trim(std::move(*output));
+}
+```
+
+The escaping runs twice over, once for the Lisp string literal and once for the shell, and `handler-case` turns anything SBCL signals into the literal text `SBCL-ERROR`. The sentinel is not new. `sbcl_prin1` beside it already worked that way. `nullopt` stays reserved for the binary being unreachable, which is a different fact about the world than a source string SBCL will not read.
+
+What is new is that nothing gets evaluated. `sbcl_prin1` evaluates a form and prints its value, which is what the evaluator's differential has wanted since R6. `sbcl_read_print` reads, prints, and stops. That's the whole of it. `conformance/reader_differential.test.cpp` is therefore a check on `read` and `prin1` with no evaluator anywhere in it, on either side.
+
+Eleven strings go through it: a fixnum, a symbol, a keyword, a string with an embedded quote, a character, a flat list, a nested list, the empty list, a vector, `'x`, and `1+`. All eleven matched. Nothing turned up past the traps below.
+
+`1+` is the interesting one. DIV-0003 is the decision to read a whole token and classify it afterwards, instead of scanning digits greedily. The reason on file: `1+` is a conventional Common Lisp symbol, and a greedy digit scan reads it as the fixnum `1` with a stray `+` left over. It was found by a `static_assert` failing and has been accepted-permanent since step L5, and all of the evidence for it had stayed inside this repository. Now an implementation that has never seen this repository agrees.
+
+
+# Three answers, measured
+
+All three were confirmed against a real oracle, SBCL 2.2.9.debian, and guessed at by no one. The architecture doc files them as facts about the oracle and not about this step, which is the right shelf for them.
+
+**Quote is a list.** With `*print-pretty*` bound to `nil`, SBCL prints `'x` as `(QUOTE X)` and `#'car` as `(FUNCTION CAR)`; with it left on, `'X` and `#'CAR`. The list form is the ANSI-defined reading of the syntax, and does not depend on a printer variable's default. So the oracle call pins the variable, and the printer renders the list.
+
+There is a wrinkle under that, which the step doesn't treat as a problem. In Common Lisp `'x` *is* the list `(QUOTE X)`: one object, two spellings. Here it is not. `quote` is one of seven `datum_branch` tags, so `'x` and `(QUOTE X)` read as two different trees that render to the same nine characters. The differential compares text, and on text the two agree.
+
+**The empty list prints as `NIL`.** Not as `()`. A `list` branch with no children renders the three letters, which means `()` and `nil` come out identically from two unrelated paths, one a branch with nothing in it and one an interned name the reader upcased. Two paths, three letters.
+
+**A tower prints its spelling here and its value there.** D19 chose readable before executable, so `datum_tower` carries the token's spelling and radix and the printer hands that back. SBCL prints `#x1f` as `31`, `2/4` as `1/2`, `1.50` as `1.5`. Each is right about the thing it is printing. They agree on canonical decimal spellings and nowhere else, so the compared corpus holds canonical decimal spellings and nothing else. A restriction to carry forward; normalising is the evaluator's job, and this reader has no numeric tower yet.
+
+A fourth, smaller, recorded in the same place. SBCL 2.2.9 prints the space character as `#\` followed by a literal space, while `#\Newline` and `#\Tab` print by name. The printer has no character-name table at all. So it agrees about space by accident and disagrees about the named ones by design, and the named ones stay out of the compared corpus. Matching one SBCL build's name table is not what this printer is for.
+
+
+# One failure, and six that can not happen
+
+The header says the printer fails one way: the rendered text would not fit in `max_print_chars`. The `switch` in `render_branch` has six returns that are not renderings. Five are a one-child branch arriving with no child: `quote`, `function`, `backquote`, `unquote`, `unquote_splice`. The sixth is a fallthrough for a `datum_branch` the switch does not know.
+
+None of the six is reachable from anything `read` produces. A quote branch is built after its child has been read, so a quote branch without one never reaches a tree. They're there because a switch over an enum has to be able to return on every path, and the choice at each one is a diagnosis or an assert. This project's rules prefer the diagnosis every time.
+
+What it diagnoses with is `foundation::parse_error`, carrying a default-constructed `source_pos`. A printer has no parse to fail and no position to report, so it borrows the reader's error type and leaves the position empty. Nothing else in `cl`'s foundation is error-shaped. The alternative was a new type of its own, for six unreachable branches and one overflow.
+
+
+# Sixty-four quotes
+
+The overflow case is the only test in the file that had to be computed before it could be written.
+
+`sixty_four_nested_quotes()` builds sixty-four apostrophes followed by `x`. Rendered, `X` is one character and each `(QUOTE ...)` wrap adds eight, so sixty-three levels reach 505 and fit, and the sixty-fourth reaches 513 and does not. The test asserts that the render came back an error. That's all it asserts. The arithmetic is a comment above it, and the comment is the only way anyone is going to check that sixty-four is the first number that works.
+
+Sixty-four quote branches plus a symbol leaf is sixty-five nodes, which is more than the other new test file's tree could hold: `reader_differential.test.cpp` declares `test_nodes = 32` and `prin1.test.cpp` declares 96. And 96 nodes at 512 characters is 48 KiB of carrier, where the header's capacity note says 32 KiB, which is the figure for a 64-node tree, and `docs/compiler_architecture.org` repeats it. The file at 32 nodes holds 16. Neither number is the one the note is about.
+
+Four steps running, a written-down number has come out a little off. This one is the dullest of them, and the first to sit in a comment right beside the code it is wrong about.
+
+A smaller inheritance in the same two files. Both open with `using tree = datum_tree<test_nodes, test_list>;` and neither ever names `tree` again; both call `read<test_nodes, test_list>` directly. `reader/read.test.cpp`, which both preambles were plainly copied from, does use it. The alias came along with the `sym_table` line above it and the comment above that. Copied preambles copy everything.
+
+
+# The commit after the commit
+
+The tag this post's code is pinned to is not A4's merge. `17820fc` is the merge and `a50345c` is a separate commit two minutes later, applying what `clang-format` and `gersemi` wanted in `src/smd/cl/printer/` and touching nothing else.
+
+Its message says why, and says it is the second time this plan has done it. `make lint` was red on a fresh checkout of the integration branch and green on a second run, because the hooks had already repaired the working tree in between. A step that runs `make lint` before its last edit collects a green from a run that isn't about the code it merged any more. The green is real, and it's about the wrong tree.
+
+Whitespace only. The reflow shifts a lambda's trailing return type up a line, rewraps two `fold_left` calls, and collapses two now-short blocks in the new `CMakeLists.txt`; the printer does what it did. Tagging the later commit publishes the formatted version. So the pin is one commit past the merge, a first for this series and recorded as one. The code in this post is the formatted code.
+
+
+# What it does not print
+
+The header's doc comment spends more words on what the printer is not than on what it is. No `|...|` multiple-escape quoting of symbol names, no `*print-circle*`, `*print-level*` or `*print-length*`, no packages, no readtable case beyond upcase, no pretty-printer layout. A full ANSI printer is a much larger thing. A differential needs a canonical structural rendering, and that's all this is.
+
+The escaping line is the one with a consequence. `cl` upcases unescaped symbol names (DIV-0001), so an ordinary name round-trips. A name that would need bars around it does not, and the header says so.
+
+The backquote family does render, `` `x `` as `` `X `` and `,x` as `,X` and `,@x` as `,@X`, so the printer is total over all seven branch tags. None of the three is ever compared. SBCL 2.2.9 prints them as implementation-specific reader-macro objects, which ANSI permits it to do. There is nothing canonical on the far side to put them next to.
+
+Eleven strings agreed on the first run. That's either the three traps being right or the corpus being too small to disagree, and eleven strings can not tell you which.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [← Phase 36 - Deleting Both Front Ends, and the Run That Stopped Before Its First Edit](phase-36-deleting-both-front-ends.md)
+
+</nav>
+
+
+# References

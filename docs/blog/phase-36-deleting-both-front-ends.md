@@ -1,0 +1,151 @@
+**DRAFT &mdash; pending author revision**
+
+<div class="abstract" id="org3047dbb">
+<p>
+Step A3 is the deletion the two steps before it existed to make possible.
+<code>src/smd/smdscheme/</code> and <code>src/smd/smdlisp/</code> leave trunk: 173 files, 183 lines in, 31,155 out.
+<code>ctest</code> goes from 1105 entries to 304 on both matrix legs, both still 100% passing.
+The step took two runs.
+The first verified a green baseline, reached <code>git rm -r</code>, and was refused by a local tool-permission classifier before it had made a single edit.
+Its row in <code>tmp/plan/metrics.jsonl</code> says <code>"outcome": "blocked"</code>, and was kept deliberately.
+The decision being executed is D32, which overrides a ratified decision's sequencing and retires a stated never-edit rule.
+What retired it is not that friction won.
+<code>smdlisp</code> really was a better oracle than SBCL for this project's own semantic choices, and the measurement that checked that held up.
+It goes because it can supply source programs and can not supply expectations, and because a tag supplies source programs losslessly and forever.
+One document on trunk now says the deciding reason was friction.
+It is the one this step wrote.
+</p>
+
+</div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 35 - Cutting the Consumers, and a Green Build That Checks Nothing ←](phase-35-cutting-the-consumers.md)
+
+</nav>
+
+
+# Stopped before the first edit
+
+The first run of A3 got through its baseline and no further.
+
+`make test-matrix` green, 1105 of 1105 on both legs. Both `iteration/*` tags listed. `./scripts/verify-transclusions.sh` at 142 resolved, one warning, zero failures. Three hundred and fifty-four seconds of build to establish all of that, which is the cost the deletion was about to cut. Then `git rm -r src/smd/smdscheme src/smd/smdlisp`, and a local tool-permission classifier refused the second path. Nothing had been edited.
+
+The plan has a protocol for halting and this was not it. `tmp/plan/AGENT-PROMPT.md` reserves `blocked-NN.md` for being stuck: three genuinely different attempts that failed, or an agent about to weaken its own verification to get past something. A permission classifier declining a command is neither. So there's no `blocked-A3.md` anywhere in `tmp/plan/`, and the whole surviving record of the halt is one line of JSON.
+
+That line exists because of two paragraphs written well before anyone needed them. Append the `metrics.jsonl` record *before* removing the worktree, the prompt says, and write it to an absolute path outside every worktree. A blocked step's own `git worktree remove --force` would otherwise destroy exactly the measurements that explain what went wrong. The blocked row is the case that rule was written for. So far it's the only one.
+
+So A3 has two rows in `metrics.jsonl`. Both say `"attempts":1`, which is true of each run and false of the step. Anyone reading the file for how many tries A3 took has to count rows. Neither row can say.
+
+The classifier itself is generic, and it isn't wrong in general. Something that declines to let an agent run `git rm -r` over a source tree is a reasonable thing to have. But it landed on the one step in fourteen whose entire content is running `git rm -r` over a source tree.
+
+
+# Eight hundred and one
+
+The step brief sizes what's leaving: `smdscheme` at 9,988 lines and 248 test cases, `smdlisp` at 20,675 lines and 555. The deletion took 31,155 lines across 173 files and put 183 back. `ctest` went from 1105 entries to 304, both legs, both at 100% passing.
+
+248 plus 555 is 803. 1105 minus 304 is 801.
+
+The two extra are the string `TEST_CASE` inside a comment. `src/smd/smdlisp/sender/sender_program.test.cpp` line 135 opens "Every `TEST_CASE` below is a&hellip;", and `src/smd/smdlisp/smdlisp.test.cpp` line 28 says "Every `static_assert` below is paired with a runtime `TEST_CASE` twin". Count `^TEST_CASE(` instead and `smdlisp` has 553. The two trees hold 801 between them, and the deletion accounts for itself to the case.
+
+Three steps running, a count in a plan file has come out a couple off. Twice because a `grep` counted the text and not the thing it stood for; once because an estimate counted the cases someone would call substantive. Each time the reconciliation has been more interesting than the number. A1's transclusion count went 37, 39, 37. A2 estimated seventeen test cases and lost eighteen. None of the three mattered. All three took a pass to settle.
+
+304 is the number the step file asked for by name, on the grounds that Phase B will reach for it more than for anything else in the step. It's what every verify loop from here on costs.
+
+
+# D32 is the decision. DIV-0032 is a number.
+
+They share a digit sequence by accident and mean unrelated things, and four documents say so, two of them in bold.
+
+D32 is the decision record. A0 wrote it into `docs/cl-language-scoping.md`'s dated amendment section, eighty-odd lines below the ratified D22 whose sequencing it overrides. The amendment opens with a line headed "Note under D22 (§3)". D22 itself, at § 3, says nothing about it. DIV-0032 is the divergence number this plan reserved for step A3 up front, so nothing could collide on the next free number. It went unspent. The plan says in advance that's expected and fine. An agent that conflates them files the governance record in `docs/divergences/`, where divergences from ANSI Common Lisp go and decisions do not.
+
+D32 itself carries a sentence about not being confused with DIV-0032. A decision record carrying a paragraph that disambiguates its own name from an unrelated number is an odd artefact. It is cheaper than the mistake it prevents.
+
+What A3 owed D32 was a dated note under it, never a second record. The note carries the two facts D32 could only predict. Both `iteration/*` tags exist and resolve after the deletion, which the step proves by running `git show iteration/smdlisp-final:src/smd/smdlisp/smdlisp.hpp` once the tree is gone and getting the file. And 1105 to 304, which is the number D32's cost argument was made about in the abstract.
+
+
+# What actually retired the oracle
+
+D22 is ratified and says the thing you would expect to be the counterargument:
+
+> every step of the spine has, in `smdlisp`, a working reference implementation of the same operator with the same reader in front of it &mdash; a cheaper and more exact oracle than SBCL for exactly the semantics that are subtlest, because it already made this project's choices.
+
+That is true, and the plan measured it instead of arguing past it. The argument below is D32 arguing for itself, and this is the only place it gets made. `src/smd/cl/conformance/corpus.hpp` holds 75 entries, and `satisfies()` runs `evaluate_program()`, so the corpus reaches only what elaborates: `cl`'s seven special operators and eighteen builtins. `smdlisp` implements nineteen special operators plus `defmacro`, six host macros and backquote. Its test suite holds roughly 120 genuinely novel source-in, value-out evaluated cases: `LET`, `SETQ`, `LAMBDA`, `FUNCALL` and `APPLY`, `DEFMACRO` and backquote, `CATCH` and `THROW`, `TAGBODY` and `GO`, multiple values. The corpus has none of it. So D22's premise held up under the measurement that was supposed to settle it.
+
+The reason it goes is narrower than that. `smdlisp` can supply source programs. It can not supply expectations. D16 already says correctness comes from external authority. D26 says a lane's entries are derived from the specification and checked against SBCL, never written afterwards to describe what was built. Taking `smdlisp`'s answers as corpus expectations would need a third `provenance_kind`, meaning "this project's earlier implementation agreed". That puts "this implementation agrees with itself" straight back into the one artefact step R6 built to get it out of. SBCL is at `/usr/bin/sbcl` and the harness already shells out to it, so every harvested entry would be re-adjudicated against SBCL anyway. At which point `smdlisp` contributed the source string and nothing else.
+
+A tag supplies source strings losslessly, for free, forever. So D32 retires the tree, and leaves a standing obligation on every future language lane. Before writing that lane's conformance entries, read the corresponding `smdlisp` test file out of `iteration/smdlisp-final` for source programs, and take every expectation from SBCL or the specification.
+
+The live alternative was to harvest those 120 cases now. It loses on timing. They are entries for operators that do not elaborate yet. Landing them here is either a red build, which this plan's hardest structural rule forbids, or inert data sitting in a header, which is what the tag already is. D32 marks itself provisional and names what would revisit it: a lane finding that reading source out of a tag is awkward enough in practice to be worth a real harvest step for one file. D32's own line on why that is hard to tell in advance is the best sentence in it: "An abstraction nobody dared touch and one nobody needed to touch look identical from outside."
+
+One fact makes the override cheaper than it looks, and the plan found it late. `smdlisp` could not have been kept anyway. `smdlisp.smdlisp` links `smdscheme.foundation` and `smdscheme.parser`, and every one of `smdlisp`'s five sub-library `CMakeLists.txt` files links a `smdscheme.*` target directly. Keeping the oracle through the language phases meant keeping both trees, and `smdscheme`'s deletion was never in question. D22 didn't have that in front of it.
+
+The note A3 appended to D32 says six of seven. There are six `CMakeLists.txt` files under `src/smd/smdlisp/`, five of them sub-library, and all six link a `smdscheme.*` target. The argument survives being counted correctly, which is the only reason the miscount is safe to leave standing on trunk.
+
+
+# Two records of one decision, disagreeing
+
+`docs/cl-rebuild-plan.md` § 8 has carried an open question since the rebuild plan was written: whether `smdlisp` is eventually retired or kept permanently as the pivot's artefact. A3's brief told it to resolve that instead of leaving it dangling, and it did:
+
+> **Resolved 2026-08-23: retired.** Decision D32 (`docs/cl-language-scoping.md`) overrides this question's own premise &mdash; R6's conformance corpus alone was not judged sufficient reason to keep `smdlisp` in the worktree; the deciding reason was agent friction with the never-edited rule, not oracle coverage.
+
+`tmp/plan/README.md` says the opposite about the same decision, in the same breath as making it: "Not because the friction argument outweighs the oracle argument &mdash; that framing is what made this look like a close call."
+
+Both are on trunk. They aren't quite contradicting each other, and the difference is the whole point. Friction is why the deletion runs third in this plan instead of fifth; that ordering is the repository owner's call and is recorded as one. The distinction between source programs and expectations is why retiring the tree costs nothing. The resolution note answers the second question with the first one's reason. It's also the version that will be read, because `docs/` outlives `tmp/`.
+
+
+# The consumers nothing runs
+
+Four files in the diff are configuration that `make test-matrix` never touches. Nothing in the diff touches `.github/workflows/docs.yml`, and that's the file that would have found out. It runs `make docs` in CI, on a different job, a week later and with no obvious cause.
+
+`docs/mrdocs.yml`'s `input:` list was five roots, all under `../src/smd/smdscheme/`; it is now seven, under `cl` and `kit`. `docs/antora.yml`'s `using-namespaces` was seven `smd::smdscheme*` entries. It is now seven `smd::cl*` and `smd::kit*` ones. `docs/modules/ROOT/pages/architecture.adoc` described the pipeline entirely in the first iteration's terms, down to a "Reflection Spike" section for a module the live tree has never had. It was rewritten stage by stage against `cl`. All of it.
+
+Then the landing page. `docs/modules/ROOT/pages/index.adoc` had one code sample on it, and this is what it was:
+
+```cpp
+constexpr auto &prog = smd::smdscheme::compiled_closure<"(+ 1 2)">;
+using Core = smd::smdscheme::closure::closure_program<32,16,...>::Core;
+auto env   = smd::smdscheme::closure::default_env<Core, 16>();
+auto result = prog(env);
+```
+
+There's a literal `...` in the second line. The only example on the front page of this project's generated documentation could never have compiled. It sat there long enough that the tree it names has now been deleted out from under it.
+
+The replacement is `smd::cl::conformance::evaluate_program("(+ 1 2)")`, which is the call `conformance/driver.test.cpp`'s `one_form_is_its_own_value` makes through its `yields` helper, on the same source string. `docs/CODING_RULES.md` says not to invent illustrative code that does not compile, and that call is already checked twice over, once as a `static_assert` and once as a Catch2 `CHECK`. `mrdocs` isn't installed in this environment, so `make docs` couldn't be run at all. The config was verified by checking that every path in the `input:` list exists on disk. The handoff says plainly that the CI job is unverified locally. The page is correct by inspection and not by a build. That is the grade of assurance phase 35 complained about in `make testinstall`, and that target still exits 0 here for the same reason it did there. One thing did improve. `pairs.hpp`, the header its old failure was actually about, is gone from both trees, so that error has nowhere left to come from.
+
+
+# Six documents, and one already wrong
+
+Six documents asserted the three-tree structure or the `smdlisp` freeze, and A3 changed all six in one pass so none is left contradicting the others. Four by edit, two by dated note. The step brief called it five and then listed six.
+
+`AGENTS.md` § "Which trees you may edit" keeps its section instead of losing it. The rule that a fix belongs in `cl` whatever tree the bug was found in still means something. It gains one flat sentence: "Neither exists on disk any longer, so there is nothing left to accidentally edit."
+
+`CLAUDE.md` § "Source layout" said `<package>` is "`smdscheme`, `smdlisp`, or `fixpoint`". Both packages this step deleted were in that list. Both packages that were actually live, `cl` and `kit`, were not. That line had been wrong since step R8 extracted the kit, months before the step that fixed it arrived to delete two thirds of what it named. No build reads it.
+
+The root `checklist.md` sentence goes to past tense, and picks up where expectations come from now. `docs/backlog/README.md`'s Rules section is refined in place, because backlog files are refined in place and never appended to. Two more get dated notes instead of edits, per this project's append-only convention for them. One is `docs/cl-rebuild-plan.md`'s § 8 resolution above. The other is `docs/cl-limitations.md`, whose note is mostly a statement that it is *not* superseded. It stays the divergence record for the pivot's tree, read against a tag and not against a worktree.
+
+Fourteen provenance comments under `src/smd/kit/foundation/` named the `src/smd/smdscheme/foundation/` file each one was extracted or moved from at R8. Those paths stopped existing, so each comment gained `, at iteration/smdscheme-final`. One clause per file. clang-format then rewrapped three or four lines around every one of them, which the metrics row declares as the step's only out-of-scope change.
+
+No anchors, no components, so nothing in this step is transcluded and `scripts/verify-transclusions.sh` staying green is the whole of what it owes. Which is what A1 was for.
+
+
+# Deleting code that works
+
+Every one of those 801 test cases passed on the commit before this one.
+
+The tags preserve something real, and the step proves it instead of asserting it, by reading a file out of `iteration/smdlisp-final` after the tree is gone. The ability to run any of it leaves with them. Nothing in `make test-matrix` builds either tag, so nothing will report it if a tag stops compiling against a compiler that moved on. The freeze is checkable today and unwatched from tomorrow.
+
+The other way this could have run is D22's own sequencing, where parity with `smdlisp` is the language plan's first phase and retiring `smdlisp` is its merge criterion. That is the version where the replacement evidence exists before the thing it replaces goes away, and it is not a silly version. It lost to a cost that's continuous against a benefit that is not. Agents get hung up on a tree they must not touch every time they walk past it; a sequenced replacement oracle costs once.
+
+The step file said in advance what to make of the number, which is that a sharp drop is the step working. Both legs still read `100% tests passed`, out of 304. Nothing was lost. It just isn't running any more.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [← Phase 35 - Cutting the Consumers, and a Green Build That Checks Nothing](phase-35-cutting-the-consumers.md)
+
+</nav>
+
+
+# References
