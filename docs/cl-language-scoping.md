@@ -205,3 +205,27 @@ D32 does not need `DIV-0032` confused with it: `D32` is this decision record; `D
 **Executed 2026-08-23, step A3.** Both `iteration/smdscheme-final` and `iteration/smdlisp-final` exist and resolve — `git show iteration/smdlisp-final:src/smd/smdlisp/smdlisp.hpp` prints the file after the deletion — so the source programs this decision defers to the C-series lanes are genuinely reachable. `make test-matrix` went from 1105 to 304 ctest entries, both legs still 100% passing; that is the number D32's cost argument was made about in the abstract.
 
 One fact worth recording here because nothing else is positioned to: `smdlisp` could not have been kept even had D22's original sequencing won. `smdlisp.smdlisp` links `smdscheme.foundation` and `smdscheme.parser`, and six of `smdlisp`'s seven sub-library `CMakeLists.txt` files link a `smdscheme.*` target directly. Keeping `smdlisp` through the C-series would have meant keeping `smdscheme` too, not one tree — and `smdscheme`'s deletion was never in question. That is a mechanical fact D22 did not have in front of it, and it makes this override cheaper than it looked.
+
+**Correction, 2026-09-11.** Two things above are wrong, found while drafting
+phase 36's post and verified against `7d63d4c^`.
+
+The `CMakeLists.txt` count in the paragraph above is wrong in both of its
+numbers. There are **six** `CMakeLists.txt` files under `src/smd/smdlisp/`,
+not seven — one top-level and five sub-library — and **all six** link a
+`smdscheme.*` target, not six of seven. The sentence also double-counts, since
+`smdlisp.smdlisp` is named separately and is one of the six. The same wrong
+count reached `tmp/plan/step-A3.md`, `tmp/plan/README.md`, and A3's commit
+message; all four were written from each other rather than from the tree. The
+argument is unaffected — it wanted "`smdlisp` cannot be kept without keeping
+`smdscheme`", and six of six establishes that more firmly than six of seven.
+
+And this record and `docs/cl-rebuild-plan.md` §8 disagree about *why*. That
+resolution says "the deciding reason was agent friction with the never-edited
+rule, not oracle coverage"; `tmp/plan/README.md` says, while making the
+decision, "Not because the friction argument outweighs the oracle argument —
+that framing is what made this look like a close call." They reconcile: the
+friction argument decided the **ordering**, that the retirement runs before the
+parity phase rather than as its merge criterion; the distinction between a
+source of programs and a source of expectations decided the **retirement**
+itself. The §8 note answers the second question with the first one's reason.
+This record is the one to trust, and `docs/` outlives `tmp/`.
