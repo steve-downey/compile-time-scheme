@@ -11,6 +11,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <string>
 #include <string_view>
 #include <variant>
 
@@ -370,7 +371,32 @@ constexpr auto reports_errors() -> bool {
            // otherwise cover.
            fails_with("#| unterminated", "unexpected end of input") &&
            fails_with("#| outer #| inner |# still open",
-                      "unexpected end of input");
+                      "unexpected end of input") &&
+           // B5: read_character's own "expected character after #\\" was
+           // pinned nowhere before this step converted it onto bind.
+           fails_with("#\\", "expected character after #\\") &&
+           // B5: a literal ending in a bare `\` is end of input, not a
+           // diagnostic of its own. The escape parser consumes the escape
+           // and then fails, and that committed failure carries the same
+           // "unterminated string" the loop's break used to reach.
+           fails_with("\"abc\\", "unterminated string");
+}
+
+constexpr auto string_capacity_boundary() -> bool {
+    // max_string_chars (src/smd/cl/reader/datum.hpp) is 128, and the check
+    // is `>=` before the append, so a literal of exactly that many
+    // characters fits and one more does not. The overflow reports at the
+    // opening quote, not at the character that would not fit. Neither side
+    // of this boundary was pinned before B5 converted read_string.
+    std::string const fits(
+        static_cast<std::size_t>(smd::cl::reader::max_string_chars), 'a');
+    std::string const over(
+        static_cast<std::size_t>(smd::cl::reader::max_string_chars) + 1, 'a');
+    sym_table syms;
+    auto const r = read_one("\"" + over + "\"", syms);
+    return root_string_is("\"" + fits + "\"", fits) && !r.has_value() &&
+           std::string_view{r.error().message} == "string too long" &&
+           r.error().where.line == 1 && r.error().where.column == 1;
 }
 
 constexpr auto error_positions_track_lines() -> bool {
@@ -449,6 +475,7 @@ static_assert(backquote_template_shape());
 static_assert(skips_comments_and_whitespace());
 static_assert(read_datum_leaves_the_rest());
 static_assert(reports_errors());
+static_assert(string_capacity_boundary());
 static_assert(error_positions_track_lines());
 static_assert(capacity_errors_not_asserts());
 static_assert(list_capacity_error());
@@ -491,6 +518,7 @@ TEST_CASE("ReadTest - SequentialReads") { CHECK(read_datum_leaves_the_rest()); }
 
 TEST_CASE("ReadTest - Errors") {
     CHECK(reports_errors());
+    CHECK(string_capacity_boundary());
     CHECK(error_positions_track_lines());
     CHECK(capacity_errors_not_asserts());
     CHECK(list_capacity_error());
