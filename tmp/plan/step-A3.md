@@ -63,7 +63,7 @@ Deleting one tree and keeping the other does not build.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-a3-delete-dead-trees -b step-a3-delete-dead-trees cl-retire-trees
 cd ../step-a3-delete-dead-trees
 git submodule update --init --recursive
@@ -384,7 +384,7 @@ git merge --no-ff step-a3-delete-dead-trees
 After the merge, before cleanup.
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"A3","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + testinstall + compile-headers","exit_code":0,"wall_seconds":<measured>,"log_bytes":<sum>,"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":"ctest count <before> -> <after>"}
 EOF
 ```
@@ -396,12 +396,12 @@ sized against the right baseline.
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-a3-delete-dead-trees
 ```
 
 Mark A3 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 

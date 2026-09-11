@@ -35,7 +35,7 @@ authority rather than only against this project's own tests.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-a5-reader-differential -b step-a5-reader-differential cl-retire-trees
 cd ../step-a5-reader-differential
 git submodule update --init --recursive
@@ -223,7 +223,7 @@ git merge --no-ff step-a5-reader-differential
 After the merge, before cleanup.
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"A5","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-A5-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
 EOF
 ```
@@ -234,12 +234,12 @@ valid JSON. Real measured numbers only.
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-a5-reader-differential
 ```
 
 Mark A5 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff — this one goes to a human, not only to B1
 

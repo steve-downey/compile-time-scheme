@@ -44,7 +44,7 @@ should surface here rather than one step later.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-a4-cl-printer -b step-a4-cl-printer cl-retire-trees
 cd ../step-a4-cl-printer
 git submodule update --init --recursive
@@ -351,7 +351,7 @@ git merge --no-ff step-a4-cl-printer
 After the merge, before cleanup — the numbers and the worktree still exist.
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"A4","lane":null,"outcome":"green","wall_seconds":<end-start>,"attempts":<n>,
  "verify":{"command":"make test-matrix","exit_code":0,"wall_seconds":<measured>,
  "log_bytes":$(wc -c < /tmp/verify-A4-after.log),"summary_lines_read":<n>},
@@ -367,12 +367,12 @@ numbers; do not estimate any of them.
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-a4-cl-printer
 ```
 
 Mark A4 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 
