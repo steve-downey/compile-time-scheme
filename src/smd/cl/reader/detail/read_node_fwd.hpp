@@ -5,6 +5,7 @@
 
 #include <smd/cl/foundation/result.hpp>
 #include <smd/cl/reader/cursor.hpp>
+#include <smd/cl/reader/detail/read_context.hpp>
 
 namespace smd::cl::reader::detail {
 
@@ -14,7 +15,10 @@ namespace smd::cl::reader::detail {
 /// them. Everything here is a template, so a declaration suffices at each
 /// call site; the definition (@c detail/node.hpp) need only be visible at
 /// the point of instantiation, which the @c read.hpp umbrella guarantees.
-template <class Ctx>
+///
+/// The constraint is part of the declaration and has to be spelled the
+/// same here as on the definition, or the two are different templates.
+template <reader_context Ctx>
 [[nodiscard]] constexpr auto read_node(cursor cur, Ctx &ctx)
     -> foundation::result<parse_state<int>>;
 // 8a2232b6-6436-4943-b35b-69e6df6faaa2 end

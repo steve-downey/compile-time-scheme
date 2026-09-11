@@ -144,5 +144,5 @@ Phase B (B1–B8) merges to integration branch `cl-parser-combinators`, created 
 - [x] Step typeclass-resync: carry `main`'s typeclass rename onto the Phase B branch (out-of-band maintenance, not one of the fourteen)
 - [x] Step B5: text: strings and character literals
 - [x] Step B6: forms: the quote family and token data
-- [ ] Step B7: sharpsign dispatch and `read_node`
+- [x] Step B7: sharpsign dispatch and `read_node`
 - [ ] Step B8: integration: the D30 measurement, DIV-0028 dissolved, architecture section, project checklist
