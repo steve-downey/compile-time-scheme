@@ -30,3 +30,31 @@ Cl is not a client of the parser combinator layer at all, so extracting it now w
 ## Revisit condition
 
 Either `src/smd/cl/reader/cursor.hpp` and its callers are rewritten onto a `parser<T>`-shaped combinator layer, making `cl` a genuine third client of `parser/`, or a fourth front end in this repository needs the same combinator abstraction independently of `cl`. Until one of those happens, `parser/` is not kit material by the same two-independent-copies standard the `foundation/` half was held to.
+
+## 2026-09-11: the revisit condition fired, and firing it dissolved the record (step B8)
+
+The revisit condition above named two triggers.
+The first one fired: steps B1–B7 of the parser-combinator plan rewrote `src/smd/cl/reader/` onto a `parser<F>`-shaped combinator layer, `smd::kit::parser`, built in `src/smd/kit/parser/` by B2 and finished by B4.
+`src/smd/cl/reader/cursor.hpp` is now a forwarding shim onto `smd::kit::parser::cursor`, and every reader function that parses — `read_radix_number`, `read_string`, `read_character`, `read_wrapped`, `read_token_datum`, `read_sharpsign` and `read_node` — is composed from the layer's nine combinators.
+
+Satisfying the condition showed that the condition was framed wrongly, which is a better outcome than satisfying it cleanly would have been.
+
+The framing was "making `cl` a genuine **third** client", and it counted to three because at the time this record was written the repository had three front ends.
+Phase A deleted two of them.
+`src/smd/smdscheme/**` and `src/smd/smdlisp/**` were removed from trunk at step A3 under decision D32 and are preserved at the annotated tags `iteration/smdscheme-final` and `iteration/smdlisp-final`.
+So `smd::kit::parser` has exactly **one** client, and the fourth-front-end trigger has no prospect of firing either.
+
+One client is what makes the layer worth having, not a shortfall against it.
+R8's lesson, which this record was the evidence for, was that extracting a module for its own sake produces something with no callers; the answer to that turned out not to be "wait for more clients" but "have one real one".
+The two-independent-copies standard the `foundation/` half was held to was the right standard for a *move* — nine files that already existed twice — and is the wrong standard for a *design*, which is what `smd::kit::parser` is: it was written in B2–B4 against a consumer that arrived in the same step as each primitive, and no primitive was added without one.
+The set closed after B4 and three further converting steps added nothing to it.
+
+This is a **dissolution, not a closure**.
+The record did not stop being true by being fixed.
+Every sentence in "What diverged" was accurate when written and is still accurate about the code it describes.
+What changed is that the proposition itself — that a kit module needs a count of clients before it earns its place — stopped being a meaningful statement about this repository once the repository had one front end.
+There is nothing left here to close, revisit, or re-verify.
+
+The one thing this record did decide that still stands: `functor<parser<F>>` is deliberately unregistered.
+An instance whose only justification is that the typeclass exists is the over-eagerness this record named, and seven converting steps produced no caller that needs the `fmap` CPO to find a parser.
+See `docs/compiler_architecture.org` §B2 ("Settled, B8") and §B8.
