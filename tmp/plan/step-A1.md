@@ -69,7 +69,7 @@ deleted and every word ever written about them still resolves.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-a1-freeze-iterations -b step-a1-freeze-iterations cl-retire-trees
 cd ../step-a1-freeze-iterations
 git submodule update --init --recursive
@@ -335,7 +335,7 @@ them in your handoff so the orchestrator pushes them with the branch.
 After the merge, before cleanup.
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"A1","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + verify-transclusions.sh","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-A1-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
 EOF
 ```
@@ -347,12 +347,12 @@ that shape.
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-a1-freeze-iterations
 ```
 
 Mark A1 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 
