@@ -424,6 +424,20 @@ constexpr auto capacity_errors_not_asserts() -> bool {
                "symbol name storage full";
 }
 
+constexpr auto wrapped_branch_error_sits_at_the_marker() -> bool {
+    // read_wrapped records its branch at the *marker's* position, not the
+    // wrapped datum's. Nothing in the types keeps those apart and for 'x
+    // they differ by one character, so the only place the difference is
+    // observable is the position of a diagnostic raised after the inner
+    // datum is already in the tree. With room for exactly one node, the
+    // leaf x fills it and the quote's own branch is what overflows.
+    sym_table syms;
+    auto const r = read<1, 8>(" 'x", syms);
+    return !r.has_value() &&
+           std::string_view{r.error().message} == "datum tree full" &&
+           r.error().where.line == 1 && r.error().where.column == 2;
+}
+
 constexpr auto list_capacity_error() -> bool {
     sym_table syms;
     auto const r = read<64, 2>("(1 2 3)", syms);
@@ -478,6 +492,7 @@ static_assert(reports_errors());
 static_assert(string_capacity_boundary());
 static_assert(error_positions_track_lines());
 static_assert(capacity_errors_not_asserts());
+static_assert(wrapped_branch_error_sits_at_the_marker());
 static_assert(list_capacity_error());
 static_assert(traverse_propagates_reader_facts());
 
@@ -521,6 +536,7 @@ TEST_CASE("ReadTest - Errors") {
     CHECK(string_capacity_boundary());
     CHECK(error_positions_track_lines());
     CHECK(capacity_errors_not_asserts());
+    CHECK(wrapped_branch_error_sits_at_the_marker());
     CHECK(list_capacity_error());
 }
 
