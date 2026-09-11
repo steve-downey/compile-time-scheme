@@ -15,8 +15,8 @@ using smd::cl::foundation::sum_monoid;
 
 TEST_CASE("MonoidShimTest - HeaderIsIdempotent") { REQUIRE(true); }
 
-static_assert(sum_monoid.combine(sum_monoid.empty(), 7) == 7);
+static_assert(sum_monoid<int>.combine(sum_monoid<int>.identity(), 7) == 7);
 
 TEST_CASE("MonoidShimTest - SumMonoidThroughShim") {
-    CHECK(sum_monoid.combine(3, 4) == 7);
+    CHECK(sum_monoid<int>.combine(3, 4) == 7);
 }

@@ -16,6 +16,7 @@ target_sources(
                 foldable.hpp
                 functor.hpp
                 identity.hpp
+                induced_monoid.hpp
                 monad.hpp
                 monoid.hpp
                 parse_error.hpp
@@ -27,6 +28,7 @@ target_sources(
                 static_vector_instances.hpp
                 trampoline.hpp
                 traversable.hpp
+                typeclass_base.hpp
 )
 
 if(SCHEMEPOC_ENABLE_TESTING)
@@ -43,6 +45,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             foldable.test.cpp
             functor.test.cpp
             identity.test.cpp
+            induced_monoid.test.cpp
             monad.test.cpp
             monoid.test.cpp
             parse_error.test.cpp
@@ -54,6 +57,7 @@ if(SCHEMEPOC_ENABLE_TESTING)
             static_vector_instances.test.cpp
             trampoline.test.cpp
             traversable.test.cpp
+            typeclass_base.test.cpp
     )
     target_link_libraries(
         kit_foundation_test

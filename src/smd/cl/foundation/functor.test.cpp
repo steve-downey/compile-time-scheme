@@ -12,9 +12,9 @@
 
 #include <utility>
 
+using smd::cl::foundation::derive_functor;
 using smd::cl::foundation::fmap;
 using smd::cl::foundation::functor;
-using smd::cl::foundation::functor_typeclass;
 
 TEST_CASE("FunctorShimTest - HeaderIsIdempotent") { REQUIRE(true); }
 
@@ -32,18 +32,18 @@ struct box_functor_impl {
     }
 };
 
-struct box_functor_map : functor<box_functor_impl> {
+struct box_functor_map : derive_functor<box_functor_impl> {
     using box_functor_impl::fmap;
 };
 
 } // namespace
 
-// functor_typeclass now lives in smd::kit::foundation (step R8): a
+// functor now lives in smd::kit::foundation (step R8): a
 // specialization must be declared where the primary template actually
 // lives, not merely where a using-declaration makes its name callable.
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto functor_typeclass<box<T>> = box_functor_map{};
+inline constexpr auto functor<box<T>> = box_functor_map{};
 }
 
 TEST_CASE("FunctorShimTest - ForwardedFmapCpoWorks") {
