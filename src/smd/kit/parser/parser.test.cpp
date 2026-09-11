@@ -9,6 +9,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <concepts>
 #include <string_view>
 
 using smd::kit::foundation::parse_error;
@@ -237,4 +238,24 @@ TEST_CASE("ParserTest - CharPMatchesExactCharacter") {
 TEST_CASE("ParserTest - CharPFailsOnMismatch") {
     no_context ctx{};
     CHECK_FALSE(run(char_p('('), ")rest", ctx).has_value());
+}
+
+// --- The argument-order guard, after parser became its own callable. -------
+//
+// A parser re-exports its callable's operator() rather than forwarding to
+// it (step B7: a forwarding call costs constant-evaluation stack, and this
+// reader's recursion is C++ recursion). The guard parse_context states is
+// therefore checked on the wrapped callable, which is where every parser in
+// this kit and its client already spells it. These pin that it is still
+// checked: a cursor passed where a context belongs is not invocable.
+
+static_assert(std::invocable<decltype(char_val) const &, cursor, no_context &>);
+static_assert(
+    std::invocable<decltype(scaled_char) const &, cursor, scale_context &>);
+static_assert(!std::invocable<decltype(char_val) const &, cursor, cursor &>);
+static_assert(!std::invocable<decltype(scaled_char) const &, cursor, cursor &>);
+
+TEST_CASE("ParserTest - ACursorIsNotAContext") {
+    CHECK(std::invocable<decltype(char_val) const &, cursor, no_context &>);
+    CHECK_FALSE(std::invocable<decltype(char_val) const &, cursor, cursor &>);
 }

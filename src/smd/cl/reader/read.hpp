@@ -32,6 +32,9 @@
 #include <smd/cl/reader/datum.hpp>
 #include <smd/cl/reader/readtable.hpp>
 #include <smd/cl/symbol/symbol_table.hpp>
+#include <smd/kit/foundation/monad.hpp>
+#include <smd/kit/parser/parser.hpp>
+#include <smd/kit/parser/parser_instances.hpp>
 
 #include <string_view>
 
@@ -55,16 +58,26 @@ template <int MaxNodes = default_max_nodes, int MaxList = default_max_list,
 read_datum(cursor cur, SymbolTable &symbols,
            readtable const &table = standard_readtable)
     -> foundation::result<parse_state<datum_tree<MaxNodes, MaxList>>> {
-    datum_tree<MaxNodes, MaxList> tree;
+    using tree_type = datum_tree<MaxNodes, MaxList>;
+    tree_type tree;
     detail::read_context<SymbolTable, MaxNodes, MaxList> ctx{tree, symbols,
                                                              table};
-    return detail::and_then(
-        detail::read_node(cur, ctx),
-        [&](parse_state<int> const &node)
-            -> foundation::result<parse_state<datum_tree<MaxNodes, MaxList>>> {
-            tree.set_root(node.value);
-            return parse_state<datum_tree<MaxNodes, MaxList>>{tree, node.rest};
-        });
+    // Read one node, then set it as the root: two steps, the second taking
+    // the first's output. That is a bind, and after step B7 there is no
+    // reader function left that spells one by hand.
+    auto const node_p =
+        smd::kit::parser::parser{[](cursor c, detail::reader_context auto &rc) {
+            return detail::read_node(c, rc);
+        }};
+    auto const set_root = [&tree](int node) {
+        return smd::kit::parser::parser{
+            [&tree, node](cursor rest, detail::reader_context auto &)
+                -> foundation::result<parse_state<tree_type>> {
+                tree.set_root(node);
+                return parse_state<tree_type>{tree, rest};
+            }};
+    };
+    return smd::kit::foundation::bind(node_p, set_root)(cur, ctx);
 }
 
 /// Reads exactly one datum from @p source: convenience over @ref
@@ -75,18 +88,36 @@ template <int MaxNodes = default_max_nodes, int MaxList = default_max_list,
 [[nodiscard]] constexpr auto read(std::string_view source, SymbolTable &symbols,
                                   readtable const &table = standard_readtable)
     -> foundation::result<datum_tree<MaxNodes, MaxList>> {
-    return detail::and_then(
-        read_datum<MaxNodes, MaxList>(cursor{source}, symbols, table),
-        [&](parse_state<datum_tree<MaxNodes, MaxList>> const &state)
-            -> foundation::result<datum_tree<MaxNodes, MaxList>> {
-            cursor const rest =
-                detail::skip_intertoken_space(state.rest, table);
-            if (!rest.empty()) {
-                return foundation::parse_error{rest.position(),
-                                               "unexpected trailing input"};
-            }
-            return state.value;
-        });
+    using tree_type = datum_tree<MaxNodes, MaxList>;
+    // The readtable is this parse's whole context. @ref read_datum builds
+    // its own reader context per call, and there is none in hand here --
+    // the same situation @ref detail::skip_intertoken_space is in, and the
+    // same answer: `readtable const` models parse_context directly (B3).
+    auto const datum_p = smd::kit::parser::parser{
+        [&symbols](cursor c, readtable const &rt)
+            -> foundation::result<parse_state<tree_type>> {
+            return read_datum<MaxNodes, MaxList>(c, symbols, rt);
+        }};
+    auto const require_end = [](tree_type const &tree) {
+        return smd::kit::parser::parser{
+            [tree](cursor rest, readtable const &rt)
+                -> foundation::result<parse_state<tree_type>> {
+                cursor const after = detail::skip_intertoken_space(rest, rt);
+                if (!after.empty()) {
+                    return foundation::parse_error{after.position(),
+                                                   "unexpected trailing input"};
+                }
+                return parse_state<tree_type>{tree, after};
+            }};
+    };
+    // The last bind is @c result's own: dropping the cursor a caller with
+    // a whole spelling in hand has no use for is not a parse step, which
+    // is the same reason the tree appends throughout detail/ never moved
+    // onto the parser layer either.
+    return smd::kit::foundation::bind(
+        smd::kit::foundation::bind(datum_p, require_end)(cursor{source}, table),
+        [](parse_state<tree_type> const &state)
+            -> foundation::result<tree_type> { return state.value; });
 }
 
 } // namespace smd::cl::reader

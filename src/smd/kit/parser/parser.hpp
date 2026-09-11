@@ -36,19 +36,38 @@ concept parser_like = requires(P p, cursor c, Ctx &ctx) { p(c, ctx); };
 /// this project's own record of paying for a captured-reference dangling
 /// bug once already).
 ///
+/// A parser *is* its callable rather than holding one: @p F is a private
+/// base and its @c operator() is re-exported, so running a parser costs one
+/// constexpr call instead of two. That is not a micro-optimization. This
+/// reader's recursion is ordinary C++ recursion, so every reified parser on
+/// the path from @c read_node back to itself spends constant-evaluation
+/// stack, and @c -fconstexpr-depth is a hard 512 by default: at step B7,
+/// with the dispatch converted, a forwarding @c operator() put the
+/// 64-deep nested-quote case in @c src/smd/cl/printer/prin1.test.cpp over
+/// that limit. Re-exporting the call instead leaves it below where it
+/// started.
+///
+/// The argument-order guard moves with the call rather than being lost:
+/// @p F names its own context parameter, and every parser in this kit and
+/// its one client spells it @c parse_context (or a refinement such as
+/// @c smd::cl::reader::detail::reader_context, or a concrete context type),
+/// so a @ref cursor passed where a context belongs is still a substitution
+/// failure. What changes is where the constraint is written -- on the
+/// callable that reads the context, which is the only place that can say
+/// anything true about it -- not whether it is checked. A wrapper that
+/// re-stated it could only do so by being a call, and a call is the cost
+/// this removes.
+///
 /// @tparam F Callable type; deduced via the deduction guide.
 template <class F>
-class parser {
+class parser : private F {
   public:
     /// Constructs a parser wrapping @p f.
     constexpr explicit parser(F f);
 
-    /// Runs the parser starting at @p cur, threading @p ctx.
-    template <parse_context Ctx>
-    constexpr auto operator()(cursor cur, Ctx &ctx) const;
-
-  private:
-    F f_;
+    /// Runs the parser starting at @p cur, threading the context @p F
+    /// itself names.
+    using F::operator();
 };
 
 /// Deduction guide: @c parser(f) deduces @c parser<F>.
@@ -56,13 +75,7 @@ template <class F>
 parser(F) -> parser<F>;
 
 template <class F>
-constexpr parser<F>::parser(F f) : f_{std::move(f)} {}
-
-template <class F>
-template <parse_context Ctx>
-constexpr auto parser<F>::operator()(cursor cur, Ctx &ctx) const {
-    return f_(cur, ctx);
-}
+constexpr parser<F>::parser(F f) : F{std::move(f)} {}
 
 /// Returns a parser that always succeeds, consuming no input and yielding
 /// @p value, for any threaded context.

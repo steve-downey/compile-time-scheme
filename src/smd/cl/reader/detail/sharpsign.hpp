@@ -14,12 +14,15 @@
 #include <smd/cl/reader/number.hpp>
 #include <smd/cl/reader/readtable.hpp>
 #include <smd/cl/reader/token.hpp>
+#include <smd/kit/parser/choice.hpp>
 #include <smd/kit/parser/parser.hpp>
 #include <smd/kit/parser/parser_instances.hpp>
+#include <smd/kit/parser/repeat.hpp>
 
 #include <algorithm>
-#include <cstddef>
+#include <optional>
 #include <utility>
+#include <variant>
 
 namespace smd::cl::reader::detail {
 
@@ -77,75 +80,132 @@ template <reader_context Ctx>
     return bind(token_p, classify_and_add)(cur, ctx);
 }
 
+// b3055934-2efb-4df4-a4bb-e961e29e7d0f
 /// Reads a sharpsign dispatch form (positioned at the `#`): the optional
 /// infix numeric argument, then the sub-handler @ref readtable::sharp_of
 /// selects.
-template <class Ctx>
+///
+/// The argument decides which parsers the character after it may name --
+/// four of the seven arms refuse one outright, one requires it to be a
+/// radix, one refuses it with a message of its own -- so the second parser
+/// here is chosen by the first one's value, which is a @c bind and not a
+/// @c lift2 (D28, docs/cl-parser-scoping.md).
+///
+/// The dispatch itself stays a @c switch. A readtable selects one branch
+/// by lookup and commits to it; @ref smd::kit::parser::operator| searches,
+/// and a search would change which diagnostic surfaces when the selected
+/// branch fails, which D31 does not permit. What changed is that every arm
+/// now names a parser instead of open-coding a call -- and because a datum
+/// is an arena index, all seven of them have the same result type, so the
+/// table already selects among same-typed parsers. That is the shape D19
+/// asked for when it said a later @c set-macro-character should be a table
+/// lookup rather than a redesign.
+template <reader_context Ctx>
 [[nodiscard]] constexpr auto read_sharpsign(cursor cur, Ctx &ctx)
     -> foundation::result<parse_state<int>> {
     auto const where = cur.position();
-    cursor after = cur.bump();
-    int argument = -1; // -1: absent
-    cursor const digits_end =
-        advance_while(after, [](char c) { return c >= '0' && c <= '9'; });
-    if (digits_end.position().offset > after.position().offset) {
-        auto const digits = after.remaining().substr(
-            0, static_cast<std::size_t>(digits_end.position().offset -
-                                        after.position().offset));
-        argument = std::ranges::fold_left(digits, 0, [](int acc, char c) {
+
+    // The optional infix numeric argument: a digit run folded into an int,
+    // -1 when absent. Absence is a value rather than a failure, so
+    // `optional` is what turns satisfy's own cursor-positioned failure --
+    // which no caller here ever sees -- into the std::nullopt `many_until`
+    // reads as "stop", and the fold rides along in `map`. The accumulator
+    // is a local the way @ref read_string's is, for the same reason: this
+    // parser is built, run, and discarded inside one call, so nothing it
+    // captures can outlive it.
+    int argument = -1;
+    auto const digit_p = smd::kit::parser::satisfy(
+        [](char c) { return c >= '0' && c <= '9'; }, "expected digit");
+    auto const accumulate = [&argument](std::optional<char> digit) {
+        if (digit.has_value()) {
             // Cap far above the largest valid radix; enough to reject.
-            return std::min(acc * 10 + (c - '0'), 999);
-        });
-        after = digits_end;
-    }
-    if (after.empty()) {
-        return foundation::parse_error{where,
-                                       "unexpected end of input after '#'"};
-    }
-    auto const reject_argument =
-        [&](auto continuation) -> foundation::result<parse_state<int>> {
-        if (argument >= 0) {
-            return foundation::parse_error{
-                where, "unexpected numeric argument after '#'"};
+            argument = std::min(
+                (argument < 0 ? 0 : argument) * 10 + (*digit - '0'), 999);
         }
-        return continuation();
+        return digit;
     };
-    switch (ctx.table.sharp_of(after.peek())) {
-    case sharpsign_kind::function_quote:
-        return reject_argument([&] {
-            return read_wrapped(after.bump(), ctx, datum_branch::function,
-                                where);
-        });
-    case sharpsign_kind::vector_open:
-        if (argument >= 0) {
-            return foundation::parse_error{
-                where, "sized #n(...) vectors not yet supported"};
-        }
-        return read_delimited(after.bump(), ctx, datum_branch::vector, where);
-    case sharpsign_kind::character_literal:
-        return reject_argument(
-            [&] { return read_character(after.bump(), ctx, where); });
-    case sharpsign_kind::radix_binary:
-        return reject_argument(
-            [&] { return read_radix_number(after.bump(), ctx, 2, where); });
-    case sharpsign_kind::radix_octal:
-        return reject_argument(
-            [&] { return read_radix_number(after.bump(), ctx, 8, where); });
-    case sharpsign_kind::radix_hex:
-        return reject_argument(
-            [&] { return read_radix_number(after.bump(), ctx, 16, where); });
-    case sharpsign_kind::radix_n:
-        if (argument < 2 || argument > 36) {
-            return foundation::parse_error{where,
-                                           "radix must be between 2 and 36"};
-        }
-        return read_radix_number(after.bump(), ctx, argument, where);
-    case sharpsign_kind::block_comment: // consumed as intertoken space
-    case sharpsign_kind::none:
-        break;
-    }
-    return foundation::parse_error{where, "unsupported '#' syntax"};
+    auto const argument_p = smd::kit::parser::map(
+        smd::kit::parser::many_until(smd::kit::parser::map(
+            smd::kit::parser::optional(digit_p), accumulate)),
+        [&argument](std::monostate) { return argument; });
+
+    auto const dispatch = [where](int infix) {
+        return parser{[where, infix](cursor after, reader_context auto &rc)
+                          -> foundation::result<parse_state<int>> {
+            if (after.empty()) {
+                return foundation::parse_error{
+                    where, "unexpected end of input after '#'"};
+            }
+            // Each sub-handler as a parser value. Every one of them
+            // reports at @c where -- the `#`'s own position, not the
+            // cursor they are handed -- which is why they are built here,
+            // closed over it, rather than named at namespace scope.
+            auto const wrapped_p = [where](datum_branch kind) {
+                return parser{
+                    [where, kind](cursor c, reader_context auto &inner) {
+                        return read_wrapped(c, inner, kind, where);
+                    }};
+            };
+            auto const delimited_p = [where](datum_branch kind) {
+                return parser{
+                    [where, kind](cursor c, reader_context auto &inner) {
+                        return read_delimited(c, inner, kind, where);
+                    }};
+            };
+            auto const character_p =
+                parser{[where](cursor c, reader_context auto &inner) {
+                    return read_character(c, inner, where);
+                }};
+            auto const radix_p = [where](int radix) {
+                return parser{
+                    [where, radix](cursor c, reader_context auto &inner) {
+                        return read_radix_number(c, inner, radix, where);
+                    }};
+            };
+            // A precondition on four of the seven arms, producing one of
+            // the five pinned diagnostics. It guards a parser rather than
+            // a continuation now, but it is otherwise the check it was.
+            auto const reject_argument =
+                [&](auto p) -> foundation::result<parse_state<int>> {
+                if (infix >= 0) {
+                    return foundation::parse_error{
+                        where, "unexpected numeric argument after '#'"};
+                }
+                return p(after.bump(), rc);
+            };
+            switch (rc.table.sharp_of(after.peek())) {
+            case sharpsign_kind::function_quote:
+                return reject_argument(wrapped_p(datum_branch::function));
+            case sharpsign_kind::vector_open:
+                if (infix >= 0) {
+                    return foundation::parse_error{
+                        where, "sized #n(...) vectors not yet supported"};
+                }
+                return delimited_p(datum_branch::vector)(after.bump(), rc);
+            case sharpsign_kind::character_literal:
+                return reject_argument(character_p);
+            case sharpsign_kind::radix_binary:
+                return reject_argument(radix_p(2));
+            case sharpsign_kind::radix_octal:
+                return reject_argument(radix_p(8));
+            case sharpsign_kind::radix_hex:
+                return reject_argument(radix_p(16));
+            case sharpsign_kind::radix_n:
+                if (infix < 2 || infix > 36) {
+                    return foundation::parse_error{
+                        where, "radix must be between 2 and 36"};
+                }
+                return radix_p(infix)(after.bump(), rc);
+            case sharpsign_kind::block_comment: // consumed as intertoken space
+            case sharpsign_kind::none:
+                break;
+            }
+            return foundation::parse_error{where, "unsupported '#' syntax"};
+        }};
+    };
+    return bind(argument_p, dispatch)(cur.bump(), ctx);
 }
+// b3055934-2efb-4df4-a4bb-e961e29e7d0f end
 
 } // namespace smd::cl::reader::detail
 
