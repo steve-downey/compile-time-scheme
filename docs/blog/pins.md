@@ -36,9 +36,21 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-30-asking-someone-else.org` | `f60b0ff` | `blog/phase-30` | `Merge step R6` (tag created at the merge, before the post) |
 | `phase-31-driving-the-machine.org` | `2f48c9f` | `blog/phase-31` | `Merge step R7` (tag created at the merge, before the post) |
 | `phase-32-extracting-the-kit.org` | `19c8702` | `blog/phase-32` | `Merge step R8` (tag created at the merge, before the post) |
+| `phase-37-a-printer-and-its-oracle.org` | `a50345c` | `blog/phase-37` | one commit past step A4's merge: `17820fc` is the merge, `a50345c` the clang-format follow-up touching only `src/smd/cl/printer/`, so the tag publishes formatted code |
 
-90 transclusions across 20 posts. Every row passes the anchor test at its pin,
+92 transclusions across 21 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
+
+The gap between phase 32 and phase 37 is the tree-retirement plan: steps A0
+through A3 changed documents, tags, build files and the contents of `src/`
+without landing a single UUID anchor, so phases 33 to 36 transclude nothing and
+take no pin, like the ten earlier posts that carry no code. Phase 37 is also the
+first row whose pin is deliberately *not* its step's merge commit. Step A4
+merged at `17820fc` and the orchestrator's clang-format follow-up landed two
+minutes later at `a50345c`, touching only whitespace under
+`src/smd/cl/printer/`; tagging the later commit publishes formatted code rather
+than unformatted. No tag moved: the choice was made when the tag was created,
+before the prose existed, which is the ordinary case from phase 20 onward.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
 the convention from `d0ff8ec` onward: the orchestrator tags the step's `--no-ff`
