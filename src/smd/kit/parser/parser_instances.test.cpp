@@ -4,6 +4,7 @@
 #include <smd/kit/parser/parser_instances.hpp>
 #include <smd/kit/parser/parser_instances.hpp> // test 2nd include OK
 
+#include <smd/kit/foundation/monad.hpp>
 #include <smd/kit/foundation/parse_error.hpp>
 #include <smd/kit/foundation/source_pos.hpp>
 #include <smd/kit/parser/parser.hpp>
@@ -151,6 +152,81 @@ static_assert([] {
     return !invoked && !r.has_value();
 }());
 // 915487ab-d22a-4335-ada8-fd79b9d159f4 end
+
+namespace {
+
+// The Monad object for a parser, which is the only way to reach fmap: the
+// fmap CPO keys on functor<T>, and parser is deliberately not registered
+// there (see parser.hpp's map).
+constexpr auto const &parser_monad =
+    smd::kit::foundation::monad<decltype(pure(0))>;
+
+// A mapped parser built where its callable does NOT outlive the call. The
+// helper returns, the lambda dies, and only then is the parser run. This is
+// the shape that catches a derived fmap holding its callable by reference:
+// derive_monad's derivation does, which is why parser_monad_impl supplies
+// its own. Constant evaluation rejects the dead read, and so does Asan.
+constexpr auto mapped_away_from_its_callable() {
+    return parser_monad.fmap([bias = 1000](int n) { return n + bias; },
+                             pure(7));
+}
+
+} // namespace
+
+// --- Functor laws over the natively supplied fmap. ------------------------
+
+static_assert([] {
+    // Identity: fmap(id, p) is p.
+    no_context ctx{};
+    auto const id = [](int n) { return n; };
+    return same_parse(parser_monad.fmap(id, char_val), char_val, "a", ctx) &&
+           same_parse(parser_monad.fmap(id, char_val), char_val, "", ctx);
+}());
+
+static_assert([] {
+    // Composition: fmap(g . f, p) is fmap(g, fmap(f, p)).
+    no_context ctx{};
+    auto const f = [](int n) { return n * 2; };
+    auto const g = [](int n) { return n + 1; };
+    auto const composed = [f, g](int n) { return g(f(n)); };
+    return same_parse(parser_monad.fmap(composed, char_val),
+                      parser_monad.fmap(g, parser_monad.fmap(f, char_val)), "a",
+                      ctx) &&
+           same_parse(parser_monad.fmap(composed, char_val),
+                      parser_monad.fmap(g, parser_monad.fmap(f, char_val)), "",
+                      ctx);
+}());
+
+static_assert([] {
+    no_context ctx{};
+    return run(mapped_away_from_its_callable(), "", ctx).value().value == 1007;
+}());
+
+TEST_CASE("ParserInstancesTest - FmapIdentity") {
+    no_context ctx{};
+    auto const id = [](int n) { return n; };
+    CHECK(same_parse(parser_monad.fmap(id, char_val), char_val, "a", ctx));
+    CHECK(same_parse(parser_monad.fmap(id, char_val), char_val, "", ctx));
+}
+
+TEST_CASE("ParserInstancesTest - FmapComposition") {
+    no_context ctx{};
+    auto const f = [](int n) { return n * 2; };
+    auto const g = [](int n) { return n + 1; };
+    auto const composed = [f, g](int n) { return g(f(n)); };
+    CHECK(same_parse(parser_monad.fmap(composed, char_val),
+                     parser_monad.fmap(g, parser_monad.fmap(f, char_val)), "a",
+                     ctx));
+    CHECK(same_parse(parser_monad.fmap(composed, char_val),
+                     parser_monad.fmap(g, parser_monad.fmap(f, char_val)), "",
+                     ctx));
+}
+
+TEST_CASE("ParserInstancesTest - FmapOutlivesItsCallable") {
+    no_context ctx{};
+    auto const p = mapped_away_from_its_callable();
+    CHECK(run(p, "", ctx).value().value == 1007);
+}
 
 TEST_CASE("ParserInstancesTest - MonadLeftIdentity") {
     no_context ctx{};
