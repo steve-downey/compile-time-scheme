@@ -44,7 +44,7 @@ struct static_vector_functor_impl {
 };
 
 /// Functor instance map for @ref static_vector.
-struct static_vector_functor_map : functor<static_vector_functor_impl> {
+struct static_vector_functor_map : derive_functor<static_vector_functor_impl> {
     using static_vector_functor_impl::fmap;
 };
 
@@ -57,7 +57,7 @@ struct static_vector_foldable_impl {
     constexpr auto fold_map(this auto &&, F &&f,
                             static_vector<T, Capacity> const &values,
                             M const &m) {
-        auto acc = m.empty();
+        auto acc = m.identity();
         for (auto const &element : values) { // substrate generic algorithm
             acc = m.combine(std::move(acc), std::invoke(f, element));
         }
@@ -77,7 +77,8 @@ struct static_vector_foldable_impl {
 };
 
 /// Foldable instance map for @ref static_vector.
-struct static_vector_foldable_map : foldable<static_vector_foldable_impl> {
+struct static_vector_foldable_map
+    : derive_foldable<static_vector_foldable_impl> {
     using static_vector_foldable_impl::fold_map;
     using static_vector_foldable_impl::fold_right;
 };
@@ -93,7 +94,7 @@ struct static_vector_foldable_map : foldable<static_vector_foldable_impl> {
 /// stop visiting early, use @c fold_left_short instead.
 ///
 /// The effect type must name its carried type as @c value_type and have a
-/// registered @c applicative_typeclass instance.
+/// registered @c applicative instance.
 struct static_vector_traversable_impl {
     template <class F, class T, int Capacity>
     constexpr auto traverse(this auto &&, F &&f,
@@ -101,7 +102,7 @@ struct static_vector_traversable_impl {
         using effect_type =
             std::remove_cvref_t<std::invoke_result_t<F &, T const &>>;
         using B = typename effect_type::value_type;
-        auto const &tc = applicative_typeclass<effect_type>;
+        auto const &tc = applicative<effect_type>;
         auto accumulated = tc.pure(static_vector<B, Capacity>{});
         auto append = [](static_vector<B, Capacity> collected, B element) {
             collected.push_back(std::move(element));
@@ -117,24 +118,24 @@ struct static_vector_traversable_impl {
 
 /// Traversable instance map for @ref static_vector.
 struct static_vector_traversable_map
-    : traversable<static_vector_traversable_impl> {
+    : derive_traversable<static_vector_traversable_impl> {
     using static_vector_traversable_impl::traverse;
 };
 
 // 51f97b89-0923-4b8f-94f1-166b79f6d70d
 /// Registers the Functor instance for @ref static_vector.
 template <class T, int Capacity>
-inline constexpr auto functor_typeclass<static_vector<T, Capacity>> =
+inline constexpr auto functor<static_vector<T, Capacity>> =
     static_vector_functor_map{};
 
 /// Registers the Foldable instance for @ref static_vector.
 template <class T, int Capacity>
-inline constexpr auto foldable_typeclass<static_vector<T, Capacity>> =
+inline constexpr auto foldable<static_vector<T, Capacity>> =
     static_vector_foldable_map{};
 
 /// Registers the Traversable instance for @ref static_vector.
 template <class T, int Capacity>
-inline constexpr auto traversable_typeclass<static_vector<T, Capacity>> =
+inline constexpr auto traversable<static_vector<T, Capacity>> =
     static_vector_traversable_map{};
 // 51f97b89-0923-4b8f-94f1-166b79f6d70d end
 

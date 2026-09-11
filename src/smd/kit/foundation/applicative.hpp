@@ -10,6 +10,9 @@
 #ifndef SRC_SMD_KIT_FOUNDATION_APPLICATIVE_HPP
 #define SRC_SMD_KIT_FOUNDATION_APPLICATIVE_HPP
 
+#include <smd/kit/foundation/typeclass_base.hpp>
+
+#include <concepts>
 #include <functional>
 #include <tuple>
 #include <type_traits>
@@ -110,9 +113,29 @@ constexpr auto make_terminating_partial(Function &&function) {
 ///
 /// @tparam Impl Concrete implementation providing @c pure and @c apply.
 template <class Impl>
-struct applicative : protected Impl {
-    using Impl::apply;
-    using Impl::pure;
+struct derive_applicative : protected Impl {
+    /// Embeds a plain value into the applicative context.
+    template <class V>
+    constexpr auto pure(this auto &&self, V &&value)
+        requires requires(Impl const &impl) {
+            impl.pure(std::forward<V>(value));
+        }
+    {
+        return impl_of(self).pure(std::forward<V>(value));
+    }
+
+    /// Applies a contextualized function to a contextualized argument.
+    template <class FunctionInContext, class ArgInContext>
+    constexpr auto apply(this auto &&self, FunctionInContext &&function,
+                         ArgInContext &&argument)
+        requires requires(Impl const &impl) {
+            impl.apply(std::forward<FunctionInContext>(function),
+                       std::forward<ArgInContext>(argument));
+        }
+    {
+        return impl_of(self).apply(std::forward<FunctionInContext>(function),
+                                   std::forward<ArgInContext>(argument));
+    }
 
     /// Lifts @p function and applies it to one or more contextualized
     /// arguments left-to-right.
@@ -128,19 +151,15 @@ struct applicative : protected Impl {
     template <class Function, class FirstArg, class... RestArgs>
     constexpr auto invoke(this auto &&self, Function &&function,
                           FirstArg &&first_arg, RestArgs &&...rest_args) {
-        using Self = std::remove_reference_t<decltype(self)>;
-        using ImplBase =
-            std::conditional_t<std::is_const_v<Self>, const Impl, Impl>;
-
-        if constexpr (requires(ImplBase &impl) {
-                          impl.invoke(std::forward<Function>(function),
-                                      std::forward<FirstArg>(first_arg),
-                                      std::forward<RestArgs>(rest_args)...);
+        if constexpr (requires {
+                          impl_of(self).invoke(
+                              std::forward<Function>(function),
+                              std::forward<FirstArg>(first_arg),
+                              std::forward<RestArgs>(rest_args)...);
                       }) {
-            return static_cast<ImplBase &>(self).invoke(
-                std::forward<Function>(function),
-                std::forward<FirstArg>(first_arg),
-                std::forward<RestArgs>(rest_args)...);
+            return impl_of(self).invoke(std::forward<Function>(function),
+                                        std::forward<FirstArg>(first_arg),
+                                        std::forward<RestArgs>(rest_args)...);
         } else {
             auto lifted = self.pure(detail::make_terminating_partial(
                 std::forward<Function>(function)));
@@ -153,46 +172,126 @@ struct applicative : protected Impl {
     /// Lifts a binary function and applies it to two effectful arguments.
     /// Equivalent to @c invoke(function, a, b).
     template <class Function, class A, class B>
-    constexpr auto lift_a2(this auto &&self, Function &&function, A &&a,
-                           B &&b) {
-        return self.invoke(std::forward<Function>(function), std::forward<A>(a),
-                           std::forward<B>(b));
+    constexpr auto lift_a2(this auto &&self, Function &&function, A &&a, B &&b)
+        requires requires(Impl const &impl) {
+            impl.lift_a2(std::forward<Function>(function), std::forward<A>(a),
+                         std::forward<B>(b));
+        } || requires {
+            // self, not impl: invoke may be this base's own synthesized
+            // member rather than anything Impl supplies, and a clause that
+            // named impl would disagree with the body below — which makes
+            // the member vanish from overload resolution with no
+            // diagnostic.
+            self.invoke(detail::probe_witness2<int>{}, std::forward<A>(a),
+                        std::forward<B>(b));
+        }
+    {
+        if constexpr (requires {
+                          impl_of(self).lift_a2(
+                              std::forward<Function>(function),
+                              std::forward<A>(a), std::forward<B>(b));
+                      }) {
+            return impl_of(self).lift_a2(std::forward<Function>(function),
+                                         std::forward<A>(a),
+                                         std::forward<B>(b));
+        } else {
+            return self.invoke(std::forward<Function>(function),
+                               std::forward<A>(a), std::forward<B>(b));
+        }
     }
 
     /// Alias for the @c apply primitive; applies a contextualized function
     /// to a contextualized argument.
     template <class FunctionInContext, class ArgInContext>
     constexpr auto ap(this auto &&self, FunctionInContext &&function,
-                      ArgInContext &&argument) {
-        return self.apply(std::forward<FunctionInContext>(function),
-                          std::forward<ArgInContext>(argument));
+                      ArgInContext &&argument)
+        requires requires(Impl const &impl) {
+            impl.ap(std::forward<FunctionInContext>(function),
+                    std::forward<ArgInContext>(argument));
+        } || requires {
+            self.apply(std::forward<FunctionInContext>(function),
+                       std::forward<ArgInContext>(argument));
+        }
+    {
+        if constexpr (requires {
+                          impl_of(self).ap(
+                              std::forward<FunctionInContext>(function),
+                              std::forward<ArgInContext>(argument));
+                      }) {
+            return impl_of(self).ap(std::forward<FunctionInContext>(function),
+                                    std::forward<ArgInContext>(argument));
+        } else {
+            return self.apply(std::forward<FunctionInContext>(function),
+                              std::forward<ArgInContext>(argument));
+        }
     }
 
     /// Sequences two effectful values, discarding the first value and
     /// returning the second. Logs/effects from both are preserved.
     template <class FirstArg, class SecondArg>
     constexpr auto discard_first(this auto &&self, FirstArg &&first,
-                                 SecondArg &&second) {
-        return self.invoke(
-            [](const auto &, auto &&rhs) {
-                return std::forward<decltype(rhs)>(rhs);
-            },
-            std::forward<FirstArg>(first), std::forward<SecondArg>(second));
+                                 SecondArg &&second)
+        requires requires(Impl const &impl) {
+            impl.discard_first(std::forward<FirstArg>(first),
+                               std::forward<SecondArg>(second));
+        } || requires {
+            self.invoke(detail::probe_witness2<int>{},
+                        std::forward<FirstArg>(first),
+                        std::forward<SecondArg>(second));
+        }
+    {
+        if constexpr (requires {
+                          impl_of(self).discard_first(
+                              std::forward<FirstArg>(first),
+                              std::forward<SecondArg>(second));
+                      }) {
+            return impl_of(self).discard_first(std::forward<FirstArg>(first),
+                                               std::forward<SecondArg>(second));
+        } else {
+            return self.invoke(
+                [](const auto &, auto &&rhs) {
+                    return std::forward<decltype(rhs)>(rhs);
+                },
+                std::forward<FirstArg>(first), std::forward<SecondArg>(second));
+        }
     }
 
     /// Sequences two effectful values, discarding the second value and
     /// returning the first. Logs/effects from both are preserved.
     template <class FirstArg, class SecondArg>
     constexpr auto discard_second(this auto &&self, FirstArg &&first,
-                                  SecondArg &&second) {
-        return self.invoke(
-            [](auto &&lhs, const auto &) {
-                return std::forward<decltype(lhs)>(lhs);
-            },
-            std::forward<FirstArg>(first), std::forward<SecondArg>(second));
+                                  SecondArg &&second)
+        requires requires(Impl const &impl) {
+            impl.discard_second(std::forward<FirstArg>(first),
+                                std::forward<SecondArg>(second));
+        } || requires {
+            self.invoke(detail::probe_witness2<int>{},
+                        std::forward<FirstArg>(first),
+                        std::forward<SecondArg>(second));
+        }
+    {
+        if constexpr (requires {
+                          impl_of(self).discard_second(
+                              std::forward<FirstArg>(first),
+                              std::forward<SecondArg>(second));
+                      }) {
+            return impl_of(self).discard_second(
+                std::forward<FirstArg>(first), std::forward<SecondArg>(second));
+        } else {
+            return self.invoke(
+                [](auto &&lhs, const auto &) {
+                    return std::forward<decltype(lhs)>(lhs);
+                },
+                std::forward<FirstArg>(first), std::forward<SecondArg>(second));
+        }
     }
 
   private:
+    template <class Self>
+    static constexpr auto impl_of(Self &&self) -> decltype(auto) {
+        return static_cast<impl_ref_t<Impl, Self>>(self);
+    }
+
     template <class Accumulated>
     constexpr auto apply_chain(this auto &&, Accumulated &&accumulated) {
         return std::forward<Accumulated>(accumulated);
@@ -217,12 +316,51 @@ struct applicative : protected Impl {
 /// Default is @c std::false_type{}, producing a compile error if @ref invoke
 /// is called for an unregistered type.
 template <class T>
-inline constexpr auto applicative_typeclass = std::false_type{};
+inline constexpr auto applicative = std::false_type{};
 
-/// Customization-point object for the @c invoke operation.
+/// Restricted @c Impl concept for Applicative: satisfied when @p Impl
+/// supplies the minimal complete basis @ref derive_applicative needs —
+/// @c pure and @c apply.
 ///
-/// Deduces the applicative context type from the first argument and dispatches
-/// through @c applicative_typeclass<FirstArg>. The NTTP @c TC may be pinned
+/// This is the MINIMAL pragma to @ref applicative_object's class
+/// declaration. @c invoke, @c lift_a2, @c ap, @c discard_first and
+/// @c discard_second are all derived and belong to @ref applicative_object
+/// alone.
+template <class Impl, class Context>
+concept applicative_impl = requires(Impl const &impl, Context const &context,
+                                    element_type_t<Context> const &element) {
+    impl.pure(element);
+    impl.apply(impl.pure(detail::probe_witness<element_type_t<Context>>{}),
+               context);
+};
+
+/// Deep object concept for an Applicative object over @p Context: satisfied
+/// when @p Obj provides the whole object surface — @c pure and @c apply,
+/// plus the derived @c invoke, @c lift_a2, @c ap, @c discard_first and
+/// @c discard_second.
+///
+/// The derived operations are probed with representative witness callables:
+/// the check is a witness that the operation exists, not a proof that it
+/// exists for every callable, which is what the failure mode at issue — an
+/// operation missing entirely — actually needs.
+template <class Obj, class Context>
+concept applicative_object = requires(Obj const &obj, Context const &context,
+                                      element_type_t<Context> const &element) {
+    obj.pure(element);
+    obj.apply(obj.pure(detail::probe_witness<element_type_t<Context>>{}),
+              context);
+    obj.ap(obj.pure(detail::probe_witness<element_type_t<Context>>{}), context);
+    obj.invoke(detail::probe_witness<element_type_t<Context>>{}, context);
+    obj.lift_a2(detail::probe_witness2<element_type_t<Context>>{}, context,
+                context);
+    obj.discard_first(context, context);
+    obj.discard_second(context, context);
+};
+
+/// Operation object for the @c invoke operation.
+///
+/// Deduces the applicative context type from the first effectful argument and
+/// dispatches through @c applicative<FirstArg>. The NTTP @c TC may be pinned
 /// explicitly for testing or alternate dispatch.
 struct invoke_fn {
     /// Applies @p function to one or more effectful arguments.
@@ -232,20 +370,82 @@ struct invoke_fn {
     /// lookup).
     /// @tparam RestArgs  Additional effectful argument types.
     /// @tparam TC        Typeclass instance (NTTP, defaults to lookup).
-    template <
-        class Function, class FirstArg, class... RestArgs,
-        const auto &TC = applicative_typeclass<std::remove_cvref_t<FirstArg>>>
+    template <class Function, class FirstArg, class... RestArgs,
+              const auto &TC = applicative<std::remove_cvref_t<FirstArg>>>
     constexpr auto operator()(Function &&function, FirstArg &&first_arg,
                               RestArgs &&...rest_args) const {
-        using tc_type = std::remove_cvref_t<decltype(TC)>;
-        return tc_type{}.invoke(std::forward<Function>(function),
-                                std::forward<FirstArg>(first_arg),
-                                std::forward<RestArgs>(rest_args)...);
+        static_assert(has_instance_v<decltype(TC)>,
+                      "No Applicative instance for this type. Specialize "
+                      "smd::kit::foundation::applicative<T> with an object "
+                      "providing pure(value) and apply(f_ctx, a_ctx).");
+        return TC.invoke(std::forward<Function>(function),
+                         std::forward<FirstArg>(first_arg),
+                         std::forward<RestArgs>(rest_args)...);
     }
 };
 
-/// Global CPO for Applicative's @c invoke operation.
+/// Global operation object for Applicative's @c invoke.
 inline constexpr invoke_fn invoke{};
+
+/// Operation object for the derived @c ap operation.
+struct ap_fn {
+    /// Applies a contextualized function to a contextualized argument.
+    ///
+    /// @tparam FunctionInContext First operand type (what keys the lookup).
+    /// @tparam ArgInContext      Second operand type.
+    /// @tparam TC                Typeclass instance (NTTP, defaults to lookup).
+    template <
+        class FunctionInContext, class ArgInContext,
+        const auto &TC = applicative<std::remove_cvref_t<FunctionInContext>>>
+    constexpr auto operator()(FunctionInContext &&function,
+                              ArgInContext &&argument) const {
+        static_assert(has_instance_v<decltype(TC)>,
+                      "No Applicative instance for this type. Specialize "
+                      "smd::kit::foundation::applicative<T> with an object "
+                      "providing pure(value) and apply(f_ctx, a_ctx).");
+        return TC.ap(std::forward<FunctionInContext>(function),
+                     std::forward<ArgInContext>(argument));
+    }
+};
+
+/// Global operation object for Applicative's @c ap.
+inline constexpr ap_fn ap{};
+
+/// Operation object for the derived @c discard_first operation.
+struct discard_first_fn {
+    /// Sequences two effectful values, yielding the second's value.
+    template <class FirstArg, class SecondArg,
+              const auto &TC = applicative<std::remove_cvref_t<FirstArg>>>
+    constexpr auto operator()(FirstArg &&first, SecondArg &&second) const {
+        static_assert(has_instance_v<decltype(TC)>,
+                      "No Applicative instance for this type. Specialize "
+                      "smd::kit::foundation::applicative<T> with an object "
+                      "providing pure(value) and apply(f_ctx, a_ctx).");
+        return TC.discard_first(std::forward<FirstArg>(first),
+                                std::forward<SecondArg>(second));
+    }
+};
+
+/// Global operation object for Applicative's @c discard_first.
+inline constexpr discard_first_fn discard_first{};
+
+/// Operation object for the derived @c discard_second operation.
+struct discard_second_fn {
+    /// Sequences two effectful values, yielding the first's value.
+    template <class FirstArg, class SecondArg,
+              const auto &TC = applicative<std::remove_cvref_t<FirstArg>>>
+    constexpr auto operator()(FirstArg &&first, SecondArg &&second) const {
+        static_assert(has_instance_v<decltype(TC)>,
+                      "No Applicative instance for this type. Specialize "
+                      "smd::kit::foundation::applicative<T> with an object "
+                      "providing pure(value) and apply(f_ctx, a_ctx).");
+        return TC.discard_second(std::forward<FirstArg>(first),
+                                 std::forward<SecondArg>(second));
+    }
+};
+
+/// Global operation object for Applicative's @c discard_second.
+inline constexpr discard_second_fn discard_second{};
 
 } // namespace smd::kit::foundation
 

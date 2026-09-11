@@ -14,11 +14,12 @@
 #include <utility>
 
 using smd::kit::foundation::all_monoid;
+using smd::kit::foundation::derive_foldable;
+using smd::kit::foundation::empty;
 using smd::kit::foundation::fold_left;
 using smd::kit::foundation::fold_map;
 using smd::kit::foundation::fold_right;
 using smd::kit::foundation::foldable;
-using smd::kit::foundation::foldable_typeclass;
 using smd::kit::foundation::length;
 using smd::kit::foundation::static_vector;
 using smd::kit::foundation::sum_monoid;
@@ -32,6 +33,10 @@ namespace {
 /// in a production instance.
 template <class T>
 struct pair_box {
+    /// The carried type, which @c element_type_t reads to key the deep
+    /// object concepts.
+    using value_type = T;
+
     T first;
     T second;
 
@@ -65,7 +70,7 @@ struct pair_box_foldable_impl {
     }
 };
 
-struct pair_box_foldable_map : foldable<pair_box_foldable_impl> {
+struct pair_box_foldable_map : derive_foldable<pair_box_foldable_impl> {
     using pair_box_foldable_impl::fold_map;
     using pair_box_foldable_impl::fold_right;
 };
@@ -74,7 +79,7 @@ struct pair_box_foldable_map : foldable<pair_box_foldable_impl> {
 
 namespace smd::kit::foundation {
 template <class T>
-inline constexpr auto foldable_typeclass<pair_box<T>> = pair_box_foldable_map{};
+inline constexpr auto foldable<pair_box<T>> = pair_box_foldable_map{};
 }
 
 namespace {
@@ -84,7 +89,8 @@ constexpr pair_box<int> one_two{1, 2};
 // fold_map is the semantic centre: map into a monoid, combine in order.
 constexpr auto fold_map_sums() -> bool {
     pair_box_foldable_map m{};
-    return m.fold_map([](int x) { return x * 10; }, one_two, sum_monoid) == 30;
+    return m.fold_map([](int x) { return x * 10; }, one_two, sum_monoid<int>) ==
+           30;
 }
 
 // Derived fold_left visits first-then-second (order observable through a
@@ -148,15 +154,38 @@ TEST_CASE("FoldableTest - DerivedToVector") {
 }
 
 TEST_CASE("FoldableTest - TypeclassLookup") {
-    const auto &tc = foldable_typeclass<pair_box<int>>;
+    const auto &tc = foldable<pair_box<int>>;
     static_assert(
         !std::is_same_v<std::remove_cvref_t<decltype(tc)>, std::false_type>);
     CHECK(tc.length(one_two) == 2);
 }
 
 TEST_CASE("FoldableTest - Cpos") {
-    CHECK(fold_map([](int x) { return x; }, one_two, sum_monoid) == 3);
+    CHECK(fold_map([](int x) { return x; }, one_two, sum_monoid<int>) == 3);
     CHECK(fold_left([](int acc, int x) { return acc + x; }, 0, one_two) == 3);
     CHECK(fold_right([](int x, int acc) { return acc + x; }, 0, one_two) == 3);
     CHECK(length(one_two) == 2);
 }
+
+// --- The empty predicate, and the two concepts. ---------------------------
+//
+// Foldable's empty is the predicate -- "holds nothing" -- which is the
+// reading C++ already has for the name in std::empty, std::ranges::empty and
+// every container's own member. Alternative's identity element is zero. One
+// namespace holds the whole typeclass family, so the name had to go to one
+// of them, and it went to the one whose reading the host language already
+// fixes.
+
+TEST_CASE("FoldableTest - DerivedEmpty") {
+    CHECK_FALSE(empty(one_two));
+    CHECK_FALSE(pair_box_foldable_map{}.empty(one_two));
+}
+
+static_assert(
+    smd::kit::foundation::foldable_impl<pair_box_foldable_impl, pair_box<int>>);
+static_assert(smd::kit::foundation::foldable_object<pair_box_foldable_map,
+                                                    pair_box<int>>);
+
+// The Impl has the two primitives and none of the derived surface.
+static_assert(!smd::kit::foundation::foldable_object<pair_box_foldable_impl,
+                                                     pair_box<int>>);

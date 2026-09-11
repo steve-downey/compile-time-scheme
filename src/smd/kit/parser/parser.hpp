@@ -84,7 +84,7 @@ template <class T>
 /// Returns a parser that applies @p f to the value @p p produces, passing
 /// @p p's error through unchanged.
 ///
-/// Deliberately not a registered @c functor_typeclass<parser<F>> instance:
+/// Deliberately not a registered @c foundation::functor<parser<F>> instance:
 /// nothing outside this step needs a generic @c fmap over a parser value,
 /// and a typeclass instance with no second caller is the over-eagerness
 /// this project already learned to avoid (R8/DIV-0028). A real second

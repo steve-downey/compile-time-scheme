@@ -16,9 +16,13 @@ namespace smd::cl::foundation {
 using smd::kit::foundation::alt;
 using smd::kit::foundation::alt_fn;
 using smd::kit::foundation::alternative;
-using smd::kit::foundation::alternative_typeclass;
-using smd::kit::foundation::empty;
-using smd::kit::foundation::empty_fn;
+using smd::kit::foundation::alternative_impl;
+using smd::kit::foundation::alternative_object;
+using smd::kit::foundation::combine;
+using smd::kit::foundation::combine_fn;
+using smd::kit::foundation::derive_alternative;
+using smd::kit::foundation::zero;
+using smd::kit::foundation::zero_fn;
 
 } // namespace smd::cl::foundation
 
