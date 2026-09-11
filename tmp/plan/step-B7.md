@@ -48,7 +48,7 @@ of open-coding a call.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-b7-dispatch -b step-b7-dispatch cl-parser-combinators
 cd ../step-b7-dispatch
 git submodule update --init --recursive
@@ -175,8 +175,12 @@ Must return nothing: no `cl` test changed anywhere in Phase B.
 ```sh
 grep -c 'fails_with' src/smd/cl/reader/read.test.cpp
 grep -rn "unsupported '#' syntax\|radix must be between\|expected datum" src/smd/cl/reader/
-./.build/*/*/cl_reader_test "*Errors*" "*Sharpsign*" "*Vector*" 2>/dev/null | tail -8
-./.build/*/*/cl_conformance_test "*ReaderDifferential*" 2>/dev/null | tail -5
+reader_test=$(echo .build/build-*/src/smd/cl/reader/Asan/cl_reader_test)
+test -x "$reader_test" || { echo "NOT BUILT: $reader_test"; }
+"$reader_test" "*Errors*" "*Sharpsign*" "*Vector*" | tail -8
+conf_test=$(echo .build/build-*/src/smd/cl/conformance/Asan/cl_conformance_test)
+test -x "$conf_test" || { echo "NOT BUILT: $conf_test"; }
+"$conf_test" "*ReaderDifferential*" | tail -5
 ```
 
 `read.test.cpp`'s `reports_errors` is a chain of `fails_with` covering fourteen
@@ -221,7 +225,7 @@ git merge --no-ff step-b7-dispatch
 ## Record measurements
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"B7","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + compile-headers","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-B7-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
 EOF
 ```
@@ -229,12 +233,12 @@ EOF
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-b7-dispatch
 ```
 
 Mark B7 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 
