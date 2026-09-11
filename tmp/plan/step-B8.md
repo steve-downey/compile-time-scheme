@@ -52,7 +52,7 @@ that says what the reader is now.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-b8-close -b step-b8-close cl-parser-combinators
 cd ../step-b8-close
 git submodule update --init --recursive
@@ -77,7 +77,7 @@ was asked to record it, deliberately, because taking it here from git is more
 reliable than asking seven agents to remember.
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 base=$(git merge-base main cl-parser-combinators)
 git worktree add /tmp/b8-before "$base" --detach
 cd /tmp/b8-before && git submodule update --init --recursive
@@ -265,7 +265,7 @@ git merge --no-ff step-b8-close
 ## Record measurements
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"B8","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-B8-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":"D30 before/after builds are in this step's wall time"}
 EOF
 ```
@@ -277,13 +277,13 @@ this row as a documentation change that inexplicably cost an hour.
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-b8-close
 git worktree list          # /tmp/b8-before must be gone too
 ```
 
 Mark B8 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 

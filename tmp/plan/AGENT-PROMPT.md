@@ -1,7 +1,7 @@
 # Agent prompt (identical for every step)
 
 You are executing **one** step of a planned fan-out in the `compile-time-scheme`
-repository at `/home/sdowney/src/steve-downey/compile-time-scheme/main`.
+repository at `/home/sdowney/src/compile-time-scheme/main`.
 
 You have no memory of earlier steps and you must not try to acquire one.
 Everything you need is on disk in the places named below.
@@ -22,7 +22,8 @@ This is `AGENTS.md` § "Reading contract" applied to this fan-out.
 **Tier 2 — this step only. Bounded, rewritten per step, consumed once.**
 
 6. `tmp/plan/checklist.md` — find the **first unchecked step**. It names your
-   step file exactly; step identifiers are `A0`–`A5` and `B1`–`B8`.
+   step file exactly; step identifiers are `A0`–`A5` and `B1`–`B8`, plus any
+   slug-named maintenance step the orchestrator has inserted between them.
 7. `tmp/plan/step-<id>.md` for that step, and **only** that one.
 8. `tmp/plan/handoff-<id>.md` addressed to your step, if it exists.
    The first step of a phase has no inbound handoff; that is normal, not a
@@ -62,7 +63,7 @@ spelunking through `git log` or through earlier steps' files to reconstruct it.
    before cleanup, while the numbers and the worktree still exist.
 8. Remove the worktree.
 9. Mark your line in `tmp/plan/checklist.md` **in the main checkout, by absolute
-   path** — `/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+   path** — `/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
    Do not mark it inside your worktree; it must not become part of your diff.
 10. Read the **next** step's file and write **one** handoff for it,
     `tmp/plan/handoff-NN.md`, in the main checkout by absolute path.
@@ -291,7 +292,7 @@ Append **one** line, on success and on block alike. The path is absolute and
 outside every worktree, deliberately:
 
 ```
-/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl
+/home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl
 ```
 
 A relative path would resolve inside your worktree, where the record becomes
