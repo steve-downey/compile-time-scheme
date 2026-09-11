@@ -48,7 +48,7 @@ of open-coding a call.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-b7-dispatch -b step-b7-dispatch cl-parser-combinators
 cd ../step-b7-dispatch
 git submodule update --init --recursive
@@ -126,8 +126,19 @@ obligation is that `scripts/verify-transclusions.sh` is green at your merge.
 contract that it returns the cursor after the datum so callers can read a
 sequence — `read.test.cpp` has a sequential-read test that pins exactly that.
 
-After this, `grep -rn 'and_then' src/smd/cl/reader/` should find nothing outside
-the kit forwarding shims. Report the actual result in your handoff either way.
+After this, `grep -rn 'and_then' src/smd/cl/reader/` should find nothing in
+`read.hpp` itself. It **will** still find calls in `detail/forms.hpp` and
+`detail/text.hpp`, and those are correct and out of your scope — an earlier
+draft of this step file expected zero repo-wide, which is wrong and B6 reported
+it. Every surviving call is `result`'s own `bind` wrapped around
+`add_branch_checked`, `add_leaf_checked` or `intern_checked`: appending to the
+tree is not a parse step, so it never belonged on the parser layer. B5 and B6
+each left theirs deliberately, for that reason.
+
+`read_delimited` in particular uses it three times and you do not own that
+function. Making the grep return zero would mean editing it. Do not.
+
+Report the actual count in your handoff either way.
 
 ### 4. Constrain, anchor, and record
 
@@ -170,13 +181,25 @@ make lint
 git diff --name-only cl-parser-combinators..HEAD | grep '\.test\.cpp$' | grep -v kit/parser
 ```
 
-Must return nothing: no `cl` test changed anywhere in Phase B.
+This measures **your own diff**, not Phase B's. An earlier draft glossed it as
+"no `cl` test changed anywhere in Phase B", which is false — B5 and B6 both
+added cases to `src/smd/cl/reader/read.test.cpp` — and which contradicts
+`AGENT-PROMPT.md`'s standing rule. The rule is the one that governs: adding a
+case is fine, **changing an existing expectation is a halt, always.** If you
+add one, record it in `out_of_scope` and in your handoff, as B5 and B6 did.
+
+What must return nothing is any test file you did not add a case to, and any
+change to an existing expectation in one you did.
 
 ```sh
 grep -c 'fails_with' src/smd/cl/reader/read.test.cpp
 grep -rn "unsupported '#' syntax\|radix must be between\|expected datum" src/smd/cl/reader/
-./.build/*/*/cl_reader_test "*Errors*" "*Sharpsign*" "*Vector*" 2>/dev/null | tail -8
-./.build/*/*/cl_conformance_test "*ReaderDifferential*" 2>/dev/null | tail -5
+reader_test=$(echo .build/build-*/src/smd/cl/reader/Asan/cl_reader_test)
+test -x "$reader_test" || { echo "NOT BUILT: $reader_test"; }
+"$reader_test" "*Errors*" "*Sharpsign*" "*Vector*" | tail -8
+conf_test=$(echo .build/build-*/src/smd/cl/conformance/Asan/cl_conformance_test)
+test -x "$conf_test" || { echo "NOT BUILT: $conf_test"; }
+"$conf_test" "*ReaderDifferential*" | tail -5
 ```
 
 `read.test.cpp`'s `reports_errors` is a chain of `fails_with` covering fourteen
@@ -214,14 +237,23 @@ intertoken space before the switch runs. It looks like a bug and it is
 not, which is why the comment outlived the rewrite.
 EOF
 
-git checkout cl-parser-combinators
+Then merge **from inside your own worktree**, and only from there:
+
+```sh
+git checkout cl-parser-combinators        # in ../step-b7-dispatch, NOT in main/
 git merge --no-ff step-b7-dispatch
 ```
+
+The checkout at `/home/sdowney/src/compile-time-scheme/main` stays on `main` and
+is never switched off it — that is a standing rule of this repository, and B6
+broke it (harmlessly, and it restored the state) because this block did not say
+where to run. `cl-parser-combinators` is checked out in no worktree, so yours
+may take it.
 
 ## Record measurements
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"B7","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + compile-headers","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-B7-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
 EOF
 ```
@@ -229,12 +261,12 @@ EOF
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-b7-dispatch
 ```
 
 Mark B7 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 

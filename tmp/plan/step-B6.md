@@ -44,7 +44,7 @@ divergence structurally safe rather than merely tested.
 ## Setup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-b6-forms -b step-b6-forms cl-parser-combinators
 cd ../step-b6-forms
 git submodule update --init --recursive
@@ -168,25 +168,61 @@ make lint
 git diff --name-only cl-parser-combinators..HEAD
 ```
 
-Must not contain `token.hpp`, `number.hpp`, or any `.test.cpp` under
-`src/smd/cl/`.
+Must not contain `token.hpp` or `number.hpp`.
+
+It **may** contain `src/smd/cl/reader/read.test.cpp` if you added a case there,
+under `AGENT-PROMPT.md`'s standing rule — adding a case is fine, changing an
+existing expectation is a halt, always. An earlier draft of this spot check
+forbade every `.test.cpp` under `src/smd/cl/`, which contradicts that rule and
+contradicted B5's own step file; B5 hit the contradiction and resolved it the
+same way. Record any such addition in `out_of_scope` and in your handoff.
 
 ```sh
 grep -n 'DIV-0003' src/smd/cl/reader/detail/token_datum.hpp
 grep -n 'scan_token\|classify_number' src/smd/cl/reader/detail/token_datum.hpp
 grep -n 'and_then' src/smd/cl/reader/detail/forms.hpp        # expect 0
-./.build/*/*/cl_reader_test "*Symbol*" "*Keyword*" "*Quote*" 2>/dev/null | tail -6
+reader_test=$(echo .build/build-*/src/smd/cl/reader/Asan/cl_reader_test)
+test -x "$reader_test" || { echo "NOT BUILT: $reader_test"; }
+"$reader_test" "*Symbol*" "*Keyword*" "*Quote*" | tail -6
 ```
 
 And the one that matters most, through the outside oracle A4 and A5 built:
 
 ```sh
-./.build/*/*/cl_conformance_test "*ReaderDifferential*" 2>/dev/null | tail -5
+conf_test=$(echo .build/build-*/src/smd/cl/conformance/Asan/cl_conformance_test)
+test -x "$conf_test" || { echo "NOT BUILT: $conf_test"; }
+"$conf_test" "*ReaderDifferential*" | tail -5
 ```
 
 That differential includes `1+`, read by `cl` and by SBCL and compared. It is
 the only check in this repository that DIV-0003 holds against something other
 than this project's own opinion, and this is the step it exists for.
+
+**Check that SBCL is actually there before you believe that check, and say
+which version you saw.** B5 found it missing from this machine; the
+differential tests skip when it is absent and ctest counts a skip as a pass,
+so a green matrix is not by itself evidence that the oracle ran. It was
+reinstalled on 2026-09-11 and the differential was confirmed green on `main`
+at **180 assertions in 3 test cases**. If your run reports far fewer
+assertions than that, the oracle is skipping and you have not checked anything.
+
+```sh
+command -v sbcl && sbcl --version   # expect SBCL 2.6.0.debian or later
+```
+
+Note the version in your `metrics.jsonl` row. A4 and A5 recorded their
+agreement against **SBCL 2.2.9.debian**, which is not the version installed
+now, so B6 is the first step to exercise the corpus against 2.6. If a corpus
+case disagrees where A5 recorded agreement, that is a genuine finding about
+one of the two implementations and it is **not** yours to fix by changing an
+expectation — that is a halt, and `blocked-B6.md`.
+
+In the unlikely event SBCL is missing again, do **not** halt — the rest of the
+step stands on its own. Say so plainly in your commit message, your
+`metrics.jsonl` note, and your handoff to B7. The claim you are then entitled
+to make is that DIV-0003 was checked against `whole_token_classification` only,
+and not against an outside implementation. Overstating that is the one failure
+this step cannot recover from later.
 
 ## Commit and merge back
 
@@ -222,7 +258,7 @@ git merge --no-ff step-b6-forms
 ## Record measurements
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"B6","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + compile-headers","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-B6-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
 EOF
 ```
@@ -230,12 +266,12 @@ EOF
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-b6-forms
 ```
 
 Mark B6 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 
