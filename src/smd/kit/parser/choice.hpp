@@ -75,7 +75,7 @@ template <class PA, class PB>
 /// the specific case of falling back to "nothing here", rather than
 /// hand-rolling an independent always-succeeds loop: unlike the retired
 /// iteration's `optional` (`iteration/smdscheme-final`,
-/// `src/smd/smdscheme/parser/parser.hpp`), which always succeeds even
+/// `src/smd/smdscheme/parser/alt.hpp`), which always succeeds even
 /// when @p p fails after consuming input, this @c optional propagates
 /// that failure, because a caller past the point of committed input has
 /// already lost the right to fall back to "nothing here".
