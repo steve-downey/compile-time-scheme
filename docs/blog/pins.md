@@ -43,6 +43,7 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-41-skipping-space.org` | `330af38` | `blog/phase-41` | `Merge step B3` (tag created at the merge, before the post) |
 | `phase-42-repetition-and-choice.org` | `08fcb02` | `blog/phase-42` | two commits past step B4's merge `5e8d7e7`: `4637b59` ticks the root `checklist.md` and `08fcb02` is a clang-format rewrite of `src/smd/kit/parser/choice.hpp`, so the tag publishes formatted code |
 | `phase-43-any-character-at-all.org` | `05ac888` | `blog/phase-43` | `Merge step B5` (tag created at the merge, before the post) |
+| `phase-44-a-record-of-declines.org` | `1d9ed7b` | `blog/phase-44` | `Merge step B6` (tag created at the merge, before the post) |
 
 94 transclusions across 22 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
@@ -123,6 +124,22 @@ The step also folds in a work-in-progress commit from an interrupted earlier
 attempt, `78cc244`, rather than carrying it as its own history; that commit is
 on the branch `step-b5-text` and is not on the pinned line, so nothing in it
 resolves here.
+
+Phase 44 follows the same ordinary rule: `blog/phase-44` is `1d9ed7b`, step B6's
+merge itself. No clang-format follow-up landed after it, and the step ticked the
+root `checklist.md`'s B6 line inside its own commit, so there is nothing to tag
+past. Both anchors the post transcludes are new in that step.
+`086ca303-e32b-40bb-88fd-09a2cffaad61` opens above `read_wrapped`'s doc comment
+in `src/smd/cl/reader/detail/forms.hpp` and closes below the function;
+`read_delimited`'s own pair, `1fe3a27d-557b-46a2-92ae-3ccd155173d2`, sits below
+it unchanged, and nothing in the file falls between the two.
+`a7927622-983d-47f3-bf8e-33985ae5db64` wraps the whole of `read_token_datum` in
+`detail/token_datum.hpp`, doc comment and DIV-0003 comment included, which is
+all the substantive content that file has. What neither anchor covers is
+`token_p`, the lift of `scan_token` named as the first argument of the
+transcluded `bind` call: that lives in `detail/read_context.hpp` under an anchor
+of its own, landed at step B2, and the post says where it is rather than working
+around it.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
 the convention from `d0ff8ec` onward: the orchestrator tags the step's `--no-ff`
