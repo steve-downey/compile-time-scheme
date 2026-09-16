@@ -42,6 +42,7 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-40-one-bind.org` | `18afb36` | `blog/phase-40` | one commit past step B2's merge: `9449339` is the merge, `18afb36` the clang-format follow-up touching only `src/smd/kit/parser/`, so the tag publishes formatted code |
 | `phase-41-skipping-space.org` | `330af38` | `blog/phase-41` | `Merge step B3` (tag created at the merge, before the post) |
 | `phase-42-repetition-and-choice.org` | `08fcb02` | `blog/phase-42` | two commits past step B4's merge `5e8d7e7`: `4637b59` ticks the root `checklist.md` and `08fcb02` is a clang-format rewrite of `src/smd/kit/parser/choice.hpp`, so the tag publishes formatted code |
+| `phase-43-any-character-at-all.org` | `05ac888` | `blog/phase-43` | `Merge step B5` (tag created at the merge, before the post) |
 
 94 transclusions across 22 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
@@ -107,6 +108,21 @@ transcludes are new in step B4, and one of them,
 `optional`, so the third function in `choice.hpp` is outside it — which the post
 uses rather than works around, since that function is the one whose doc comment
 cites the wrong file of `iteration/smdscheme-final`.
+
+Phase 43 goes back to the ordinary rule: `blog/phase-43` is `05ac888`, step B5's
+merge itself. No clang-format follow-up landed after it, and the step ticked the
+root `checklist.md`'s B5 line inside its own commit rather than leaving it to a
+follow-up, so there is nothing to tag past. Both anchors the post transcludes
+are new in that step, and both sit in a file that carried none before it:
+`4a777d67-1246-4233-bf78-73aa4c23257a` opens above `read_string` and closes
+below it, `766d64ea-9ba2-46fb-a63c-b2ce52c6fe6f` likewise around
+`read_character`. `named_char`, `named_chars` and `lookup_char_name` sit between
+the two pairs and are outside both, which is the right boundary: the step left
+them untouched on the grounds that a table and a lookup over it are not parsers.
+The step also folds in a work-in-progress commit from an interrupted earlier
+attempt, `78cc244`, rather than carrying it as its own history; that commit is
+on the branch `step-b5-text` and is not on the pinned line, so nothing in it
+resolves here.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
 the convention from `d0ff8ec` onward: the orchestrator tags the step's `--no-ff`
