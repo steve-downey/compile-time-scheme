@@ -37,23 +37,66 @@ makes them a good test of whether B4's bounded repetition generalises past the
 one caller it was written for. If it does not, that is an amendment worth
 having early.
 
-## Setup
+## Setup — read this before running anything; it is not the plan's usual shape
+
+**This step has already been started once and was cut off mid-run.** A branch
+`step-b5-text` exists and carries one WIP commit, `78cc244`. Its own commit
+message is addressed to you; read it first with `git log -1 78cc244`. In
+summary: `read_string` and `read_character` were converted, the architecture
+doc was updated, and two new `read.test.cpp` cases were added pinning
+`"string too long"` and `"expected character after #\"` — two text diagnostics
+that **no test covered before this step**, which is the hazard this step
+exists to close. The worker had reached a clean `make compile-headers` and was
+starting its spot checks when it stopped. Not done: the full verification, the
+spot checks, the metrics row, the checklist ticks, and the handoff to B6.
+
+The branch also predates the `typeclass-resync` step, which merged `main`'s
+typeclass rename into `cl-parser-combinators`. Bring it forward:
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
-git worktree add ../step-b5-text -b step-b5-text cl-parser-combinators
+cd /home/sdowney/src/compile-time-scheme/main
+git worktree add ../step-b5-text step-b5-text     # existing branch — no -b
 cd ../step-b5-text
 git submodule update --init --recursive
+git merge cl-parser-combinators
 ```
 
+That merge has been checked and is clean; the WIP touches only
+`src/smd/cl/reader/detail/text.hpp`, `src/smd/cl/reader/read.test.cpp` and
+`docs/compiler_architecture.org`. An unexpected conflict is information —
+resolve it and say so in your commit message.
+
+**The WIP is evidence, not authority.** You own this step's outcome, not that
+worker's judgment. Read what it did against "The change" below and against
+Tier 1, and change whatever does not hold up — including discarding a
+conversion and redoing it. Its own message tells you not to trust its unfinished
+verification, and that goes for its design decisions too.
+
 ## Verify GREEN baseline
+
+Your baseline is **inherited, not measured here**, because the WIP commit is
+already applied to the tree you start from and there is no clean pre-change
+state left on this branch to measure. The `typeclass-resync` step verified
+`cl-parser-combinators` immediately before you: **378 ctest entries per leg,
+both legs 100%, Debug and Asan.** That is the number this step's "unchanged
+tests" claim is against.
+
+Run the matrix anyway as your first act, before editing, so you know what the
+WIP's state actually is:
 
 ```sh
 make test-matrix > /tmp/verify-B5-base.log 2>&1; echo "exit=$?"
 grep -E '=== test-matrix|tests passed|Total Test time' /tmp/verify-B5-base.log
 ```
 
-Not green ⇒ `blocked-B5.md`.
+This is **not** a gate the way a clean baseline would be. A red result here is a
+fact about the unfinished WIP, and your job is to finish the step, not to halt.
+Record what it said either way. Halt with `blocked-B5.md` only if you cannot get
+to green by the ordinary rules — three genuinely different attempts, or a fix
+that would require weakening the verification.
+
+Expect 380 rather than 378 if the WIP's two new cases are sound: +2 over the
+inherited baseline, nothing removed, and **no existing expectation changed.**
 
 ## What already exists that this step builds on
 
@@ -215,7 +258,7 @@ git merge --no-ff step-b5-text
 ## Record measurements
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"B5","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + compile-headers","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-B5-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
 EOF
 ```
@@ -223,12 +266,12 @@ EOF
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-b5-text
 ```
 
 Mark B5 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 

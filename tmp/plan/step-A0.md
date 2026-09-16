@@ -17,7 +17,7 @@ this plan ever runs. The orchestrator has the longer version of that argument;
 this file is authoritative for you and you do not need it.
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree add ../step-a0-reconcile -b plan-reconciliation main
 cd ../step-a0-reconcile
 git submodule update --init --recursive
@@ -486,13 +486,13 @@ DIV-0029 records the one thing with no precedent here, which is how a
 ratified decision gets superseded.
 EOF
 
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git merge --no-ff plan-reconciliation
 ```
 
 **Merge from the main checkout, not from inside your worktree.** `main` is
 already checked out at
-`/home/sdowney/src/steve-downey/compile-time-scheme/main`, so a `git checkout
+`/home/sdowney/src/compile-time-scheme/main`, so a `git checkout
 main` inside the worktree fails outright — git refuses to check a branch out
 twice. Every other step in this plan merges into a phase branch that is checked
 out nowhere and can do it in place; A0 is the exception because its integration
@@ -505,7 +505,7 @@ Do not push. `AGENTS.md`: pushing is the orchestrator's, on instruction.
 After the merge, before cleanup.
 
 ```sh
-cat >> /home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
+cat >> /home/sdowney/src/compile-time-scheme/main/tmp/plan/metrics.jsonl <<EOF
 {"step":"A0","lane":null,"outcome":"green","wall_seconds":<measured>,"attempts":<n>,"verify":{"command":"make test-matrix + lint + verify-transclusions","exit_code":0,"wall_seconds":<measured>,"log_bytes":$(wc -c < /tmp/verify-A0-after.log),"summary_lines_read":<n>},"diff":{"files_changed":<n>,"insertions":<n>,"deletions":<n>},"out_of_scope":[],"note":""}
 EOF
 ```
@@ -518,12 +518,12 @@ and it is the most actionable thing this run can produce.
 ## Cleanup
 
 ```sh
-cd /home/sdowney/src/steve-downey/compile-time-scheme/main
+cd /home/sdowney/src/compile-time-scheme/main
 git worktree remove ../step-a0-reconcile
 ```
 
 Mark A0 done in
-`/home/sdowney/src/steve-downey/compile-time-scheme/main/tmp/plan/checklist.md`.
+`/home/sdowney/src/compile-time-scheme/main/tmp/plan/checklist.md`.
 
 ## Handoff
 
