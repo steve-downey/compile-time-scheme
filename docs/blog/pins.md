@@ -40,6 +40,7 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-38-forty-six-strings.org` | `dcea38b` | `blog/phase-38` | `Merge step A5` (tag created at the merge, before the post) |
 | `phase-39-eight-headers.org` | `c79918b` | `blog/phase-39` | `Merge step B1` (tag created at the merge, before the post) |
 | `phase-40-one-bind.org` | `18afb36` | `blog/phase-40` | one commit past step B2's merge: `9449339` is the merge, `18afb36` the clang-format follow-up touching only `src/smd/kit/parser/`, so the tag publishes formatted code |
+| `phase-41-skipping-space.org` | `330af38` | `blog/phase-41` | `Merge step B3` (tag created at the merge, before the post) |
 
 94 transclusions across 22 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
@@ -81,6 +82,15 @@ them, `606983ed-f5d7-454d-9570-3b510ace3aba`, stops before the
 anchor covers `parser_monad_impl` and `parser_monad_map`, which sit inside
 `namespace smd::kit::parser`, and the registration is in a second namespace
 block below it.
+
+Phase 41 goes back to the ordinary rule: `blog/phase-41` is `330af38`, step B3's
+merge itself, with no clang-format follow-up to tag past. Both anchors the post
+transcludes are new in that step. `2ce9b1bf-8125-40fa-8496-fb96580aab21` opens
+above the converted `skip_intertoken_space` and covers only that three-line
+wrapper; `intertoken_step`, the parser whose three-way decision actually
+replaced the `while (true)` loop, sits above it in `namespace skip_detail` and
+is outside the anchor, as are `skip_block_comment` and its recursive worker. The
+post says so rather than working around it.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
 the convention from `d0ff8ec` onward: the orchestrator tags the step's `--no-ff`
