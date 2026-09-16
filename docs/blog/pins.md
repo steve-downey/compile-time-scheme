@@ -354,3 +354,15 @@ That is the right outcome and not a gap: the tag is immutable, the post is
 written against it, and a post wanting a region no one anchored quotes it or
 places an anchor of its own in a later step. Neither the pinned tree nor the
 post is repairable after the fact, and neither needs to be.
+
+Phase 46 takes no pin and adds no row, for the same reason phases 33 to 36
+take none: its step landed no UUID anchor because it changed no source at all.
+It measured the compiler, appended a dated note to a divergence record, wrote
+one section of `docs/compiler_architecture.org`, and ticked a checklist line.
+The post transcludes nothing. The code it does quote — the depth probe — was
+never in the repository in the first place: it is a fixture written outside the
+tree so that measuring the reader could not perturb it, and it is reproduced in
+the post as a plain `#+begin_src cpp` block. `blog/phase-46` exists anyway, at
+`8d15c70`, one commit past step B8's merge `5665d8b`, because that commit
+corrects a composition claim inside the measurement section the post reads
+from. Nothing resolves against the tag; it marks where the series stops.
