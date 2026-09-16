@@ -297,6 +297,17 @@ The 40% is not all conversion cost, and the two extra rows say why: all twelve e
 
 A sevenfold increase in evaluated operations is a real constant factor, and it still leaves the reader using three percent of the default budget. The limit is a flag, and raising it is free.
 
+*The sevenfold is not the conversion's cost, though, and saying so was the same mistake as the whole-matrix row.* The two columns above are not the same file: =read.test.cpp= gained four expectations and two =constexpr= predicates over B3, B5 and B6, and the ops limit is a property of a translation unit rather than of the reader inside it. Holding the file fixed and compiling it against both readers separates the two (bisected the same way, =-fsyntax-only -O0=, the pre-series file taken from =d6ae364= and compiling clean against the post-series headers under =-Wall -Wextra=):
+
+| =read.test.cpp=          | before reader | after reader | ratio |
+|--------------------------+---------------+--------------+-------|
+| the file as B1 found it  |        149541 |       260368 |  1.74 |
+| the file as B7 left it   |        208953 |      1046872 |  5.01 |
+
+*1.74 is what the conversion costs on identical input.* The rest is one added case. =string_capacity_boundary= reads a 129-character string literal at =static_assert= to pin =max_string_chars= on both sides; comment out that one =static_assert= and the same file needs 325965 operations after against 171779 before. So that single case accounts for 720907 operations under the converted reader and 37174 under the old one, a factor of nineteen.
+
+That is the shape of the charge, and it is worth more than the headline. =read_string= was a raw loop and is now =many_until= over =escaped_char | any_char=, reifying a parser per character, so the conversion costs operations per *character of input* where the old reader cost them per datum. Nothing else in the tree reads a long literal. The one thing that does is a test B5 added, which is why the translation-unit number reads as sevenfold and the reader's own number is under two.
+
 *The binding limit is =-fconstexpr-depth=, and this is the finding the section exists for.* GCC caps constant-evaluation depth at 512 by default, again confirmed from the compiler's diagnostic, and the reader's recursion -- unlike the evaluator's, which is a machine -- is ordinary C++ recursion. So every reified parser between =read_node= and its own recursive call is a frame, and the cost scales with the *nesting depth of the source being read*. Bisecting the minimal depth at which each translation unit compiles:
 
 | minimal =-fconstexpr-depth= | before | after |
@@ -308,10 +319,13 @@ A sevenfold increase in evaluated operations is a real constant factor, and it s
 
 | nesting depth N | before | after |
 |-----------------+--------+-------|
+| 1 | 41 | 48 |
+| 2 | 43 | 53 |
 | 4 | 47 | 63 |
 | 16 | 71 | 123 |
 | 64 | 167 | 363 |
+| 100 | 239 | 543 |
 
-Both are linear and the slope is the whole story: *2.0 frames per level of source nesting before, 5.0 after*, over a fixed overhead of about 39 frames either way. That predicts a ceiling, and the prediction holds exactly -- bisecting the deepest N that compiles at the default =-fconstexpr-depth=512= gives *236 before and 93 after*. The reader can read a form nested 93 deep at compile time with no flags, where it could manage 236.
+Both are linear, and exactly so: before is =39 + 2N= and after is =43 + 5N=, which is every probed value at N = 1, 2, 4, 16, 64 and 100 with nothing left over. *2.0 frames per level of source nesting before, 5.0 after* -- over a fixed overhead that is 39 frames before and 43 after, not the same on both sides. That predicts a ceiling, and the prediction holds exactly -- bisecting the deepest N that compiles at the default =-fconstexpr-depth=512= gives *236 before and 93 after*, which is what those two lines give and not what a shared overhead of 39 would have given for the second of them. The reader can read a form nested 93 deep at compile time with no flags, where it could manage 236.
 
 *What that cost, stated plainly.* Two and a half times the stack per level of nesting, and a default-flags nesting ceiling cut to 39% of what it was. It was very nearly worse: B7's first conversion of the readtable dispatch, with =parser<F>= holding its callable and forwarding to it, put =prin1.test.cpp= at 570 and stopped the build, and the margin before that step -- with nobody measuring -- had been 88 frames. Re-exporting the callable's =operator()= instead of forwarding removed one frame from every parser invocation B2 onward had placed and brought the same case to 363. The qualitative question D30 actually asks is whether a workable limit exists, and it does: =-fconstexpr-depth= is a flag, the project sets it nowhere, and the tree compiles under the default with 149 frames to spare. A deeper source is a compiler flag away, which is exactly the kind of cost D30 says not to gate on.
