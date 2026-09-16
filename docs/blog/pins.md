@@ -41,6 +41,7 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-39-eight-headers.org` | `c79918b` | `blog/phase-39` | `Merge step B1` (tag created at the merge, before the post) |
 | `phase-40-one-bind.org` | `18afb36` | `blog/phase-40` | one commit past step B2's merge: `9449339` is the merge, `18afb36` the clang-format follow-up touching only `src/smd/kit/parser/`, so the tag publishes formatted code |
 | `phase-41-skipping-space.org` | `330af38` | `blog/phase-41` | `Merge step B3` (tag created at the merge, before the post) |
+| `phase-42-repetition-and-choice.org` | `08fcb02` | `blog/phase-42` | two commits past step B4's merge `5e8d7e7`: `4637b59` ticks the root `checklist.md` and `08fcb02` is a clang-format rewrite of `src/smd/kit/parser/choice.hpp`, so the tag publishes formatted code |
 
 94 transclusions across 22 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
@@ -91,6 +92,21 @@ wrapper; `intertoken_step`, the parser whose three-way decision actually
 replaced the `while (true)` loop, sits above it in `namespace skip_detail` and
 is outside the anchor, as are `skip_block_comment` and its recursive worker. The
 post says so rather than working around it.
+
+Phase 42 is the third row not pinned to its step's merge, and the first pinned
+two commits past one. Step B4 merged at `5e8d7e7`; `4637b59` then ticks the root
+`checklist.md`'s B4 line, which the step's own worktree diff missed, and
+`08fcb02` reflows four lines of `src/smd/kit/parser/choice.hpp` under
+clang-format. Tagging the last of the three publishes formatted code, for the
+same reason phases 37 and 40 are tagged past their merges; the checklist commit
+in between touches no code and is simply carried along. The formatting claim is
+checked rather than assumed: with all whitespace stripped, `choice.hpp` hashes
+identically at `5e8d7e7` and at `08fcb02`. All three anchors the post
+transcludes are new in step B4, and one of them,
+`0fb6ef1c-7476-4f92-8259-0cc24c0459f3`, closes after `alt` and above
+`optional`, so the third function in `choice.hpp` is outside it — which the post
+uses rather than works around, since that function is the one whose doc comment
+cites the wrong file of `iteration/smdscheme-final`.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
 the convention from `d0ff8ec` onward: the orchestrator tags the step's `--no-ff`
