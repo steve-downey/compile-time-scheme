@@ -162,7 +162,7 @@ template <reader_context Ctx>
                         return read_radix_number(c, inner, radix, where);
                     }};
             };
-            // A precondition on four of the seven arms, producing one of
+            // A precondition on five of the seven arms, producing one of
             // the five pinned diagnostics. It guards a parser rather than
             // a continuation now, but it is otherwise the check it was.
             auto const reject_argument =

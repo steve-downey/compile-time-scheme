@@ -58,3 +58,17 @@ There is nothing left here to close, revisit, or re-verify.
 The one thing this record did decide that still stands: `functor<parser<F>>` is deliberately unregistered.
 An instance whose only justification is that the typeclass exists is the over-eagerness this record named, and seven converting steps produced no caller that needs the `fmap` CPO to find a parser.
 See `docs/compiler_architecture.org` §B2 ("Settled, B8") and §B8.
+
+## 2026-09-16: the dissolution stands; the arithmetic under it does not (drafting blog phase 46)
+
+The note above is right that this record dissolved rather than closed, and right that `smd::kit::parser` has exactly one client. Its explanation of *why the condition counted to three* is wrong, and a divergence record is the thing a later reader believes, so it is corrected here rather than left standing.
+
+The note says the condition "counted to three because at the time this record was written the repository had three front ends", and that "Phase A deleted two of them". That is not what was counted. "What diverged" and "Consequences" above name the two existing copies of the layer explicitly: `smdscheme`'s `parser/` in this repository, and `compile-time-forth`'s, which is a separate repository this project can read but not modify. `cl` was to be the third *client of `parser/`*, which is what the revisit condition says.
+
+Checked against the tree at `19c8702`, the R8 merge where this record was written: `git ls-tree -r 19c8702 -- src/smd/` returns exactly one path under a `parser/` directory, `src/smd/smdscheme/parser/`. The Common Lisp pivot, which was the third *front end* in this repository, never had a `parser/` or `cursor` directory at any revision — `git ls-tree -r iteration/smdlisp-final -- src/smd/smdlisp/` matches neither name. It was never in the count.
+
+So A3 removed one of the two copies from trunk, not two. The other has not moved: `/home/sdowney/src/compile-time-forth` still holds `src/smd/forth/parser/` with `cursor.hpp`, `parser.hpp`, `alt.hpp` and `parser_ops.hpp`, the four names §"What diverged" lists.
+
+The record is genuinely ambiguous about its own unit, which is how the mistake was available to make. "A genuine **third** client of `parser/`" counts copies of the layer (`smdscheme`, `forth`, then `cl`). "A fourth front end in this repository" counts front ends here (`smdscheme`, `smdlisp`, `cl`, then a fourth). Two rulers, two consecutive sentences of the revisit condition. The 2026-09-11 note read the second and used it to explain a number produced by the first.
+
+None of this reaches the conclusion. Inside this repository the layer has one client; the fourth-front-end trigger has no prospect of firing; the two-independent-copies standard remains the wrong standard for a design. The dissolution above stands exactly as written, on a premise that does not.

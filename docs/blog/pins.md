@@ -38,6 +38,13 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-32-extracting-the-kit.org` | `19c8702` | `blog/phase-32` | `Merge step R8` (tag created at the merge, before the post) |
 | `phase-37-a-printer-and-its-oracle.org` | `a50345c` | `blog/phase-37` | one commit past step A4's merge: `17820fc` is the merge, `a50345c` the clang-format follow-up touching only `src/smd/cl/printer/`, so the tag publishes formatted code |
 | `phase-38-forty-six-strings.org` | `dcea38b` | `blog/phase-38` | `Merge step A5` (tag created at the merge, before the post) |
+| `phase-39-eight-headers.org` | `c79918b` | `blog/phase-39` | `Merge step B1` (tag created at the merge, before the post) |
+| `phase-40-one-bind.org` | `18afb36` | `blog/phase-40` | one commit past step B2's merge: `9449339` is the merge, `18afb36` the clang-format follow-up touching only `src/smd/kit/parser/`, so the tag publishes formatted code |
+| `phase-41-skipping-space.org` | `330af38` | `blog/phase-41` | `Merge step B3` (tag created at the merge, before the post) |
+| `phase-42-repetition-and-choice.org` | `08fcb02` | `blog/phase-42` | two commits past step B4's merge `5e8d7e7`: `4637b59` ticks the root `checklist.md` and `08fcb02` is a clang-format rewrite of `src/smd/kit/parser/choice.hpp`, so the tag publishes formatted code |
+| `phase-43-any-character-at-all.org` | `05ac888` | `blog/phase-43` | `Merge step B5` (tag created at the merge, before the post) |
+| `phase-44-a-record-of-declines.org` | `1d9ed7b` | `blog/phase-44` | `Merge step B6` (tag created at the merge, before the post) |
+| `phase-45-a-wall-at-512.org` | `633ee81` | `blog/phase-45` | `Merge step B7` (tag created at the merge, before the post) |
 
 94 transclusions across 22 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
@@ -57,6 +64,83 @@ Phase 38 goes back to the ordinary rule: `blog/phase-38` is step A5's merge
 commit `dcea38b` itself. A one-line follow-up `48b6502` ticks the root
 `checklist.md`'s A5 line, which the step's own worktree diff missed, and touches
 no code, so nothing about it belongs in a pin.
+
+Phase 39 is the first row from the parser-combinator plan, and follows the same
+rule: `blog/phase-39` is `c79918b`, step B1's merge, which carries both the
+split and the one-line commit ticking the root `checklist.md`'s B1 line. Both
+anchors the post transcludes are new in that step. The third UUID B1 landed,
+`b803edcd-959d-4364-94f8-13fb256e7b9b` around `read_node`, predates the step and
+travelled into `detail/node.hpp` intact; no post transcludes it, so it adds no
+row here.
+
+Phase 40 is the second row not pinned to its step's merge, for the same reason
+phase 37 was. Step B2 merged at `9449339` and the orchestrator's clang-format
+follow-up landed under four minutes later at `18afb36`, reflowing four files under
+`src/smd/kit/parser/` and collapsing one `gersemi` block in that directory's
+`CMakeLists.txt`; tagging the later commit publishes formatted code. The
+follow-up is formatting only, checked rather than assumed: with all whitespace
+stripped, each of the four C++ files hashes identically at `9449339` and at
+`18afb36`. All three anchors the post transcludes are new in step B2, and one of
+them, `606983ed-f5d7-454d-9570-3b510ace3aba`, stops before the
+`monad_typeclass` specialization that the post's own argument turns on — the
+anchor covers `parser_monad_impl` and `parser_monad_map`, which sit inside
+`namespace smd::kit::parser`, and the registration is in a second namespace
+block below it.
+
+Phase 41 goes back to the ordinary rule: `blog/phase-41` is `330af38`, step B3's
+merge itself, with no clang-format follow-up to tag past. Both anchors the post
+transcludes are new in that step. `2ce9b1bf-8125-40fa-8496-fb96580aab21` opens
+above the converted `skip_intertoken_space` and covers only that three-line
+wrapper; `intertoken_step`, the parser whose three-way decision actually
+replaced the `while (true)` loop, sits above it in `namespace skip_detail` and
+is outside the anchor, as are `skip_block_comment` and its recursive worker. The
+post says so rather than working around it.
+
+Phase 42 is the third row not pinned to its step's merge, and the first pinned
+two commits past one. Step B4 merged at `5e8d7e7`; `4637b59` then ticks the root
+`checklist.md`'s B4 line, which the step's own worktree diff missed, and
+`08fcb02` reflows four lines of `src/smd/kit/parser/choice.hpp` under
+clang-format. Tagging the last of the three publishes formatted code, for the
+same reason phases 37 and 40 are tagged past their merges; the checklist commit
+in between touches no code and is simply carried along. The formatting claim is
+checked rather than assumed: with all whitespace stripped, `choice.hpp` hashes
+identically at `5e8d7e7` and at `08fcb02`. All three anchors the post
+transcludes are new in step B4, and one of them,
+`0fb6ef1c-7476-4f92-8259-0cc24c0459f3`, closes after `alt` and above
+`optional`, so the third function in `choice.hpp` is outside it — which the post
+uses rather than works around, since that function is the one whose doc comment
+cites the wrong file of `iteration/smdscheme-final`.
+
+Phase 43 goes back to the ordinary rule: `blog/phase-43` is `05ac888`, step B5's
+merge itself. No clang-format follow-up landed after it, and the step ticked the
+root `checklist.md`'s B5 line inside its own commit rather than leaving it to a
+follow-up, so there is nothing to tag past. Both anchors the post transcludes
+are new in that step, and both sit in a file that carried none before it:
+`4a777d67-1246-4233-bf78-73aa4c23257a` opens above `read_string` and closes
+below it, `766d64ea-9ba2-46fb-a63c-b2ce52c6fe6f` likewise around
+`read_character`. `named_char`, `named_chars` and `lookup_char_name` sit between
+the two pairs and are outside both, which is the right boundary: the step left
+them untouched on the grounds that a table and a lookup over it are not parsers.
+The step also folds in a work-in-progress commit from an interrupted earlier
+attempt, `78cc244`, rather than carrying it as its own history; that commit is
+on the branch `step-b5-text` and is not on the pinned line, so nothing in it
+resolves here.
+
+Phase 44 follows the same ordinary rule: `blog/phase-44` is `1d9ed7b`, step B6's
+merge itself. No clang-format follow-up landed after it, and the step ticked the
+root `checklist.md`'s B6 line inside its own commit, so there is nothing to tag
+past. Both anchors the post transcludes are new in that step.
+`086ca303-e32b-40bb-88fd-09a2cffaad61` opens above `read_wrapped`'s doc comment
+in `src/smd/cl/reader/detail/forms.hpp` and closes below the function;
+`read_delimited`'s own pair, `1fe3a27d-557b-46a2-92ae-3ccd155173d2`, sits below
+it unchanged, and nothing in the file falls between the two.
+`a7927622-983d-47f3-bf8e-33985ae5db64` wraps the whole of `read_token_datum` in
+`detail/token_datum.hpp`, doc comment and DIV-0003 comment included, which is
+all the substantive content that file has. What neither anchor covers is
+`token_p`, the lift of `scan_token` named as the first argument of the
+transcluded `bind` call: that lives in `detail/read_context.hpp` under an anchor
+of its own, landed at step B2, and the post says where it is rather than working
+around it.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
 the convention from `d0ff8ec` onward: the orchestrator tags the step's `--no-ff`
@@ -243,3 +327,42 @@ checks this document in the same pinned-transclusion category as the blog
 posts, alongside `docs/blog/phase-*.org`, even though it lives under
 `docs/history/` and follows the `iteration/*` tag family rather than
 `blog/phase-*`.
+
+Phase 45 follows the ordinary rule as well: `blog/phase-45` is `633ee81`, step
+B7's merge itself. No clang-format follow-up landed after it — the reformat B7
+needed was run inside its own worktree before the commit, so the next commit on
+the branch is the next step's — and the step ticked the root `checklist.md`'s B7 line
+inside its own commit, leaving nothing to tag past. Both anchors the post
+transcludes resolve in that tree, but only one of them is new.
+`b3055934-2efb-4df4-a4bb-e961e29e7d0f` is B7's own, opening above
+`read_sharpsign`'s doc comment in `src/smd/cl/reader/detail/sharpsign.hpp` and
+closing below the function; `read_radix_number`, which B2 converted and which
+B7's step file forbade touching, sits above it in the same file and is outside
+it, carrying no anchor of its own. `b803edcd-959d-4364-94f8-13fb256e7b9b` is
+B1's, placed around `read_node` when the reader was split into eight headers
+and kept in place around the rewritten function, which decision D21 explicitly
+permits: an anchor belongs to the step that lands it, and a later step may move,
+split or keep it as the code requires. It covers everything substantive in
+`detail/node.hpp` — the file is the include block, that one function, and the
+namespace braces.
+
+What neither anchor covers is the change the post is actually about.
+`src/smd/kit/parser/parser.hpp` carries no UUID anchor at any revision, so the
+`parser<F>` reshape — the private base and the re-exported `operator()` — is
+quoted in the post as a plain `#+begin_src cpp` block rather than transcluded.
+That is the right outcome and not a gap: the tag is immutable, the post is
+written against it, and a post wanting a region no one anchored quotes it or
+places an anchor of its own in a later step. Neither the pinned tree nor the
+post is repairable after the fact, and neither needs to be.
+
+Phase 46 takes no pin and adds no row, for the same reason phases 33 to 36
+take none: its step landed no UUID anchor because it changed no source at all.
+It measured the compiler, appended a dated note to a divergence record, wrote
+one section of `docs/compiler_architecture.org`, and ticked a checklist line.
+The post transcludes nothing. The code it does quote — the depth probe — was
+never in the repository in the first place: it is a fixture written outside the
+tree so that measuring the reader could not perturb it, and it is reproduced in
+the post as a plain `#+begin_src cpp` block. `blog/phase-46` exists anyway, at
+`8d15c70`, one commit past step B8's merge `5665d8b`, because that commit
+corrects a composition claim inside the measurement section the post reads
+from. Nothing resolves against the tag; it marks where the series stops.

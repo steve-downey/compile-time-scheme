@@ -1,340 +1,404 @@
-- [Overview](#org970c11e)
-- [Blog Posts](#orgb5b58f5)
-  - [[Phase 0 — Introduction and Motivation](phase-0-intro.md)](#org9ee4df4)
-  - [[Phase 1 — Foundation](phase-1-foundation.md)](#org4425f96)
-  - [[Phase 2 — Front End](phase-2-front-end.md)](#org5d6eba5)
-  - [[Phase 3 — Reader](phase-3-reader.md)](#orgd6ea206)
-  - [[Phase 4 — Elaboration](phase-4-elaboration.md)](#orgf6afd6c)
-  - [[Phase 5 — Fixpoint Trees](phase-5-fixpoint-trees.md)](#orga8a5535)
-  - [[Phase 6 — Closures and Values](phase-6-closures.md)](#orged6b266)
-  - [[Phase 7 — Mendler Interpretation](phase-7-mendler.md)](#org34b4a1b)
-  - [[Phase 8 — Sender-Based Evaluation](phase-8-senders.md)](#org422597e)
-  - [[Phase 9 — Visualizing Execution](phase-9-graphs.md)](#org04da5d9)
-  - [[Phase 10 — Constexpr Pipeline](phase-10-constexpr.md)](#orgfd62eea)
-  - [[Phase 11 — Real World Integration](phase-11-real-world.md)](#org9965db6)
-  - [[Phase 12 — CPS](phase-12-cps.md)](#org3e694e4)
-  - [[Phase 13 — Conclusion](phase-13-conclusion.md)](#orgad31dd7)
-  - [[Phase 14 — Mutation: set!, begin, and a Store](phase-14-set-bang.md)](#org23e2806)
-  - [[Phase 15 — Why Not call/cc: From Scheme to Common Lisp](phase-15-why-common-lisp.md)](#org5f43f8e)
-  - [[Phase 16 — Reading Common Lisp: Case, Keywords, and #'](phase-16-reading-common-lisp.md)](#org42d0859)
-  - [[Phase 17 — nil, t, and Living in a Lisp-2](phase-17-nil-t-lisp2.md)](#org91c114a)
-  - [[Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)](#orgbc9341b)
-  - [[Phase 19 — block, catch, unwind-protect: One-Shot Control in CPS](phase-19-one-shot-control.md)](#org4dfab3d)
-  - [[Phase 20 — defmacro: the Compiler Runs the Language](phase-20-defmacro.md)](#org6e1dc71)
-  - [[Phase 21 — Common Lisp Control Flow as Sender Graphs](phase-21-sender-graphs.md)](#org175781b)
-  - [[Phase 22 — What We Left Out, and Why It Matters](phase-22-limitations.md)](#org05b475b)
-  - [[Phase 23 — Why Rebuild Rather Than Refactor](phase-23-why-rebuild.md)](#orge46ebc6)
-  - [[Phase 24 — Two Copies and a Fold That Stops](phase-24-substrate.md)](#org3c04272)
-  - [[Phase 25 — Interning Symbols, and Seven Divergences That Were One](phase-25-symbols.md)](#org5185565)
-  - [[Phase 26 — Reading More Than It Can Run](phase-26-reader-core-ast.md)](#org8079ba7)
-  - [[Phase 27 — The Elaborator Never Recurses](phase-27-elaboration.md)](#org921cadf)
-  - [[Phase 28 — Three Channels, and a Machine Instead of a Fold](phase-28-three-channels.md)](#org638c907)
-  - [[Phase 29 — Answering Phase 7, and One Invariant That Was Two](phase-29-answering-phase-7.md)](#org84a8dbf)
-  - [[Phase 30 — Asking Someone Else Whether the Answers Are Right](phase-30-asking-someone-else.md)](#org15f31cf)
-  - [[Phase 31 — Driving the Machine, Not Forking It](phase-31-driving-the-machine.md)](#org1b6f45f)
-  - [[Phase 32 — Extracting the Kit, and a Bar That Measured the Wrong Thing](phase-32-extracting-the-kit.md)](#org520e936)
-  - [[Phase 33 — Nothing Left to Do, and an Oracle Worth Only Its Questions](phase-33-no-next-step.md)](#org4d39e8c)
-  - [[Phase 34 — Freezing Two Iterations, and Two Links Nothing Checks](phase-34-freezing-the-iterations.md)](#orge70194c)
-  - [[Phase 35 — Cutting the Consumers, and a Green Build That Checks Nothing](phase-35-cutting-the-consumers.md)](#org84baa6c)
-  - [[Phase 36 — Deleting Both Front Ends, and the Run That Stopped Before Its First Edit](phase-36-deleting-both-front-ends.md)](#org7b78f42)
-  - [[Phase 37 — A Printer, and Why It Could Not Land Alone](phase-37-a-printer-and-its-oracle.md)](#orgc2800c8)
-  - [[Phase 38 — Forty-Six Strings, and a Spot Check That Could Not Run](phase-38-forty-six-strings.md)](#org5ed904d)
-- [Table of Contents](#org0e228ac)
+- [Overview](#orgdbfa970)
+- [Blog Posts](#org73451b8)
+  - [[Phase 0 — Introduction and Motivation](phase-0-intro.md)](#org5694f55)
+  - [[Phase 1 — Foundation](phase-1-foundation.md)](#org78be27f)
+  - [[Phase 2 — Front End](phase-2-front-end.md)](#org0c0d8f9)
+  - [[Phase 3 — Reader](phase-3-reader.md)](#org67f8073)
+  - [[Phase 4 — Elaboration](phase-4-elaboration.md)](#org1f2fb6c)
+  - [[Phase 5 — Fixpoint Trees](phase-5-fixpoint-trees.md)](#org9acc993)
+  - [[Phase 6 — Closures and Values](phase-6-closures.md)](#org949415d)
+  - [[Phase 7 — Mendler Interpretation](phase-7-mendler.md)](#org110e6f2)
+  - [[Phase 8 — Sender-Based Evaluation](phase-8-senders.md)](#orgf44edc7)
+  - [[Phase 9 — Visualizing Execution](phase-9-graphs.md)](#org0e6362e)
+  - [[Phase 10 — Constexpr Pipeline](phase-10-constexpr.md)](#org4550f94)
+  - [[Phase 11 — Real World Integration](phase-11-real-world.md)](#orgc2cf1f5)
+  - [[Phase 12 — CPS](phase-12-cps.md)](#org8ad6047)
+  - [[Phase 13 — Conclusion](phase-13-conclusion.md)](#org4902f8b)
+  - [[Phase 14 — Mutation: set!, begin, and a Store](phase-14-set-bang.md)](#org7f12d45)
+  - [[Phase 15 — Why Not call/cc: From Scheme to Common Lisp](phase-15-why-common-lisp.md)](#orgee93f6d)
+  - [[Phase 16 — Reading Common Lisp: Case, Keywords, and #'](phase-16-reading-common-lisp.md)](#orgf3e78b2)
+  - [[Phase 17 — nil, t, and Living in a Lisp-2](phase-17-nil-t-lisp2.md)](#org0e51a85)
+  - [[Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)](#orgf7ff3e3)
+  - [[Phase 19 — block, catch, unwind-protect: One-Shot Control in CPS](phase-19-one-shot-control.md)](#org15d9abb)
+  - [[Phase 20 — defmacro: the Compiler Runs the Language](phase-20-defmacro.md)](#org57b9bc2)
+  - [[Phase 21 — Common Lisp Control Flow as Sender Graphs](phase-21-sender-graphs.md)](#org750c778)
+  - [[Phase 22 — What We Left Out, and Why It Matters](phase-22-limitations.md)](#org6c89f75)
+  - [[Phase 23 — Why Rebuild Rather Than Refactor](phase-23-why-rebuild.md)](#org443599c)
+  - [[Phase 24 — Two Copies and a Fold That Stops](phase-24-substrate.md)](#org3fcc027)
+  - [[Phase 25 — Interning Symbols, and Seven Divergences That Were One](phase-25-symbols.md)](#org980d97d)
+  - [[Phase 26 — Reading More Than It Can Run](phase-26-reader-core-ast.md)](#orgd4f0707)
+  - [[Phase 27 — The Elaborator Never Recurses](phase-27-elaboration.md)](#org08616ba)
+  - [[Phase 28 — Three Channels, and a Machine Instead of a Fold](phase-28-three-channels.md)](#org2835bf6)
+  - [[Phase 29 — Answering Phase 7, and One Invariant That Was Two](phase-29-answering-phase-7.md)](#orgff12ed8)
+  - [[Phase 30 — Asking Someone Else Whether the Answers Are Right](phase-30-asking-someone-else.md)](#org3c94a25)
+  - [[Phase 31 — Driving the Machine, Not Forking It](phase-31-driving-the-machine.md)](#orgd484e29)
+  - [[Phase 32 — Extracting the Kit, and a Bar That Measured the Wrong Thing](phase-32-extracting-the-kit.md)](#org5ff3f75)
+  - [[Phase 33 — Nothing Left to Do, and an Oracle Worth Only Its Questions](phase-33-no-next-step.md)](#orgcee9239)
+  - [[Phase 34 — Freezing Two Iterations, and Two Links Nothing Checks](phase-34-freezing-the-iterations.md)](#orge3df9f3)
+  - [[Phase 35 — Cutting the Consumers, and a Green Build That Checks Nothing](phase-35-cutting-the-consumers.md)](#org2cb83c3)
+  - [[Phase 36 — Deleting Both Front Ends, and the Run That Stopped Before Its First Edit](phase-36-deleting-both-front-ends.md)](#org4909d82)
+  - [[Phase 37 — A Printer, and Why It Could Not Land Alone](phase-37-a-printer-and-its-oracle.md)](#org7b16fe0)
+  - [[Phase 38 — Forty-Six Strings, and a Spot Check That Could Not Run](phase-38-forty-six-strings.md)](#org5492b84)
+  - [[Phase 39 — Eight Headers, and a Comment the Formatter Made False](phase-39-eight-headers.md)](#org52f7312)
+  - [[Phase 40 — One bind, and the Namespace It Could Not Be Declared In](phase-40-one-bind.md)](#org53de02f)
+  - [[Phase 41 — Skipping Space, and a Law That Would Not Finish](phase-41-skipping-space.md)](#org6e3bc7b)
+  - [[Phase 42 — A Repetition That Owns Nothing, and a Choice Nothing Calls](phase-42-repetition-and-choice.md)](#org83931e8)
+  - [[Phase 43 — Any Character At All, and a Step Started Twice](phase-43-any-character-at-all.md)](#org30e7be8)
+  - [[Phase 44 — A Record of Declines, and a Test Made to Fail](phase-44-a-record-of-declines.md)](#org957be23)
+  - [[Phase 45 — The Readtable Dispatch, and a Wall at 512](phase-45-a-wall-at-512.md)](#orga9eb0ad)
+  - [[Phase 46 — Ninety-Three Deep, and a Divergence That Dissolved](phase-46-ninety-three-deep.md)](#orgccd0587)
+- [Table of Contents](#org38b6d2e)
 
 
 
-<a id="org970c11e"></a>
+<a id="orgdbfa970"></a>
 
 # Overview
 
 This is the complete blog series documenting the implementation of a Scheme-light compiler in C++26, compiling entirely at compile-time inside the C++ constant evaluator. Each phase builds on the previous work, from zero-allocation parsing through fixpoint trees to Mendler-style evaluation and sender-based asynchronous execution.
 
 
-<a id="orgb5b58f5"></a>
+<a id="org73451b8"></a>
 
 # Blog Posts
 
 
-<a id="org9ee4df4"></a>
+<a id="org5694f55"></a>
 
 ## [Phase 0 — Introduction and Motivation](phase-0-intro.md)
 
 The overall design philosophy: expanding C++26 `constexpr` to prove what the constant evaluator can accomplish.
 
 
-<a id="org4425f96"></a>
+<a id="org78be27f"></a>
 
 ## [Phase 1 — Foundation](phase-1-foundation.md)
 
 Establish the memory vocabulary: `result<T>`, `static_vector`, `Box<A>`, and the `Fix<F>` fixpoint combinator.
 
 
-<a id="org5d6eba5"></a>
+<a id="org0c0d8f9"></a>
 
 ## [Phase 2 — Front End](phase-2-front-end.md)
 
 Zero-allocation combinator parsers using immutable cursors and applicative composition.
 
 
-<a id="orgd6ea206"></a>
+<a id="org67f8073"></a>
 
 ## [Phase 3 — Reader](phase-3-reader.md)
 
 Translate source text into a raw `Datum` tree, treating all input as nested shapes with no semantic judgement.
 
 
-<a id="orgf6afd6c"></a>
+<a id="org1f2fb6c"></a>
 
 ## [Phase 4 — Elaboration](phase-4-elaboration.md)
 
 Classify `Datum` nodes into a typed core AST covering `if`, `lambda`, `let`, `let*`, `define`, and `quote`.
 
 
-<a id="orga8a5535"></a>
+<a id="org9acc993"></a>
 
 ## [Phase 5 — Fixpoint Trees](phase-5-fixpoint-trees.md)
 
 Define `Fix<CompF>` — a heap-pointer computation tree using open-recursive algebraic types and the fixpoint combinator.
 
 
-<a id="orged6b266"></a>
+<a id="org949415d"></a>
 
 ## [Phase 6 — Closures and Values](phase-6-closures.md)
 
 Define the runtime value domain: numbers, booleans, closures, and environments that bind names to values at evaluation time.
 
 
-<a id="org34b4a1b"></a>
+<a id="org110e6f2"></a>
 
 ## [Phase 7 — Mendler Interpretation](phase-7-mendler.md)
 
 Implement `mendler_run` using a genuine `mendler_para` combinator — a Mendler-style paramorphism over `Fix<CompF>` that is synchronous and fully `constexpr`-capable.
 
 
-<a id="org422597e"></a>
+<a id="orgf44edc7"></a>
 
 ## [Phase 8 — Sender-Based Evaluation](phase-8-senders.md)
 
 Implement `sender_mendler_run`, which rewrites evaluation as a graph of Beman Execution senders with `when_all` for argument-list parallelism.
 
 
-<a id="org04da5d9"></a>
+<a id="org0e6362e"></a>
 
 ## [Phase 9 — Visualizing Execution](phase-9-graphs.md)
 
 Use C++26 reflection to walk the nested sender type structure at compile time and emit Graphviz DOT output of the execution graph.
 
 
-<a id="orgfd62eea"></a>
+<a id="org4550f94"></a>
 
 ## [Phase 10 — Constexpr Pipeline](phase-10-constexpr.md)
 
 Wire all phases together into a single `constexpr` pipeline and demonstrate evaluation results baked into the binary.
 
 
-<a id="org9965db6"></a>
+<a id="orgc2cf1f5"></a>
 
 ## [Phase 11 — Real World Integration](phase-11-real-world.md)
 
 Show how to embed the compiler in a real C++ program: pre-compiled closures, runtime environment injection, and FFI callbacks.
 
 
-<a id="org3e694e4"></a>
+<a id="org8ad6047"></a>
 
 ## [Phase 12 — CPS](phase-12-cps.md)
 
 Explore Continuation-Passing Style as an alternative evaluation backend for the closure evaluator.
 
 
-<a id="orgad31dd7"></a>
+<a id="org4902f8b"></a>
 
 ## [Phase 13 — Conclusion](phase-13-conclusion.md)
 
 Reflect on what the climb taught me about C++26 `constexpr` limits, fixpoint types, and the Mendler recursion scheme.
 
 
-<a id="org23e2806"></a>
+<a id="org7f12d45"></a>
 
 ## [Phase 14 — Mutation: set!, begin, and a Store](phase-14-set-bang.md)
 
 Come back down from the summit for `set!`: a shared store of mutable cells, an environment that binds names to locations, and the `begin` sequencing it takes to observe an effect.
 
 
-<a id="org5f43f8e"></a>
+<a id="orgee93f6d"></a>
 
 ## [Phase 15 — Why Not call/cc: From Scheme to Common Lisp](phase-15-why-common-lisp.md)
 
 *DRAFT — pending author revision.* Why `call/cc` stops here: a sender's one-shot completion contract cannot express a multishot continuation, Kiselyov's independent case against `call/cc`, and why Common Lisp's dynamic-extent control operators are exactly the discipline senders already enforce.
 
 
-<a id="org42d0859"></a>
+<a id="orgf3e78b2"></a>
 
 ## [Phase 16 — Reading Common Lisp: Case, Keywords, and #'](phase-16-reading-common-lisp.md)
 
 *DRAFT — pending author revision.* The `smdlisp` reader: case folding to uppercase at read time, keywords as a distinct datum kind, `;` comments as intertoken space, the maximal-munch fix behind DIV-0003 (the `1+` bug), and `#'` lowering to its own datum kind instead of a synthesized `(function x)` list.
 
 
-<a id="org91c114a"></a>
+<a id="org0e51a85"></a>
 
 ## [Phase 17 — nil, t, and Living in a Lisp-2](phase-17-nil-t-lisp2.md)
 
 *DRAFT — pending author revision.* The direct evaluator: one `is_true` function instead of Scheme's per-site `#f` encoding, a Lisp-2 environment where variable and function lookup never touch, `funcall` and `#'` as real call semantics, and the closure-capture-ownership question resolved with an arena instead of an owning pointer.
 
 
-<a id="orgbc9341b"></a>
+<a id="orgf7ff3e3"></a>
 
 ## [Phase 18 — setq, defun, progn: a Programmable Core](phase-18-setq-defun-progn.md)
 
 *DRAFT — pending author revision.* `setq` returns the assigned value and `defun~/~defvar~/~defparameter` return the bound name, both departures from Scheme; the store from Phase 14 adapted for ANSI CL's return conventions; a mutable environment reference threaded through both the direct evaluator and a new continuation-passing backend; and a datum-arena lifetime bug caught at compile time while building a one-argument `compile_to_closure`.
 
 
-<a id="org4dfab3d"></a>
+<a id="org15d9abb"></a>
 
 ## [Phase 19 — block, catch, unwind-protect: One-Shot Control in CPS](phase-19-one-shot-control.md)
 
 *DRAFT — pending author revision.* The one-shot nonlocal exits Phase 15 argued for, now built in both evaluators: `block` and `return-from` resolved lexically by name, `catch` and `throw` resolved dynamically by an evaluated tag, and `unwind-protect` running its cleanups on every way out. The lexical/dynamic distinction lands as two data structures with two lifetimes — an append-only slab of exit records a closure may capture, and a reused-slot stack of catch frames nothing can. Plus DIV-0011: an uncaught `throw` here runs cleanups that ANSI CL says should not run.
 
 
-<a id="org6e1dc71"></a>
+<a id="org57b9bc2"></a>
 
 ## [Phase 20 — defmacro: the Compiler Runs the Language](phase-20-defmacro.md)
 
 *DRAFT — pending author revision.* Object-language macros: a `defmacro`-defined `my-when` is a Lisp lambda that `smdlisp` compiles with its own elaborator and runs with its own evaluator during the expansion pass — the compiler running the language it compiles, at compile time. The new machinery is a datum⇄value reification pair; the merge test is that `my-when` is `when`, whether written with `list~/~cons` or with a backquote template, plus an expansion-budget diagnostic for a macro that expands into itself.
 
 
-<a id="org175781b"></a>
+<a id="org750c778"></a>
 
 ## [Phase 21 — Common Lisp Control Flow as Sender Graphs](phase-21-sender-graphs.md)
 
 *DRAFT — pending author revision.* The Common Lisp core evaluated over Beman Execution senders. The closure backends push a value, a diagnosed error, a `return-from` unwind and a `throw` unwind down one `result<value>` wire and tell them apart with sentinel messages compared by pointer identity; a sender has three channels natively, so the sentinels are deleted instead of ported. `unwind-protect` becomes an ordinary sender adapter whose three completion functions all funnel into one cleanup call, while dynamic-binding restore refuses to move out of ordinary C++ control flow at all. Plus a P2996 graph dump, and DIV-0015: this backend has no `constexpr` twin.
 
 
-<a id="org05b475b"></a>
+<a id="org6c89f75"></a>
 
 ## [Phase 22 — What We Left Out, and Why It Matters](phase-22-limitations.md)
 
 *DRAFT — pending author revision.* The reflective finale. Most of decision D10's out-of-scope list — strings, floats, CLOS, `format`, `loop` — is incidental to Phase 15's thesis about one-shot control; two gaps are not: the sender backend doesn't cover multiple values (DIV-0017/0018), and a nonlocal exit carries only its primary value even where every other exit path carries all of them (DIV-0019). Plus five sharper structural limits worth a paragraph each, including DIV-0015's warning not to call all three backends compile-time evaluators.
 
 
-<a id="orge46ebc6"></a>
+<a id="org443599c"></a>
 
 ## [Phase 23 — Why Rebuild Rather Than Refactor](phase-23-why-rebuild.md)
 
 *DRAFT — pending author revision.* The pivot works, and this is the argument for building it again anyway. Twenty divergence records, each locally correct and honestly written the same day, turn out on a single reading to be seven bills for one missing abstraction: a symbol is a `std::string_view` and so has nowhere to keep anything. Plus the freeze whose reason had evaporated, a test suite that had become a ratchet rather than a safety net, and a style document that was ratified and never adopted. Nothing is built; everything here is an argument, and arguments about software are cheap.
 
 
-<a id="org3c04272"></a>
+<a id="org3fcc027"></a>
 
 ## [Phase 24 — Two Copies and a Fold That Stops](phase-24-substrate.md)
 
 *DRAFT — pending author revision.* The new tree's `foundation/` starts as the reviewed union of two independent copies of the same code, and the merge is convincing mostly because there was nothing to merge — for five files the entire difference is the include guard, the namespace, and a comment saying it was adapted by copy. New in neither copy: a left fold that stops on the first failure, which `std::ranges::fold_left` can't do, and the Foldable and Traversable typeclasses the coding rules had required all along. The substrate has no behaviour of its own, so the law tests are the evidence.
 
 
-<a id="org5185565"></a>
+<a id="org980d97d"></a>
 
 ## [Phase 25 — Interning Symbols, and Seven Divergences That Were One](phase-25-symbols.md)
 
 *DRAFT — pending author revision.* The keystone. A symbol becomes an entry in a table with a name and three independently writable slots, identity becomes id comparison, and the table owns its characters so a compiled program stops pointing into the reader's arena. Six of the seven divergences close by construction and a seventh partly — in a component with no callers, since this tree has no reader and no evaluator yet. Also settles a question the plan left open: the table rides along into the running program.
 
 
-<a id="org8079ba7"></a>
+<a id="orgd4f0707"></a>
 
 ## [Phase 26 — Reading More Than It Can Run](phase-26-reader-core-ast.md)
 
 *DRAFT — pending author revision.* A readtable-shaped reader that implements full ANSI atom syntax before the evaluator can run any of it: strings, characters, `#(...)` vectors and every numeric-tower spelling read without complaint, and a literal with no machine representation yet is carried as its spelling. The datum tree and the core AST become instantiations of one container, so the Foldable and Traversable instances are written once and law-tested once. Plus an oracle test against the frozen pivot reader, three cases excluded because the oracle is the wrong answer there, and a GCC trunk misfold that the compile-time half of a twin test could not see.
 
 
-<a id="org921cadf"></a>
+<a id="org08616ba"></a>
 
 ## [Phase 27 — The Elaborator Never Recurses](phase-27-elaboration.md)
 
 *DRAFT — pending author revision.* A tree built children-before-parent has node indices in topological order, so ascending index order is a bottom-up catamorphism and descending order is top-down propagation. Elaboration becomes three index loops — atoms by `traverse`, roles by a descending pass, emission by a fold that stops on the first error — with no stack, no visitor that calls itself, and no bound on nesting depth. Plus the Lisp-2 rule as a consequence rather than a special case, and the one new node kind that decision D18's own exception licenses.
 
 
-<a id="org638c907"></a>
+<a id="org2835bf6"></a>
 
 ## [Phase 28 — Three Channels, and a Machine Instead of a Fold](phase-28-three-channels.md)
 
 *DRAFT — pending author revision.* An evaluated form finishes with a value, with a diagnosed error, or with an unwind in flight, and decision D13 makes those three alternatives of one type, so the pivot's sentinel messages compared by pointer identity are deleted instead of ported. `unwind-protect` is what the split costs, and it is rebuilt as a continuation frame that intercepts all three channels. Evaluation is the one traversal here the tree's own folds can't carry, so the evaluator is a small-step machine with defunctionalized continuations and its single loop in `foundation::trampoline` — which makes recursion depth and non-termination diagnosed capacities rather than compiler behaviour. Plus DIV-0009 closed: a recursive `defun` counts a list inside a `static_assert`.
 
 
-<a id="org84a8dbf"></a>
+<a id="orgff12ed8"></a>
 
 ## [Phase 29 — Answering Phase 7, and One Invariant That Was Two](phase-29-answering-phase-7.md)
 
 *DRAFT — pending author revision.* No step of the rebuild landed here. Phase 28 claimed evaluation is the one traversal that can't be a fold, and phase 7 of this series had already evaluated `if` inside a Mendler fold; what actually rules the fold out is the representation, since a columnar tree has no pointer to chase and no descent for a recurse-knob to choose. The machine turns out to be a scheme anyway — an unfold, with `step` as the coalgebra — and the reference doc behind phases 5 through 8 gets a status header, because its warning that a CPS trampoline linearizes independent arguments inverts on a column. Re-reading the argument against the code found the defect: `tagged_tree` was carrying two invariants as one, and children-before-parent, which every scheme depends on, was documented in a comment and checked nowhere.
 
 
-<a id="org15f31cf"></a>
+<a id="org3c94a25"></a>
 
 ## [Phase 30 — Asking Someone Else Whether the Answers Are Right](phase-30-asking-someone-else.md)
 
 *DRAFT — pending author revision.* Decision D16's conformance corpus: seventy-five cases, each stating its outcome by channel — value, diagnosed error, or unwind — split between thirty-five adapted from Paul Dietz's `ansi-test` (MIT, pinned commit) and forty hand-derived from the ANSI text, because `ansi-test` leans on strings, characters and the numeric tower, none of which are in scope. Only one entry, `nil.8`, pins anything, because D16 permits a test to pin a scope-decision and never a defect; writing the other seventy-four found six new divergences. Plus `sbcl_oracle.hpp`: a differential check against a real SBCL, shelled out to and skipped rather than failed when the binary isn't on `PATH`, closing the weakest evidence this series has been carrying since phase 28.
 
 
-<a id="org1b6f45f"></a>
+<a id="orgd484e29"></a>
 
 ## [Phase 31 — Driving the Machine, Not Forking It](phase-31-driving-the-machine.md)
 
 *DRAFT — pending author revision.* Decision D17's second backend over the rebuild's core tree: `machine_sender` connects a Beman Execution sender that runs `eval::machine`'s own trampoline to completion, then dispatches the result onto `set_value`, `set_error`, and `set_stopped`, D13's three channels spent again. The tempting alternative — forking a call's argument list into sibling senders, the pivot's trick — was rejected on a concrete cost recorded in DIV-0016: the machine is single-owner state, and reproducing that trick would mean rebuilding a recursive evaluator in the one place R5 spent a whole phase removing recursion from. Nothing here is `constexpr` (DIV-0015, accepted-permanent), and the one `when_all` demonstration joins two independent whole programs, never one program's own arguments.
 
 
-<a id="org520e936"></a>
+<a id="org5ff3f75"></a>
 
 ## [Phase 32 — Extracting the Kit, and a Bar That Measured the Wrong Thing](phase-32-extracting-the-kit.md)
 
 *DRAFT — pending author revision.* Step R8, the rebuild plan's last step: checking `docs/cl-rebuild-plan.md` §5's years-old kit specification against the actual code rather than re-quoting it. `parser/` turns out to have no `cl` client at all — the reader is hand-written recursive descent, not a combinator stack — so DIV-0028 leaves it unmoved while `foundation/`'s nine named files extract, three of them as supersets rather than exact copies. Seventeen files land in `smd::kit::foundation` as forwarding shims, not nine: the first pass drew the kit's boundary on whether a second implementation of `foldable~/~traversable~/~monoid~/~identity` already existed, mistaking a sibling project's unfinished refactor for evidence about this code's generality, and the repository owner overturned it before the step closed.
 
 
-<a id="org4d39e8c"></a>
+<a id="orgcee9239"></a>
 
 ## [Phase 33 — Nothing Left to Do, and an Oracle Worth Only Its Questions](phase-33-no-next-step.md)
 
 *DRAFT — pending author revision.* `AGENTS.md` says to work the next unchecked step in `checklist.md`, and after R8 there wasn't one: the file is ticked through the original phases, the pivot, the rebuild and the blog backfill, and then stops, so an agent following the project's own rules finds nothing to do. Step A0 puts the next fourteen steps there and repairs four records that had come loose the same way — two scoping notes still calling themselves unratified proposals after being merged, a phase sketch for a plan nobody will execute, and three backlog items whose gating conditions had passed unnoticed. The substantive one is decision D32, which overrules the ratified D22: parity with `smdlisp` was to be the language plan's first phase and retiring `smdlisp` its merge criterion, and the new plan deletes it three steps from here instead. D22's oracle argument was measured before being overruled and held up — seventy-five corpus entries reach `cl`'s seven special operators and nothing else, while `smdlisp` holds roughly 120 evaluated cases covering exactly the gap — so what settles it is narrower: `smdlisp` supplies source programs and never expectations, and an annotated tag supplies those for free. Plus DIV-0029, for the thing this repository had no mechanism for at all, which is how a ratified decision gets superseded.
 
 
-<a id="orge70194c"></a>
+<a id="orge3df9f3"></a>
 
 ## [Phase 34 — Freezing Two Iterations, and Two Links Nothing Checks](phase-34-freezing-the-iterations.md)
 
 *DRAFT — pending author revision.* Step A1, so that step A3 can delete thirty thousand lines without breaking anything that points at them. `docs/compiler_architecture.org` is a living document whose links `scripts/verify-transclusions.sh` resolves against the worktree on purpose, and thirty-one of them pointed into the two trees about to leave trunk — thirty-one honest failures on the very next run. Both trees are frozen as annotated `iteration/*` tags and the prose moves to `docs/history/architecture-iterations.org`, repinned. The counting is the story: three passes over the same document reported 37 transclusions, then 39, then 37 again, because 39 is how many `[[file:` links there are and 37 is how many carry a `::<uuid>`. The two left over are plain hyperlinks to `docs/cl-limitations.md`, both in the section that moved, into a document one directory deeper — and nothing in this repository can tell you whether they still resolve.
 
 
-<a id="org84baa6c"></a>
+<a id="org2cb83c3"></a>
 
 ## [Phase 35 — Cutting the Consumers, and a Green Build That Checks Nothing](phase-35-cutting-the-consumers.md)
 
 *DRAFT — pending author revision.* Step A2, the middle of a three-step subtraction: A1 froze the two dead front ends as tags, A2 cuts everything that points at them, A3 deletes them. The build still names both trees out loud — eleven examples link their targets by name, the top-level export list names eight of them, and `src/smd/cl/reader/oracle_compare.test.cpp` reaches into *both* trees rather than only the one an earlier pass at the plan assumed, the third reach arriving transitively with no include of its own. Twelve lines in, 1302 out. The number to distrust is `make testinstall`, which moved from exit 2 to exit 0 here and was not fixed: `find_package` now resolves a package claiming no `smd::smdscheme` target, nothing is left to link one, and zero installed tests run. Four separate documents say so, because the exit code is the only part a later reader sees without opening any of them. Plus a spot check that is a `grep` for two strings which has to come back empty, so the comments left in place of the deleted wiring can not name the trees they are about — and one of those comments got its own count wrong on the way out.
 
 
-<a id="org7b78f42"></a>
+<a id="org4909d82"></a>
 
 ## [Phase 36 — Deleting Both Front Ends, and the Run That Stopped Before Its First Edit](phase-36-deleting-both-front-ends.md)
 
 *DRAFT — pending author revision.* Step A3, the deletion the two steps before it existed to make possible: `src/smd/smdscheme/` and `src/smd/smdlisp/` leave trunk, 173 files and 31,155 lines out, and `ctest` goes from 1105 entries to 304 on both matrix legs, both still 100% passing. It took two runs — the first verified a green baseline, reached `git rm -r`, and was refused by a local tool-permission classifier before making a single edit, and its `"outcome": "blocked"` row was kept on purpose, so the record shows the deletion took two goes and why. The decision executed here is D32, which retires a stated never-edit rule; DIV-0032 is only the divergence number reserved for the step, and conflating the two files the governance record in the wrong directory. The oracle did not go because friction won: `smdlisp` really was a better oracle than SBCL for this project's own semantic choices, and the measurement that checked that held up, so the reason is narrower — `smdlisp` can supply source programs and can not supply expectations, and a tag supplies source programs for free and forever. One document on trunk now says the deciding reason was friction, and it is the one this step wrote. The same step's note under D32 gets the `CMakeLists.txt` count wrong in the sentence that proves the tree could never have been kept, and the front page of the generated documentation turns out to have carried a code sample with a literal `...` in it that could never have compiled.
 
 
-<a id="orgc2800c8"></a>
+<a id="org7b16fe0"></a>
 
 ## [Phase 37 — A Printer, and Why It Could Not Land Alone](phase-37-a-printer-and-its-oracle.md)
 
 *DRAFT — pending author revision.* Step A4 lands `smd::cl::printer::prin1` and its first oracle comparison in one commit, because a printer whose only witness is a test written from its own output is the evidence D16 refuses. A2 retired the reader's structural comparison against `smdlisp` and A3 deleted the tree it compared against, so until this step there was no differential oracle at all — a gap opened on purpose. The printer is a `foundation::cata_short` over the datum tree, carrier the rendered text of one node, and `sbcl_read_print` lands beside it: eleven source strings read here, rendered, and compared against what SBCL 2.2.9.debian's own reader and `prin1` make of the same string, all eleven agreeing on the first run. `1+` is the one worth stopping on, because DIV-0003 has been accepted-permanent since step L5 on the strength of an argument and nothing else, and now an implementation that has never seen this repository agrees. Three of SBCL's answers were measured rather than guessed: with `*print-pretty*` off `'x` prints as `(QUOTE X)`, the empty list prints as `NIL`, and a tower prints its value where this reader prints its spelling. The header documents one way to fail and the code has seven, six of which nothing the reader produces can reach; its capacity note says 32 KiB, which is the figure for a 64-node tree, where the test file declares 96 and holds 48.
 
 
-<a id="org5ed904d"></a>
+<a id="org5492b84"></a>
 
 ## [Phase 38 — Forty-Six Strings, and a Spot Check That Could Not Run](phase-38-forty-six-strings.md)
 
 *DRAFT — pending author revision.* Step A5 broadens A4's eleven cases into forty-one source strings and a five-case error table, and closes Phase A. Twenty of the twenty-three non-error inputs the retired `oracle_compare.test.cpp` tested come across, checked against SBCL now instead of against a sibling tree in this same repository; the three that don't are the quasiquote family, which SBCL prints as `SB-INT:QUASIQUOTE` and `#S(SB-IMPL::COMMA ...)`, implementation-specific and ANSI-permitted. Twenty more are syntax that comparison could never have reached, because D10 kept strings, characters, vectors and the numeric tower out of `smdlisp` entirely. All forty-six agreed with SBCL 2.2.9.debian on the first run, one attempt, no new exclusions. What that green does not say is whether the comparison happened at all: the differential skips when `sbcl` is not on `PATH`, Catch2's `SKIP_RETURN_CODE 4` keeps the leg at 100% passing, and the oracle's version rides in an `INFO` that prints only on failure. The one spot check that would have shown the difference — 180 assertions against 1 — globs two directories down for a binary that is six down, and `2>/dev/null` swallows the error while `tail` returns 0. The capacity comment is written for pressure that isn't there, since the widest case in either table holds three elements. And DIV-0034 records that the file named `sbcl_differential.test.cpp` has never compared this project against SBCL at all, which makes it the second divergence number Phase A issued out of six reserved, the four in between having gone unused.
 
 
-<a id="org0e228ac"></a>
+<a id="org52f7312"></a>
+
+## [Phase 39 — Eight Headers, and a Comment the Formatter Made False](phase-39-eight-headers.md)
+
+*DRAFT — pending author revision.* Step B1 opens Phase B on its own branch by splitting `src/smd/cl/reader/read.hpp` — 607 lines, eleven `Ctx`-templated declarations over ten functions, two public entry points and a character-name table — into eight headers under `detail/` plus an umbrella, so that the seven combinator steps after it each have a small file to declare as their scope instead of all declaring the same one. Nothing observable changes: no test file is touched, `ctest` holds at 311 entries on both legs, and `make compile-headers` proves each of the eight stands alone rather than working by luck of include order. `detail/read_node_fwd.hpp` is what makes the split possible, and the sentence explaining it names `read_sharpsign` as a caller of `read_node` in five separate places, where `read_sharpsign` calls `read_wrapped`, `read_delimited` and `read_character` and never calls `read_node` at all — as `sharpsign.hpp`'s own include list quietly shows. The first `make lint` run sorted the umbrella's includes alphabetically and left a hand-written "dependency order" comment standing over a list that no longer had one; the fix describes the forward declaration instead, because order stopped mattering the moment every header became self-contained and guarded. The architecture paragraph written in the same commit still claims the order, and still has `node.hpp` last where the sorted list puts it second, directly above a transclusion of the list itself. The step's `wc -l` spot check expects roughly 60 against roughly 583 and prints 94, against a file that was 607; 583 is a line off what `read.hpp` held until the Monad typeclass widened it, on the day the plan was written. At 695 seconds this is the plan's declared floor for a Phase B step, and it is slower than A5's SBCL corpus and twice A3's deletion of 31,155 lines.
+
+
+<a id="org53de02f"></a>
+
+## [Phase 40 — One bind, and the Namespace It Could Not Be Declared In](phase-40-one-bind.md)
+
+*DRAFT — pending author revision.* This step creates `smd::kit::parser`: a `parser<F>` over a context threaded through every call, registered as a Monad instance rather than given a `bind` of its own, with `read_radix_number` converted as its first client. The layer this repository already had was Applicative and Alternative and had nothing named `bind`, which was enough for Scheme and is not enough for a reader where `#nnR` reads a radix that decides how the next token is classified. The brief's illustration of the registration does not compile: `monad_typeclass` is a variable template in `smd::kit::foundation`, a specialization must be declared in a namespace enclosing the primary template's own, and `smd::kit::parser` is a sibling of that namespace rather than an ancestor — confirmed against GCC 16 rather than assumed, and fixed with the shape `tagged_tree_instances.hpp` already carried one level down. The spot check meant to find the registration, `grep 'monad_typeclass<parser'`, finds nothing, and the step recorded it as unmatchable by any valid spelling; one valid spelling does match, though it is not the one that landed and the one that landed had the precedent. `read_radix_number` becomes `bind(token_p, classify_and_add)(cur, ctx)`, the first reader function whose continuation takes its context as a parameter instead of capturing it, with the same two diagnostic strings at the same two positions and `scan_token` untouched. Of the three primitives, `bind` is the only one anything outside the kit's own tests calls: `map` appears only in its own Functor laws and `parser_like` has no user at all. `monad.hpp`'s class comment, written before this step, says an instance that defers its continuation — "a parser that stores what to do next" — has to supply `join`, `then` and `apply` itself rather than inherit them, and `parser_monad_map` inherits all three. The reader's `CMakeLists.txt` gains `kit.parser`, recorded as out of declared scope rather than left to be noticed, and the commit's count of `and_then` in the pre-split `read.hpp` — fifteen — is neither the seventeen occurrences nor the thirteen calls.
+
+
+<a id="org6e3bc7b"></a>
+
+## [Phase 41 — Skipping Space, and a Law That Would Not Finish](phase-41-skipping-space.md)
+
+*DRAFT — pending author revision.* The reader's whitespace and comment skipping moves onto the combinator layer: `src/smd/kit/parser/` gains `satisfy`, `char_p` and a `skip_many` that discards every value and treats exhaustion as success, and `skip_intertoken_space` becomes one `skip_many` over a parser that handles whichever of the three skippable syntaxes applies at the cursor. The brief asked for three laws and, in a separate paragraph, for a free decision about whether the repetition guards against a parser that consumes nothing or documents that away as a precondition. The two are not independent. `skip_many(skip_many(p))` does not give a wrong answer, it fails to return, and GCC reports that as an operation count exceeding 33554432, which is what an infinite loop looks like when the loop runs in the constant evaluator. `skip_many` is itself a parser that succeeds without consuming once its inner parser is spent, so its own documented precondition excluded the primitive itself; the fix is one condition, stop on a success that made no progress, and it is a property of the combinator now rather than a warning in a doc comment. The comment skipper did not become a combinator at all — it is a recursive function with a depth parameter that never touches `skip_many`, which is why the architecture note's claim that the guard costs nothing "at either of this step's two call sites" names one of them and there is one. The two-character delimiters are spelled with `bind` and an ignored argument, which is the derived `then` that `monad.hpp` supplies with no customization-point object to reach it by. Two new cases pin what an unterminated `#|` does, flat and nested, because nothing had checked that before, and both went into a file the step's own spot check says must not appear in the diff. The premise — "the reader's last two raw loops" — is short by three: `forms.hpp`, `text.hpp` and `token.hpp` each still hold one, each under a comment claiming the same substrate exception this step's whole argument is against, and one of them calls itself the layer's one primitive loop. 266 seconds and two attempts, against a declared floor of 695.
+
+
+<a id="org83931e8"></a>
+
+## [Phase 42 — A Repetition That Owns Nothing, and a Choice Nothing Calls](phase-42-repetition-and-choice.md)
+
+*DRAFT — pending author revision.* The reader's delimited-list reader gives up its last raw loop, and the combinator that takes it over holds no container, no capacity and no message. The brief asked for a `many_bounded<Capacity>` carrying a message and a failure position; what landed is `many_until`, control flow and nothing more, because the one position the design turns on — `"too many elements"`, at the post-intertoken-skip position of the element that would not fit — comes out exact only when the closure already holding that cursor also owns the capacity check. So `read_delimited`'s step keeps the accumulator, the check and the message, and hands back a `std::optional` whose payload nothing reads: the repetition tests only whether it is engaged. Ordered choice lands beside it with law tests and no caller at all. The retired iteration exercised `operator|` ten ways across two test files, covering three situations, and not one of them the rule the operator exists for — a left alternative that consumes and then fails wins outright, even with the second alternative's character sitting right there. That rule is a `static_assert` now, and so is the one saying a double failure reports the second alternative's own error rather than a synthesized "expected one of &hellip;". The `optional` beside them sits outside the anchor and cites the wrong file of the frozen tag it differs from; the function it names lives in the file next door, under a comment drawing a distinction its own body never draws. No reader test looks at the overflow position: `list_capacity_error` checks the message, and the position is pinned in the substrate's tests against a step closure written to look like `read_delimited`. `read_delimited` itself is still `template <class Ctx>`, with the concept on its step closure instead, and the handoff counts four functions constraining with it where one does. The brief's closing instruction was to grep the reader for one shape and report what survives; the architecture note says none, and the command returns ten lines. Seven files, one attempt, and a wall clock reading fifty-one hours that its own note says measures nothing.
+
+
+<a id="org30e7be8"></a>
+
+## [Phase 43 — Any Character At All, and a Step Started Twice](phase-43-any-character-at-all.md)
+
+*DRAFT — pending author revision.* String literals and character literals move onto the combinator layer, and the worker that moved them is the second one to try: the first ran out of budget part way through and committed what it had under a message saying incomplete, do not merge, and re-run the verification from scratch rather than trusting the interrupted session's. The brief adds that the unfinished work is evidence and not authority, and three of its parts did not survive being read that way. The first attempt tested the closing quote twice, in the repetition's step and again inside one of the two alternatives, then flattened every failure of the choice into `unterminated string` through a `has_value()` ladder, the one idiom the house rules name and the reader had none of left; the landed version tests the quote once, in the step, which is what lets the second alternative honestly be `any_char`, and its own end-of-input failure already carries the right message at the right position. `satisfy` wanted to be both alternatives and could not be, because it reports failure at the cursor while every diagnostic a reader can see out of this file reports at the opening quote — a finding about the primitive, with the fix deferred until a second caller wants it. The same anchoring is what makes ordered choice commit to an escape once it has consumed one, and the architecture note has the direction backwards: the position it calls "past" the choice's starting cursor is four characters behind it, and the comparison is an inequality rather than an ordering. The character reader stays a `bind` and was never a loop, whatever the commit message and the architecture heading it landed call it. For half of what this step converts a green test matrix was proving nothing, because two of the four diagnostics in the file had no test at all; the new boundary case had to stop using the file's own failure helper in order to check a position, and the outside oracle never ran, since SBCL is absent and the harness counts a skip as a pass. Of the six spot checks the step was handed, four are wrong: a grep told to expect zero returns three, two of the commands glob for a binary four directory levels short of where it is, the filters on one of those name test cases that do not exist, and a diff check forbids the very file the brief's own setup calls the deliverable. Four files, 199 insertions, and a record that says one attempt for a step that had two.
+
+
+<a id="org957be23"></a>
+
+## [Phase 44 — A Record of Declines, and a Test Made to Fail](phase-44-a-record-of-declines.md)
+
+*DRAFT — pending author revision.* The quote family and token data move onto the combinator layer, and the layer gains nothing, which is what the step before it did too. The brief asks for more than the conversion: if the primitive set has stopped growing, say so and settle a note that has been marked provisional since the layer was built, because a layer that stopped needing additions and a layer nothing dares extend have the same file list and the same green matrix. Two quiet steps is thin evidence, and the architecture note rests instead on a record of what was asked for and turned down — a collecting repetition with no client yet, a bounded one that would have owned state its caller needed, a parser for "any character that is not this one" whose negation was really a stop condition in the wrong place, and this step, which wanted nothing. The quote reader was `bind` written out by hand, twice, over two types that spelled their sequencing the same way, and only the outer one moves; appending to a tree is not a parse step, which is why the reader still contains calls that look unconverted and are not. The brief warned that the branch's position, the marker's and not the wrapped datum's, is easy to swap by accident and that no test would obviously say so, and that was true, because the position reaches the tree only as a diagnostic no successful read raises. The new case leaves room for exactly one node, so the leaf fills the tree and the quote's branch is what overflows, pinning the column at the quote. Then the step mutated the code and watched the case fail: substituting the resumption cursor's position still breaks that `static_assert` and no other, and putting the two nested `and_then` calls back leaves it passing, which is what changing no behaviour looks like. The outside oracle ran for the first time in this phase — SBCL 2.6.0.debian, 180 assertions across three cases, one of which is a header included twice — over a corpus that happens to cover both halves of what changed, down to a bare `'` in its error table. The commit message the step was handed closes on a claim that was already true three weeks earlier, and the message that landed drops it. The spot check demanding zero `and_then` in the converted file finds seven lines before and six after, three of them in the one function the same document forbids touching. Five files, 140 insertions, one attempt, twenty minutes, and an architecture note calling the conversion worth more than four fewer lines where the function gained four.
+
+
+<a id="orga9eb0ad"></a>
+
+## [Phase 45 — The Readtable Dispatch, and a Wall at 512](phase-45-a-wall-at-512.md)
+
+*DRAFT — pending author revision.* What is left of the reader is its spine, two switches on the readtable, and the brief expects the readtable to be the obstacle and explains why it is not: a datum is an arena index, so every arm of both switches already returns the same type, and a table selecting among parsers is a table selecting among same-typed parsers. The switches stay switches, because a table selects one arm and commits while ordered choice searches, and a search changes which diagnostic surfaces when an arm fails. Then the build stopped — not a failing test but a compiler limit, `'constexpr' evaluation depth exceeds maximum of 512`, on a flag the project sets nowhere and had never had cause to look at. The series has named that flag twice before, both times about the evaluator, and the project's C++ rules say evaluation does not recurse in C++ at all — but the reader is not evaluation and never was, so every reified parser between the node reader and its own recursive call is a frame. The step bisected rather than estimated — 424 frames before it, a reported 570 with the dispatch converted the obvious way, which is a parser that holds a callable and forwards to it — and changing the parser type to **be** its callable, the function object as a private base with its `operator()` re-exported, brings the same case to 363. Reproducing the middle number gives 562, and the difference does not matter, because the cap is 512. Running that bisection backwards across the phase's earlier tags is the number no one had: the case needed 167 when the phase opened and still needed 167 after five of the seven steps that have landed, so the whole rise came from the one step immediately before this, which reported twenty minutes and a green matrix and left 88 frames of margin under a cap no one had looked at. The architecture note's closing claim is therefore wrong in the flattering direction — 363 is below where this step found the number, not below where the series started. The test that caught it was written for the printer eight phases earlier, to overflow a character limit that also happens to be 512 and has nothing to do with this one. The primitive predicted to need extending did not, because the digit run of `#nnR` cannot fail. Ordered choice gets its second caller in the reader, in the comma arm. The argument-order guard survives the reshape, checked rather than assumed: the error line comes back byte for byte identical against the pre-change header, though the notes under it name a different candidate, the wrapper before and the lambda after. Eight files, 315 insertions, two attempts, fifty-two minutes, and a doc comment that says four where the switch it documents says five.
+
+
+<a id="orgccd0587"></a>
+
+## [Phase 46 — Ninety-Three Deep, and a Divergence That Dissolved](phase-46-ninety-three-deep.md)
+
+*DRAFT — pending author revision.* The last of the eight steps changed no source: it measured, and it wrote. The cost was supposed to be operation count, and the reader's own translation unit does go from 149541 evaluated constant-expression operations to 1046872, seven times as many — which is three percent of what GCC allows before it stops, on a flag raising which would have been free. The sevenfold is not the conversion's price, though, because the two columns are not the same file: hold the test file fixed and compile it against both readers and the conversion costs 1.74, while one case the series itself added, a 129-character string literal read at `static_assert`, carries a factor of nineteen on its own — which is the real shape of the charge, since the converted string reader reifies a parser per character and nothing else in the tree reads anything long. What the series actually spends is constant-evaluation stack, and this step measured its slope rather than one point of it: a probe outside the repository reads N nested quotes through the reader at `static_assert`, and bisecting `-fconstexpr-depth` at six values of N in both trees gives two straight lines, 2.0 frames per level of source nesting before and 5.0 after. Extrapolating to GCC's default cap of 512 and then bisecting to confirm it, source nested 236 levels deep would have compiled before the series and 93 levels compiles after; the tree's own deepest constant evaluation, sixty-four nested quotes written nine phases back to overflow the printer's text buffer, went from 167 frames to 363 with 149 to spare. Every bisected number reproduces exactly, but the two lines do not share the intercept the note gives them — 39 before and 43 after — and that is the one place four frames decide an answer, because a shared 39 predicts a ceiling of 94 and 94 does not compile. Run the probe backwards over the phase's tags and five of the seven steps that touched code cost nothing at all, the sixth takes the ceiling from 236 levels to 78 on its own, and the seventh, which added two dispatchers, gives fifteen back. The first cold-build comparison was measuring `ccache`, which the project configures as the compiler launcher, so both sides were run again with it off. The claim the whole series rests on — that nothing observable changed — is checked mechanically rather than by eye: every input-and-expected-message pair extracted from the reader's test file at both ends and compared as sets, seventeen before and twenty-one after, none removed, none altered, each of the four additions pinning a diagnostic nothing had ever tried. And the divergence record saying the parser combinator layer had no client in this front end dissolved instead of closing, because its revisit condition fired and firing it showed the condition was framed against a repository that no longer exists. The closing note's explanation of the number is wrong, though: it reads "third client" as the repository's three front ends, two of them since deleted, where the record counted the two existing copies of the layer — the retired Scheme front end's and the sibling Forth repository's, the second of which was never in this repository and is still there. The conclusion survives intact, which is the least satisfying way to be right. Also in: the two places the series kept the worse combinator on purpose, because the scoping decision forbade improving behaviour on the way past, and the one thing the divergence record decided that still stands, `functor<parser<F>>` deliberately unregistered. Four files, 96 insertions, one attempt, twenty-five minutes, and most of the twenty-five is measurement.
+
+
+<a id="org38b6d2e"></a>
 
 # Table of Contents
 
 
 # Table of Contents
 
-1.  [Overview](#org970c11e)
-2.  [Blog Posts](#orgb5b58f5)
-3.  [Table of Contents](#org0e228ac)
+1.  [Overview](#orgdbfa970)
+2.  [Blog Posts](#org73451b8)
+3.  [Table of Contents](#org38b6d2e)
