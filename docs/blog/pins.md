@@ -44,6 +44,7 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-42-repetition-and-choice.org` | `08fcb02` | `blog/phase-42` | two commits past step B4's merge `5e8d7e7`: `4637b59` ticks the root `checklist.md` and `08fcb02` is a clang-format rewrite of `src/smd/kit/parser/choice.hpp`, so the tag publishes formatted code |
 | `phase-43-any-character-at-all.org` | `05ac888` | `blog/phase-43` | `Merge step B5` (tag created at the merge, before the post) |
 | `phase-44-a-record-of-declines.org` | `1d9ed7b` | `blog/phase-44` | `Merge step B6` (tag created at the merge, before the post) |
+| `phase-45-a-wall-at-512.org` | `633ee81` | `blog/phase-45` | `Merge step B7` (tag created at the merge, before the post) |
 
 94 transclusions across 22 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
@@ -326,3 +327,30 @@ checks this document in the same pinned-transclusion category as the blog
 posts, alongside `docs/blog/phase-*.org`, even though it lives under
 `docs/history/` and follows the `iteration/*` tag family rather than
 `blog/phase-*`.
+
+Phase 45 follows the ordinary rule as well: `blog/phase-45` is `633ee81`, step
+B7's merge itself. No clang-format follow-up landed after it — the reformat B7
+needed was run inside its own worktree before the commit, so the next commit on
+the branch is the next step's — and the step ticked the root `checklist.md`'s B7 line
+inside its own commit, leaving nothing to tag past. Both anchors the post
+transcludes resolve in that tree, but only one of them is new.
+`b3055934-2efb-4df4-a4bb-e961e29e7d0f` is B7's own, opening above
+`read_sharpsign`'s doc comment in `src/smd/cl/reader/detail/sharpsign.hpp` and
+closing below the function; `read_radix_number`, which B2 converted and which
+B7's step file forbade touching, sits above it in the same file and is outside
+it, carrying no anchor of its own. `b803edcd-959d-4364-94f8-13fb256e7b9b` is
+B1's, placed around `read_node` when the reader was split into eight headers
+and kept in place around the rewritten function, which decision D21 explicitly
+permits: an anchor belongs to the step that lands it, and a later step may move,
+split or keep it as the code requires. It covers everything substantive in
+`detail/node.hpp` — the file is the include block, that one function, and the
+namespace braces.
+
+What neither anchor covers is the change the post is actually about.
+`src/smd/kit/parser/parser.hpp` carries no UUID anchor at any revision, so the
+`parser<F>` reshape — the private base and the re-exported `operator()` — is
+quoted in the post as a plain `#+begin_src cpp` block rather than transcluded.
+That is the right outcome and not a gap: the tag is immutable, the post is
+written against it, and a post wanting a region no one anchored quotes it or
+places an anchor of its own in a later step. Neither the pinned tree nor the
+post is repairable after the fact, and neither needs to be.
