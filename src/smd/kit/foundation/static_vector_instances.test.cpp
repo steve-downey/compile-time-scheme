@@ -103,7 +103,7 @@ constexpr auto traverse_preserves_shape() -> bool {
 constexpr auto traverse_leftmost_error() -> bool {
     constexpr parse_error later{source_pos{}, "later"};
     auto traversed = traverse(
-        [](int x) {
+        [later](int x) {
             if (x == 2) {
                 return result<int>{boom};
             }

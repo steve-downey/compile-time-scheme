@@ -1,0 +1,124 @@
+**DRAFT &mdash; pending author revision**
+
+<div class="abstract" id="orgdf158e2">
+<p>
+Step A3 is going to delete about thirty thousand lines, and step A1 exists so that deletion breaks nothing that points at them.
+<code>docs/compiler_architecture.org</code> is a living document: <code>scripts/verify-transclusions.sh</code> resolves its links against the worktree on purpose, so an orphaned anchor is caught the moment the code under it moves.
+Thirty-one of its links pointed into the two trees about to leave trunk, which would have been thirty-one honest failures on the very next run.
+The fix was a mechanism this project already had. The counting was the hard part.
+Three separate passes over the same document reported 37 transclusions, then 39, then 37 again.
+39 is how many <code>[[file:</code> occurrences there are; 37 is how many carry a <code>::&lt;uuid&gt;</code> and are actually transclusions; the two left over are plain hyperlinks to <code>docs/cl-limitations.md</code>, which the verifier ignores entirely.
+Both of those hyperlinks sat in the section that moved, the document they moved into is one directory deeper, and nothing in this repository can tell you whether they still resolve.
+A link without a UUID is invisible to the checker that would otherwise catch it breaking, and the spot check A1 wrote to catch it by hand miscounted too.
+</p>
+
+</div>
+
+{{TEASER\_END}}
+
+<nav style="margin-bottom: 2em; border-bottom: 1px solid #ccc; padding-bottom: 1em">
+
+[↑ Series Index](index.md) | [Phase 33 - Nothing Left to Do, and an Oracle Worth Only Its Questions ←](phase-33-no-next-step.md)
+
+</nav>
+
+
+# Thirty-one links about to go dead
+
+The ordering argument is blunt, and it's the owner's: agents keep getting hung up on the trees they must not touch and doing strategically wrong things, sometimes without saying so, as long as the trees are there to get hung up on. So the deletion runs third instead of fifth, ahead of everything it was originally sequenced behind.
+
+It can't run first. `docs/compiler_architecture.org` transcludes live code through `file:…::<uuid>` links that `scripts/verify-transclusions.sh` resolves against the worktree, and not against a tag. That is a choice, and the right one: a living document is supposed to roll forward, and a link that stops resolving should be caught while the prose around it is still worth fixing. Delete `src/smd/smdscheme/` and `src/smd/smdlisp/` with the document as it stood and every later step's acceptance gate reports thirty-one failures, correctly, forever.
+
+The obvious fix is to stop checking that document. Turning a check off to keep it green is how a check dies. Pinning the whole document would stop the failures as well, and it would freeze the one section describing code still under active development. Worse than the problem. The prose is sound: the argument those sections make about two finished iterations didn't become wrong because the code moved on. What's wrong is that finished writing was living in a document that rolls forward, and this project already had the answer to that, because the blog posts under `docs/blog/` have resolved against `blog/phase-NN` tags ever since the pinning plan landed. Same mechanism, new tag family. So A1 freezes both trees as annotated tags, moves the two sections into `docs/history/architecture-iterations.org`, and repoints every link at the freeze. Nothing is deleted and nothing is rewritten. That's why it's its own step.
+
+
+# The same document, counted three times
+
+The first version of this plan said the document carried 37 transclusions, 31 of them into the trees A3 removes.
+
+The re-decomposition checked, and disagreed. Its step file says "verified by direct count on this tree: the document carries **39**". To its credit it also tells whoever reads it next that the disagreement is unresolved: "the plan this fan-out started from said 37 and 31; the 31 held, the 37 did not — recount before trusting either number again." So the third pass recounted. 37 was right the first time.
+
+```sh
+grep -o '\[\[file:' docs/compiler_architecture.org | wc -l          # 39
+grep -o '\[\[file:[^]:]*::' docs/compiler_architecture.org | wc -l  # 37
+```
+
+Both numbers are true about the same file. 39 is how many `[[file:` links there are. 37 is how many carry a `::<uuid>` after the path, which is the part the verifier knows how to resolve. The other two are ordinary document hyperlinks to `docs/cl-limitations.md`. Both passes counted correctly. They were answering different questions, and neither said which one out loud.
+
+The 31 never moved across any of the three counts, which is why the disagreement stayed harmless as long as it did. Seven links into `smdscheme`, twenty-one into `smdlisp`, three into the `godbolt_lisp` examples that step A2 removes. Thirty-one go, six stay, and six plus thirty-one is thirty-seven.
+
+The superseded plan wrote its own spot check, and it's wrong twice. It asked for two counts that "must sum to 39 (5 surviving in the living doc + 3 examples + 31 moved)". Five is wrong; six survive. And the three example links are inside the 31 already. Two errors, in opposite directions, summing to the total the wrong grep had already produced. A check that confirms a wrong number is worse than no check, because now you have agreement.
+
+
+# A link with no UUID is a link nothing checks
+
+Both of the hyperlinks lived in "The Common Lisp Layer", so both moved. `docs/history/architecture-iterations.org` sits one directory deeper than `docs/compiler_architecture.org`, and these links are document-relative, so `cl-limitations.md` had to become `../cl-limitations.md`. One `../`, twice.
+
+The verifier will never tell you whether that happened. It only looks at links carrying a UUID, because a UUID is what it knows how to resolve; a bare `[[file:…]]` is a path it has no opinion about. The step file is explicit about this and calls the two links a trap: fix them by hand, check them by hand, nothing downstream will. They were fixed by hand, correctly, and `docs/history/architecture-iterations.org` today points at `../cl-limitations.md` in both places.
+
+Then the spot check written to prove it:
+
+```sh
+grep -c 'cl-limitations.md' docs/compiler_architecture.org \
+        docs/history/architecture-iterations.org             # expect 2 across both
+```
+
+It prints 0 and 8. The string `cl-limitations.md` appears eleven times across eight lines of the moved prose, almost all of them ordinary verbatim mentions in running text (`docs/cl-limitations.md`, DIV-0019). And `grep -c` counts lines, not occurrences. There was no way for that command to distinguish the two links from nine mentions of the same filename. The whole counting story here is a `grep` answering a question no one asked. So is the hand-check written for the one thing nothing else could check.
+
+It didn't matter here; the instruction above the command said to check by hand, and somebody did. It will matter the next time no one does. The links that need a human are exactly the links no tool is watching. So the only signal that one broke is somebody clicking it. No one clicks a cross-reference in an architecture document that got moved to `history/` because it stopped rolling forward.
+
+
+# Two tags, and a commit that didn't exist yet
+
+`iteration/smdscheme-final` and `iteration/smdlisp-final`, both annotated, each naming the last commit at which its tree still existed in trunk. That is the whole freeze.
+
+The `iteration/` prefix is deliberate and `docs/blog/pins.md` now says why: these are not blog pins and must not sort among `blog/phase-*`. No post is written against either one, and neither names a step in the series. Calling them `blog/phase-34a` would have been less typing, and it would have quietly broken the property the pins document exists to preserve: the tag list reads as the post list.
+
+There's an ordering problem in creating them at all. The links written in the new document must name a revision that exists at the time they're written, and the tags are supposed to name this step's merge commit, which doesn't exist yet. The resolution is that `git show REV:PATH` doesn't care about merges: tag the branch tip before merging, verify the links resolve there, and the `--no-ff` merge makes the tagged commit an ancestor, which is all that resolving a pinned link needs. The tags do not move afterwards. `docs/blog/pins.md` records the one pin that ever moved, phase 19's, and the rule it established on the way past. A pin may move while the post is still a draft, and never once the prose is out. Moving a tag under published prose is the exact thing pinning is for.
+
+The likelier way to get this step wrong is the paths. A living link is document-relative, `file:../src/smd/smdlisp/closure/env.hpp`. A pinned link is repo-relative, `orgit-file:~/src/compile-time-scheme/main::iteration/smdlisp-final::src/smd/smdlisp/closure/env.hpp`, because `git show` takes repo-relative paths and nothing else. Every one of the thirty-one links had to lose a `../` that the two hyperlinks beside them had to gain. That one the verifier catches. Which is why it was safe to name in advance.
+
+
+# What the verifier thought it was checking
+
+Teaching `verify-transclusions.sh` about the new document cost a conditional, a rewritten loop and a `shellcheck` pragma; the step's own commit message calls it two lines. The reason it's nearly that small is an accident: `md_globs` was already an array and `posts_glob` was a lone string beside it, so the new category is an idiom copied from the line above.
+
+The header comment cost more, because it had to say what the category now is. It used to read "posts `docs/blog/phase-*.org` transclude via `orgit-file:` links pinned to a `blog/phase-NN` tag", and every noun in that sentence was about blogging. It now says posts *plus* the retired-iteration history document, pinned to `blog/phase-NN` for a post and `iteration/<tree>-final` for the history doc. The sentence underneath changed too, from "a post's code is frozen at the revision its prose was written against" to "a pinned document's code". The category was never blog posts. It was documents whose code has stopped moving, and it took a document that isn't a post to make anyone name it.
+
+`docs/cl-limitations.md` needed the same correction for the same reason. It asserted that `docs/compiler_architecture.org` was "unaffected either way" by the pinning scheme, since it's a living document and not a pinned post. That was false when it was written: twenty-one of the living document's anchors pointed into the `smdlisp` tree. A1 appends the correction and leaves the claim standing above it.
+
+
+# Three commits, and none of them is a merge that says so
+
+Every other step in this plan is meant to land as a `--no-ff` merge the orchestrator names after the step, so that `git log` finds it by its identifier. A1's log entry reads:
+
+```
+9fb0152 docs: strip the trailing blank line pre-commit removes
+b7a5742 docs: move the finished iterations out of the living document, first
+549a1fc docs: move the finished iterations out of the living document, first
+```
+
+The middle one is the merge. It carries the merged commit's message verbatim instead of naming itself, so the log shows the same subject twice and nothing anywhere says "A1". You have to read the parents to find it.
+
+The third commit is the interesting one. `architecture-iterations.org` went in with a trailing blank line that pre-commit's `end-of-file-fixer` removes, so `make lint` was red on a fresh checkout of the integration branch and green on the second run, because the first run had already repaired the working tree. A hook that fixes what it checks can not distinguish a file that was clean from a file it just cleaned, and the only way to see the difference is a checkout that hasn't been fixed yet. A1's own post-edit lint must have run before its last edit to that file. One newline, caught by the orchestrator, committed on top of the merge.
+
+Which is why this post's pin is `9fb0152` and not the merge. There's a commit after the merge. `docs/blog/pins.md` has a name for pinning to the last authorship commit instead of a step merge, and it belongs to posts 5 through 12, the retrospective ones, written long after the code they describe. This is the first time a step that had a plan, a branch and an integration merge has landed on the same basis. Not by any decision. Just by having one more commit than the shape expected.
+
+Nothing in this post is transcluded, because A1 touched no C++ and placed no anchors of its own; the links it moved are references to anchors other steps landed.
+
+The plan asks every step for a line in `tmp/plan/metrics.jsonl` saying what its verification cost. I went to read A1's. On `main` that file held three baseline rows and nothing else.
+
+The row existed the whole time, one directory away. The tracker is edited only in the main checkout, by absolute path, so that it can never turn up inside a step's own diff, and that worked: `tmp/plan/` appears in nothing either phase committed. No one committed it either. So trunk carried a checklist with no step ticked and a three-row metrics file, for a plan that had run to the end.
+
+A1's real row puts the step at 821 seconds and its verification at 40, with a test matrix unaffected by a documentation-only change, as expected. Nothing asked it for this, but the row also records that the step file's `grep -c` spot check undercounts. Six of the eight lines that match are bare prose mentions of the path; two carry the links. The true count is 8, not 2.
+
+A1 caught the miscount at the time and wrote it down. It went in a file no one had committed.
+
+<nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
+
+[↑ Series Index](index.md) | [← Phase 33 - Nothing Left to Do, and an Oracle Worth Only Its Questions](phase-33-no-next-step.md)
+
+</nav>
+
+
+# References

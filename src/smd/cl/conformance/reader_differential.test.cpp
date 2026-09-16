@@ -4,9 +4,10 @@
 // The printer's first real oracle comparison (decision D16), landed in the
 // same step as printer::prin1 itself rather than ahead of it: a printer
 // whose only witness is a test written against its own output is exactly
-// the evidence D16 rejects. A3 deleted reader/oracle_compare.test.cpp's
-// other half along with the rest of smdlisp, so between A3 and this file
-// the reader had no differential oracle at all.
+// the evidence D16 rejects. A2 deleted reader/oracle_compare.test.cpp's
+// other half when it cut the dead trees' consumers, one step ahead of A3
+// deleting smdlisp itself, so between A2 and this file the reader had no
+// differential oracle at all.
 //
 // For each source string, this reads with this project's own reader,
 // renders with printer::prin1, and compares against what SBCL's own reader
@@ -20,7 +21,7 @@
 // than fail when `sbcl` is not on PATH -- a missing oracle is a fact about
 // the environment, not a defect in this project.
 //
-// A5 broadens A4's eleven cases into a real corpus, closing the gap A3's
+// A5 broadens A4's eleven cases into a real corpus, closing the gap A2's
 // deletion of oracle_compare.test.cpp opened: `inherited_cases` below is
 // every input that retired file tested (fixnums, fold-alike symbols,
 // keywords, lists, and the non-excluded quote family), now checked against
@@ -110,8 +111,8 @@ void check_all(std::span<reader_case const> table) {
 }
 
 // 05847dd9-bb9c-4e88-bb71-734ff3f3bf8a
-// Every input `reader/oracle_compare.test.cpp` tested, before A3 deleted it
-// along with the rest of smdlisp, now checked against SBCL instead.
+// Every input `reader/oracle_compare.test.cpp` tested, before A2 deleted it
+// as a consumer of the dead trees, now checked against SBCL instead.
 constexpr std::array<reader_case, 21> inherited_cases{{
     {"Fixnums: bare", "42"},
     {"Fixnums: negative", "-7"},
