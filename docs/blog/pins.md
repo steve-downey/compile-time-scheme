@@ -39,6 +39,7 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-37-a-printer-and-its-oracle.org` | `a50345c` | `blog/phase-37` | one commit past step A4's merge: `17820fc` is the merge, `a50345c` the clang-format follow-up touching only `src/smd/cl/printer/`, so the tag publishes formatted code |
 | `phase-38-forty-six-strings.org` | `dcea38b` | `blog/phase-38` | `Merge step A5` (tag created at the merge, before the post) |
 | `phase-39-eight-headers.org` | `c79918b` | `blog/phase-39` | `Merge step B1` (tag created at the merge, before the post) |
+| `phase-40-one-bind.org` | `18afb36` | `blog/phase-40` | one commit past step B2's merge: `9449339` is the merge, `18afb36` the clang-format follow-up touching only `src/smd/kit/parser/`, so the tag publishes formatted code |
 
 94 transclusions across 22 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
@@ -66,6 +67,20 @@ anchors the post transcludes are new in that step. The third UUID B1 landed,
 `b803edcd-959d-4364-94f8-13fb256e7b9b` around `read_node`, predates the step and
 travelled into `detail/node.hpp` intact; no post transcludes it, so it adds no
 row here.
+
+Phase 40 is the second row not pinned to its step's merge, for the same reason
+phase 37 was. Step B2 merged at `9449339` and the orchestrator's clang-format
+follow-up landed under four minutes later at `18afb36`, reflowing four files under
+`src/smd/kit/parser/` and collapsing one `gersemi` block in that directory's
+`CMakeLists.txt`; tagging the later commit publishes formatted code. The
+follow-up is formatting only, checked rather than assumed: with all whitespace
+stripped, each of the four C++ files hashes identically at `9449339` and at
+`18afb36`. All three anchors the post transcludes are new in step B2, and one of
+them, `606983ed-f5d7-454d-9570-3b510ace3aba`, stops before the
+`monad_typeclass` specialization that the post's own argument turns on — the
+anchor covers `parser_monad_impl` and `parser_monad_map`, which sit inside
+`namespace smd::kit::parser`, and the registration is in a second namespace
+block below it.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
 the convention from `d0ff8ec` onward: the orchestrator tags the step's `--no-ff`
