@@ -38,6 +38,7 @@ Ten of the twenty-one posts transclude no code and take no pin.
 | `phase-32-extracting-the-kit.org` | `19c8702` | `blog/phase-32` | `Merge step R8` (tag created at the merge, before the post) |
 | `phase-37-a-printer-and-its-oracle.org` | `a50345c` | `blog/phase-37` | one commit past step A4's merge: `17820fc` is the merge, `a50345c` the clang-format follow-up touching only `src/smd/cl/printer/`, so the tag publishes formatted code |
 | `phase-38-forty-six-strings.org` | `dcea38b` | `blog/phase-38` | `Merge step A5` (tag created at the merge, before the post) |
+| `phase-39-eight-headers.org` | `c79918b` | `blog/phase-39` | `Merge step B1` (tag created at the merge, before the post) |
 
 94 transclusions across 22 posts. Every row passes the anchor test at its pin,
 with the one recorded exception below.
@@ -57,6 +58,14 @@ Phase 38 goes back to the ordinary rule: `blog/phase-38` is step A5's merge
 commit `dcea38b` itself. A one-line follow-up `48b6502` ticks the root
 `checklist.md`'s A5 line, which the step's own worktree diff missed, and touches
 no code, so nothing about it belongs in a pin.
+
+Phase 39 is the first row from the parser-combinator plan, and follows the same
+rule: `blog/phase-39` is `c79918b`, step B1's merge, which carries both the
+split and the one-line commit ticking the root `checklist.md`'s B1 line. Both
+anchors the post transcludes are new in that step. The third UUID B1 landed,
+`b803edcd-959d-4364-94f8-13fb256e7b9b` around `read_node`, predates the step and
+travelled into `detail/node.hpp` intact; no post transcludes it, so it adds no
+row here.
 
 Phase 21 is the first post whose tag was created *before* its prose, which is
 the convention from `d0ff8ec` onward: the orchestrator tags the step's `--no-ff`
