@@ -160,9 +160,9 @@ What did change is =parser<F>= itself, and it is a shape change rather than an a
 
 *Settled, B8 -- and settled by the same finding that dissolved DIV-0028.* =map= is not a registered =functor<parser<F>>= instance and is no longer provisionally unregistered: it is deliberately unregistered, for the reason it never was registered. Nothing outside the Monad instance needs a generic =fmap= over a parser value, and seven converting steps is enough evidence that the client which would need one is not coming. Registering it anyway would be precisely the over-eagerness DIV-0028 named against this same layer -- an instance whose only justification is that the typeclass exists. The native =fmap= remains reachable through the monad object, which is how every caller in the tree reaches it. What would settle it the other way is a caller that has a =parser= value in a generic context and needs the =fmap= CPO to find it; that caller does not exist, and if one ever does, the fix is one =inline constexpr auto functor<parser<F>> = ...= beside the monad registration, not a redesign.
 
-** B3: the skipping layer is combinators, not two raw loops
+** B3: the skipping layer is combinators, not raw loops
 
-=skip_block_comment= and =skip_intertoken_space= (=src/smd/cl/reader/detail/skip.hpp=) held the reader's last two raw loops, each carrying a comment calling itself a "substrate generic algorithm" -- the exception =docs/cpp-rules.md= grants a raw =for=/=while= only inside the substrate's own generic algorithms, claimed by code living in the reader rather than the substrate. Building both from combinators that do live in the substrate (=src/smd/kit/parser/=) is the honest version of that claim.
+=skip_block_comment= and =skip_intertoken_space= (=src/smd/cl/reader/detail/skip.hpp=) held two of the reader's five remaining raw loops, each carrying a comment calling itself a "substrate generic algorithm" -- the exception =docs/cpp-rules.md= grants a raw =for=/=while= only inside the substrate's own generic algorithms, claimed by code living in the reader rather than the substrate. Building both from combinators that do live in the substrate (=src/smd/kit/parser/=) is the honest version of that claim.
 
 #+transclude: [[file:../src/smd/kit/parser/repeat.hpp::013cfe3b-6dfa-4f4b-b715-a59917e7715b]] :lines 2- :src cpp :end "013cfe3b-6dfa-4f4b-b715-a59917e7715b end"
 
@@ -197,7 +197,7 @@ Two additions to =src/smd/kit/parser/=: ordered choice (=choice.hpp=) and a diag
 
 ** B5: text -- =read_string= and =read_character= are the last two hand-managed loops
 
-=src/smd/cl/reader/detail/text.hpp= held the reader's last two raw loops after B3 and B4. =read_string= accumulated into a fixed buffer with an escape flag threaded by hand through each iteration; =read_character= did two-character lookahead and then sliced the source by offset arithmetic. Neither is a loop any more: every =while= and =for= still matching a grep over the file is a word in a doc comment.
+=src/smd/cl/reader/detail/text.hpp= held the reader's last raw loop after B3 and B4, other than =scan_token='s, which is out of scope for the whole series by standing rule and is still there. =read_string= accumulated into a fixed buffer with an escape flag threaded by hand through each iteration; =read_character= did two-character lookahead and then sliced the source by offset arithmetic. Neither is a loop any more: every =while= and =for= still matching a grep over the file is a word in a doc comment.
 
 #+transclude: [[file:../src/smd/cl/reader/detail/text.hpp::4a777d67-1246-4233-bf78-73aa4c23257a]] :lines 2- :src cpp :end "4a777d67-1246-4233-bf78-73aa4c23257a end"
 
