@@ -30,6 +30,14 @@ the rule does not reach them; internal docs are supposed to cross-reference
 freely, and preferably as real links. If that was the intent, this entry is
 aimed at the wrong target and should be rewritten rather than executed.
 
+**Either way, do no prose work in `docs/history/` without asking first.** The
+owner said on 2026-09-16 that the directory may eventually be dropped from
+`main`, or purged outright as misleading, since its prose describes two front
+ends that no longer exist on trunk and can be mistaken for a description of the
+live tree. The code is preserved by the `iteration/smdscheme-final` and
+`iteration/smdlisp-final` tags regardless. A cleanup pass over a directory
+that may be deleted is the worst of both outcomes.
+
 ## Why it is not done
 
 It is a prose pass over roughly twenty posts and wants doing in one sitting by
