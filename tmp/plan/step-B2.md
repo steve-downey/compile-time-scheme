@@ -1,4 +1,4 @@
-# Step B2 — `smd::kit::parser`, a Monad instance over a threaded context
+# Step B2 — parser-monad — `smd::kit::parser`, a Monad instance over a threaded context
 
 ## Project context
 

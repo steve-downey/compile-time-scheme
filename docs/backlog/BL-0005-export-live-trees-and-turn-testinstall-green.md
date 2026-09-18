@@ -128,7 +128,7 @@ failure: a `FILE_SET HEADERS` list missing a header that only the installed
 
 Schedule it once the parser-combinator work in `tmp/plan/` Phase B has
 landed, so the new example and install tests are written against the reader
-the project actually wants to demonstrate rather than against a shape B1–B8
-are about to change underneath them. Close it as declined only if the
+the project actually wants to demonstrate rather than against a shape the reader-combinators
+steps are about to change underneath them. Close it as declined only if the
 project decides installed-package coverage is not worth maintaining for a
 proof-of-concept repository, which is not currently expected.

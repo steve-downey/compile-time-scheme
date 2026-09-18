@@ -1,4 +1,4 @@
-# Step A5 — broaden the SBCL differential into a real corpus
+# Step A5 — reader-differential-corpus — broaden the SBCL differential into a real corpus
 
 ## Project context
 

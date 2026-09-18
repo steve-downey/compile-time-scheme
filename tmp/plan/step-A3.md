@@ -1,4 +1,4 @@
-# Step A3 — delete `smdscheme` and `smdlisp` from trunk
+# Step A3 — delete-dead-trees — delete `smdscheme` and `smdlisp` from trunk
 
 ## Project context
 

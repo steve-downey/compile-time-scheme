@@ -25,12 +25,12 @@ The reader parses data but does not classify special forms. The elaborator recog
 
 Plans and status:
 
-- `tmp/plan/` — **the active plan**: steps A0–A5 (retiring the two earlier iterations) and B1–B8 (parser combinators in `cl`'s reader). `tmp/plan/checklist.md` is its status; `tmp/plan/README.md` is the orchestrator's view. Agents read their own step file, not the whole directory.
+- `tmp/plan/` — **the active plan**: the `tree-retirement` series, A0–A5 (retiring the two earlier iterations), and the `reader-combinators` series, B1–B8 (parser combinators in `cl`'s reader). `tmp/plan/checklist.md` is its status; `tmp/plan/README.md` is the orchestrator's view. Agents read their own step file, not the whole directory.
 - `docs/cl-parser-scoping.md` (D27–D31) and `docs/cl-language-scoping.md` (D22–D26) — the ratified reasoning the active plan executes. Read by numbered section, never wholesale.
-- `checklist.md` — step-by-step status for the original steps, the Common Lisp pivot, and the rebuild.
+- `checklist.md` — step-by-step status for the original steps, the Common Lisp pivot, the rebuild, the blog backfill and the `tmp/plan/` fan-out. The later series are headed by slug (`blog-backfill`, `tree-retirement`, `reader-combinators`) and each of their steps is named by one; a step's ordinal is reading order, never its identity, and the letter-number ordinals collide across series.
 - `docs/cl-rebuild-plan.md` — closed at R8 by `docs/cl-rebuild-closing-note.md`; its phase list is finished. Still authoritative for decision records D11–D21, which are live. Read by named section.
 - `docs/cl-pivot-plan.md` — the pivot plan (decision records D1–D10). Still authoritative for how the current `smdlisp` got its shape; its step list is finished. Read by named section on demand, never wholesale.
-- `docs/history/blog-backfill-plan.md` — the arrears: phases 23–27, for steps R0–R4, which landed without posts. Steps B5–B11.
+- `docs/history/blog-backfill-plan.md` — the arrears: phases 23–27, for steps R0–R4, which landed without posts. Its steps are `checklist.md`'s `blog-backfill` series; their ordinals B5–B11 overlap the fan-out's B5–B8 and are not names.
 - `docs/backlog/` — identified-but-unscheduled work, one file per item. Not a plan and not an agent read path; consult it only when deciding what to schedule next.
 - `docs/history/schemepoc-plan.md` — the superseded pre-pivot plan. Historical only.
 - `docs/divergences/` — one record per deliberate divergence from ANSI Common Lisp, the active plan, or a project rule. `docs/divergences/README.md` classifies each as `defect`, `scope-decision`, `artifact-of-D1`, `toolchain`, or `process`. These docs are append-only: append a dated note, never edit in place. **A test may pin a `scope-decision`; a test must never pin a `defect`** (D16).

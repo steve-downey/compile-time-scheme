@@ -1,4 +1,4 @@
-# Step A0 — rebase the record against reality
+# Step A0 — record-reconciliation — rebase the record against reality
 
 ## Project context
 

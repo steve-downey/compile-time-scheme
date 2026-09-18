@@ -12,7 +12,7 @@ what grounds. The files are `src/smd/kit/foundation/alternative.hpp`, its
 `alternative.test.cpp`, their `CMakeLists.txt` entry, and the `cl` forwarding
 shim.
 
-Three outcomes are live. Keep it because B1–B8 will wire `parser<T>` into it,
+Three outcomes are live. Keep it because the reader-combinators steps will wire `parser<T>` into it,
 which is what `compile-time-forth` already does. Keep it as a published kit
 surface with no in-repo client, stated as such. Or remove it and let it come
 back with its first real caller.

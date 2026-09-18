@@ -38,7 +38,8 @@ against the text that was there.
 | 7 | `grep and_then` expected to reach zero repo-wide; seven calls survive legitimately, three inside a function the step does not own | `step-B7.md`, corrected mid-run |
 
 **Number 2 is the expensive one**, and it is the argument for step zero on its
-own. B1's handoff reported it. **No step file was corrected until B6**, five
+own. The `split-read-header` (B1) handoff reported it. **No step file was
+corrected until `forms-and-tokens` (B6)**, five
 steps later, so every intervening step ran a check that could not fail. One of
 those checks was the only thing standing between a green matrix and an oracle
 that was not running — see

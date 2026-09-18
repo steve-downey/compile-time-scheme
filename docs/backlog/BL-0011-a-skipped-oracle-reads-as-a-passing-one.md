@@ -2,7 +2,7 @@
 
 - **Status:** open
 - **Date:** 2026-09-15
-- **Origin:** found twice independently — by step B5, which merged green while the oracle was contributing nothing, and again by phase 38's blog drafter, which ran the check A5 had written to prove the oracle worked and found it could not run.
+- **Origin:** found twice independently — by the reader-combinators step B5, `text-literals`, which merged green while the oracle was contributing nothing, and again by phase 38's blog drafter, which ran the check A5 had written to prove the oracle worked and found it could not run.
 - **Frozen-tree impact:** none. `src/smd/cl/conformance/` is a live-tree directory.
 
 ## What
@@ -55,8 +55,9 @@ which is exactly right for a divergence and leaves agreement unattributed.
 
 **It has already cost something.** SBCL was present when A4 and A5 built the
 differential and recorded agreement against **SBCL 2.2.9.debian**. It was
-absent from this machine by step B5, which merged with both matrix legs green
-and the oracle contributing nothing. It was reinstalled before B6 at **SBCL
+absent from this machine by `text-literals` (reader-combinators B5), which
+merged with both matrix legs green and the oracle contributing nothing. It was
+reinstalled before `forms-and-tokens` (B6) at **SBCL
 2.6.0.debian** — a different build from the one every exclusion was measured
 against — and the differential still passes at 180 assertions. That is a good
 outcome and nothing in the code establishes it: no test, no comment and no

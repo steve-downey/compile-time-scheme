@@ -1,4 +1,4 @@
-# Step B4 — choice and bounded repetition; `read_delimited` onto the combinator layer
+# Step B4 — choice-and-repetition — choice and bounded repetition; `read_delimited` onto the combinator layer
 
 ## Project context
 

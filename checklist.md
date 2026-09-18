@@ -98,7 +98,7 @@ Supersedes the pivot's decision set with D11–D17.
 `src/smd/smdlisp/**` was frozen as a behavioural oracle from R1 onward and was never edited. Decision D32 (`docs/cl-language-scoping.md`) retired that rule at step A3 of the plan added below: the tree was deleted from trunk and is preserved instead at the annotated tag `iteration/smdlisp-final`, as a source of source programs only. Per D16, expectations come from SBCL or the specification, never from `smdlisp`'s own answers; the conformance corpus (`src/smd/cl/conformance`) is where those checked expectations live.
 
 Every phase ships a blog post as a deliverable (D20), drafted by an agent that did not do the work and reviewed by a clean agent running the `voice` skill.
-R0–R4 landed before that was recorded; `docs/history/blog-backfill-plan.md` covers the arrears as steps B5–B11.
+R0–R4 landed before that was recorded; `docs/history/blog-backfill-plan.md` covers the arrears as the [blog-backfill](#blog-backfill) series below.
 
 - [x] Step R0: decisions, divergence classification, plan
 - [x] Step R1: substrate — `src/smd/cl/foundation`, short-circuiting fold, topological folds, typeclass instances, law tests, the test matrix
@@ -111,38 +111,43 @@ R0–R4 landed before that was recorded; `docs/history/blog-backfill-plan.md` co
 - [x] Step R7: sender backend (D17) (+ phase 31)
 - [x] Step R8: extract the kit — `smd::kit::foundation` (R8 moved seventeen `foundation/` files; eighteen forwarding shims now, since `monad.hpp` landed; `parser/` has no `cl` client, DIV-0028) (+ phase 32)
 
-## Blog backfill (docs/history/blog-backfill-plan.md)
+## blog-backfill
 
-Phases 23–27, for steps R0–R4, which landed without posts.
+Phases 23–27, for steps R0–R4, which landed without posts; the plan is `docs/history/blog-backfill-plan.md`.
+Each step is named by its slug, which links to the plan's entry for it. The ordinal is reading order only: it continues `docs/epistolary-pinning-plan.md`'s B-series and collides with [reader-combinators](#reader-combinators) from B5 on, so a bare "B5" names a step in three series and is never an identity.
 B6–B10 are independent of each other and depend only on B5.
 
-- [x] Step B5: tags `blog/phase-24`–`blog/phase-27` placed on the four step merges, whose anchors landed with their steps
-- [x] Step B6: blog phase 23 — R0, why rebuild rather than refactor (no pin, no transclusions)
-- [x] Step B7: blog phase 24 — R1, the substrate
-- [x] Step B8: blog phase 25 — R2, interned symbols
-- [x] Step B9: blog phase 26 — R3, reader and core AST
-- [x] Step B10: blog phase 27 — R4, elaboration as three schemes
-- [x] Step B11: `docs/blog/index.org` entries, `docs/blog/pins.md` rows and third-era note, `make blog-md` and transclusion verification green
+- [x] Step B5 — [anchors-and-tags](docs/history/blog-backfill-plan.md#anchors-and-tags): tags `blog/phase-24`–`blog/phase-27` placed on the four step merges, whose anchors landed with their steps
+- [x] Step B6 — [why-rebuild-post](docs/history/blog-backfill-plan.md#why-rebuild-post): blog phase 23 — R0, why rebuild rather than refactor (no pin, no transclusions)
+- [x] Step B7 — [substrate-post](docs/history/blog-backfill-plan.md#substrate-post): blog phase 24 — R1, the substrate
+- [x] Step B8 — [interned-symbols-post](docs/history/blog-backfill-plan.md#interned-symbols-post): blog phase 25 — R2, interned symbols
+- [x] Step B9 — [reader-and-core-ast-post](docs/history/blog-backfill-plan.md#reader-and-core-ast-post): blog phase 26 — R3, reader and core AST
+- [x] Step B10 — [elaboration-schemes-post](docs/history/blog-backfill-plan.md#elaboration-schemes-post): blog phase 27 — R4, elaboration as three schemes
+- [x] Step B11 — [backfill-close-out](docs/history/blog-backfill-plan.md#backfill-close-out): `docs/blog/index.org` entries, `docs/blog/pins.md` rows and third-era note, `make blog-md` and transclusion verification green
 
-## Plan reconciliation and reader combinators (tmp/plan/)
+## tree-retirement
 
-Executed as a `tmp/plan/` fan-out rather than hand-driven, per `tmp/plan/checklist.md`.
-Phase 0 (A0) merges to `main` directly.
-Phase A (A1–A5) merges to integration branch `cl-retire-trees`, created off `main` after A0.
-Phase B (B1–B8) merges to integration branch `cl-parser-combinators`, created off `main` after Phase A's gate.
+Phase 0 and Phase A of the `tmp/plan/` fan-out, executed as a fan-out rather than hand-driven, per `tmp/plan/checklist.md`; each step's slug links to its step file.
+A0 merged to `main` directly. A1–A5 merged to the integration branch `cl-retire-trees`, created off `main` after A0.
 
-- [x] Step A0: rebase the record against reality — the root checklist, decision D32, three backlog items, and a dated amendment to each scoping note
-- [x] Step A1: freeze both iterations as tags; move their architecture prose to a pinned history doc
-- [x] Step A2: neutralise the dead trees' build consumers (examples, install test, export list)
-- [x] Step A3: delete `smdscheme` and `smdlisp` from trunk, executing D32
-- [x] Step A4: a `prin1`-shaped printer for `cl` datums, proved against SBCL in the same step
-- [x] Step A5: broaden the SBCL reader differential into a real corpus
-- [x] Step B1: split `read.hpp` into component headers plus an umbrella (mechanical, zero behavioural diff)
-- [x] Step B2: `smd::kit::parser`: a Monad instance over a context-threaded parser, with `read_radix_number` as its first client
-- [x] Step B3: intertoken space and comments onto the layer
-- [x] Step B4: choice and bounded repetition; `read_delimited` onto the combinator layer
-- [x] Step typeclass-resync: carry `main`'s typeclass rename onto the Phase B branch (out-of-band maintenance, not one of the fourteen)
-- [x] Step B5: text: strings and character literals
-- [x] Step B6: forms: the quote family and token data
-- [x] Step B7: sharpsign dispatch and `read_node`
-- [x] Step B8: integration: the D30 measurement, DIV-0028 dissolved, architecture section, project checklist
+- [x] Step A0 — [record-reconciliation](tmp/plan/step-A0.md): rebase the record against reality — the root checklist, decision D32, three backlog items, and a dated amendment to each scoping note
+- [x] Step A1 — [freeze-iterations-as-tags](tmp/plan/step-A1.md): freeze both iterations as tags; move their architecture prose to a pinned history doc
+- [x] Step A2 — [neutralise-build-consumers](tmp/plan/step-A2.md): neutralise the dead trees' build consumers (examples, install test, export list)
+- [x] Step A3 — [delete-dead-trees](tmp/plan/step-A3.md): delete `smdscheme` and `smdlisp` from trunk, executing D32
+- [x] Step A4 — [datum-printer](tmp/plan/step-A4.md): a `prin1`-shaped printer for `cl` datums, proved against SBCL in the same step
+- [x] Step A5 — [reader-differential-corpus](tmp/plan/step-A5.md): broaden the SBCL reader differential into a real corpus
+
+## reader-combinators
+
+Phase B of the same fan-out, merged to the integration branch `cl-parser-combinators`, created off `main` after Phase A's gate; each step's slug links to its step file.
+The ordinals are reading order only and collide with [blog-backfill](#blog-backfill)'s from B5 on. `typeclass-resync` was inserted mid-run without one, and nothing renumbered.
+
+- [x] Step B1 — [split-read-header](tmp/plan/step-B1.md): split `read.hpp` into component headers plus an umbrella (mechanical, zero behavioural diff)
+- [x] Step B2 — [parser-monad](tmp/plan/step-B2.md): `smd::kit::parser`: a Monad instance over a context-threaded parser, with `read_radix_number` as its first client
+- [x] Step B3 — [intertoken-space](tmp/plan/step-B3.md): intertoken space and comments onto the layer
+- [x] Step B4 — [choice-and-repetition](tmp/plan/step-B4.md): choice and bounded repetition; `read_delimited` onto the combinator layer
+- [x] No ordinal — [typeclass-resync](tmp/plan/step-typeclass-resync.md): carry `main`'s typeclass rename onto the Phase B branch (out-of-band maintenance, inserted 2026-09-10 between B4 and B5; not one of the fourteen)
+- [x] Step B5 — [text-literals](tmp/plan/step-B5.md): text: strings and character literals
+- [x] Step B6 — [forms-and-tokens](tmp/plan/step-B6.md): forms: the quote family and token data
+- [x] Step B7 — [readtable-dispatch](tmp/plan/step-B7.md): sharpsign dispatch and `read_node`
+- [x] Step B8 — [combinator-integration](tmp/plan/step-B8.md): integration: the D30 measurement, DIV-0028 dissolved, architecture section, project checklist

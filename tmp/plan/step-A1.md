@@ -1,4 +1,4 @@
-# Step A1 — freeze both iterations as tags, and pin their architecture prose
+# Step A1 — freeze-iterations-as-tags — freeze both iterations as tags, and pin their architecture prose
 
 ## Project context
 
