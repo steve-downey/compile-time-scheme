@@ -11,6 +11,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <string>
 #include <string_view>
 #include <variant>
 
@@ -359,7 +360,43 @@ constexpr auto reports_errors() -> bool {
            fails_with("#5(1)", "sized #n(...) vectors not yet supported") &&
            fails_with("#5'x", "unexpected numeric argument after '#'") &&
            fails_with("1 2", "unexpected trailing input") &&
-           fails_with("|abc", "unterminated |");
+           fails_with("|abc", "unterminated |") &&
+           // D31 (docs/cl-parser-scoping.md): an unterminated `#|` block
+           // comment is not diagnosed at the comment. skip_block_comment
+           // consumes to end of input regardless of nesting depth, and it
+           // is the caller's end-of-input handling -- not the comment
+           // skipper -- that reports here. Pinned so a future combinator
+           // rewrite does not "improve" this into a diagnostic pointing at
+           // the unterminated comment itself, which read.test.cpp does not
+           // otherwise cover.
+           fails_with("#| unterminated", "unexpected end of input") &&
+           fails_with("#| outer #| inner |# still open",
+                      "unexpected end of input") &&
+           // B5: read_character's own "expected character after #\\" was
+           // pinned nowhere before this step converted it onto bind.
+           fails_with("#\\", "expected character after #\\") &&
+           // B5: a literal ending in a bare `\` is end of input, not a
+           // diagnostic of its own. The escape parser consumes the escape
+           // and then fails, and that committed failure carries the same
+           // "unterminated string" the loop's break used to reach.
+           fails_with("\"abc\\", "unterminated string");
+}
+
+constexpr auto string_capacity_boundary() -> bool {
+    // max_string_chars (src/smd/cl/reader/datum.hpp) is 128, and the check
+    // is `>=` before the append, so a literal of exactly that many
+    // characters fits and one more does not. The overflow reports at the
+    // opening quote, not at the character that would not fit. Neither side
+    // of this boundary was pinned before B5 converted read_string.
+    std::string const fits(
+        static_cast<std::size_t>(smd::cl::reader::max_string_chars), 'a');
+    std::string const over(
+        static_cast<std::size_t>(smd::cl::reader::max_string_chars) + 1, 'a');
+    sym_table syms;
+    auto const r = read_one("\"" + over + "\"", syms);
+    return root_string_is("\"" + fits + "\"", fits) && !r.has_value() &&
+           std::string_view{r.error().message} == "string too long" &&
+           r.error().where.line == 1 && r.error().where.column == 1;
 }
 
 constexpr auto error_positions_track_lines() -> bool {
@@ -385,6 +422,20 @@ constexpr auto capacity_errors_not_asserts() -> bool {
            !pool_full.has_value() &&
            std::string_view{pool_full.error().message} ==
                "symbol name storage full";
+}
+
+constexpr auto wrapped_branch_error_sits_at_the_marker() -> bool {
+    // read_wrapped records its branch at the *marker's* position, not the
+    // wrapped datum's. Nothing in the types keeps those apart and for 'x
+    // they differ by one character, so the only place the difference is
+    // observable is the position of a diagnostic raised after the inner
+    // datum is already in the tree. With room for exactly one node, the
+    // leaf x fills it and the quote's own branch is what overflows.
+    sym_table syms;
+    auto const r = read<1, 8>(" 'x", syms);
+    return !r.has_value() &&
+           std::string_view{r.error().message} == "datum tree full" &&
+           r.error().where.line == 1 && r.error().where.column == 2;
 }
 
 constexpr auto list_capacity_error() -> bool {
@@ -438,8 +489,10 @@ static_assert(backquote_template_shape());
 static_assert(skips_comments_and_whitespace());
 static_assert(read_datum_leaves_the_rest());
 static_assert(reports_errors());
+static_assert(string_capacity_boundary());
 static_assert(error_positions_track_lines());
 static_assert(capacity_errors_not_asserts());
+static_assert(wrapped_branch_error_sits_at_the_marker());
 static_assert(list_capacity_error());
 static_assert(traverse_propagates_reader_facts());
 
@@ -480,8 +533,10 @@ TEST_CASE("ReadTest - SequentialReads") { CHECK(read_datum_leaves_the_rest()); }
 
 TEST_CASE("ReadTest - Errors") {
     CHECK(reports_errors());
+    CHECK(string_capacity_boundary());
     CHECK(error_positions_track_lines());
     CHECK(capacity_errors_not_asserts());
+    CHECK(wrapped_branch_error_sits_at_the_marker());
     CHECK(list_capacity_error());
 }
 

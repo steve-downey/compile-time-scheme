@@ -137,11 +137,12 @@ Phase B (B1–B8) merges to integration branch `cl-parser-combinators`, created 
 - [x] Step A3: delete `smdscheme` and `smdlisp` from trunk, executing D32
 - [x] Step A4: a `prin1`-shaped printer for `cl` datums, proved against SBCL in the same step
 - [x] Step A5: broaden the SBCL reader differential into a real corpus
-- [ ] Step B1: split `read.hpp` into component headers plus an umbrella (mechanical, zero behavioural diff)
-- [ ] Step B2: `smd::kit::parser`: a Monad instance over a context-threaded parser, with `read_radix_number` as its first client
-- [ ] Step B3: intertoken space and comments onto the layer
-- [ ] Step B4: choice and bounded repetition; `read_delimited` onto the combinator layer
-- [ ] Step B5: text: strings and character literals
-- [ ] Step B6: forms: the quote family and token data
-- [ ] Step B7: sharpsign dispatch and `read_node`
-- [ ] Step B8: integration: the D30 measurement, DIV-0028 dissolved, architecture section, project checklist
+- [x] Step B1: split `read.hpp` into component headers plus an umbrella (mechanical, zero behavioural diff)
+- [x] Step B2: `smd::kit::parser`: a Monad instance over a context-threaded parser, with `read_radix_number` as its first client
+- [x] Step B3: intertoken space and comments onto the layer
+- [x] Step B4: choice and bounded repetition; `read_delimited` onto the combinator layer
+- [x] Step typeclass-resync: carry `main`'s typeclass rename onto the Phase B branch (out-of-band maintenance, not one of the fourteen)
+- [x] Step B5: text: strings and character literals
+- [x] Step B6: forms: the quote family and token data
+- [x] Step B7: sharpsign dispatch and `read_node`
+- [x] Step B8: integration: the D30 measurement, DIV-0028 dissolved, architecture section, project checklist
