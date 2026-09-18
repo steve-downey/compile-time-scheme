@@ -1,4 +1,4 @@
-# Step A4 — a `prin1`-shaped printer for `cl` datums, proved against SBCL
+# Step A4 — datum-printer — a `prin1`-shaped printer for `cl` datums, proved against SBCL
 
 ## Project context
 

@@ -1,4 +1,4 @@
-# Step B8 — close the series: measure the cost, and record what dissolved
+# Step B8 — combinator-integration — close the series: measure the cost, and record what dissolved
 
 ## Project context
 

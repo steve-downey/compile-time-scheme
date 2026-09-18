@@ -105,15 +105,38 @@ Write what the step's own diff and brief show, including what they show as unres
 
 ## 6. Steps
 
-Numbering continues `docs/epistolary-pinning-plan.md`'s B-series, which owns B0–B4.
+Each step is named by its slug, which heads its entry below and is what the root `checklist.md` links to under [blog-backfill](../../checklist.md#blog-backfill).
+The ordinals are reading order only.
+They continue `docs/epistolary-pinning-plan.md`'s B-series — which owns B0–B5, not B0–B4 as this section first said, so that plan's B5 and this one's are different steps — and they collide again with the reader-combinator fan-out's B1–B8 in `tmp/plan/` (the root checklist's [reader-combinators](../../checklist.md#reader-combinators) series).
+A bare "B5" therefore names three different pieces of work, and is never used as an identity.
 
-- **B5** — anchors and tags. **Done 2026-08-02** (§3): `main` rewritten from R1 forward, 18 anchors, four tags. The force-push is pending; the tags are local until it happens.
-- **B6** — phase 23 (R0). No pin, no transclusions; the "why rebuild rather than refactor" essay, drawn from the plan's §1 and §3.
-- **B7** — phase 24 (R1), pinned to `blog/phase-24`.
-- **B8** — phase 25 (R2), pinned to `blog/phase-25`.
-- **B9** — phase 26 (R3), pinned to `blog/phase-26`.
-- **B10** — phase 27 (R4), pinned to `blog/phase-27`.
-- **B11** — close-out. `docs/blog/index.org` gains five entries; `docs/blog/pins.md` gains five rows and a short third-era note recording that these pins were built by anchor branch rather than chosen from an existing merge, and why. `make blog-md` and `scripts/verify-transclusions.sh` green, and the back catalogue's regenerated `.md` unchanged apart from the known `#orgXXXXXXX` id churn.
+### anchors-and-tags
+
+**B5** — anchors and tags. **Done 2026-08-02** (§3): `main` rewritten from R1 forward, 18 anchors, four tags. The force-push is pending; the tags are local until it happens.
+
+### why-rebuild-post
+
+**B6** — phase 23 (R0). No pin, no transclusions; the "why rebuild rather than refactor" essay, drawn from the plan's §1 and §3.
+
+### substrate-post
+
+**B7** — phase 24 (R1), pinned to `blog/phase-24`.
+
+### interned-symbols-post
+
+**B8** — phase 25 (R2), pinned to `blog/phase-25`.
+
+### reader-and-core-ast-post
+
+**B9** — phase 26 (R3), pinned to `blog/phase-26`.
+
+### elaboration-schemes-post
+
+**B10** — phase 27 (R4), pinned to `blog/phase-27`.
+
+### backfill-close-out
+
+**B11** — close-out. `docs/blog/index.org` gains five entries; `docs/blog/pins.md` gains five rows and a short third-era note recording that these pins were built by anchor branch rather than chosen from an existing merge, and why. `make blog-md` and `scripts/verify-transclusions.sh` green, and the back catalogue's regenerated `.md` unchanged apart from the known `#orgXXXXXXX` id churn.
 
 B6 through B10 are independent of each other and depend only on B5.
 

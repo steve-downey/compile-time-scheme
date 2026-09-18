@@ -1,4 +1,4 @@
-# Step B3 — intertoken space and comments onto the layer
+# Step B3 — intertoken-space — intertoken space and comments onto the layer
 
 ## Project context
 

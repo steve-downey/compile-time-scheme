@@ -1,4 +1,4 @@
-# Step B5 — text: string literals and character literals
+# Step B5 — text-literals — text: string literals and character literals
 
 ## Project context
 

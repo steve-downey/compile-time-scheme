@@ -1,4 +1,4 @@
-# Step B7 — sharpsign dispatch and `read_node`
+# Step B7 — readtable-dispatch — sharpsign dispatch and `read_node`
 
 ## Project context
 

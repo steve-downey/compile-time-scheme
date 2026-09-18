@@ -1,4 +1,4 @@
-# Step B1 — split `read.hpp` into component headers plus an umbrella
+# Step B1 — split-read-header — split `read.hpp` into component headers plus an umbrella
 
 ## Project context
 
