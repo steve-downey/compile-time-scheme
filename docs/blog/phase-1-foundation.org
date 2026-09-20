@@ -38,7 +38,7 @@ propagation, ~static_vector~ for fixed-capacity inline storage, the
 
 ** result\<T\>
 
-The parsing pipeline can fail — mismatched parentheses, unexpected end of
+The parsing pipeline can fail: mismatched parentheses, unexpected end of
 input, unrecognised token forms. I need a type that represents either a
 successful value or a parse error, and that I can return from ~constexpr~
 functions without exceptions.
@@ -61,7 +61,7 @@ class result {
 #+end_src
 
 ~result<T>~ is a thin wrapper over ~std::variant~. A ~parse_error~ carries
-a ~source_pos~ — line and column — and a static string literal naming what
+a ~source_pos~ (line and column) and a static string literal naming what
 was expected. Because ~message~ is a pointer to a string literal, the struct
 holds no owned memory and is trivially copyable across evaluation boundaries.
 
@@ -75,7 +75,7 @@ cognitive load low.
 
 Every collection in the compiler has a known maximum size at compile time. A
 ~std::vector~ would require heap allocation that persists beyond the
-evaluation — illegal in ~constexpr~. Instead I use a fixed-capacity inline
+evaluation, which is illegal in ~constexpr~. Instead I use a fixed-capacity inline
 vector:
 
 #+begin_src c++
@@ -92,7 +92,7 @@ class static_vector {
 };
 #+end_src
 
-The entire vector lives in the ~std::array~ member — no heap, no dynamic
+The entire vector lives in the ~std::array~ member: no heap, no dynamic
 allocation. Because all storage is inline, instances can be returned by value
 from ~constexpr~ functions and verified with ~static_assert~:
 
@@ -117,9 +117,9 @@ identifier length. Hard limits make the types simple.
 
 ** tree_arena and arena_box
 
-The reader produces a recursive tree — lists that contain atoms and other
+The reader produces a recursive tree of lists that contain atoms and other
 lists. Representing recursion in ~constexpr~ without persistent heap
-allocation requires indirection that does not use heap pointers.
+allocation requires indirection that doesn't use heap pointers.
 
 The solution is an arena-and-handle pattern:
 
@@ -147,14 +147,14 @@ struct tree_arena {
 #+end_src
 
 A ~tree_arena<Datum, 1024>~ holds up to 1024 datum nodes in a contiguous
-~static_vector~. An ~arena_box<Datum>~ is just an integer — the index of a
+~static_vector~. An ~arena_box<Datum>~ is just an integer, the index of a
 node in the arena. Recursive structures embed ~arena_box~ handles instead of
 pointers. The entire tree lives in one flat array, and a datum node's children
 are adjacent integer offsets rather than scattered heap addresses.
 
 This pattern is sometimes called region-based memory management
 [cite:@wiki2024arena]. The compile-time variant works because the arena itself
-is a ~static_vector~ — inline storage that the constant evaluator can reason
+is a ~static_vector~, inline storage that the constant evaluator can reason
 about without tracing heap pointers.
 
 The null handle has ~id_ == -1~ and converts to ~false~, matching the
@@ -210,13 +210,13 @@ must be freed before that evaluation ends.
 The key invariant that makes ~Box<A>~ legal in ~constexpr~ contexts is
 *transient allocation*. C++20 extended constant evaluation to permit dynamic
 allocation so long as every ~new~ within a constant evaluation is matched by a
-corresponding ~delete~ before the evaluation returns. Allocation that escapes —
-a heap pointer surviving in the result — remains illegal.
+corresponding ~delete~ before the evaluation returns. Allocation that escapes
+(a heap pointer surviving in the result) remains illegal.
 
 In SchemePoC the intermediate ~Fix<CompF>~ tree is built from ~Box~-bearing
 nodes and fully consumed by the evaluator. The evaluator's result type,
-~result<value>~, contains only scalar fields — numbers, booleans, and
-environment handles — with no heap pointers. When the evaluation completes,
+~result<value>~, contains only scalar fields (numbers, booleans, and
+environment handles) with no heap pointers. When the evaluation completes,
 the ~Fix<CompF>~ tree falls out of scope, its ~Box~ destructors run, every
 ~new~ is matched by a ~delete~, and the result escapes cleanly.
 

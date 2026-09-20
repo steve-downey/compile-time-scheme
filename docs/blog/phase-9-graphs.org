@@ -51,7 +51,7 @@ The traversal is straightforward: ~template_arguments_of(sender_type)~ yields ~[
 
 There is one subtlety, and it is a feature of P2996 rather than a bug.
 Reflections preserve alias structure: when the user writes ~using S = decltype(sender_v::just(42))~ and reflects ~^^S~, the resulting ~std::meta::info~ is an alias-entity reflection, not a class template specialisation.
-~template_arguments_of~ on an alias throws, because aliases do not have template arguments — the type they /denote/ does.
+~template_arguments_of~ on an alias throws, because aliases don't have template arguments; the type they /denote/ does.
 ~std::meta::dealias~ peels the alias layer off and returns the underlying class template specialisation, after which ~template_arguments_of~ succeeds.
 
 Classification has a parallel subtlety.
@@ -62,17 +62,17 @@ The tag at ~args[0]~ may itself be a class template specialisation (e.g. ~just_t
 
 Once I possess a homogeneous C++ tree, I turn once again to Category Theory to render the Graphviz dot-language diagram.
 
-Using the ~Applicative~ typeclass from the foundation—the same typeclass that drives the ~lift2~ and sequencing combinators in Phase 2's parser library—I constructed a ~string_writer~ Applicative.
+Using the ~Applicative~ typeclass from the foundation (the same typeclass that drives the ~lift2~ and sequencing combinators in Phase 2's parser library), I constructed a ~string_writer~ Applicative.
 The applicative and alternative interfaces allow me to map functionally over the returned string values.
 While the Graphviz mapping is currently driven through a simple indexing iteration, the types align allowing pure state accumulation.
 
 #+transclude: [[orgit-file:~/src/compile-time-scheme/main::blog/phase-9::src/smd/smdscheme/sender/dump_scheme_plan.hpp::e0d42f47-3007-4d03-955a-2e94c9fad8b1]] :lines 2- :src cpp :end "e0d42f47-3007-4d03-955a-2e94c9fad8b1 end"
 
-The ~dump_scheme_plan~ function encapsulates the compile-time reflection traversal into a ~constexpr~ lambda, cleanly executing the heavy ~meta~ machinery strictly during translation.
+The ~dump_scheme_plan~ function encapsulates the compile-time reflection traversal in a ~constexpr~ lambda, doing the reflection work during translation.
 
 * Example Output
 
-Running ~dump_scheme_plan~ on the sender type for ~(+ 1 2)~ — a binary addition of two constants — produces:
+Running ~dump_scheme_plan~ on the sender type for ~(+ 1 2)~, a binary addition of two constants, produces:
 
 #+begin_example
 digraph SchemeExecutionPlan {
@@ -90,9 +90,9 @@ digraph SchemeExecutionPlan {
 [[file:sender-graph-add.svg]]
 
 The structure is legible: ~then~ applies the addition function to the result of ~when_all~, which evaluates two ~just~ senders (the constants 1 and 2) in parallel.
-This is the sender equivalent of the Scheme expression tree — branching preserved, parallelism visible.
+This is the sender equivalent of the Scheme expression tree: branching preserved, parallelism visible.
 
-For a more complex expression — ~fib(3)~, which expands to ~fib(2) + fib(1)~ where ~fib(2) = fib(1) + fib(0)~:
+For a more complex expression, ~fib(3)~, which expands to ~fib(2) + fib(1)~ where ~fib(2) = fib(1) + fib(0)~:
 
 #+begin_example
 digraph SchemeExecutionPlan {

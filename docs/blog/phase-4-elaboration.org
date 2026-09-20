@@ -10,7 +10,7 @@
 
 #+begin_abstract
 The elaborator transforms raw datum trees into a typed core AST. It recognizes
-~if~, ~lambda~, ~quote~, ~define~, ~let~, and ~let*~ — turning unstructured
+~if~, ~lambda~, ~quote~, ~define~, ~let~, and ~let*~, turning unstructured
 lists into semantic program nodes.
 #+end_abstract
 
@@ -24,7 +24,7 @@ lists into semantic program nodes.
 * Assigning Meaning to Structure
 
 The reader produces a tree of data. It does not know that ~(if #t 1 2)~ is a
-conditional — it sees a four-element list. The elaborator is where that
+conditional. It sees a four-element list. The elaborator is where that
 distinction is finally made. I walk the datum tree, inspect the shapes of
 lists, and emit a strongly-typed core AST whose node types encode the
 semantics of the program.
@@ -37,7 +37,7 @@ never needs to change when the language gains new special forms.
 * The Core AST Types
 
 The elaborated representation lives in ~elaborated_core.hpp~. Unlike the
-datum tree — which is a homogeneous variant — the core AST has node types
+datum tree, which is a homogeneous variant, the core AST has node types
 that carry exactly the structure required by each semantic form.
 
 Leaf nodes are plain structs:
@@ -53,7 +53,7 @@ struct core_quote {
 };
 #+end_src
 
-~core_quote~ holds only atoms — integers, booleans, and symbols. Nested
+~core_quote~ holds only atoms: integers, booleans, and symbols. Nested
 list quotation is not yet supported. ~core_symbol~ stores a view into the
 source string, so no allocation is required.
 
@@ -89,7 +89,7 @@ struct core_define {
 #+end_src
 
 The ~arena_box<R, MaxNodes>~ handles are integer indices into a
-~tree_arena~. Children do not nest recursively by value — they live in the
+~tree_arena~. Children don't nest recursively by value; they live in the
 arena and are referenced by index. This is the same arena pattern as the
 datum tree, keeping everything ~constexpr~-friendly.
 
@@ -114,7 +114,7 @@ using core_type =
 
 ~core_type~ is the fixed point of ~core_f_factory~. The same ~Fix<F>~
 combinator that drives the datum tree drives the core tree. Adding a new
-node type means extending the variant — the Fix machinery does not change.
+node type means extending the variant. The Fix machinery doesn't change.
 
 * Recognizing Special Forms
 
@@ -168,7 +168,7 @@ if (name == "if") {
 
 Each sub-expression is elaborated recursively before the parent node is
 constructed. ~make_arena_box~ allocates the child into the core arena and
-returns an integer handle. The parent node stores those handles — no raw
+returns an integer handle. The parent node stores those handles: no raw
 pointers, no heap allocation.
 
 ~lambda~ elaboration also checks that the formals list contains only
@@ -231,7 +231,7 @@ for (int i = 0; i < arg_ids.size(); ++i) {
 return core{core_f{std::move(app)}};
 #+end_src
 
-The binding expressions are elaborated in the outer scope — they cannot
+The binding expressions are elaborated in the outer scope, so they cannot
 see each other or the bound names. That is the semantics of ~let~: all
 bindings are evaluated before any of them are in scope.
 
@@ -282,7 +282,7 @@ The empty-bindings case is handled at the top: if there are no bindings,
 
 Every elaboration step returns ~foundation::result<core_type>~. A parse
 failure short-circuits upward through the ~.has_value()~ check and early
-return. No exceptions — errors are values that propagate through the call
+return. There are no exceptions; errors are values that propagate through the call
 chain. This makes the entire elaborator usable at compile time inside a
 ~static_assert~.
 
@@ -290,7 +290,7 @@ chain. This makes the entire elaborator usable at compile time inside a
 
 The core AST produced here is still arena-based: children are integer
 handles that require the arena for dereferencing. The next step converts
-this into a self-contained ~Fix<CompF>~ tree — an IR that carries its own
+this into a self-contained ~Fix<CompF>~ tree, an IR that carries its own
 data and does not need an arena for traversal. That representation is what
 the Mendler-style interpreter walks.
 

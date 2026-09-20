@@ -1,6 +1,6 @@
 **DRAFT &mdash; pending author revision**
 
-<div class="abstract" id="orgb380758">
+<div class="abstract" id="org136d1e9">
 <p>
 Step R8 is "extract the kit," and <code>docs/cl-rebuild-plan.md</code> §5 had already named the kit's contents years of steps ago: nine <code>foundation/</code> files plus four <code>parser/</code> files, copied with what it called essentially zero drift between <code>smdscheme</code> and the sibling <code>compile-time-forth</code> repository.
 Checking that sentence against the actual code changed the scope three ways.
@@ -211,7 +211,7 @@ The absence measured `compile-time-forth`'s backlog. It said nothing about this 
 
 One trace of the correction was still sitting in the tree at this step's merge. `result.hpp`'s own shim comment narrated `result_instances.hpp` as staying behind in `cl` "because `foldable=/=traversable` have exactly one implementation." That was true when the sentence was first written and false two files and one correction later; nobody had gone back to fix it before the merge landed, so it was wrong about the layout, not just the reasoning behind it. A follow-up commit outside R8, prompted by this post's own draft, has since corrected the wording; the tag this post pins to predates that fix, so the mistake described here is what a reader looking at this commit would actually have found. Small, harmless, and just the kind of thing a mid-step reversal leaves lying around until someone reads two files side by side.
 
-Seventeen headers moved in the end, eight more than §5's original list. The correction also dissolved something instead of working around it a second time: once a type and every typeclass it instantiates share a namespace, a specialization of `functor_typeclass` or `foldable_typeclass` for that type is ordinary same-namespace code again, no reopening required. `tagged_tree_instances.hpp` still needs the reopening trick, honestly, because `tagged_tree` itself stayed in `cl` while the typeclasses it instantiates did not; that workaround was never wrong, it just marks one file now instead of three.
+Seventeen headers moved in the end, eight more than §5's original list. The correction also dissolved something instead of working around it a second time: once a type and every typeclass it instantiates share a namespace, a specialization of `functor_typeclass` or `foldable_typeclass` for that type is ordinary same-namespace code again, no reopening required. `tagged_tree_instances.hpp` still needs the reopening trick because `tagged_tree` itself stayed in `cl` while the typeclasses it instantiates did not; that workaround was never wrong, it just marks one file now instead of three.
 
 
 # What stayed out, for a reason that never wavered

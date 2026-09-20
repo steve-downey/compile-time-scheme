@@ -1,8 +1,8 @@
-**DRAFT &#x2014; pending author revision**
+**DRAFT &mdash; pending author revision**
 
-<div class="abstract" id="orgcce6513">
+<div class="abstract" id="orgc1dcd79">
 <p>
-Phase 15 argued that <code>call/cc</code> cannot ride on senders, and that Common Lisp's nonlocal exits &#x2014; one-shot, upward-only, dynamic extent &#x2014; are the control operators a sender backend can actually express.
+Phase 15 argued that <code>call/cc</code> cannot ride on senders, and that Common Lisp's nonlocal exits, one-shot, upward-only, dynamic extent, are the control operators a sender backend can actually express.
 Steps L14 and L15 are the first half of collecting on that argument: <code>block</code> and <code>return-from</code>, then <code>catch</code>, <code>throw</code>, and <code>unwind-protect</code>, in both the direct evaluator and the CPS backend.
 The interesting part is not that they work. It is that the lexical/dynamic distinction Common Lisp draws in its semantics came out as two different data structures with two different lifetimes: a <code>block</code>'s exit record is found by name, capturable by a closure, and lives in an append-only slab; a <code>catch</code>'s frame is found by an evaluated tag, capturable by nothing, and lives on a stack whose slots get reused.
 <code>unwind-protect</code> then turned out to be one unconditional loop where I had expected a four-way case analysis.
@@ -22,7 +22,7 @@ And an uncaught <code>throw</code> here runs cleanups that ANSI CL says should n
 
 # The argument, now with code under it
 
-Phase 15 was the pivot post: `call/cc` stops here, because a sender's operation state completes once, through exactly one of `set_value`, `set_error`, or `set_stopped`, and a multishot continuation is a value you can invoke again after its extent has already returned (Dominiak, Michał and others, 2024) (Kiselyov, Oleg, 2005). That was an argument about contracts, made before any of the code existed. Common Lisp's escapes are all dynamic extent &#x2014; leave early, leave once, do not come back (Steele, Guy L., 1990). Two steps later there is something to point at.
+Phase 15 was the pivot post: `call/cc` stops here, because a sender's operation state completes once, through exactly one of `set_value`, `set_error`, or `set_stopped`, and a multishot continuation is a value you can invoke again after its extent has already returned (Dominiak, Michał and others, 2024) (Kiselyov, Oleg, 2005). That was an argument about contracts, made before any of the code existed. Common Lisp's escapes are all dynamic extent: leave early, leave once, do not come back (Steele, Guy L., 1990). Two steps later there is something to point at.
 
 I'm not going to relitigate the pivot; [Phase 15](phase-15-why-common-lisp.md) has it. What this post is about is what the argument cost to implement, and the one place where implementing it taught me something I had not worked out in advance.
 
@@ -31,7 +31,7 @@ I'm not going to relitigate the pivot; [Phase 15](phase-15-why-common-lisp.md) h
 
 `(block b ... (return-from b 42) ...)` and `(catch 'c ... (throw 'c 42) ...)` read like the same feature with different spelling. Both leave a form early with a value. Both are one-shot. Both are upward-only.
 
-The difference is where the target comes from. A `return-from` names its block, and the elaborator resolves that name &#x2014; an unknown block name is an elaboration error, before anything runs. A `throw` evaluates a tag, and the value it computes is matched against live `catch` frames with `eq`:
+The difference is where the target comes from. A `return-from` names its block, and the elaborator resolves that name; an unknown block name is an elaboration error, before anything runs. A `throw` evaluates a tag, and the value it computes is matched against live `catch` frames with `eq`:
 
 ```cpp
 /// A Common Lisp `catch` form: `(catch tag-form body...)`.
@@ -71,7 +71,7 @@ Nothing about a `throw` is checkable at elaboration time, because a tag is an ar
 
 Here is the part I did not see coming, and it is the best thing in the step.
 
-An `exit_record` &#x2014; the `block` side, from L14 &#x2014; is installed in the environment under its name, in a third namespace alongside variables and functions. A `lambda` written inside the block captures that environment by value, and therefore carries the exit record's pointer out with it. That is deliberate: a `lambda` called while its block is still on the stack can `return-from` it, which is what makes a block an escape a helper can invoke rather than just a labelled early return. (The implicit `(block f ...)` that ANSI CL wraps around a `defun` body is here too, though `f` cannot yet call itself &#x2014; a `defun` captures its environment before its own name is bound, which is DIV-0009 and unrelated to any of this.) Capture is also how a closure can smuggle a `return-from` out past the block's own extent, which is why the record carries a `live` flag and a stale one is a diagnosed error instead of a jump into nothing.
+An `exit_record`, the `block` side, from L14, is installed in the environment under its name, in a third namespace alongside variables and functions. A `lambda` written inside the block captures that environment by value, and therefore carries the exit record's pointer out with it. That is deliberate: a `lambda` called while its block is still on the stack can `return-from` it, which is what makes a block an escape a helper can invoke rather than just a labelled early return. (The implicit `(block f ...)` that ANSI CL wraps around a `defun` body is here too, though `f` cannot yet call itself: a `defun` captures its environment before its own name is bound, which is DIV-0009 and unrelated to any of this.) Capture is also how a closure can smuggle a `return-from` out past the block's own extent, which is why the record carries a `live` flag and a stale one is a diagnosed error instead of a jump into nothing.
 
 A `catch_record` cannot be captured by anything, and the reason is the environment itself:
 
@@ -122,7 +122,7 @@ struct catch_record {
 };
 ```
 
-`env` is copied to make a lexical capture. That is the whole mechanism of lexical scoping in this design &#x2014; there is no parent pointer, a nested scope is a copy with more bindings appended. So anything living in `env` gets copied along with every closure built under it, and a dynamically scoped frame must not. Put a `catch` frame in the environment and a closure created inside the `catch` body would still be pointing at that frame long after the form it belongs to has returned.
+`env` is copied to make a lexical capture. That is the whole mechanism of lexical scoping in this design. There is no parent pointer; a nested scope is a copy with more bindings appended. So anything living in `env` gets copied along with every closure built under it, and a dynamically scoped frame must not. Put a `catch` frame in the environment and a closure created inside the `catch` body would still be pointing at that frame long after the form it belongs to has returned.
 
 The frames go on a stack owned by `env_arena` instead, which is where the two lifetimes stop matching:
 
@@ -160,14 +160,14 @@ constexpr auto push_catch(value<Core> tag) -> catch_record<Core> * {
 }
 ```
 
-Exit records accumulate: one per `block` activation, never reclaimed, so the arena's capacity bounds how many times a program may enter a `block` at all. Catch frames reuse their slots, so the capacity bounds nesting depth and nothing else &#x2014; a loop that runs a `catch` a million times never gets past depth one. Two operators that ANSI CL describes with nearly the same paragraph, and the semantic difference between them shows up as a slab versus a stack.
+Exit records accumulate: one per `block` activation, never reclaimed, so the arena's capacity bounds how many times a program may enter a `block` at all. Catch frames reuse their slots, so the capacity bounds nesting depth and nothing else; a loop that runs a `catch` a million times never gets past depth one. Two operators that ANSI CL describes with nearly the same paragraph, and the semantic difference between them shows up as a slab versus a stack.
 
-The stack is a stack by index, not by `pop_back`: `static_vector` has no `pop_back`, and `smd::smdscheme` is frozen for semantic changes under decision D1, so a separate `depth_` counter is the authority on the live prefix. That accident is load-bearing. Popping a frame does not invalidate the frames below it, which is what an in-flight `throw` needs: intervening `catch` frames pop themselves as the unwind passes through, while the target frame's pointer &#x2014; taken before any of that started &#x2014; stays good.
+The stack is a stack by index, not by `pop_back`: `static_vector` has no `pop_back`, and `smd::smdscheme` is frozen for semantic changes under decision D1, so a separate `depth_` counter is the authority on the live prefix. That accident is load-bearing. Popping a frame does not invalidate the frames below it, which is what an in-flight `throw` needs: intervening `catch` frames pop themselves as the unwind passes through, while the target frame's pointer, taken before any of that started, stays good.
 
 
 # Two markers, and why both are named objects
 
-An unwind has to travel somewhere. The plan for L14 said it would travel through an exit table threaded by the CPS dispatcher, with `return-from` invoking the block's continuation directly. That isn't what got built. `result<value<Core>>` is a frozen two-alternative type &#x2014; a value or a `parse_error` &#x2014; and it cannot grow a third alternative, so an unwind travels as an ordinary error whose message is a single shared pointer compared by identity. Every call site in both evaluators already checks `has_value()` before invoking a continuation. Which means every call site already skipped intervening frames for a `return-from` before anyone wrote a line for it.
+An unwind has to travel somewhere. The plan for L14 said it would travel through an exit table threaded by the CPS dispatcher, with `return-from` invoking the block's continuation directly. That isn't what got built. `result<value<Core>>` is a frozen two-alternative type, a value or a `parse_error`, and it cannot grow a third alternative, so an unwind travels as an ordinary error whose message is a single shared pointer compared by identity. Every call site in both evaluators already checks `has_value()` before invoking a continuation. Which means every call site already skipped intervening frames for a `return-from` before anyone wrote a line for it.
 
 L15 needed a second marker:
 
@@ -199,12 +199,12 @@ inline constexpr char const *throw_unwind_marker = throw_unwind_marker_storage;
 
 Two distinct markers, because each mechanism has to let the other's unwind through untouched. A `block` sitting between a `throw` and its `catch` has no business claiming the value, and a `catch` between a `return-from` and its block has none either. Both frames decide by comparing the marker pointer before they look at anything else, so `(block b (catch 'c (return-from b 3)) 99)` is 3, with the catch stack back at depth zero on the way past.
 
-The "must stay a named `inline constexpr char[]`" warning in those docs is L14's scar tissue. A `constexpr char const *` initialized from a bare string literal gets folded to the literal's address at each use, and with literal merging off &#x2014; the Asan build &#x2014; equal content lands at different addresses. The identity check then holds during constant evaluation and fails at run time, and a `return-from` escapes its own block. Constexpr-green is not run-time-green, which is why the marker has a run-time test of its own now, checking both that the pointer is stable and that it is distinguishable from the block marker.
+The "must stay a named `inline constexpr char[]`" warning in those docs is L14's scar tissue. A `constexpr char const *` initialized from a bare string literal gets folded to the literal's address at each use, and with literal merging off, the Asan build, equal content lands at different addresses. The identity check then holds during constant evaluation and fails at run time, and a `return-from` escapes its own block. Constexpr-green is not run-time-green, which is why the marker has a run-time test of its own now, checking both that the pointer is stable and that it is distinguishable from the block marker.
 
 
 # unwind-protect is one loop
 
-I expected `unwind-protect` to be the hard one, on the theory that four exit paths &#x2014; a value, an ordinary error, a `return-from`, a `throw` &#x2014; meant four cases to get right.
+I expected `unwind-protect` to be the hard one, on the theory that four exit paths, a value, an ordinary error, a `return-from`, a `throw`, meant four cases to get right.
 
 They are one case:
 
@@ -245,7 +245,7 @@ All four already arrive at the same place as one `result`, because the unwinds w
 
 Innermost-first ordering isn't encoded anywhere. It falls out of nesting: an inner `unwind-protect` regains control before the unwind reaches an outer one, so its cleanups run first by construction.
 
-Under CPS there is one thing to be careful about. The protected form is dispatched with identity continuations rather than the caller's `cont` and `k`, so that this frame gets control back before the value goes anywhere. Wrap only the escape path and the cleanups silently stop running on normal completion &#x2014; an `unwind-protect` that protects three exits out of four. `catch` does the same thing for the same reason: it is a continuation barrier, and it has to be one so its frame pops exactly once on every path out, including the boring one.
+Under CPS there is one thing to be careful about. The protected form is dispatched with identity continuations rather than the caller's `cont` and `k`, so that this frame gets control back before the value goes anywhere. Wrap only the escape path and the cleanups silently stop running on normal completion, an `unwind-protect` that protects three exits out of four. `catch` does the same thing for the same reason: it is a continuation barrier, and it has to be one so its frame pops exactly once on every path out, including the boring one.
 
 
 # What the tests had to witness
@@ -278,7 +278,7 @@ Then the dynamic search, innermost-first, skipping a live frame with the wrong t
 (catch 'a (throw 'b 1))                       ; error: throw: no catch for tag
 ```
 
-Every one of those runs twice, once through the direct evaluator and once through the CPS backend, with the same answer required from both. The catch stack is checked back at depth zero afterwards on all three shapes &#x2014; normal completion, caught throw, uncaught throw &#x2014; because a frame left on the stack after its extent ended is a `throw` that finds a catcher which isn't there any more. 614 tests green at the merge.
+Every one of those runs twice, once through the direct evaluator and once through the CPS backend, with the same answer required from both. The catch stack is checked back at depth zero afterwards on all three shapes, normal completion, caught throw, uncaught throw, because a frame left on the stack after its extent ended is a `throw` that finds a catcher which isn't there any more. 614 tests green at the merge.
 
 Each of the L15 merge criteria is asserted twice as well, once inside a `static_assert` and once as an ordinary run-time test case. That is not belt and braces for its own sake. L14 is the reason: the marker bug above was constexpr-green and run-time-broken, and nothing in the constant evaluator was ever going to catch it.
 
@@ -287,9 +287,9 @@ Each of the L15 merge criteria is asserted twice as well, once inside a `static_
 
 An uncaught `throw` here runs every intervening `unwind-protect` cleanup on its way out. ANSI CL says no unwinding occurs at all: a `throw` with no outstanding matching catcher signals `control-error` at the point of the `throw`, with the stack intact, and cleanups run only if some handler later transfers control out.
 
-There is no condition system in `smdlisp`, and no channel to signal into that is not also a return. Returning *is* unwinding here. Diagnosing the uncaught `throw` is easy &#x2014; the search fails, and the error says so &#x2014; but by the time that error is a `result` propagating outward, it is indistinguishable to an `unwind-protect` from any other error passing through, and `unwind-protect` runs cleanups on errors.
+There is no condition system in `smdlisp`, and no channel to signal into that is not also a return. Returning *is* unwinding here. Diagnosing the uncaught `throw` is easy: the search fails, and the error says so. But by the time that error is a `result` propagating outward, it is indistinguishable to an `unwind-protect` from any other error passing through, and `unwind-protect` runs cleanups on errors.
 
-I could have given the uncaught-throw error a third marker that `unwind-protect` recognizes and skips. That buys conformance on a case which is already a program bug, and pays for it with an `unwind-protect` that sometimes doesn't protect. Running cleanups unconditionally is the safer failure, and it's what keeps the loop above a single unconditional loop. Filed as DIV-0011, closed when there is a condition system &#x2014; that is, when signaling can be a call rather than a return.
+I could have given the uncaught-throw error a third marker that `unwind-protect` recognizes and skips. That buys conformance on a case which is already a program bug, and pays for it with an `unwind-protect` that sometimes doesn't protect. Running cleanups unconditionally is the safer failure, and it's what keeps the loop above a single unconditional loop. Filed as DIV-0011, closed when there is a condition system, that is, when signaling can be a call rather than a return.
 
 
 # Half of the payoff

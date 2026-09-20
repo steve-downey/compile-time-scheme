@@ -1,6 +1,6 @@
 **DRAFT &mdash; pending author revision**
 
-<div class="abstract" id="org62ea107">
+<div class="abstract" id="org7b2d00e">
 <p>
 Phase 15 argued that Common Lisp's control operators are the largest control vocabulary a structured-concurrency backend can express soundly, and Phase 19 built them in two evaluators that had never met a sender.
 This is the step where they meet one.
@@ -408,7 +408,7 @@ The `switch` in `start` is the only place in the backend where an `outcome` turn
 
 # unwind-protect is an adapter now
 
-This is the part of the step I actually wanted to see, and it's the part where the sender model earns something the closure model gets for free.
+This is the part of the step I actually wanted to see. The sender model makes explicit something the closure model gets for free.
 
 Under direct or CPS evaluation, `unwind-protect` runs its cleanups on every exit path because there is only one exit path. The four outcomes have already been merged into one `result` by the time `core_unwind_protect` sees them, so a single unconditional loop covers all of them, and Phase 19 was pleased about it. A sender backend can't inherit that from C++ control flow. Three channels really are three functions, called from three different places inside the child operation, and there is no arrangement of the surrounding code that makes them one. The property has to be rebuilt, and the natural place to rebuild it is a receiver:
 

@@ -47,7 +47,7 @@ The signal is a good deal more convincing after you do the merge and find there 
 
 The only additions to what both copies already had are the ~value_type~ alias and the defaulted equality, and both are there because the typeclass instances and their law tests need them.
 There is also a comment about a step that has not happened.
-Decision D13 says the evaluator R5 builds needs a third alternative --- an unwind in flight --- as a distinct channel beside value and error.
+Decision D13 says the evaluator R5 builds needs a third alternative, an unwind in flight, as a distinct channel beside value and error.
 It isn't there.
 What is there is a note telling callers to use ~has_value~ / ~value~ / ~error~ and stay off the ~std::variant~ underneath, so the alternative set can widen later without breaking any of them.
 Cheap to write down now, expensive to retrofit, which is the only reason I put it in a header this early.
@@ -200,7 +200,7 @@ R0 ran in a container with no gcc-16, so all of that was careful reading and not
 
 This step ran where a compiler exists, and the compiler never got the chance to disagree.
 Zero call sites in either front end, a two-line stub for a test file, and a ~CMakeLists.txt~ listing only the header: nothing has ever instantiated it, which is why nothing ever complained.
-It doesn't come across into ~src/smd/cl/~ at all --- deleted rather than repaired, in the plan's words --- and ~mendler_para~ supersedes it.
+It doesn't come across into ~src/smd/cl/~ at all. The plan says to delete it rather than repair it, and ~mendler_para~ supersedes it.
 The ~smdscheme~ copy stays where it is.
 
 * Still open

@@ -1,6 +1,6 @@
-**DRAFT &#x2014; pending author revision**
+**DRAFT &mdash; pending author revision**
 
-<div class="abstract" id="orgf4c1a98">
+<div class="abstract" id="org4074a97">
 <p>
 Phase 22 ended the series.
 This one starts it again, in a new tree, because <code>smdlisp</code> is going to be rebuilt rather than refactored.
@@ -41,7 +41,7 @@ A string has no function slot, so a self-call inside a `defun` body has nowhere 
 
 DIV-0009 is the headline. `(defun len (l) (if (null l) 0 (+ 1 (len (cdr l)))))` fails. A Lisp in which that doesn't work is not yet a Lisp (Steele, Guy L., 1990), and step L14's `block` tests were rewritten to avoid recursion because of it, which is the kind of accommodation you make once and then stop noticing you made.
 
-The interesting part is an argument against the process I was running, not for it. Every one of those seven decisions was locally correct. Each was the right call for its step, taken with the alternatives visible, and written down honestly the same day. There is no moment where somebody got it wrong. The aggregate is still wrong, and no individual record could have shown that, because a divergence document's entire job is to describe one divergence. Twenty accurate documents add up to something none of them says.
+The interesting part is an argument against the process I was running, not for it. Every one of those seven decisions was locally correct. Each was the right call for its step, taken with the alternatives visible, and written down the same day. There is no moment where somebody got it wrong. The aggregate is still wrong, and no individual record could have shown that, because a divergence document's entire job is to describe one divergence. Twenty accurate documents add up to something none of them says.
 
 
 # Three reasons it's now
@@ -91,9 +91,9 @@ Nothing is built. Everything above is an argument, and arguments about software 
 
 The obvious way to lose is to rebuild the same architecture with better names. Interning symbols is the keystone decision, and it either closes those seven divergences or it doesn't. The phase that would show it has a criterion I can't talk my way around: R5 is done when `(defun len ...)` runs, and otherwise R5 is not done.
 
-The second way to lose is scope. The pivot proved a pipeline on a deliberately small core, and whether D10's out-of-scope list carries over unchanged is written down as an open question rather than answered. Two of its entries already argue with decisions taken: conditions are out of scope, which is the sole reason DIV-0011 can not be fixed, and D13 is the change that would make a minimal `signal` / `handler-case` expressible. So I do not yet know how much of Phase 22's list &#x2014; the numeric tower, conditions and restarts, CLOS, readtables, `format` &#x2014; is "not yet" and how much is "never". Whichever way that goes is the decision most likely to look foolish in a year.
+The second way to lose is scope. The pivot proved a pipeline on a deliberately small core, and whether D10's out-of-scope list carries over unchanged is written down as an open question rather than answered. Two of its entries already argue with decisions taken: conditions are out of scope, which is the sole reason DIV-0011 can not be fixed, and D13 is the change that would make a minimal `signal` / `handler-case` expressible. So I do not yet know how much of Phase 22's list &mdash; the numeric tower, conditions and restarts, CLOS, readtables, `format` &mdash; is "not yet" and how much is "never". Whichever way that goes is the decision most likely to look foolish in a year.
 
-And R0 has a hole in it that should be stated plainly. The container this analysis ran in had no gcc-16, so none of it is compile-verified. The dead `fold_fix`, the loop counts, the GCC sanitizer defect recorded in DIV-0013: all of that came out of reading the tree, and nothing was built to check it. R1's brief says to confirm the findings against a real toolchain before acting on them. It would be a good joke on the whole exercise if the specification for the rebuild turned out to rest on a fact that isn't true.
+And R0 has a hole in it. The container this analysis ran in had no gcc-16, so none of it is compile-verified. The dead `fold_fix`, the loop counts, the GCC sanitizer defect recorded in DIV-0013: all of that came out of reading the tree, and nothing was built to check it. R1's brief says to confirm the findings against a real toolchain before acting on them. It would be a good joke on the whole exercise if the specification for the rebuild turned out to rest on a fact that isn't true.
 
 R1 is the substrate.
 

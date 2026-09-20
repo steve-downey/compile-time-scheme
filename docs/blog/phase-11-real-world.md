@@ -1,4 +1,4 @@
-<div class="abstract" id="org3be8218">
+<div class="abstract" id="org71e3021">
 <p>
 The lexer, elaborator, CPS pass, and DOT output all work now. What does it look like to actually call this from a C++26 program?
 This phase focuses on invoking a Scheme script from C++, passing parameters, and running it.
@@ -31,7 +31,7 @@ constexpr auto program =
 
 Here, the template string `(print-and-add current-year 10)` is fully elaborated and safely evaluated down to the lowest CPS core at compile-time.
 
-The returned variable is a callable program object &#x2014; a `closure::closure_program` functor &#x2014; that represents the entry point to the pre-constructed AST sequence. At runtime, the caller initializes a dynamic variable environment and passes it into this entry point.
+The returned variable is a callable program object, a `closure::closure_program` functor, that represents the entry point to the pre-constructed AST sequence. At runtime, the caller initializes a dynamic variable environment and passes it into this entry point.
 
 ```cpp
 int main() {
@@ -51,7 +51,7 @@ The execution requires registering variables natively. A `current-year` variable
 
 # FFI Abstractions
 
-I bridge the C++ type system to the value wrappers with a `std::span` over `scm::closure::value<Core>` &#x2014; the same `value<Core>` variant type that `cps_dispatch` (Phase 12) produces and the closure backend (Phase 6) defines.
+I bridge the C++ type system to the value wrappers with a `std::span` over `scm::closure::value<Core>`, the same `value<Core>` variant type that `cps_dispatch` (Phase 12) produces and the closure backend (Phase 6) defines.
 
 ```cpp
 constexpr auto
@@ -77,16 +77,16 @@ Native callbacks get a `std::span` into the evaluated variable pool. The callbac
 
 # Integrating the Sender Backend
 
-While the standard closure backend relies on standard C++ stack evaluation by wrapping tail-calls, the `beman::execution` sender backend needs a bit more setup. Here's what changes.
+While the standard closure backend relies on standard C++ stack evaluation by wrapping tail-calls, the `beman::execution` sender backend needs a bit more setup. Two things change.
 
-First, standard instantiation requires `compile_to_sender` rather than the simplified `compiled_closure` variant &#x2014; switching from the closure backend (Phase 6) to the sender backend (Phase 8).
+First, standard instantiation requires `compile_to_sender` rather than the simplified `compiled_closure` variant, switching from the closure backend (Phase 6) to the sender backend (Phase 8).
 
 ```cpp
 constexpr auto program =
     scm::sender::compile_to_sender<512, 16>(scheme_source).value();
 ```
 
-Second, the returned program object is still invoked synchronously as `program(env)`, exactly like the closure backend. The difference is internal: the sender backend describes evaluation as a graph of senders and drives it to completion with `sync_wait` inside `operator()`, rather than walking the tree directly. The asynchronous machinery is hidden behind the same synchronous call interface.
+Second, the returned program object is still invoked synchronously as `program(env)`, like the closure backend. The difference is internal: the sender backend describes evaluation as a graph of senders and drives it to completion with `sync_wait` inside `operator()`, rather than walking the tree directly. The asynchronous support is hidden behind the same synchronous call interface.
 
 ```cpp
 auto env = scm::closure::default_env<Core, 16>();
@@ -102,7 +102,7 @@ auto result = program(env);
 scm::reflection::reified_environment<RuntimeStateTag> state{};
 ```
 
-The call returns a `foundation::result<closure::value<Core>>` &#x2014; the same result type the closure backend yields. The caller checks `result.has_value()` and extracts the payload with `std::get<int>(result.value())` (reporting `result.error().message` on failure); the `sync_wait` that drives the sender graph runs internally and never appears at the call site.
+The call returns a `foundation::result<closure::value<Core>>`, the same result type the closure backend yields. The caller checks `result.has_value()` and extracts the payload with `std::get<int>(result.value())` (reporting `result.error().message` on failure); the `sync_wait` that drives the sender graph runs internally and never appears at the call site.
 
 
 # Reflection-Reified Environments
@@ -155,14 +155,14 @@ consteval void compile_environment(std::vector<capture_desc> captures) {
 }
 ```
 
-`reified_environment<Tag>` starts as a declared-but-undefined struct template. `compile_environment<Tag>` calls `std::meta::define_aggregate` at `consteval` time, which **injects data members** into that template specialization. After `compile_environment<Tag>` runs, `reified_environment<Tag>` becomes a complete aggregate type whose fields correspond exactly to the supplied `(type, name)` pairs &#x2014; ordinary members, accessible by name, fully typed.
+`reified_environment<Tag>` starts as a declared-but-undefined struct template. `compile_environment<Tag>` calls `std::meta::define_aggregate` at `consteval` time, which **injects data members** into that template specialization. After `compile_environment<Tag>` runs, `reified_environment<Tag>` becomes a complete aggregate type whose fields correspond to the supplied `(type, name)` pairs: ordinary members, accessible by name, fully typed.
 
 This is distinct from the read-only introspection in Phase 8. There, reflection **read** information from existing types. Here, reflection **writes** a new type into existence.
 
 
 ## A `consteval {}` Block
 
-The mechanism is invoked via a C++26 standalone `consteval` block &#x2014; a block-level statement that executes unconditionally at compile time, with no enclosing function:
+The mechanism is invoked via a C++26 standalone `consteval` block, a block-level statement that executes unconditionally at compile time, with no enclosing function:
 
 ```cpp
 consteval {
@@ -183,7 +183,7 @@ struct reified_environment<RuntimeStateTag> {
 
 ## Using the Reified Struct
 
-At runtime, the struct is used exactly like any other aggregate &#x2014; by field name, with native C++ types:
+At runtime, the struct is used like any other aggregate, by field name, with native C++ types:
 
 ```cpp
 // Populate a reified C++ aggregate structure directly from reflection
@@ -207,7 +207,7 @@ if (result.has_value()) {
 
 ## What This Enables
 
-The practical motivation is decoupling the shape of the runtime environment from the point in the code where the struct is written. In a more complete system, `compile_environment` could be driven by the Scheme program itself &#x2014; the elaborator could extract the free variables of a Scheme expression and produce the corresponding `capture_desc` list at `consteval` time, generating a precisely-shaped C++ aggregate to hold exactly the variables that Scheme program needs. That would close the loop between compile-time Scheme evaluation and statically typed C++ data, without any runtime type erasure.
+The practical motivation is decoupling the shape of the runtime environment from the point in the code where the struct is written. In a more complete system, `compile_environment` could be driven by the Scheme program itself. The elaborator could extract the free variables of a Scheme expression and produce the corresponding `capture_desc` list at `consteval` time, generating a C++ aggregate shaped to hold the variables that Scheme program needs. That would close the loop between compile-time Scheme evaluation and statically typed C++ data, without any runtime type erasure.
 
 
 # Conclusion

@@ -13,10 +13,10 @@
 #+begin_abstract
 String literals and character literals move onto the combinator layer. The worker that moved them is the second one to try.
 The first ran out of budget part way through and committed what it had. Its commit message is addressed to whoever picks it up: incomplete, do not merge, and re-run the verification from scratch rather than trusting the interrupted session's.
-The brief adds a line of its own. The unfinished work is evidence, not authority.
+The brief adds a line of its own. The unfinished work is only evidence.
 The second worker kept the shape and rewrote the middle. The whole difference is where the closing quote gets tested.
 The first attempt tested it twice, once in the repetition's step and once inside one of the two alternatives. Then it flattened every failure of the choice into ~unterminated string~ through a ~has_value()~ ladder, the one idiom the house rules name and the reader had none of left.
-The landed version tests the quote once, in the step. That is what lets the second alternative honestly be any character at all. Its own end-of-input failure already carries the right message at the right position, so nothing has to translate anything.
+The landed version tests the quote once, in the step. The second alternative can then be any character at all. Its own end-of-input failure already carries the right message at the right position, so nothing has to translate anything.
 ~satisfy~ wanted to be both alternatives and could not be. It reports failure at the cursor; every diagnostic a reader can see out of this file reports at the opening quote instead.
 The same property is what makes ordered choice commit to an escape once it has consumed one. The architecture note has the direction backwards: the position it calls "past" the choice's starting cursor is four characters behind it.
 For half of what this step converts, a green test matrix was proving nothing. Two of the four diagnostics in the file had no test at all.
@@ -75,7 +75,7 @@ The landed version tests the quote once, in the step, ahead of the
 alternatives. That is exactly what the list reader does with its closing
 delimiter. The second alternative is then =any_char=, and it means it.
 
-The other thing that went was a shape, not a rule. The first attempt ran the
+The other thing that went was a shape rather than a rule. The first attempt ran the
 choice, asked the result whether it had a value, and returned
 ~unterminated string~ at the opening quote for anything else:
 
@@ -87,7 +87,7 @@ if (!matched.has_value()) {
 #+end_src
 
 The house rules say that threading a =result= through a structure is a
-=traverse= over the result applicative, not an ~if (!r.has_value()) return r;~
+=traverse= over the result applicative instead of an ~if (!r.has_value()) return r;~
 ladder. The list reader's last one went before any of the combinator work
 started, and the step before this one went looking for what survived and
 reported that no ladder does. So grep the reader for that spelling. Eleven

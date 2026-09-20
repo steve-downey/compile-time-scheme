@@ -1,7 +1,7 @@
-<div class="abstract" id="orgba42121">
+<div class="abstract" id="org45b3d71">
 <p>
 The elaborator transforms raw datum trees into a typed core AST. It recognizes
-<code>if</code>, <code>lambda</code>, <code>quote</code>, <code>define</code>, <code>let</code>, and <code>let*</code> — turning unstructured
+<code>if</code>, <code>lambda</code>, <code>quote</code>, <code>define</code>, <code>let</code>, and <code>let*</code>, turning unstructured
 lists into semantic program nodes.
 </p>
 
@@ -18,14 +18,14 @@ lists into semantic program nodes.
 
 # Assigning Meaning to Structure
 
-The reader produces a tree of data. It does not know that `(if #t 1 2)` is a conditional — it sees a four-element list. The elaborator is where that distinction is finally made. I walk the datum tree, inspect the shapes of lists, and emit a strongly-typed core AST whose node types encode the semantics of the program.
+The reader produces a tree of data. It does not know that `(if #t 1 2)` is a conditional. It sees a four-element list. The elaborator is where that distinction is finally made. I walk the datum tree, inspect the shapes of lists, and emit a strongly-typed core AST whose node types encode the semantics of the program.
 
 This separation is not accidental (Abelson, Harold and Sussman, Gerald Jay, 1996). A reader that understands keywords couples syntax to semantics. Every new special form would mean changing the reader too. Keeping them apart means the reader never needs to change when the language gains new special forms.
 
 
 # The Core AST Types
 
-The elaborated representation lives in `elaborated_core.hpp`. Unlike the datum tree — which is a homogeneous variant — the core AST has node types that carry exactly the structure required by each semantic form.
+The elaborated representation lives in `elaborated_core.hpp`. Unlike the datum tree, which is a homogeneous variant, the core AST has node types that carry exactly the structure required by each semantic form.
 
 Leaf nodes are plain structs:
 
@@ -40,7 +40,7 @@ struct core_quote {
 };
 ```
 
-`core_quote` holds only atoms — integers, booleans, and symbols. Nested list quotation is not yet supported. `core_symbol` stores a view into the source string, so no allocation is required.
+`core_quote` holds only atoms: integers, booleans, and symbols. Nested list quotation is not yet supported. `core_symbol` stores a view into the source string, so no allocation is required.
 
 Recursive nodes are parameterized on the recursive self-reference `R` and arena capacity:
 
@@ -72,7 +72,7 @@ struct core_define {
 };
 ```
 
-The `arena_box<R, MaxNodes>` handles are integer indices into a `tree_arena`. Children do not nest recursively by value — they live in the arena and are referenced by index. This is the same arena pattern as the datum tree, keeping everything `constexpr`-friendly.
+The `arena_box<R, MaxNodes>` handles are integer indices into a `tree_arena`. Children don't nest recursively by value; they live in the arena and are referenced by index. This is the same arena pattern as the datum tree, keeping everything `constexpr`-friendly.
 
 The open-recursive variant factory ties it all together:
 
@@ -93,7 +93,7 @@ using core_type =
     foundation::fix<core_f_factory<MaxNodes, MaxList>::template type>;
 ```
 
-`core_type` is the fixed point of `core_f_factory`. The same `Fix<F>` combinator that drives the datum tree drives the core tree. Adding a new node type means extending the variant — the Fix machinery does not change.
+`core_type` is the fixed point of `core_f_factory`. The same `Fix<F>` combinator that drives the datum tree drives the core tree. Adding a new node type means extending the variant. The Fix machinery doesn't change.
 
 
 # Recognizing Special Forms
@@ -143,7 +143,7 @@ if (name == "if") {
 }
 ```
 
-Each sub-expression is elaborated recursively before the parent node is constructed. `make_arena_box` allocates the child into the core arena and returns an integer handle. The parent node stores those handles — no raw pointers, no heap allocation.
+Each sub-expression is elaborated recursively before the parent node is constructed. `make_arena_box` allocates the child into the core arena and returns an integer handle. The parent node stores those handles: no raw pointers, no heap allocation.
 
 `lambda` elaboration also checks that the formals list contains only symbols and has no duplicates:
 
@@ -201,7 +201,7 @@ for (int i = 0; i < arg_ids.size(); ++i) {
 return core{core_f{std::move(app)}};
 ```
 
-The binding expressions are elaborated in the outer scope — they cannot see each other or the bound names. That is the semantics of `let`: all bindings are evaluated before any of them are in scope.
+The binding expressions are elaborated in the outer scope, so they cannot see each other or the bound names. That is the semantics of `let`: all bindings are evaluated before any of them are in scope.
 
 
 # let\* Desugaring
@@ -244,12 +244,12 @@ The empty-bindings case is handled at the top: if there are no bindings, `let*` 
 
 # Error Propagation
 
-Every elaboration step returns `foundation::result<core_type>`. A parse failure short-circuits upward through the `.has_value()` check and early return. No exceptions — errors are values that propagate through the call chain. This makes the entire elaborator usable at compile time inside a `static_assert`.
+Every elaboration step returns `foundation::result<core_type>`. A parse failure short-circuits upward through the `.has_value()` check and early return. There are no exceptions; errors are values that propagate through the call chain. This makes the entire elaborator usable at compile time inside a `static_assert`.
 
 
 # What Comes Next
 
-The core AST produced here is still arena-based: children are integer handles that require the arena for dereferencing. The next step converts this into a self-contained `Fix<CompF>` tree — an IR that carries its own data and does not need an arena for traversal. That representation is what the Mendler-style interpreter walks.
+The core AST produced here is still arena-based: children are integer handles that require the arena for dereferencing. The next step converts this into a self-contained `Fix<CompF>` tree, an IR that carries its own data and does not need an arena for traversal. That representation is what the Mendler-style interpreter walks.
 
 <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
 

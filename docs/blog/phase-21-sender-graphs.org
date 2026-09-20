@@ -76,7 +76,7 @@ Nothing in the thunk runs until the operation state is started, so wrapping this
 
 * unwind-protect is an adapter now
 
-This is the part of the step I actually wanted to see, and it's the part where the sender model earns something the closure model gets for free.
+This is the part of the step I actually wanted to see. The sender model makes explicit something the closure model gets for free.
 
 Under direct or CPS evaluation, ~unwind-protect~ runs its cleanups on every exit path because there is only one exit path.
 The four outcomes have already been merged into one ~result~ by the time ~core_unwind_protect~ sees them, so a single unconditional loop covers all of them, and Phase 19 was pleased about it.
