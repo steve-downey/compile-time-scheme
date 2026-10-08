@@ -99,7 +99,7 @@ Small, harmless, and just the kind of thing a mid-step reversal leaves lying aro
 
 Seventeen headers moved in the end, eight more than §5's original list.
 The correction also dissolved something instead of working around it a second time: once a type and every typeclass it instantiates share a namespace, a specialization of =functor_typeclass= or =foldable_typeclass= for that type is ordinary same-namespace code again, no reopening required.
-=tagged_tree_instances.hpp= still needs the reopening trick, honestly, because =tagged_tree= itself stayed in =cl= while the typeclasses it instantiates did not; that workaround was never wrong, it just marks one file now instead of three.
+=tagged_tree_instances.hpp= still needs the reopening trick because =tagged_tree= itself stayed in =cl= while the typeclasses it instantiates did not; that workaround was never wrong, it just marks one file now instead of three.
 
 * What stayed out, for a reason that never wavered
 

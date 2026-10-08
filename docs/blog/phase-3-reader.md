@@ -1,6 +1,6 @@
-<div class="abstract" id="orgb1f52e1">
+<div class="abstract" id="org86dc9ce">
 <p>
-The reader takes a string and produces a tree of datums — integers, booleans,
+The reader takes a string and produces a tree of datums: integers, booleans,
 symbols, lists, and quoted forms. It sees data, not programs. That separation
 is the key to homoiconicity.
 </p>
@@ -20,7 +20,7 @@ is the key to homoiconicity.
 
 Before the elaborator can classify an `if` or a `lambda`, before evaluation can run, something has to take the raw source string and produce structure. That is the reader's job. It asks only one question of every character sequence: is this a valid Scheme datum? It never asks what the datum means.
 
-This separation is not accidental. It is homoiconicity: the same tree that represents data also represents code — the data/code duality of S-expressions that goes back to McCarthy's original Lisp (McCarthy, John, 1960). The reader produces the same structure for the list `(1 2 3)` and for the expression `(+ 1 2)`. The symbol `+` and the integer `1` are just atoms — the reader does not know that `+` is addition. That knowledge belongs to the elaborator.
+This separation is not accidental. It is homoiconicity: the same tree that represents data also represents code, the data/code duality of S-expressions that goes back to McCarthy's original Lisp (McCarthy, John, 1960). The reader produces the same structure for the list `(1 2 3)` and for the expression `(+ 1 2)`. The symbol `+` and the integer `1` are just atoms. The reader doesn't know that `+` is addition. That knowledge belongs to the elaborator.
 
 
 ## Datum Types
@@ -34,7 +34,7 @@ struct datum_symbol  { std::string_view name{}; };
 struct datum_boolean { bool value{}; };
 ```
 
-The recursive cases — list and quote — need to refer to child datums. The open-recursive fixpoint pattern does the work here.
+The recursive cases, list and quote, need to refer to child datums. The open-recursive fixpoint pattern does the work here.
 
 A `datum_list` holds a `static_vector` of `arena_box` handles:
 
@@ -47,7 +47,7 @@ struct datum_list {
 };
 ```
 
-`R` is the self-referential element type — the recursive datum. Rather than embedding a `datum` directly (which would make the struct infinitely large), `datum_list` stores integer handles into an arena. The handles are typed as `arena_box<R, MaxNodes>`: they name an index in a `tree_arena` of capacity `MaxNodes`. The children live in the arena; the list only holds their addresses.
+`R` is the self-referential element type, the recursive datum. Rather than embedding a `datum` directly (which would make the struct infinitely large), `datum_list` stores integer handles into an arena. The handles are typed as `arena_box<R, MaxNodes>`: they name an index in a `tree_arena` of capacity `MaxNodes`. The children live in the arena; the list only holds their addresses.
 
 `datum_quote` is similar:
 
@@ -79,7 +79,7 @@ using datum_type =
     foundation::fix<datum_f_factory<MaxNodes, MaxList>::template type>;
 ```
 
-`foundation::fix<F>` wraps `F<fix<F>>` so `datum_type` is the recursive type. The template parameters `MaxNodes` and `MaxList` are compile-time capacities: the arena can hold at most `MaxNodes` nodes, and each list can hold at most `MaxList` children. Both are statically checked — no allocation, no overflow.
+`foundation::fix<F>` wraps `F<fix<F>>` so `datum_type` is the recursive type. The template parameters `MaxNodes` and `MaxList` are compile-time capacities: the arena can hold at most `MaxNodes` nodes, and each list can hold at most `MaxList` children. Both are statically checked: no allocation, no overflow.
 
 
 ## Atom Parsers
@@ -184,7 +184,7 @@ if (c == '(') {
 }
 ```
 
-Each child datum is allocated into the arena with `make_arena_box`, which returns an `arena_box` handle. The list stores handles, not values, so there is no copying of child trees — only integer indices accumulate in the `static_vector`.
+Each child datum is allocated into the arena with `make_arena_box`, which returns an `arena_box` handle. The list stores handles, not values, so there is no copying of child trees; only integer indices accumulate in the `static_vector`.
 
 
 ## Quote Preservation

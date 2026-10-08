@@ -1,4 +1,4 @@
-<div class="abstract" id="orgfb86def">
+<div class="abstract" id="orga5f5482">
 <p>
 The summit is reached. A Scheme-light compiler parses, elaborates,
 tree-transforms, and evaluates entirely at C++26 compile time. The
@@ -26,37 +26,37 @@ This final post reviews each phase and draws out the lessons for what comes next
 # Architecture in Review
 
 
-## Phase 1 &#x2014; Foundation
+## Phase 1: Foundation
 
 I establish the vocabulary: `result<T>` for error propagation without exceptions, `static_vector` for fixed-capacity sequences backed by `std::array`, `Box<A>` for owning heap indirection in `constexpr` contexts, and `Fix<F>` for the open-recursive fixpoint combinator. These four types carry the entire pipeline.
 
-`static_vector` is the easy one &#x2014; a `std::array` with a size counter, no allocator, fully constexpr-friendly by design. `Box<A>` is the interesting case: raw `new` / `delete` inside a `constexpr` destructor, valid since C++20 as long as every allocation is freed before the compiler observes the result. `Fix<F>` turns an open-recursive functor into a proper recursive type by tying the knot with a heap pointer.
+`static_vector` is the easy one, a `std::array` with a size counter, no allocator, fully constexpr-friendly by design. `Box<A>` is the interesting case: raw `new` / `delete` inside a `constexpr` destructor, valid since C++20 as long as every allocation is freed before the compiler observes the result. `Fix<F>` turns an open-recursive functor into a proper recursive type by tying the knot with a heap pointer.
 
 
-## Phase 2 &#x2014; Front End
+## Phase 2: Front End
 
-The parser combinators use immutable cursors: a string view plus an offset. Combining two parsers advances the cursor; failure propagates through `result`. No allocation happens at parse time &#x2014; the combinator structure is static.
+The parser combinators use immutable cursors: a string view plus an offset. Combining two parsers advances the cursor; failure propagates through `result`. No allocation happens at parse time; the combinator structure is static.
 
 The applicative pattern (McBride, Conor and Paterson, Ross, 2008) drives this. A parser is a `Cursor → result<T, Cursor>` function. `map` lifts pure functions over the result type. `ap` threads the cursor through a sequence. `many` folds a parser until it fails.
 
 
-## Phase 3 &#x2014; Reader
+## Phase 3: Reader
 
-The reader is the first phase that produces data structures. It reads S-expressions into a `Datum` tree: atoms, symbols, integers, booleans, and nested lists. The tree lives in an arena &#x2014; a flat slab of pre-allocated nodes addressed by handle rather than pointer. The arena is the workaround for the constraint that persistent heap allocations cannot cross out of a `constexpr` evaluation: arena nodes are stack-allocated inside the evaluation and freed when the evaluation ends.
+The reader is the first phase that produces data structures. It reads S-expressions into a `Datum` tree: atoms, symbols, integers, booleans, and nested lists. The tree lives in an arena, a flat slab of pre-allocated nodes addressed by handle rather than pointer. The arena is the workaround for the constraint that persistent heap allocations cannot cross out of a `constexpr` evaluation: arena nodes are stack-allocated inside the evaluation and freed when the evaluation ends.
 
-The reader asks no semantic questions. It treats `(if x y z)` and `(foo bar)` identically &#x2014; four-element lists. Semantic recognition is the next phase's job.
+The reader asks no semantic questions. It treats `(if x y z)` and `(foo bar)` identically, four-element lists. Semantic recognition is the next phase's job.
 
 
-## Phase 4 &#x2014; Elaboration
+## Phase 4: Elaboration
 
 The elaborator traverses the `Datum` tree and classifies nodes into a typed core AST. `if` becomes `core::if_expr`. `lambda` becomes `core::lambda`. Variable references become `core::var`. Applications become `core::apply`. Quote, `define`, `let`, and `let*` are recognized by head symbol.
 
-`let` desugars immediately: `(let ((x e)) body)` becomes `((lambda (x) body) e)`. `let*` desugars to nested single-binding lets, each with its own lambda scope. No new IR nodes are required &#x2014; the interpreter never sees `let` at all.
+`let` desugars immediately: `(let ((x e)) body)` becomes `((lambda (x) body) e)`. `let*` desugars to nested single-binding lets, each with its own lambda scope. No new IR nodes are required; the interpreter never sees `let` at all.
 
 
-## Phase 5 &#x2014; Fixpoint Trees
+## Phase 5: Fixpoint Trees
 
-The elaborated core AST is arena-based and handle-indexed. To evaluate it, I translate it into `Fix<CompF>` &#x2014; a heap-pointer computation tree using the open-recursive fixpoint combinator (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991).
+The elaborated core AST is arena-based and handle-indexed. To evaluate it, I translate it into `Fix<CompF>`, a heap-pointer computation tree using the open-recursive fixpoint combinator (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991).
 
 `CompF` is the open-recursive functor:
 
@@ -77,14 +77,14 @@ struct comp_f_factory {
 `Fix<CompF>` ties the recursion knot: each node's children are `Box<Fix<CompF>>` values. The translation from core AST to `Fix<CompF>` is the `core_to_comp` pass. From this point, the arena is no longer needed.
 
 
-## Phase 6 &#x2014; Closures and Values
+## Phase 6: Closures and Values
 
 The value domain is `closure::value<Core>`: an `int`, a `bool`, a symbol, a closure, a builtin, or a foreign function. A closure holds a non-owning pointer to its lambda node in the core tree and a captured copy of the environment (a `static_vector` of name/value bindings, held in a `constexpr_box`).
 
-The environment is copied on `lambda` entry &#x2014; functional, not imperative. The builtin arithmetic operators (just `+` and `*`) are `builtin` values holding an operation enum (`builtin_op`); a separate `foreign_function` alternative holds a native function pointer for the FFI callbacks of Phase 11.
+The environment is copied on `lambda` entry. It remains functional. The builtin arithmetic operators (just `+` and `*`) are `builtin` values holding an operation enum (`builtin_op`); a separate `foreign_function` alternative holds a native function pointer for the FFI callbacks of Phase 11.
 
 
-## Phase 7 &#x2014; Mendler Interpretation
+## Phase 7: Mendler Interpretation
 
 `mendler_run` is a genuine Mendler-style paramorphism over `Fix<CompF>`. The Mendler scheme (Mendler, Nax Paul, 1987) gives the algebra explicit control over recursion by threading the recursive call as an argument. The project provides two generic combinators (`mendler_fold` and `mendler_para`) in `src/smd/fixpoint/recursion_schemes.hpp`; the interpreter uses `mendler_para` because closures need the original `Fix` node:
 
@@ -108,10 +108,10 @@ auto mendler_run(Comp<MaxList> const& comp, Env const& env) -> Res {
 }
 ```
 
-A standard catamorphism would first fold all children, then pass the results to the algebra &#x2014; too uniform for language interpretation, where `if` must evaluate only one branch and `lambda` must not evaluate its body at creation time. The algebra receives `recurse` as a parameter and calls it selectively, with whatever context it chooses.
+A standard catamorphism would first fold all children, then pass the results to the algebra, too uniform for language interpretation, where `if` must evaluate only one branch and `lambda` must not evaluate its body at creation time. The algebra receives `recurse` as a parameter and calls it selectively, with whatever context it chooses.
 
 
-## Phase 8 &#x2014; Sender-Based Evaluation
+## Phase 8: Sender-Based Evaluation
 
 `sender_mendler_run` has the same structure as `mendler_run` but wraps each sub-evaluation as a deferred sender. For binary builtin application, the two argument senders are combined with `when_all`:
 
@@ -129,9 +129,9 @@ return sender_v::then(sender_v::when_all(eval_arg0, eval_arg1), apply_builtin);
 With `sync_wait` as the scheduler, execution is inline-sequential. A thread-pool scheduler would parallelize argument evaluation without changing the evaluation code. The sender graph makes structural independence visible to the framework (Dominiak, Michał and others, 2024).
 
 
-## Phase 9 &#x2014; Constexpr Pipeline
+## Phase 9: Constexpr Pipeline
 
-`constexpr_eval` chains the full pipeline &#x2014; reader, elaborator, `core_to_comp`, `mendler_run` &#x2014; and `static_assert` proves it works:
+`constexpr_eval` chains the full pipeline: reader, elaborator, `core_to_comp`, and `mendler_run`. The ~static\_assert~s prove it works:
 
 ```c++
 // src/smd/smdscheme/sender/fixpoint_program.test.cpp
@@ -142,7 +142,7 @@ static_assert(std::get<int>(constexpr_eval("(let* ((x 1) (y (+ x 1))) (+ x y))")
                                 .value()) == 3);
 ```
 
-These are compiler-enforced invariants, not unit tests. If any is wrong, the translation unit does not compile.
+These are compiler-enforced invariants. If any is wrong, the translation unit doesn't compile.
 
 
 # Lessons Learned
@@ -150,19 +150,19 @@ These are compiler-enforced invariants, not unit tests. If any is wrong, the tra
 
 ## `constexpr` is Turing-complete, but allocation is the boundary
 
-Transient allocations work &#x2014; any `Box` created during evaluation must be freed before the compiler observes the result. Persistent allocations do not. A `fixpoint_program` cannot be stored as a `constexpr` variable because its `Box` nodes would escape the transient allocation scope. The evaluation result &#x2014; a variant of scalars &#x2014; can be stored.
+Transient allocations work: any `Box` created during evaluation must be freed before the compiler observes the result. Persistent allocations do not. A `fixpoint_program` cannot be stored as a `constexpr` variable because its `Box` nodes would escape the transient allocation scope. The evaluation result, a variant of scalars, can be stored.
 
 The consteval allocation proposal (future C++ work) would lift this restriction. Until then, the program lives only for the duration of its evaluation.
 
 
 ## `Fix<F>` + Mendler gives control without losing structure
 
-A standard fold is too uniform for language interpretation. `if` must evaluate only one branch. `lambda` must not evaluate its body until applied. Mendler recursion threads the recursive call as an argument, so the algebra decides when to recurse. The tree stays structurally visible &#x2014; no continuation-passing, no CPS transformation, no trampoline. The interpreter is a single function over a sum type (Bird, Richard S. and de Moor, Oege, 1997).
+A standard fold is too uniform for language interpretation. `if` must evaluate only one branch. `lambda` must not evaluate its body until applied. Mendler recursion threads the recursive call as an argument, so the algebra decides when to recurse. The tree stays structurally visible, no continuation-passing, no CPS transformation, no trampoline. The interpreter is a single function over a sum type (Bird, Richard S. and de Moor, Oege, 1997).
 
 
 ## Senders compose but type erasure is the bottleneck
 
-`when_all` works for fixed-arity arguments &#x2014; binary builtins. Runtime-arity argument lists (closures, variadic forms) cannot be handled with a variadic `when_all` without type erasure. `any_sender` or coroutines add complexity the proof-of-concept avoids. Sequential evaluation is the current answer for variable-arity cases.
+`when_all` works for fixed-arity arguments, binary builtins. Runtime-arity argument lists (closures, variadic forms) cannot be handled with a variadic `when_all` without type erasure. `any_sender` or coroutines add complexity the proof-of-concept avoids. Sequential evaluation is the current answer for variable-arity cases.
 
 
 ## Desugaring is the right level for `let` / `let*`
@@ -172,14 +172,14 @@ No new IR nodes. No new interpreter cases. The elaborator rewrites `let` and `le
 
 # What `std::indirect` Will Fix
 
-The natural C++26 type for owned indirection is `std::indirect` (Coe, Jonathan and others, 2024). The obstacle is its explicit default constructor. `static_vector` value-initializes its backing `std::array<T, Capacity>`, which requires a non-explicit default. `Box` provides that &#x2014; its default sets `ptr = nullptr`. When `std::indirect` gains a non-explicit default constructor, or gains full constexpr support, `Box` can be retired and the pipeline simplifies.
+The natural C++26 type for owned indirection is `std::indirect` (Coe, Jonathan and others, 2024). The obstacle is its explicit default constructor. `static_vector` value-initializes its backing `std::array<T, Capacity>`, which requires a non-explicit default. `Box` provides that; its default sets `ptr = nullptr`. When `std::indirect` gains a non-explicit default constructor, or gains full constexpr support, `Box` can be retired and the pipeline simplifies.
 
 
 # Future Work
 
 **call/cc**: First-class continuations. In a Mendler interpreter, this means reifying the "recurse" function as a value. The CPS structure is already implicit in the recursive call pattern (Steele, Guy L., 1977) (Appel, Andrew W., 1992).
 
-**set!**: Mutable bindings require a store &#x2014; an indirection from environment names to mutable locations. A boxing transformation pass can introduce this before the interpreter runs.
+**set!**: Mutable bindings require a store, an indirection from environment names to mutable locations. A boxing transformation pass can introduce this before the interpreter runs.
 
 **Hygienic macros (syntax-rules)**: Operate on datum trees before elaboration. The sets-of-scopes model (Flatt, Matthew, 2016) handles renaming correctly without the defects of earlier hygienic approaches.
 
@@ -192,13 +192,13 @@ The natural C++26 type for owned indirection is `std::indirect` (Coe, Jonathan a
 
 The mountain metaphor has driven this series, and it holds here too. Nobody climbs Everest because the summit needs to be reached. They climb to find out what they can do at altitude.
 
-C++26 `constexpr` is capable of a non-trivial functional compiler. The tools &#x2014; `Fix<F>`, Mendler folds, sender composition &#x2014; are general-purpose. They apply beyond Scheme. The techniques for zero-allocation parsing, arena-based ASTs, open-recursive computation trees, and Mendler-style interpretation are each useful independently of the compile-time constraint.
+C++26 `constexpr` is capable of a non-trivial functional compiler. The tools, `Fix<F>`, Mendler folds, sender composition, are general-purpose. They apply beyond Scheme. The techniques for zero-allocation parsing, arena-based ASTs, open-recursive computation trees, and Mendler-style interpretation are each useful independently of the compile-time constraint.
 
-The proof-of-concept proved what it set out to prove: the compiler can do real evaluative work, not just type-checking. The path is marked. Where it goes next is a different climb.
+The proof-of-concept proved what it set out to prove: the compiler can do real evaluative work rather than just type-checking. The path is marked. Where it goes next is a different climb.
 
 <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
 
-[↑ Series Index](index.md)
+[↑ Series Index](index.md) | [Next: Phase 14 - Mutation: set! →](phase-14-set-bang.md)
 
 </nav>
 

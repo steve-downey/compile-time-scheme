@@ -66,7 +66,7 @@ A Lisp in which that doesn't work is not yet a Lisp [cite:@steele1990cltl2], and
 
 The interesting part is an argument against the process I was running, not for it.
 Every one of those seven decisions was locally correct.
-Each was the right call for its step, taken with the alternatives visible, and written down honestly the same day.
+Each was the right call for its step, taken with the alternatives visible, and written down the same day.
 There is no moment where somebody got it wrong.
 The aggregate is still wrong, and no individual record could have shown that, because a divergence document's entire job is to describe one divergence.
 Twenty accurate documents add up to something none of them says.
@@ -153,7 +153,7 @@ Two of its entries already argue with decisions taken: conditions are out of sco
 So I do not yet know how much of Phase 22's list --- the numeric tower, conditions and restarts, CLOS, readtables, ~format~ --- is "not yet" and how much is "never".
 Whichever way that goes is the decision most likely to look foolish in a year.
 
-And R0 has a hole in it that should be stated plainly.
+And R0 has a hole in it.
 The container this analysis ran in had no gcc-16, so none of it is compile-verified.
 The dead ~fold_fix~, the loop counts, the GCC sanitizer defect recorded in DIV-0013: all of that came out of reading the tree, and nothing was built to check it.
 R1's brief says to confirm the findings against a real toolchain before acting on them.

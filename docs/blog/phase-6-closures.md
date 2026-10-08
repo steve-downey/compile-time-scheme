@@ -1,4 +1,4 @@
-<div class="abstract" id="orgc36e7b6">
+<div class="abstract" id="orgbeef52a">
 <p>
 Every Scheme expression evaluates to a value. I represent values as a
 six-alternative variant: integers, booleans, builtins, closures, symbols,
@@ -19,7 +19,7 @@ scoping with most-recent-first shadowing.
 
 # Values, Environments, and Closures
 
-The previous phase built `Comp<MaxList>` — the `Fix<CompF>` tree that the interpreter walks. Before I can write the interpreter, I need to define what it produces: a runtime value. Every Scheme expression, whether a literal integer, a built-in operator, or a user-defined function, evaluates to a value. The value representation is where the type system meets the semantics.
+The previous phase built `Comp<MaxList>`, the `Fix<CompF>` tree that the interpreter walks. Before I can write the interpreter, I need to define what it produces: a runtime value. Every Scheme expression, whether a literal integer, a built-in operator, or a user-defined function, evaluates to a value. The value representation is where the type system meets the semantics.
 
 
 ## The Value Variant
@@ -35,19 +35,19 @@ using value = std::variant<int, bool, builtin, closure<Core>, symbol,
 
 Each alternative has a distinct role:
 
--   `int` — Scheme integers. The only numeric type in this proof-of-concept.
--   `bool` — Scheme booleans (`#t` and `#f`).
--   `builtin` — A built-in arithmetic operator (currently `+` and `*`).
--   `closure<Core>` — A user-defined function paired with its captured environment.
--   `symbol` — A runtime interned symbol, distinct from a variable name. Used for quoted symbols like `'foo`.
--   `foreign_function<Core>` — A native C++ callable reachable from Scheme.
+-   `int`: Scheme integers. The only numeric type in this proof-of-concept.
+-   `bool`: Scheme booleans (`#t` and `#f`).
+-   `builtin`: A built-in arithmetic operator (currently `+` and `*`).
+-   `closure<Core>`: A user-defined function paired with its captured environment.
+-   `symbol`: A runtime interned symbol, distinct from a variable name. Used for quoted symbols like `'foo`.
+-   `foreign_function<Core>`: A native C++ callable reachable from Scheme.
 
 The `Core` type parameter threads through `closure` and `foreign_function`, both of which need to produce or consume `value<Core>`. This makes `value` a mutually recursive type, but because the alternatives are value types with no heap allocation of their own, the variant stays a concrete aggregate.
 
 
 ## Environments
 
-The environment maps variable names to values. In Scheme, each `lambda` body executes in the lexical scope where the lambda was defined — a chain of binding frames that the evaluator consults on every variable reference (Abelson, Harold and Sussman, Gerald Jay, 1996).
+The environment maps variable names to values. In Scheme, each `lambda` body executes in the lexical scope where the lambda was defined, a chain of binding frames that the evaluator consults on every variable reference (Abelson, Harold and Sussman, Gerald Jay, 1996).
 
 I use a flat linear search rather than a linked chain of frames:
 
@@ -87,7 +87,7 @@ constexpr auto env<Core, MaxBindings>::lookup(std::string_view name) const
 
 Searching newest-first means a later `define` call shadows an earlier one with the same name. This implements Scheme's lexical scoping semantics: bindings introduced inside a lambda shadow outer bindings for the duration of the call. The `foundation::result` return type carries either a value or an `"unbound variable"` error that propagates up through the evaluator.
 
-The `static_vector` keeps everything on the stack — no heap allocation, fully `constexpr`. The `MaxBindings` parameter sets a compile-time ceiling on environment size.
+The `static_vector` keeps everything on the stack: no heap allocation, fully `constexpr`. The `MaxBindings` parameter sets a compile-time ceiling on environment size.
 
 
 ## Closures
@@ -108,7 +108,7 @@ struct closure {
 };
 ```
 
-`node` is a non-owning pointer into the program's core tree — the `Core` type the value domain is parameterized on. The direct closure evaluator instantiates `Core` with the elaborator's `core_type` (the `fix<core_f_factory>` arena tree from Phase 4); the sender backend reuses the same `closure` template with the `Comp` (`Fix<CompF>`) tree from Phase 5. Either way, the program object owns that tree for the entire evaluation; closures hold raw pointers into it. There is no ownership question: the program outlives all closures.
+`node` is a non-owning pointer into the program's core tree, the `Core` type the value domain is parameterized on. The direct closure evaluator instantiates `Core` with the elaborator's `core_type` (the `fix<core_f_factory>` arena tree from Phase 4); the sender backend reuses the same `closure` template with the `Comp` (`Fix<CompF>`) tree from Phase 5. Either way, the program object owns that tree for the entire evaluation; closures hold raw pointers into it. There is no ownership question: the program outlives all closures.
 
 `captured` is an owned deep copy of the environment at the moment the lambda was evaluated. When the evaluator encounters a `lambda` form, it freezes the current environment and stores it in the closure. When the closure is later applied, evaluation resumes in that captured environment, extended with the argument bindings. This is the standard environment model of evaluation (Abelson, Harold and Sussman, Gerald Jay, 1996).
 
@@ -144,7 +144,7 @@ template <typename Core, int MaxBindings>
 }
 ```
 
-Every program starts with `+` and `*` in scope. Calling a builtin evaluates its two arguments and computes the result inline — the dispatch is a direct switch on the `builtin_op` enum. (The collect-arguments-into-a-span calling convention belongs to foreign functions, covered next, not to builtins.)
+Every program starts with `+` and `*` in scope. Calling a builtin evaluates its two arguments and computes the result inline; the dispatch is a direct switch on the `builtin_op` enum. (The collect-arguments-into-a-span calling convention belongs to foreign functions, covered next, not to builtins.)
 
 
 ## Foreign Functions
@@ -175,7 +175,7 @@ A `foreign_function` is a plain function pointer with the signature `result<valu
 
 The `closure` struct holds `constexpr_box<env<Core, 16>>` rather than `env<Core, 16>` directly. The reason is a circular dependency: `env` contains `value<Core>`, `value<Core>` contains `closure<Core>`, and `closure<Core>` contains `env`. C++ does not allow an incomplete type as a direct non-static data member, but it allows a pointer to one.
 
-`constexpr_box` is the same workaround pattern as `fixpoint::Box` from the previous phase — a raw `new` / `delete` owning pointer with deep-copy semantics:
+`constexpr_box` is the same workaround pattern as `fixpoint::Box` from the previous phase, a raw `new` / `delete` owning pointer with deep-copy semantics:
 
 ```c++
 // src/smd/smdscheme/closure/value.hpp
@@ -194,7 +194,7 @@ struct constexpr_box {
 };
 ```
 
-`std::unique_ptr` cannot be used in `constexpr` because its copy constructor is deleted. `constexpr_box` provides the necessary deep-copy semantics while still destroying via `delete`. It appears here for the same reason `Box` appears in `comp_f_factory`: breaking a recursive type relationship that the C++ type system cannot yet express with a standard vocabulary type. `std::indirect` (Coe, Jonathan and others, 2024) would replace both, but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support is not yet available in GCC 16 — so I fall back to the raw pointer workaround.
+`std::unique_ptr` cannot be used in `constexpr` because its copy constructor is deleted. `constexpr_box` provides the necessary deep-copy semantics while still destroying via `delete`. It appears here for the same reason `Box` appears in `comp_f_factory`: breaking a recursive type relationship that the C++ type system cannot yet express with a standard vocabulary type. `std::indirect` (Coe, Jonathan and others, 2024) would replace both, but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support isn't yet available in GCC 16, so I fall back to the raw pointer workaround.
 
 
 # What Comes Next

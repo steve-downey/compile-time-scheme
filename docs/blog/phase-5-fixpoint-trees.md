@@ -1,6 +1,6 @@
-<div class="abstract" id="org719568f">
+<div class="abstract" id="orgb78675f">
 <p>
-I represent the computation tree as <code>Fix&lt;CompF&gt;</code> — a type-level fixed-point
+I represent the computation tree as <code>Fix&lt;CompF&gt;</code>, a type-level fixed-point
 combinator that ties the recursive knot. Each node is a variant layer
 parameterized by its children, enabling generic folds and transformations
 over the tree structure.
@@ -55,7 +55,7 @@ constexpr auto unwrap_fix(const Fix<F> &fixed) -> const F<Fix<F>> & {
 
 `wrap_fix` injects one layer into the fixed point. `unwrap_fix` exposes the layer for pattern matching. They are the iso-recursive isomorphism boundaries (Bird, Richard S. and de Moor, Oege, 1997).
 
-Inside `F`, recursive children are stored as `Box<Fix<F>>` rather than `Fix<F>` by value. A plain `Fix<F>` in a `std::variant` member would require knowing its own size before it is defined — the classic recursive type problem. `Box<A>` is a constexpr-capable owning pointer:
+Inside `F`, recursive children are stored as `Box<Fix<F>>` rather than `Fix<F>` by value. A plain `Fix<F>` in a `std::variant` member would require knowing its own size before it is defined: the classic recursive type problem. `Box<A>` is a constexpr-capable owning pointer:
 
 ```c++
 // src/smd/fixpoint/box.hpp
@@ -72,7 +72,7 @@ constexpr auto make_box(Args &&...args) -> Box<A> {
 }
 ```
 
-`Box` uses `new` / `delete`, which are `constexpr` in C++20 for transient allocations. The natural C++26 type for this role is `std::indirect` (Coe, Jonathan and others, 2024), but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support is not yet available in GCC 16. `Box` avoids both constraints.
+`Box` uses `new` / `delete`, which are `constexpr` in C++20 for transient allocations. The natural C++26 type for this role is `std::indirect` (Coe, Jonathan and others, 2024), but its explicit default constructor blocks aggregate initialization inside `static_vector`, and full `constexpr` support isn't yet available in GCC 16. `Box` avoids both constraints.
 
 
 # The CompF Functor
@@ -149,7 +149,7 @@ template <int MaxList>
 using Comp = smd::fixpoint::Fix<comp_f_factory<MaxList>::template type>;
 ```
 
-`comp_pure` holds only atoms — integers, booleans, and `string_view`. It does not hold full `closure::value` objects. The reason is circular type dependency: `closure::value` is parameterized by `Comp`, so if `comp_pure` held a `closure::value`, the definition of `Comp` would circularly depend on `closure::value` which circularly depends on `Comp`. Storing only atoms breaks the cycle.
+`comp_pure` holds only atoms: integers, booleans, and `string_view`. It does not hold full `closure::value` objects. The reason is circular type dependency: `closure::value` is parameterized by `Comp`, so if `comp_pure` held a `closure::value`, the definition of `Comp` would circularly depend on `closure::value` which circularly depends on `Comp`. Storing only atoms breaks the cycle.
 
 `comp_lookup` stores a `string_view` into the source string, so variable references require no allocation.
 
@@ -166,7 +166,7 @@ using Comp = smd::fixpoint::Fix<comp_f_factory<MaxList>::template type>;
 
 # fmap\_comp: The Functor Map
 
-For `Fix<CompF>` to support generic folds and transformations, `CompF` must be a functor — it must define a `fmap` operation that transforms children while leaving structure intact (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991):
+For `Fix<CompF>` to support generic folds and transformations, `CompF` must be a functor, with an `fmap` operation that transforms children while leaving structure intact (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991):
 
 ```cpp
 template <int MaxList, typename F, typename A>
@@ -204,14 +204,14 @@ fmap_comp(F &&f,
 }
 ```
 
-Leaves (`comp_pure`, `comp_lookup`) pass through unchanged. Internal nodes apply `f` to each child and rebuild the node with the transformed children. The type changes from `F<A>` to `F<B>` — the node shape is preserved, only the child type changes.
+Leaves (`comp_pure`, `comp_lookup`) pass through unchanged. Internal nodes apply `f` to each child and rebuild the node with the transformed children. The type changes from `F<A>` to `F<B>`. The node shape is preserved; only the child type changes.
 
-This is the `fmap` that makes `CompF` a functor in the categorical sense. With `fmap_comp` in place, generic recursion schemes — `fold_fix` (catamorphism), `refold` (hylomorphism), `mendler_fold` (Mendler catamorphism), and `mendler_para` (Mendler paramorphism) — become expressible in terms of it (Bird, Richard S. and de Moor, Oege, 1997). The Mendler-style combinators are the ones actually used by the interpreter: they thread context and give the algebra explicit control over recursion order (see Phase 7).
+This is the `fmap` that makes `CompF` a functor in the categorical sense. With `fmap_comp` in place, generic recursion schemes such as `fold_fix` (catamorphism), `refold` (hylomorphism), `mendler_fold` (Mendler catamorphism), and `mendler_para` (Mendler paramorphism) become expressible in terms of it (Bird, Richard S. and de Moor, Oege, 1997). The Mendler-style combinators are the ones actually used by the interpreter: they thread context and give the algebra explicit control over recursion order (see Phase 7).
 
 
 # core\_to\_comp: The Conversion Anamorphism
 
-The function `core_to_comp` converts an arena-based `core_type` node into a `Comp` tree. Conceptually it is an anamorphism — an unfold that generates a recursive structure from a seed (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991). In practice I use manual recursion rather than a generic `unfold_fix` because I need to propagate errors when encountering invalid nodes.
+The function `core_to_comp` converts an arena-based `core_type` node into a `Comp` tree. Conceptually it is an anamorphism, an unfold that generates a recursive structure from a seed (Meijer, Erik and Fokkinga, Maarten and Paterson, Ross, 1991). In practice I use manual recursion rather than a generic `unfold_fix` because I need to propagate errors when encountering invalid nodes.
 
 The application case shows the pattern clearly:
 
@@ -253,16 +253,16 @@ The application case shows the pattern clearly:
 }
 ```
 
-`define` is a top-level declaration, not an expression. Encountering it inside a `core_to_comp` traversal means the source program is malformed.
+`define` is a top-level declaration rather than an expression. Encountering it inside a `core_to_comp` traversal means the source program is malformed.
 
 
 # Why Two Representations?
 
 The arena-based core tree and `Fix<CompF>` serve different roles.
 
-The arena tree is optimized for `constexpr` construction. Arena handles are plain integers — no allocations, no pointers. The elaborator runs entirely at compile time, filling a fixed-size arena on the stack. The arena can be statically sized because the program text is bounded.
+The arena tree is optimized for `constexpr` construction. Arena handles are plain integers: no allocations, no pointers. The elaborator runs entirely at compile time, filling a fixed-size arena on the stack. The arena can be statically sized because the program text is bounded.
 
-`Fix<CompF>` with `Box` children is optimized for traversal. A `Comp` node is self-contained: it does not need an external arena to dereference its children. The Mendler-style interpreter in the next phase walks `Comp` trees by pattern-matching on `unwrap_fix(node)` and recursing directly into `Box`-stored children. Passing only the node — no arena — keeps the interpreter's interface clean and makes closures straightforward to represent: a closure captures a `Box<Comp>` body, not a handle plus arena.
+`Fix<CompF>` with `Box` children is optimized for traversal. A `Comp` node is self-contained: it does not need an external arena to dereference its children. The Mendler-style interpreter in the next phase walks `Comp` trees by pattern-matching on `unwrap_fix(node)` and recursing directly into `Box`-stored children. Passing only the node, with no arena, keeps the interpreter's interface clean and makes closures straightforward to represent: a closure captures a `Box<Comp>` body instead of a handle plus arena.
 
 The conversion step is a one-time cost at the boundary between the front end and the evaluator.
 

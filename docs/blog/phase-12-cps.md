@@ -1,4 +1,4 @@
-<div class="abstract" id="orgb8d6b65">
+<div class="abstract" id="orgfd818bb">
 <p>
 By Phase 4, my compile-time compiler could parse and elaborate code into a typed <code>core_type</code> AST, and Phase 6 gave it a closure-based value domain.
 This phase recasts evaluation in Continuation-Passing Style (CPS (Reynolds, John C., 1972)) at the C++ template layer: continuations are threaded explicitly through the closure evaluator, and tail positions are written as C++ return-position calls so the native optimizer can treat them as loops at runtime.
@@ -27,7 +27,7 @@ int add(int a, int b) {
 int result = add(2, add(3, 4));
 ```
 
-In Continuation-Passing Style, functions don't just return. They accept an extra argument&#x2014;a callback&#x2014;representing "what to do next." This callback is known as the **Continuation**.
+In Continuation-Passing Style, functions don't just return. They accept an extra argument&mdash;a callback&mdash;representing "what to do next." This callback is known as the **Continuation**.
 
 ```c++
 // Continuation-Passing Style (conceptual)
@@ -65,7 +65,7 @@ Each CPS form takes an environment (`env`) containing variables and a continuati
 
 # Dispatching Core Nodes in CPS
 
-Instead of rewriting an entire interpreter loop within C++ structures natively (which would require a manual trampoline or defunctionalization (Danvy, Olivier and Nielsen, Lasse R., 2001) to avoid deep stack frames), I let the C++ compiler's own optimizer do the work. Over the `core_type` AST from Phase 4&#x2014;with its `arena_box` handles, `core_if`, `core_lambda`, and `core_application` nodes&#x2014;I built `cps_dispatch`. The result type of every dispatch is `foundation::result<closure::value<Core>>`: the `result<T>` error-handling type from Phase 1, parameterized on the closure value type defined in Phase 6.
+Instead of rewriting an entire interpreter loop within C++ structures natively (which would require a manual trampoline or defunctionalization (Danvy, Olivier and Nielsen, Lasse R., 2001) to avoid deep stack frames), I let the C++ compiler's own optimizer do the work. Over the `core_type` AST from Phase 4, with its `arena_box` handles, `core_if`, `core_lambda`, and `core_application` nodes, I built `cps_dispatch`. The result type of every dispatch is `foundation::result<closure::value<Core>>`: the `result<T>` error-handling type from Phase 1, parameterized on the closure value type defined in Phase 6.
 
 ```cpp
 template <int MaxNodes, int MaxList, class Cont, class Env, class K>
@@ -124,7 +124,7 @@ One important caveat: this does **not** extend to the constant evaluator. GCC's 
 
 # Conclusion
 
-Continuation-passing templates plus native tail-call return forms keep Scheme's evaluation state on the C++ stack &#x2014; no heap-allocated continuations, no manual trampoline.
+Continuation-passing templates plus native tail-call return forms keep Scheme's evaluation state on the C++ stack: no heap-allocated continuations, no manual trampoline.
 
 Phase 6 already defined the `closure` value type that `cps_dispatch` produces; this phase showed how a CPS traversal of the `core_type` arena threads continuations through evaluation, resolving lambda applications in tail position.
 

@@ -1,6 +1,6 @@
-**DRAFT &#x2014; pending author revision**
+**DRAFT &mdash; pending author revision**
 
-<div class="abstract" id="orgac9e59e">
+<div class="abstract" id="orgae44bb7">
 <p>
 Step R1 builds <code>src/smd/cl/foundation/</code>, the substrate the rebuilt Common Lisp front end sits on.
 It starts as the reviewed union of two independent copies of the same code: <code>smdscheme</code>'s, and the one in the sibling repository <code>compile-time-forth</code>.
@@ -66,7 +66,7 @@ class result {
 };
 ```
 
-The only additions to what both copies already had are the `value_type` alias and the defaulted equality, and both are there because the typeclass instances and their law tests need them. There is also a comment about a step that has not happened. Decision D13 says the evaluator R5 builds needs a third alternative &#x2014; an unwind in flight &#x2014; as a distinct channel beside value and error. It isn't there. What is there is a note telling callers to use `has_value` / `value` / `error` and stay off the `std::variant` underneath, so the alternative set can widen later without breaking any of them. Cheap to write down now, expensive to retrofit, which is the only reason I put it in a header this early.
+The only additions to what both copies already had are the `value_type` alias and the defaulted equality, and both are there because the typeclass instances and their law tests need them. There is also a comment about a step that has not happened. Decision D13 says the evaluator R5 builds needs a third alternative, an unwind in flight, as a distinct channel beside value and error. It isn't there. What is there is a note telling callers to use `has_value` / `value` / `error` and stay off the `std::variant` underneath, so the alternative set can widen later without breaking any of them. Cheap to write down now, expensive to retrofit, which is the only reason I put it in a header this early.
 
 
 # A fold that stops
@@ -211,7 +211,7 @@ The fix in process is `make test-matrix`. Debug at `-O0`, Asan at `-O3`, and con
 
 R0 read `foundation::fold_fix` in the old tree and concluded it could not be instantiated at all. Line 50 calls `fmap(tree.inner, lambda)`, while the CPO in `functor.hpp` takes `(function, value)`, so the lookup is `functor_typeclass<lambda>`, which is `std::false_type`, which has no `fmap`. Unqualified `fmap` inside the namespace finds the CPO variable, so ADL never runs and no overload can turn up to rescue it. R0 ran in a container with no gcc-16, so all of that was careful reading and nothing more.
 
-This step ran where a compiler exists, and the compiler never got the chance to disagree. Zero call sites in either front end, a two-line stub for a test file, and a `CMakeLists.txt` listing only the header: nothing has ever instantiated it, which is why nothing ever complained. It doesn't come across into `src/smd/cl/` at all &#x2014; deleted rather than repaired, in the plan's words &#x2014; and `mendler_para` supersedes it. The `smdscheme` copy stays where it is.
+This step ran where a compiler exists, and the compiler never got the chance to disagree. Zero call sites in either front end, a two-line stub for a test file, and a `CMakeLists.txt` listing only the header: nothing has ever instantiated it, which is why nothing ever complained. It doesn't come across into `src/smd/cl/` at all. The plan says to delete it rather than repair it, and `mendler_para` supersedes it. The `smdscheme` copy stays where it is.
 
 
 # Still open

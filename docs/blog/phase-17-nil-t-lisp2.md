@@ -1,6 +1,6 @@
-**DRAFT &#x2014; pending author revision**
+**DRAFT &mdash; pending author revision**
 
-<div class="abstract" id="org76d653f">
+<div class="abstract" id="orga5806da">
 <p>
 Steps L4 through L10 built a reader and an elaborator; neither one runs anything.
 Step L11 is the first <code>smdlisp</code> code that actually executes a program, and executing a program is where the semantic decisions from <code>docs/cl-pivot-plan.md</code> stop being paperwork and start being code you have to get right on the first try.
@@ -21,9 +21,9 @@ Three programs run end to end at compile time by the end of this post: <code>(if
 
 # One truthiness function
 
-Scheme's evaluator in this project never had a single place that decided whether a value was true. It had one at every `if`: check whether the condition happens to be the boolean `#f`, and treat everything else, including `0` and the empty list, as true. That works, but it means "what counts as false" is a fact about the `if`-handling code, not a fact you can point at.
+Scheme's evaluator in this project never had a single place that decided whether a value was true. It had one at every `if`: check whether the condition happens to be the boolean `#f`, and treat everything else, including `0` and the empty list, as true. That works, but it leaves "what counts as false" buried in the `if`-handling code.
 
-Common Lisp only has one false value, and I wanted the evaluator to say so in one place rather than imply it at every branch point. `nil` is it &#x2014; the sole false value, the empty list, and the symbol `NIL`, simultaneously, per decision D3. Everything else is true, including `0` and every keyword. There is exactly one function that gets to answer the question:
+Common Lisp only has one false value, and I wanted the evaluator to say so in one place rather than imply it at every branch point. `nil` is it, the sole false value, the empty list, and the symbol `NIL`, simultaneously, per decision D3. Everything else is true, including `0` and every keyword. There is exactly one function that gets to answer the question:
 
 ```cpp
 template <typename Core>
@@ -49,14 +49,14 @@ And the evaluator's only branching form calls it, and nothing else in the evalua
 },
 ```
 
-`t` needed a runtime representation, which the L10 elaborator deliberately left unpicked &#x2014; the core AST only records that the source spelled the canonical true constant, and defers what value that becomes. `pairs.hpp`'s predicates (`null`, `eq`, `eql`, `atom`) already return the symbol `T` for a true result, so making `core_true` evaluate to that exact same value, `symbol{"T"}`, was the only choice that did not invent a second notion of true a step later. `(eq t 'T)` and `(if (null nil) 1 2)` now agree with each other by construction, not by coincidence.
+`t` needed a runtime representation, which the L10 elaborator deliberately left unpicked. The core AST only records that the source spelled the canonical true constant and defers what value that becomes. `pairs.hpp`'s predicates (`null`, `eq`, `eql`, `atom`) already return the symbol `T` for a true result, so making `core_true` evaluate to that exact same value, `symbol{"T"}`, was the only choice that did not invent a second notion of true a step later. `(eq t 'T)` and `(if (null nil) 1 2)` now agree with each other by construction.
 
 
 # A Lisp-2 that actually doesn't know about itself
 
 Common Lisp keeps functions and variables in separate namespaces. `(f x)` looks `f` up among function bindings and `x` up among variable bindings, and a program can bind both names at once without either shadowing the other. Step L9 built the environment with two independent binding lists to support this; step L11 is where the evaluator has to actually respect the split at every lookup site, not just at the ones that are obviously about function calls.
 
-An ordinary symbol used as an expression &#x2014; the `x` in `(+ x 1)` &#x2014; always resolves through the variable namespace. An application head, a `#'name`, or a `(function name)` always resolves through the function namespace, and the elaborator already collapsed all three spellings down to one core node (`core_function`) so the evaluator only has to get this right in one place:
+An ordinary symbol used as an expression, the `x` in `(+ x 1)`, always resolves through the variable namespace. An application head, a `#'name`, or a `(function name)` always resolves through the function namespace, and the elaborator already collapsed all three spellings down to one core node (`core_function`) so the evaluator only has to get this right in one place:
 
 ```cpp
 [&](elaborator::core_symbol const &cs) -> Res {
@@ -99,7 +99,7 @@ Notice what is missing: there is no fallback from `lookup_function` to `lookup_v
 
 # funcall and #' at the evaluator, not just the reader
 
-Step L6 gave `#'f` its own reader node instead of desugaring it to `(function f)`, on the theory that the reader's job is to record what the source said and nothing more. Step L11 is where that deferred decision gets cashed in: evaluating a `core_function` node &#x2014; whether it's the head of an application, the operand of a bare `#'f` expression, or an ordinary argument to `funcall` &#x2014; is the one place `#'` acquires meaning. Evaluate it, and you get a function value, full stop, regardless of which of the three source spellings produced the node.
+Step L6 gave `#'f` its own reader node instead of desugaring it to `(function f)`, on the theory that the reader's job is to record what the source said and nothing more. Step L11 is where that deferred decision gets cashed in: evaluating a `core_function` node, whether it's the head of an application, the operand of a bare `#'f` expression, or an ordinary argument to `funcall`, is the one place `#'` acquires meaning. Evaluate it, and you get a function value, full stop, regardless of which of the three source spellings produced the node.
 
 `funcall` and `apply` needed something a plain two-argument builtin can't give them: the ability to call an arbitrary function value with an arbitrary argument list computed at runtime. So they're builtins that recurse into the same call-dispatch helper ordinary application already uses, instead of a case in `pairs.hpp`'s primitive table:
 
@@ -232,7 +232,7 @@ Step L6 gave `#'f` its own reader node instead of desugaring it to `(function f)
 func_val);
 ```
 
-`apply`'s only real complication is CL's rule that the last argument is a list to be spread and every argument before it is passed through unchanged &#x2014; `(apply #'+ 1 (list 2 3))` has to walk the pair chain that `(list 2 3)` built and turn it back into three ordinary arguments, `1`, `2`, and `3`, before making the call.
+`apply`'s only real complication is CL's rule that the last argument is a list to be spread and every argument before it is passed through unchanged. `(apply #'+ 1 (list 2 3))` has to walk the pair chain that `(list 2 3)` built and turn it back into three ordinary arguments, `1`, `2`, and `3`, before making the call.
 
 
 # The closure-capture question, resolved
@@ -253,9 +253,9 @@ constexpr auto alloc(env<Core, MaxBindings> e)
 }
 ```
 
-`smd::smdscheme::closure::env`'s own answer to this problem is a `constexpr_box` &#x2014; an owning box backed by `new` and `delete` whose destructor runs when the closure holding it is destroyed, relying on C++20's rule that transient constant-evaluation allocation just has to be freed before the enclosing evaluation finishes. That works, but only because Scheme's `closure` and `env` are defined together in one header, where `env` is complete everywhere `constexpr_box` needs it to be. Splitting `env` into its own header for the Lisp-2 split ruled that construction out, which forced the question instead of letting me duplicate the answer. An arena needs no `new`, no `delete`, and no argument about whether a transient allocation got freed in time &#x2014; it needs only that whoever is running the evaluation keeps the arena alive for as long as they keep using anything it produced, which is the same discipline the core tree's own arena already requires.
+`smd::smdscheme::closure::env`'s own answer to this problem is a `constexpr_box`, an owning box backed by `new` and `delete` whose destructor runs when the closure holding it is destroyed, relying on C++20's rule that transient constant-evaluation allocation just has to be freed before the enclosing evaluation finishes. That works, but only because Scheme's `closure` and `env` are defined together in one header, where `env` is complete everywhere `constexpr_box` needs it to be. Splitting `env` into its own header for the Lisp-2 split ruled that construction out, which forced the question instead of letting me duplicate the answer. An arena needs no `new`, no `delete`, and no argument about whether a transient allocation got freed in time. It needs only that whoever is running the evaluation keeps the arena alive for as long as they keep using anything it produced, which is the same discipline the core tree's own arena already requires.
 
-I found the exact failure mode this design exists to prevent while writing this step's own tests, not while writing the evaluator. A test helper that read, elaborated, and evaluated a bare keyword atom, then returned the resulting value out of the function that did all three, crashed under AddressSanitizer with a stack-use-after-return &#x2014; the elaborated root, held in a local variable, went out of scope while the returned `keyword` still held a view into its spelling. Same bug as L10's, one more layer up, caught the same way.
+I found the exact failure mode this design exists to prevent while writing this step's own tests, not while writing the evaluator. A test helper that read, elaborated, and evaluated a bare keyword atom, then returned the resulting value out of the function that did all three, crashed under AddressSanitizer with a stack-use-after-return: the elaborated root, held in a local variable, went out of scope while the returned `keyword` still held a view into its spelling. Same bug as L10's, one more layer up, caught the same way.
 
 
 # The merge test: three programs, one evaluator
@@ -266,9 +266,9 @@ I found the exact failure mode this design exists to prevent while writing this 
 (funcall #'cons 1 nil)                ; => (1)
 ```
 
-All three run as compile-time `static_assert` checks: read the source, elaborate it, evaluate the result, and check the answer, all inside the C++ constant evaluator. The first exercises truthiness and the `if` branch. The second exercises a closure over quoted list data &#x2014; `'(1 2 3)` elaborates to hermetic `cons` cells built at compile time by the elaborator, and the lambda has to walk them through the ordinary `CAR` and `CDR` builtins, proving that hand-built and builtin-built pairs are the same kind of value. The third exercises `funcall`, `#'`, and the function namespace together: `#'cons` resolves `CONS` as a function value without calling it, and `funcall` is what actually calls it.
+All three run as compile-time `static_assert` checks: read the source, elaborate it, evaluate the result, and check the answer, all inside the C++ constant evaluator. The first exercises truthiness and the `if` branch. The second exercises a closure over quoted list data. `'(1 2 3)` elaborates to hermetic `cons` cells built at compile time by the elaborator, and the lambda has to walk them through the ordinary `CAR` and `CDR` builtins, proving that hand-built and builtin-built pairs are the same kind of value. The third exercises `funcall`, `#'`, and the function namespace together: `#'cons` resolves `CONS` as a function value without calling it, and `funcall` is what actually calls it.
 
-Everything that made this evaluator interesting was already implied by earlier steps' decisions &#x2014; `nil` as sole false value from L7, the two namespaces from L9, `#'` as its own reader node from L6. Step L11's job was mostly to stop deferring and make those decisions run.
+Everything that made this evaluator interesting was already implied by earlier steps' decisions, `nil` as sole false value from L7, the two namespaces from L9, `#'` as its own reader node from L6. Step L11's job was mostly to stop deferring and make those decisions run.
 
 <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
 

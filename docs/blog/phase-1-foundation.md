@@ -1,4 +1,4 @@
-<div class="abstract" id="orgbc0185f">
+<div class="abstract" id="orge52ee35">
 <p>
 Every structure in this compiler lives in compile-time memory. I establish the
 vocabulary types that make this possible: fixed-capacity vectors, a result monad,
@@ -26,7 +26,7 @@ Four vocabulary types carry the entire foundation: `result<T>` for error propaga
 
 ## result\\<T\\>
 
-The parsing pipeline can fail — mismatched parentheses, unexpected end of input, unrecognised token forms. I need a type that represents either a successful value or a parse error, and that I can return from `constexpr` functions without exceptions.
+The parsing pipeline can fail: mismatched parentheses, unexpected end of input, unrecognised token forms. I need a type that represents either a successful value or a parse error, and that I can return from `constexpr` functions without exceptions.
 
 ```c++
 // src/smd/smdscheme/foundation/result.hpp
@@ -45,14 +45,14 @@ class result {
 };
 ```
 
-`result<T>` is a thin wrapper over `std::variant`. A `parse_error` carries a `source_pos` — line and column — and a static string literal naming what was expected. Because `message` is a pointer to a string literal, the struct holds no owned memory and is trivially copyable across evaluation boundaries.
+`result<T>` is a thin wrapper over `std::variant`. A `parse_error` carries a `source_pos` (line and column) and a static string literal naming what was expected. Because `message` is a pointer to a string literal, the struct holds no owned memory and is trivially copyable across evaluation boundaries.
 
 I deliberately chose this narrow design over `std::expected` (cppreference.com, 2024). `std::expected`'s richer monadic interface is appealing, but `result<T>` only needs the two constructors and three accessors that the parsing pipeline actually calls. The smaller surface keeps cognitive load low.
 
 
 ## static\_vector\\<T, Capacity\\>
 
-Every collection in the compiler has a known maximum size at compile time. A `std::vector` would require heap allocation that persists beyond the evaluation — illegal in `constexpr`. Instead I use a fixed-capacity inline vector:
+Every collection in the compiler has a known maximum size at compile time. A `std::vector` would require heap allocation that persists beyond the evaluation, which is illegal in `constexpr`. Instead I use a fixed-capacity inline vector:
 
 ```c++
 // src/smd/smdscheme/foundation/static_vector.hpp
@@ -68,7 +68,7 @@ class static_vector {
 };
 ```
 
-The entire vector lives in the `std::array` member — no heap, no dynamic allocation. Because all storage is inline, instances can be returned by value from `constexpr` functions and verified with `static_assert`:
+The entire vector lives in the `std::array` member: no heap, no dynamic allocation. Because all storage is inline, instances can be returned by value from `constexpr` functions and verified with `static_assert`:
 
 ```c++
 // src/smd/smdscheme/foundation/static_vector.test.cpp
@@ -89,7 +89,7 @@ The capacity is a compile-time constant and pushing beyond it is a precondition 
 
 ## tree\_arena and arena\_box
 
-The reader produces a recursive tree — lists that contain atoms and other lists. Representing recursion in `constexpr` without persistent heap allocation requires indirection that does not use heap pointers.
+The reader produces a recursive tree of lists that contain atoms and other lists. Representing recursion in `constexpr` without persistent heap allocation requires indirection that doesn't use heap pointers.
 
 The solution is an arena-and-handle pattern:
 
@@ -116,9 +116,9 @@ struct tree_arena {
 };
 ```
 
-A `tree_arena<Datum, 1024>` holds up to 1024 datum nodes in a contiguous `static_vector`. An `arena_box<Datum>` is just an integer — the index of a node in the arena. Recursive structures embed `arena_box` handles instead of pointers. The entire tree lives in one flat array, and a datum node's children are adjacent integer offsets rather than scattered heap addresses.
+A `tree_arena<Datum, 1024>` holds up to 1024 datum nodes in a contiguous `static_vector`. An `arena_box<Datum>` is just an integer, the index of a node in the arena. Recursive structures embed `arena_box` handles instead of pointers. The entire tree lives in one flat array, and a datum node's children are adjacent integer offsets rather than scattered heap addresses.
 
-This pattern is sometimes called region-based memory management (Wikipedia, 2024). The compile-time variant works because the arena itself is a `static_vector` — inline storage that the constant evaluator can reason about without tracing heap pointers.
+This pattern is sometimes called region-based memory management (Wikipedia, 2024). The compile-time variant works because the arena itself is a `static_vector`, inline storage that the constant evaluator can reason about without tracing heap pointers.
 
 The null handle has `id_ == -1` and converts to `false`, matching the conventional nullable-pointer idiom.
 
@@ -161,9 +161,9 @@ constexpr auto make_box(Args &&...args) -> Box<A> {
 
 ## The Constexpr Allocation Model
 
-The key invariant that makes `Box<A>` legal in `constexpr` contexts is **transient allocation**. C++20 extended constant evaluation to permit dynamic allocation so long as every `new` within a constant evaluation is matched by a corresponding `delete` before the evaluation returns. Allocation that escapes — a heap pointer surviving in the result — remains illegal.
+The key invariant that makes `Box<A>` legal in `constexpr` contexts is **transient allocation**. C++20 extended constant evaluation to permit dynamic allocation so long as every `new` within a constant evaluation is matched by a corresponding `delete` before the evaluation returns. Allocation that escapes (a heap pointer surviving in the result) remains illegal.
 
-In SchemePoC the intermediate `Fix<CompF>` tree is built from `Box`-bearing nodes and fully consumed by the evaluator. The evaluator's result type, `result<value>`, contains only scalar fields — numbers, booleans, and environment handles — with no heap pointers. When the evaluation completes, the `Fix<CompF>` tree falls out of scope, its `Box` destructors run, every `new` is matched by a `delete`, and the result escapes cleanly.
+In SchemePoC the intermediate `Fix<CompF>` tree is built from `Box`-bearing nodes and fully consumed by the evaluator. The evaluator's result type, `result<value>`, contains only scalar fields (numbers, booleans, and environment handles) with no heap pointers. When the evaluation completes, the `Fix<CompF>` tree falls out of scope, its `Box` destructors run, every `new` is matched by a `delete`, and the result escapes cleanly.
 
 This is why `Box<A>` works: the allocation is real but temporary. The compiler tracks it, verifies the cleanup, and accepts the result as a compile-time constant.
 

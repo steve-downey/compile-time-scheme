@@ -1,4 +1,4 @@
-<div class="abstract" id="org28e791c">
+<div class="abstract" id="org7b9b1c5">
 <p>
 A catamorphism folds every child before the algebra sees the result. But
 Scheme's <code>if</code> must choose a branch before evaluating it, and lambda
@@ -37,7 +37,7 @@ The key word is **all**. `fmap` transforms every child before the algebra sees a
 
 This is the right tool for evaluating arithmetic expressions. Given a tree representing `(+ (* 3 4) 2)`, a fold evaluates `(* 3 4)` to `12`, evaluates `2` to `2`, and then passes both results to the `+` algebra. The algebra has nothing more to do; all the work happened in the fold.
 
-For Scheme, this does not work.
+For Scheme, this doesn't work.
 
 
 ## Why Folds Fail for Scheme
@@ -47,14 +47,14 @@ For Scheme, this does not work.
 
 Consider `(if #f (error!) 42)`. The correct result is `42`. A fold evaluates both `(error!)` and `42` before the algebra for `if` gets to run. There is no way to short-circuit. The branch not taken is evaluated unconditionally.
 
-Lazy evaluation — deciding based on the condition, then evaluating only the chosen branch — cannot be expressed as a fold. The fold structure commits to evaluating every child.
+Lazy evaluation (deciding based on the condition, then evaluating only the chosen branch) cannot be expressed as a fold. The fold structure commits to evaluating every child.
 
 
 ### Lambda Application
 
 Consider `(let ((x 10)) x)`, which desugars to `((lambda (x) x) 10)`. The body `x` must be evaluated in an environment where `x` is bound to `10`. But the fold evaluates the body **before** the algebra runs, in whatever environment the fold was started with. The argument `10` is also evaluated before the algebra runs.
 
-When the algebra for `comp_apply` finally executes, it has pre-evaluated children — a closure and an integer — but it cannot go back and re-evaluate the body in the extended environment. The evaluation order is fixed by the fold.
+When the algebra for `comp_apply` finally executes, it has pre-evaluated children, a closure and an integer, but it cannot go back and re-evaluate the body in the extended environment. The evaluation order is fixed by the fold.
 
 The same problem appears with the lambda itself: a fold would try to recurse into the body immediately. But a lambda should not evaluate its body; it should capture the current environment and defer body evaluation until the lambda is applied.
 
@@ -75,7 +75,7 @@ alg : (∀ B. (B → A) → F<B> → A)
 
 In practice this means the algebra receives a `recurse` function alongside each layer. It can call `recurse` on any child, in any order, with any arguments it chooses. It can decline to call `recurse` on a child at all.
 
-This breaks the uniformity constraint that makes folds tractable — and breaks it in exactly the right direction for an interpreter that needs environment threading and lazy branching.
+This breaks the uniformity constraint that makes folds tractable, and breaks it in exactly the right direction for an interpreter that needs environment threading and lazy branching.
 
 
 ## The Generic Combinators
@@ -97,7 +97,7 @@ constexpr auto mendler_fold(Algebra const &alg, Ctx const &ctx,
 }
 ```
 
-The algebra receives `recurse` — an opaque function it can call selectively — plus the current context and the unwrapped functor layer. It decides when, whether, and with what context to recurse on each child.
+The algebra receives `recurse`, an opaque function it can call selectively, plus the current context and the unwrapped functor layer. It decides when, whether, and with what context to recurse on each child.
 
 `mendler_para` is the Mendler-style paramorphism: it additionally passes the original `Fix<F>` node to the algebra, enabling cases that need the whole recursive structure (such as creating closures that point into the tree):
 
@@ -182,7 +182,7 @@ Variable lookup delegates entirely to `env`. If the name is unbound, `env.lookup
 },
 ```
 
-This is where the Mendler structure pays off. The algebra calls `recurse` on the condition first. Then exactly one of `cons` or `alt` is recursed into — the other is never touched. Any fold over this node would force both branches first.
+This is where the Mendler structure matters. The algebra calls `recurse` on the condition first. Then exactly one of `cons` or `alt` is recursed into; the other is never touched. Any fold over this node would force both branches first.
 
 The truthiness rule follows Scheme: anything other than `#f` is truthy.
 
@@ -198,7 +198,7 @@ The truthiness rule follows Scheme: anything other than `#f` is truthy.
 },
 ```
 
-A `lambda` expression does not evaluate its body. It captures the current environment in a `constexpr_box` and bundles it with a non-owning pointer to the `Comp` node itself. No recursion happens here. The `node` reference comes from `mendler_para`'s paramorphism — this is why we use `mendler_para` rather than plain `mendler_fold`.
+A `lambda` expression does not evaluate its body. It captures the current environment in a `constexpr_box` and bundles it with a non-owning pointer to the `Comp` node itself. No recursion happens here. The `node` reference comes from `mendler_para`'s paramorphism. This is why we use `mendler_para` rather than plain `mendler_fold`.
 
 
 ### `comp_apply` with a Builtin
@@ -248,14 +248,14 @@ The function is evaluated first, revealing it is a builtin. Arguments are then e
 },
 ```
 
-This is the core of lexical scoping. Arguments evaluate in `env` — the call-site environment. Then `new_env` starts from the closure's captured environment and is extended with the argument bindings. The body evaluates in `new_env`.
+This is the core of lexical scoping. Arguments evaluate in `env`, the call-site environment. Then `new_env` starts from the closure's captured environment and is extended with the argument bindings. The body evaluates in `new_env`.
 
 The two environments serve different roles: `env` is where the caller lives; `new_env` is where the callee lives. Confusing them would be dynamic scoping.
 
 
 ## The Reader Monad Pattern
 
-The signature `mendler_run(comp, env) → result<value>` is a Reader monad computation: `Reader Env (Result Value)`. The environment threads explicitly through every call to `recurse`. There is no mutable global environment, no stack of frames pushed and popped implicitly. Each call site passes the environment it wants the callee to use — the `Ctx` parameter of `mendler_para` is exactly this threaded reader context.
+The signature `mendler_run(comp, env) → result<value>` is a Reader monad computation: `Reader Env (Result Value)`. The environment threads explicitly through every call to `recurse`. There is no mutable global environment, no stack of frames pushed and popped implicitly. Each call site passes the environment it wants the callee to use. The `Ctx` parameter of `mendler_para` is exactly this threaded reader context.
 
 Lambda application is the only site that extends the environment. Every other call to `recurse` passes `env` unchanged. This makes the scoping rules visible in the algebra: find the `new_env` construction and you have found the only place where new names enter scope.
 

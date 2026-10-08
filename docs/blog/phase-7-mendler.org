@@ -53,7 +53,7 @@ representing ~(+ (* 3 4) 2)~, a fold evaluates ~(* 3 4)~ to ~12~,
 evaluates ~2~ to ~2~, and then passes both results to the ~+~ algebra. The
 algebra has nothing more to do; all the work happened in the fold.
 
-For Scheme, this does not work.
+For Scheme, this doesn't work.
 
 ** Why Folds Fail for Scheme
 
@@ -64,8 +64,8 @@ evaluates both ~(error!)~ and ~42~ before the algebra for ~if~ gets to run.
 There is no way to short-circuit. The branch not taken is evaluated
 unconditionally.
 
-Lazy evaluation — deciding based on the condition, then evaluating only the
-chosen branch — cannot be expressed as a fold. The fold structure
+Lazy evaluation (deciding based on the condition, then evaluating only the
+chosen branch) cannot be expressed as a fold. The fold structure
 commits to evaluating every child.
 
 *** Lambda Application
@@ -77,7 +77,7 @@ environment the fold was started with. The argument ~10~ is also evaluated
 before the algebra runs.
 
 When the algebra for ~comp_apply~ finally executes, it has pre-evaluated
-children — a closure and an integer — but it cannot go back and re-evaluate
+children, a closure and an integer, but it cannot go back and re-evaluate
 the body in the extended environment. The evaluation order is fixed by the
 fold.
 
@@ -106,7 +106,7 @@ In practice this means the algebra receives a ~recurse~ function alongside
 each layer. It can call ~recurse~ on any child, in any order, with any
 arguments it chooses. It can decline to call ~recurse~ on a child at all.
 
-This breaks the uniformity constraint that makes folds tractable —
+This breaks the uniformity constraint that makes folds tractable,
 and breaks it in exactly the right direction for an interpreter that needs
 environment threading and lazy branching.
 
@@ -131,7 +131,7 @@ constexpr auto mendler_fold(Algebra const &alg, Ctx const &ctx,
 }
 #+end_src
 
-The algebra receives ~recurse~ — an opaque function it can call selectively —
+The algebra receives ~recurse~, an opaque function it can call selectively,
 plus the current context and the unwrapped functor layer. It decides when,
 whether, and with what context to recurse on each child.
 
@@ -231,9 +231,9 @@ Variable lookup delegates entirely to ~env~. If the name is unbound,
 },
 #+end_src
 
-This is where the Mendler structure pays off. The algebra calls ~recurse~
+This is where the Mendler structure matters. The algebra calls ~recurse~
 on the condition first. Then exactly one of ~cons~ or ~alt~ is recursed
-into — the other is never touched. Any fold over this node would
+into; the other is never touched. Any fold over this node would
 force both branches first.
 
 The truthiness rule follows Scheme: anything other than ~#f~ is truthy.
@@ -252,7 +252,7 @@ The truthiness rule follows Scheme: anything other than ~#f~ is truthy.
 A ~lambda~ expression does not evaluate its body. It captures the current
 environment in a ~constexpr_box~ and bundles it with a non-owning pointer to
 the ~Comp~ node itself. No recursion happens here. The ~node~ reference comes
-from ~mendler_para~'s paramorphism — this is why we use ~mendler_para~ rather
+from ~mendler_para~'s paramorphism. This is why we use ~mendler_para~ rather
 than plain ~mendler_fold~.
 
 *** ~comp_apply~ with a Builtin
@@ -303,7 +303,7 @@ operation is applied to the integer results.
 },
 #+end_src
 
-This is the core of lexical scoping. Arguments evaluate in ~env~ — the
+This is the core of lexical scoping. Arguments evaluate in ~env~, the
 call-site environment. Then ~new_env~ starts from the closure's captured
 environment and is extended with the argument bindings. The body evaluates
 in ~new_env~.
@@ -317,7 +317,7 @@ The signature ~mendler_run(comp, env) → result<value>~ is a Reader monad
 computation: ~Reader Env (Result Value)~. The environment threads explicitly
 through every call to ~recurse~. There is no mutable global environment, no
 stack of frames pushed and popped implicitly. Each call site passes the
-environment it wants the callee to use — the ~Ctx~ parameter of
+environment it wants the callee to use. The ~Ctx~ parameter of
 ~mendler_para~ is exactly this threaded reader context.
 
 Lambda application is the only site that extends the environment. Every other

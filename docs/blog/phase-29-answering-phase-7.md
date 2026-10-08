@@ -1,6 +1,6 @@
-**DRAFT &#x2014; pending author revision**
+**DRAFT &mdash; pending author revision**
 
-<div class="abstract" id="orgcd424fb">
+<div class="abstract" id="org92fa42a">
 <p>
 No step of the rebuild landed here.
 Phase 28 said evaluation is the one traversal in this pipeline that can't be a fold, and phase 7 of this same series evaluated <code>if</code> inside a fold, selectively, and shipped a post about it.
@@ -52,7 +52,7 @@ And the sentence still wasn't right even then, because it says what the machine 
 
 "Why Environment-Threading Breaks Catamorphisms" lists the two cases as lazy `if` and a body evaluated in the extended environment; both are answered here by `para` plus a machine. "Applicative Parallelism Preserved" is the one phase 28 already takes apart: its prediction that a CPS trampoline linearizes what `Fix<CompF>` preserved is true of a pointer tree and backwards on a column. What that post doesn't say is that the prediction has been sitting in `docs/` for four phases with nothing marking it as spent, which is the part that worries me more than the claim did.
 
-The document gets a status header saying not to plan `src/smd/cl/**` work from it. DIV-0016 gets a dated note recording the prediction as obsolete rather than pending, since the document carrying it doesn't say so itself. And R7's brief gets the decision instead of the inheritance: porting the pivot's Mendler sender interpreter is ruled out, and a `when_all` demonstration, if there's one to make, comes from an argument frame that forks. Scoped honestly, too. Left-to-right argument evaluation is the conforming order as soon as an argument can have effects (ANSI 3.1.2.1.2.3) (Steele, Guy L., 1990), so whatever R7 shows is either about the effect-free fragment or about visible graph structure, and never about evaluation order.
+The document gets a status header saying not to plan `src/smd/cl/**` work from it. DIV-0016 gets a dated note recording the prediction as obsolete rather than pending, since the document carrying it doesn't say so itself. And R7's brief gets the decision instead of the inheritance: porting the pivot's Mendler sender interpreter is ruled out, and a `when_all` demonstration, if there's one to make, comes from an argument frame that forks. The scope matters too. Left-to-right argument evaluation is the conforming order as soon as an argument can have effects (ANSI 3.1.2.1.2.3) (Steele, Guy L., 1990), so whatever R7 shows is either about the effect-free fragment or about visible graph structure, and never about evaluation order.
 
 
 # One invariant was two
@@ -144,7 +144,7 @@ The algebra receives its children through the branch's own child list, in that l
 
 The Foldable and Traversable instances are not in that position. They visit leaves in ascending index order, so `fold_map` under a monoid that doesn't commute, and the leftmost error of a `traverse` over the `result` applicative (McBride, Conor and Paterson, Ross, 2008), are answers about the layout as much as about the tree. R3 had already pinned the consequence in a test called `cata_and_fold_map_disagree_on_permuted_trees`: one shape laid out two ways, the fold through the child lists says 12 and the fold through the index order says 21, and both are correct. What was missing was the invariant having a name, so that a pass could say which one it was standing on.
 
-What moves is a diagnostic. No scheme's answer moves at all. A future builder that keeps I1 and drops I2 &#x2014; one emitting by level, or hash-consing shared subtrees &#x2014; leaves every scheme's result unchanged and silently changes which atom `lower_atoms` reports as the leftmost bad one. D15 gets a dated scope note for this: its claim that index order makes every pass a linear fold is too broad by one pass, and it's the pass that carries the diagnostics. The decision is unchanged. What was wrong is the reasoning underneath it, which licensed three passes with an argument that reaches two.
+What moves is a diagnostic. No scheme's answer moves at all. A future builder that keeps I1 and drops I2 &mdash; one emitting by level, or hash-consing shared subtrees &mdash; leaves every scheme's result unchanged and silently changes which atom `lower_atoms` reports as the leftmost bad one. D15 gets a dated scope note for this: its claim that index order makes every pass a linear fold is too broad by one pass, and it's the pass that carries the diagnostics. The decision is unchanged. What was wrong is the reasoning underneath it, which licensed three passes with an argument that reaches two.
 
 
 # The precondition nothing checked

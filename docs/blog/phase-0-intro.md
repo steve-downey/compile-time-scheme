@@ -1,9 +1,9 @@
-<div class="abstract" id="orge20d133">
+<div class="abstract" id="orga99507c">
 <p>
-I am building a Scheme-light compiler that parses, elaborates, and evaluates Lisp
+I'm building a Scheme-light compiler that parses, elaborates, and evaluates Lisp
 code entirely during C++26 compilation. This series documents each phase of that
 ascent: from zero-allocation parsers through fixpoint trees to Mendler-style
-evaluation — all inside the C++ constant evaluator.
+evaluation, all inside the C++ constant evaluator.
 </p>
 
 </div>
@@ -21,7 +21,7 @@ evaluation — all inside the C++ constant evaluator.
 
 > "Nobody climbs mountains for scientific reasons. Science is used to raise money for the expeditions, but you really climb for the hell of it." — Edmund Hillary
 
-This project is a proof of concept targeting C++26 on GCC16. It implements a fully staged compiler pipeline inside the C++ compile-time evaluation engine. I transform a source text string into a syntax tree, elaborate it into an abstract semantic core, build a fixpoint computation tree, and evaluate it — all strictly before the compiler ever emits a single byte of executable machine code.
+This project is a proof of concept targeting C++26 on GCC16. It implements a fully staged compiler pipeline inside the C++ compile-time evaluation engine. I transform a source text string into a syntax tree, elaborate it into an abstract semantic core, build a fixpoint computation tree, and evaluate it, all strictly before the compiler ever emits a single byte of executable machine code.
 
 Why? The connection between functional compilation and machine execution is deep (Steele, Guy L., 1977). Scheme's lambda calculus maps cleanly onto the abstract machines that execute it. Nobody needs a compile-time Scheme embedded in C++. I want to find out where C++'s boundaries actually are.
 
@@ -49,36 +49,36 @@ source string
       └─ sender_mendler_run (sender-structured, Beman Execution)
 ```
 
-The reader parses Scheme data into a raw datum tree without asking any semantic questions. The elaborator translates that tree into a typed core AST. A conversion step builds a `Fix<CompF>` heap-pointer computation tree — a recursively defined algebraic type using the fixpoint combinator. Two evaluators then interpret that tree: a synchronous Mendler-style interpreter that is fully `constexpr`, and a sender-based variant that structures evaluation as composable asynchronous operations using Beman Execution.
+The reader parses Scheme data into a raw datum tree without asking any semantic questions. The elaborator translates that tree into a typed core AST. A conversion step builds a `Fix<CompF>` heap-pointer computation tree, a recursively defined algebraic type using the fixpoint combinator. Two evaluators then interpret that tree: a synchronous Mendler-style interpreter that is fully `constexpr`, and a sender-based variant that structures evaluation as composable asynchronous operations using Beman Execution.
 
 
 # Phase-by-Phase Roadmap
 
-**Phase 1 — Foundation**: I establish the memory vocabulary: arenas, handle-based indirection, the `Box` type, and the fixpoint combinator `Fix`.
+**Phase 1: Foundation**: I establish the memory vocabulary: arenas, handle-based indirection, the `Box` type, and the fixpoint combinator `Fix`.
 
-**Phase 2 — Front End**: I build zero-allocation combinator parsers using immutable cursors that compose without allocating.
+**Phase 2: Front End**: I build zero-allocation combinator parsers using immutable cursors that compose without allocating.
 
-**Phase 3 — Reader**: I implement a reader that translates source text into a raw `Datum` tree, treating all input as nested shapes with no semantic judgement.
+**Phase 3: Reader**: I implement a reader that translates source text into a raw `Datum` tree, treating all input as nested shapes with no semantic judgement.
 
-**Phase 4 — Elaboration**: I implement the elaborator that classifies `Datum` nodes into a typed core AST covering `if`, `lambda`, `let`, `let*`, `define`, and `quote`.
+**Phase 4: Elaboration**: I implement the elaborator that classifies `Datum` nodes into a typed core AST covering `if`, `lambda`, `let`, `let*`, `define`, and `quote`.
 
-**Phase 5 — Fixpoint Trees**: I define `Fix<CompF>` — a heap-pointer computation tree built from open-recursive algebraic types — and the `core_to_comp` translation that bridges the arena-based core AST to the heap-based computation tree.
+**Phase 5: Fixpoint Trees**: I define `Fix<CompF>`, a heap-pointer computation tree built from open-recursive algebraic types, and the `core_to_comp` translation that bridges the arena-based core AST to the heap-based computation tree.
 
-**Phase 6 — Closures and Values**: I define the runtime value domain: numbers, booleans, closures, and the environments that bind names to values at evaluation time.
+**Phase 6: Closures and Values**: I define the runtime value domain: numbers, booleans, closures, and the environments that bind names to values at evaluation time.
 
-**Phase 7 — Mendler Interpretation**: I implement `mendler_run` using a genuine `mendler_para` combinator — a Mendler-style paramorphism over `Fix<CompF>` that gives the interpreter algebra explicit control over recursion. The interpreter is synchronous and fully `constexpr`-capable.
+**Phase 7: Mendler Interpretation**: I implement `mendler_run` using a genuine `mendler_para` combinator, a Mendler-style paramorphism over `Fix<CompF>` that gives the interpreter algebra explicit control over recursion. The interpreter is synchronous and fully `constexpr`-capable.
 
-**Phase 8 — Sender-Based Evaluation**: I implement `sender_mendler_run`, which rewrites evaluation as a graph of Beman Execution senders with `when_all` for argument-list parallelism.
+**Phase 8: Sender-Based Evaluation**: I implement `sender_mendler_run`, which rewrites evaluation as a graph of Beman Execution senders with `when_all` for argument-list parallelism.
 
-**Phase 9 — Visualizing Execution**: I use C++26 reflection to walk the nested sender type structure at compile time and emit Graphviz DOT output of the execution graph.
+**Phase 9: Visualizing Execution**: I use C++26 reflection to walk the nested sender type structure at compile time and emit Graphviz DOT output of the execution graph.
 
-**Phase 10 — Constexpr Pipeline**: I wire all phases together into a single `constexpr` pipeline and demonstrate evaluation results baked into the binary.
+**Phase 10: Constexpr Pipeline**: I wire all phases together into a single `constexpr` pipeline and demonstrate evaluation results baked into the binary.
 
-**Phase 11 — Real World Integration**: I show how to embed the compiler in a real C++ program: pre-compiled closures, runtime environment injection, and FFI callbacks.
+**Phase 11: Real World Integration**: I show how to embed the compiler in a real C++ program: pre-compiled closures, runtime environment injection, and FFI callbacks.
 
-**Phase 12 — CPS**: I explore Continuation-Passing Style as an alternative backend for the closure evaluator.
+**Phase 12: CPS**: I explore Continuation-Passing Style as an alternative backend for the closure evaluator.
 
-**Phase 13 — Conclusion**: I reflect on what the climb taught me about C++26 `constexpr` limits, fixpoint types, and the Mendler recursion scheme.
+**Phase 13: Conclusion**: I reflect on what the climb taught me about C++26 `constexpr` limits, fixpoint types, and the Mendler recursion scheme.
 
 <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
 

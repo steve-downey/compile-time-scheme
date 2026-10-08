@@ -1,10 +1,10 @@
-**DRAFT &#x2014; pending author revision**
+**DRAFT &mdash; pending author revision**
 
-<div class="abstract" id="org2a7139d">
+<div class="abstract" id="org7042a21">
 <p>
-Step L12 gave <code>smdlisp</code> a way to mutate a variable, define a function, and declare a special one &#x2014; <code>setq</code>, <code>defun</code>, <code>defvar</code>, <code>defparameter</code> &#x2014; on the direct evaluator, by adapting the store from Phase 14 almost unchanged.
+Step L12 gave <code>smdlisp</code> a way to mutate a variable, define a function, and declare a special one, <code>setq</code>, <code>defun</code>, <code>defvar</code>, <code>defparameter</code>, on the direct evaluator, by adapting the store from Phase 14 almost unchanged.
 Step L13, which this post actually documents (the docs lag the code by one step, as usual), rebuilt the same fifteen core forms as a continuation-passing evaluator and proved the two agree on every program that matters.
-Along the way, building a one-argument <code>compile_to_closure</code> &#x2014; the same shape the Scheme backend already has &#x2014; turned up the same dangling-pointer knife-edge Phase 14 warned about, one layer further up the stack.
+Along the way, building a one-argument <code>compile_to_closure</code>, the same shape the Scheme backend already has, turned up the same dangling-pointer knife-edge Phase 14 warned about, one layer further up the stack.
 </p>
 
 </div>
@@ -22,14 +22,14 @@ Along the way, building a one-argument <code>compile_to_closure</code> &#x2014; 
 
 Scheme's `set!` has nothing useful to hand back. There is no value to return, so the Scheme evaluator invented one: an `unspecified` alternative, added to the value variant in Phase 14 for exactly this purpose. ANSI Common Lisp disagrees with that design on both counts it touches.
 
-`setq` returns the value it just assigned, and it takes any number of name/value pairs, assigned left to right, yielding the value of the last one. There is no `unspecified` kind anywhere in `smdlisp`'s value variant &#x2014; adding one only to satisfy a form that does not need it would have been inventing a problem to match the old solution. `defun`, `defvar`, and `defparameter` go the other way: all three return the **name** they just bound, never the value. `(defun f (x) x)` evaluates to the symbol `F`, not to a closure.
+`setq` returns the value it just assigned, and it takes any number of name/value pairs, assigned left to right, yielding the value of the last one. There is no `unspecified` kind anywhere in `smdlisp`'s value variant; adding one only to satisfy a form that does not need it would have been inventing a problem to match the old solution. `defun`, `defvar`, and `defparameter` go the other way: all three return the **name** they just bound, never the value. `(defun f (x) x)` evaluates to the symbol `F`. It doesn't produce a closure.
 
-Both rules come straight from the spec, and both meant the store machinery from Phase 14 &#x2014; built for a language where mutation has no interesting return value &#x2014; had to be adapted, not reused as-is.
+Both rules come straight from the spec, and both meant the store from Phase 14, built for a language where mutation has no interesting return value, had to be adapted before reuse.
 
 
 # The store, again
 
-The mechanism underneath `setq` is the one Phase 14 already built: a flat array of mutable cells addressed by a stable integer, shared by pointer across every copy of the environment. `smdlisp`'s Lisp-2 environment (Phase 17) only ever needs this for the **variable** namespace &#x2014; redefining a function is already ordinary shadowing, no store required &#x2014; so only `values_` gets the store-backed treatment:
+The mechanism underneath `setq` is the one Phase 14 already built: a flat array of mutable cells addressed by a stable integer, shared by pointer across every copy of the environment. `smdlisp`'s Lisp-2 environment (Phase 17) only ever needs this for the **variable** namespace; redefining a function is ordinary shadowing and requires no store, so only `values_` gets the store-backed treatment:
 
 ```cpp
 template <typename Core, int MaxBindings>
@@ -50,14 +50,14 @@ constexpr auto env<Core, MaxBindings>::set_value(symbol name,
 }
 ```
 
-`set_value` is `const`, same as Phase 14's `assign`: it never touches the environment's own binding list, only the cell the store pointer names, so an evaluator holding an environment by reference can still mutate through it. An unbound name is a diagnosed error, not an implicit definition &#x2014; ANSI CL's rule, and the same one Scheme already enforced.
+`set_value` is `const`, same as Phase 14's `assign`: it never touches the environment's own binding list, only the cell the store pointer names, so an evaluator holding an environment by reference can still mutate through it. An unbound name is a diagnosed error, not an implicit definition, ANSI CL's rule, and the same one Scheme already enforced.
 
 
 # Everything routes through one mutable reference
 
 The store answers "how does a write survive a copy of the environment." It does not answer a second, related question: how does `(progn (defun f (x) x) (f 1))` see the `defun` from inside the same `progn`?
 
-The answer this step settled on is that the environment is threaded as a mutable reference through the whole evaluation, not copied at each step. `defun` mutates it in place; every later sibling in the same `progn`, or the same lambda body, evaluates against that same object and sees the mutation. Nothing here is specific to the direct evaluator &#x2014; it has to hold under CPS too, since `core_progn`'s continuation-passing form evaluates each expression but the last purely for effect, discards the value, and only tail-passes the continuation on the final one:
+This step threads the environment as a mutable reference through the whole evaluation instead of copying it at each step. `defun` mutates it in place; every later sibling in the same `progn`, or the same lambda body, evaluates against that same object and sees the mutation. Nothing here is specific to the direct evaluator; it has to hold under CPS too, since `core_progn`'s continuation-passing form evaluates each expression but the last purely for effect, discards the value, and only tail-passes the continuation on the final one:
 
 ```cpp
 [&](elaborator::core_progn<Core, MaxNodes, MaxList> const &cp)
@@ -84,7 +84,7 @@ This is exactly Scheme's `begin` from Phase 14, ported over unchanged in shape. 
 
 # setq under continuation-passing style
 
-The direct evaluator can just `return last` after its assignment loop. A continuation-passing evaluator cannot &#x2013; there is no `return` that means anything outside the current continuation, so the assigned value has to be handed to `cont` and `k` like every other node's result:
+The direct evaluator can just `return last` after its assignment loop. A continuation-passing evaluator cannot: there is no `return` that means anything outside the current continuation, so the assigned value has to be handed to `cont` and `k` like every other node's result:
 
 ```cpp
 [&](elaborator::core_setq<Core, MaxNodes, MaxList> const &sq)
@@ -142,7 +142,7 @@ The direct evaluator can just `return last` after its assignment loop. A continu
 },
 ```
 
-`defvar` and `defparameter` share one node, distinguished by a flag: `defvar` initializes only if the name is not already bound, `defparameter` always does. Both mark the name special &#x2014; the mark is recorded now and does nothing yet, since dynamic-binding behavior for special variables is a later step's problem:
+`defvar` and `defparameter` share one node, distinguished by a flag: `defvar` initializes only if the name is not already bound, `defparameter` always does. Both mark the name special; the mark is recorded now and does nothing yet, since dynamic-binding behavior for special variables is a later step's problem:
 
 ```cpp
 [&](elaborator::core_defvar<Core, MaxNodes> const &dv) -> Res {
@@ -193,14 +193,14 @@ Phase 14 ended with a warning about a pointer that only survives one evaluation,
 
 The Scheme backend's `compile_to_closure` takes one argument, a source string, and hands back a fully self-contained, callable value. I wanted the same thing here, and wrote it that way first: read, elaborate, and compile CPS, with the datum arena a local variable discarded on return. GCC's constexpr evaluator refused to build the test that actually uses a lambda parameter, pointing straight at that local: *accessing 'arena\_dr' outside its lifetime*.
 
-The core arena is fine to return by value &#x2014; it is index-addressed, not pointer-based, so copying it just copies integers that still mean the same thing afterward. The problem is that `smdlisp`'s elaborated core nodes &#x2013; a lambda's parameter names, a `setq`'s targets, a `defun`'s or `defvar`'s name &#x2013; hold plain `string_view~s into the *datum* arena's storage, not owned copies. Discard the datum arena and every one of those views points at nothing. It is the identical bug Phase 17 hit for a bare root symbol, one layer further from the root: that fix made ~core_symbol` and `core_keyword` own their spelling; this one still doesn't reach a name that is merely a list element rather than the whole program.
+The core arena is fine to return by value; it is index-addressed, not pointer-based, so copying it just copies integers that still mean the same thing afterward. The problem is that `smdlisp`'s elaborated core nodes, a lambda's parameter names, a `setq`'s targets, a `defun`'s or `defvar`'s name, hold plain `string_view~s into the *datum* arena's storage. They don't own copies. Discard the datum arena and every one of those views points at nothing. It is the identical bug Phase 17 hit for a bare root symbol, one layer further from the root: that fix made ~core_symbol` and `core_keyword` own their spelling; this one still doesn't reach a name that is merely a list element rather than the whole program.
 
-The fix was not to chase the bug into the elaborator &#x2013; out of scope for this step &#x2013; but to stop pretending the datum arena can be discarded at all. `compile_to_closure` now takes it as a caller-owned reference, the same discipline the pair heap, the store, and the closure-capture arena already use everywhere else in `smdlisp`. Recorded as DIV-0007. It is a worse API than the Scheme original's, and it is correct.
+The fix was not to chase the bug into the elaborator, out of scope for this step, but to stop pretending the datum arena can be discarded at all. `compile_to_closure` now takes it as a caller-owned reference, the same discipline the pair heap, the store, and the closure-capture arena already use everywhere else in `smdlisp`. Recorded as DIV-0007. It is a worse API than the Scheme original's, and it is correct.
 
 
 # What's still deferred
 
-`defvar`'s special mark does nothing observable yet; step L16 owes it real dynamic-binding semantics. And the CPS backend, like the direct evaluator before it, still has no story for a program that outlives the run that compiled it &#x2013; the knife-edge is marked, not resolved, for the second time in this series.
+`defvar`'s special mark does nothing observable yet; step L16 owes it real dynamic-binding semantics. And the CPS backend, like the direct evaluator before it, still has no story for a program that outlives the run that compiled it. The knife-edge is marked, not resolved, for the second time in this series.
 
 <nav style="margin-top: 3em; border-top: 1px solid #ccc; padding-top: 1em">
 

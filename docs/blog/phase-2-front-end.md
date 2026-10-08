@@ -1,7 +1,7 @@
-<div class="abstract" id="org406cced">
+<div class="abstract" id="org4c30703">
 <p>
 Parsing Scheme starts with an immutable cursor and a library of applicative
-combinators. No raw function pointers, no mutation, no heap — just composition.
+combinators. No raw function pointers, no mutation, no heap. Just composition.
 </p>
 
 </div>
@@ -19,7 +19,7 @@ combinators. No raw function pointers, no mutation, no heap — just composition
 
 Before I can elaborate, evaluate, or compile anything, I need to turn source text into a tree. The front end does that work: a cursor that tracks position without mutating, a result type that models success and failure, and a library of parser combinators that snap together like LEGO.
 
-The entire parser is `constexpr`. No allocation escapes. Everything composes from the same handful of primitive forms — `pure`, `satisfy`, `map`, `lift2`, and `operator|`.
+The entire parser is `constexpr`. No allocation escapes. Everything composes from the same handful of primitive forms: `pure`, `satisfy`, `map`, `lift2`, and `operator|`.
 
 
 ## The Immutable Cursor
@@ -57,7 +57,7 @@ class cursor {
 };
 ```
 
-`peek()` reads the next character without consuming it. `bump()` returns a brand-new cursor with one character removed from the front and the position updated. Neither mutates anything. Backtracking is free: to "go back," a parser discards the advanced cursor and uses the checkpoint it saved earlier — no undo stack, no state restoration.
+`peek()` reads the next character without consuming it. `bump()` returns a brand-new cursor with one character removed from the front and the position updated. Neither mutates anything. Backtracking is free: to "go back," a parser discards the advanced cursor and uses the checkpoint it saved earlier; there's no undo stack or state restoration.
 
 The position tracks line, column, and absolute byte offset. The offset is the critical field for the alternative combinator: it detects whether a parser consumed any input before failing.
 
@@ -96,12 +96,12 @@ constexpr auto skip_intertoken_space(cursor cur) -> cursor {
 }
 ```
 
-`is_initial_symbol_char` and `is_symbol_char` encode Scheme's two-phase symbol alphabet: the initial character must be a letter or operator symbol, but subsequent characters can also include digits. `is_delimiter` detects token boundaries without consuming them. `skip_intertoken_space` is a plain loop — no parser abstraction needed for something this simple.
+`is_initial_symbol_char` and `is_symbol_char` encode Scheme's two-phase symbol alphabet: the initial character must be a letter or operator symbol, but subsequent characters can also include digits. `is_delimiter` detects token boundaries without consuming them. `skip_intertoken_space` is a plain loop. Something this simple doesn't need a parser abstraction.
 
 
 ## Parser Objects
 
-Every parser is a callable that takes a `cursor` and returns a `parse_result<T>`. The `parse_result<T>` is an alias for `foundation::result<parse_state<T>>` — either a value plus the remaining cursor, or a `parse_error` with position and message:
+Every parser is a callable that takes a `cursor` and returns a `parse_result<T>`. The `parse_result<T>` is an alias for `foundation::result<parse_state<T>>`: either a value plus the remaining cursor, or a `parse_error` with position and message:
 
 ```c++
 // src/smd/smdscheme/parser/parser.hpp
@@ -132,7 +132,7 @@ template <class F>
 parser(F) -> parser<F>;
 ```
 
-The class is intentionally thin. It stores `F` by value (critical for `constexpr` — lambda addresses are unavailable at compile time), exposes `operator()(cursor)`, and satisfies the `parser_like` concept. The CTAD guide means `parser{lambda}` works without spelling out `F`.
+The class is intentionally thin. It stores `F` by value (critical for `constexpr`, because lambda addresses are unavailable at compile time), exposes `operator()(cursor)`, and satisfies the `parser_like` concept. The CTAD guide means `parser{lambda}` works without spelling out `F`.
 
 
 ## Primitive Parsers
@@ -220,7 +220,7 @@ template <parser_like PA, parser_like PB, class F>
 }
 ```
 
-`pb` runs starting at `ra.value().rest` — the two parsers are strictly ordered and together consume the concatenation of their individual inputs. The degenerate cases `sequence_left` and `sequence_right` drop one of the two values:
+`pb` runs starting at `ra.value().rest`; the two parsers are strictly ordered and together consume the concatenation of their individual inputs. The degenerate cases `sequence_left` and `sequence_right` drop one of the two values:
 
 ```c++
 // src/smd/smdscheme/parser/parser.hpp
@@ -263,7 +263,7 @@ If `pa` consumed at least one character before failing, the offset advanced past
 
 ## Repetition: `many` and `some`
 
-Repeating a parser zero or more times requires a fixed-capacity container — dynamic allocation is unavailable in `constexpr`. `many` collects results into the `foundation::static_vector` introduced in Phase 1:
+Repeating a parser zero or more times requires a fixed-capacity container because dynamic allocation is unavailable in `constexpr`. `many` collects results into the `foundation::static_vector` introduced in Phase 1:
 
 ```c++
 // src/smd/smdscheme/parser/alt.hpp
@@ -285,7 +285,7 @@ template <int Capacity, parser_like P>
 }
 ```
 
-`many<Capacity>(p)` loops until `p` fails or the vector is full, always succeeding (zero matches is a valid result). `some<Capacity>(p)` requires at least one match and propagates the error if `p` immediately fails. The `Capacity` is a non-type template parameter — the compiler must know the maximum repetitions at compile time.
+`many<Capacity>(p)` loops until `p` fails or the vector is full, always succeeding (zero matches is a valid result). `some<Capacity>(p)` requires at least one match and propagates the error if `p` immediately fails. The `Capacity` is a non-type template parameter; the compiler must know the maximum repetitions at compile time.
 
 `lexeme(p)` strips surrounding inter-token whitespace before and after `p`:
 
@@ -310,7 +310,7 @@ This is the standard Parsec approach (Leijen, Daan and Meijer, Erik, 2001): make
 
 ## Compile-Time Specification
 
-The `static_assert` suite in the test file is not documentation — it is the machine-checked specification:
+The `static_assert` suite in the test file is not documentation. It is the machine-checked specification:
 
 ```c++
 static_assert(char_p('x')(cursor{"xyz"}).has_value());

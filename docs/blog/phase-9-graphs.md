@@ -1,4 +1,4 @@
-<div class="abstract" id="orgfc7c372">
+<div class="abstract" id="org4755dd0">
 <p>
 By lowering my Scheme AST into heavily typed <code>std::execution</code> Senders, I gained improved performance.
 Debugging it means reading thousands of lines of template backtraces.
@@ -153,7 +153,7 @@ consteval auto build_scheme_tree(std::meta::info sender_type,
 
 The traversal is straightforward: `template_arguments_of(sender_type)` yields `[Tag, Data, Child...]`, and each child at positions `[2+]` is recursed into directly.
 
-There is one subtlety, and it is a feature of P2996 rather than a bug. Reflections preserve alias structure: when the user writes `using S = decltype(sender_v::just(42))` and reflects `^^S`, the resulting `std::meta::info` is an alias-entity reflection, not a class template specialisation. `template_arguments_of` on an alias throws, because aliases do not have template arguments — the type they *denote* does. `std::meta::dealias` peels the alias layer off and returns the underlying class template specialisation, after which `template_arguments_of` succeeds.
+There is one subtlety, and it is a feature of P2996 rather than a bug. Reflections preserve alias structure: when the user writes `using S = decltype(sender_v::just(42))` and reflects `^^S`, the resulting `std::meta::info` is an alias-entity reflection, not a class template specialisation. `template_arguments_of` on an alias throws, because aliases don't have template arguments; the type they *denote* does. `std::meta::dealias` peels the alias layer off and returns the underlying class template specialisation, after which `template_arguments_of` succeeds.
 
 Classification has a parallel subtlety. The tag at `args[0]` may itself be a class template specialisation (e.g. `just_t<set_value_t>`) or a plain class (e.g. `when_all_t`). `has_template_arguments` distinguishes the two cases so we can call `template_of` + `identifier_of` when there is a primary template, and `identifier_of` directly when there is not.
 
@@ -162,7 +162,7 @@ Classification has a parallel subtlety. The tag at `args[0]` may itself be a cla
 
 Once I possess a homogeneous C++ tree, I turn once again to Category Theory to render the Graphviz dot-language diagram.
 
-Using the `Applicative` typeclass from the foundation—the same typeclass that drives the `lift2` and sequencing combinators in Phase 2's parser library—I constructed a `string_writer` Applicative. The applicative and alternative interfaces allow me to map functionally over the returned string values. While the Graphviz mapping is currently driven through a simple indexing iteration, the types align allowing pure state accumulation.
+Using the `Applicative` typeclass from the foundation (the same typeclass that drives the `lift2` and sequencing combinators in Phase 2's parser library), I constructed a `string_writer` Applicative. The applicative and alternative interfaces allow me to map functionally over the returned string values. While the Graphviz mapping is currently driven through a simple indexing iteration, the types align allowing pure state accumulation.
 
 ```cpp
 /// Renders a @ref scheme_tree as a complete Graphviz DOT graph string.
@@ -215,12 +215,12 @@ void dump_scheme_plan(std::ostream &out = std::cout) {
 }
 ```
 
-The `dump_scheme_plan` function encapsulates the compile-time reflection traversal into a `constexpr` lambda, cleanly executing the heavy `meta` machinery strictly during translation.
+The `dump_scheme_plan` function encapsulates the compile-time reflection traversal in a `constexpr` lambda, doing the reflection work during translation.
 
 
 # Example Output
 
-Running `dump_scheme_plan` on the sender type for `(+ 1 2)` — a binary addition of two constants — produces:
+Running `dump_scheme_plan` on the sender type for `(+ 1 2)`, a binary addition of two constants, produces:
 
 ```
 digraph SchemeExecutionPlan {
@@ -237,9 +237,9 @@ digraph SchemeExecutionPlan {
 
 ![img](sender-graph-add.svg)
 
-The structure is legible: `then` applies the addition function to the result of `when_all`, which evaluates two `just` senders (the constants 1 and 2) in parallel. This is the sender equivalent of the Scheme expression tree — branching preserved, parallelism visible.
+The structure is legible: `then` applies the addition function to the result of `when_all`, which evaluates two `just` senders (the constants 1 and 2) in parallel. This is the sender equivalent of the Scheme expression tree: branching preserved, parallelism visible.
 
-For a more complex expression — `fib(3)`, which expands to `fib(2) + fib(1)` where `fib(2) = fib(1) + fib(0)`:
+For a more complex expression, `fib(3)`, which expands to `fib(2) + fib(1)` where `fib(2) = fib(1) + fib(0)`:
 
 ```
 digraph SchemeExecutionPlan {
